@@ -14,11 +14,13 @@ type CommercialPolicy = { id: string; careCategory?: string; marginRate: number;
   /** P1-10 (B-05): days a released final quote stays acceptable, and the exchange-rate move (0–1) beyond which Finance re-approves. */
   finalQuoteValidityDays?: number; fxToleranceRate?: number;
   /** P1-16 (D-E): a change order within the lower of this share (0–0.5) of the facility package and this EGP cap is Finance's alone. */
-  changeOrderBandRate?: number; changeOrderBandEgp?: number; active: boolean; version: number; validFrom?: string };
+  changeOrderBandRate?: number; changeOrderBandEgp?: number;
+  /** P1-17 (D-F): hours after the examination a fit to fly stays valid for a return flight (24–168). */
+  fitToFlyHours?: number; active: boolean; version: number; validFrom?: string };
 type DepositPolicy = { id: string; careCategory?: string; /** Share of the estimate, 0–1 (W-1). */ depositRate: number;
   /** P0-4: bounds in US dollars, null for none. */ minimumUsd?: number | null; maximumUsd?: number | null; active: boolean; version: number; validFrom?: string };
 type CareArea = { slug: string; nameEn: string; nameAr: string };
-type Pending = { kind: "margin" | "deposit"; area: string; value: number; minimumUsd?: number | null; maximumUsd?: number | null; manualBandEgp?: number | null; finalQuoteValidityDays?: number; fxTolerancePercent?: number; bandPercent?: number; bandEgp?: number; form: HTMLFormElement };
+type Pending = { kind: "margin" | "deposit"; area: string; value: number; minimumUsd?: number | null; maximumUsd?: number | null; manualBandEgp?: number | null; finalQuoteValidityDays?: number; fxTolerancePercent?: number; bandPercent?: number; bandEgp?: number; fitToFlyHours?: number; form: HTMLFormElement };
 
 /**
  * Commercial › Margin & Deposit — internal commercial configuration: the central margin and coordination-deposit policies.
@@ -64,7 +66,9 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
         // P1-10: every revision also states how long a final quote stands and how far the rate may move; both are prefilled, never silently reset.
         finalQuoteValidityDays: pending.finalQuoteValidityDays, fxToleranceRate: pending.fxTolerancePercent == null ? undefined : pending.fxTolerancePercent / 100,
         // P1-16: and the change-order band (both prefilled; left out, the backend carries the current values over).
-        changeOrderBandRate: pending.bandPercent == null ? undefined : pending.bandPercent / 100, changeOrderBandEgp: pending.bandEgp } });
+        changeOrderBandRate: pending.bandPercent == null ? undefined : pending.bandPercent / 100, changeOrderBandEgp: pending.bandEgp,
+        // P1-17: and the fit-to-fly window (prefilled; left out, the backend carries the current value over).
+        fitToFlyHours: pending.fitToFlyHours } });
       // P0-4: every revision states its bounds; an empty field is no bound, never "keep the old one".
       else await api("/finance/deposit-policies", { method: "PUT", body: { careCategory, depositRate: pending.value / 100, minimumUsd: pending.minimumUsd ?? null, maximumUsd: pending.maximumUsd ?? null } });
       pending.form.reset(); setPending(null); setNotice(ar ? "حُفظ إصدار جديد." : "New version saved."); await load();
@@ -83,13 +87,14 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   if (loadError) return shell(<ErrorNotice error={loadError} locale={locale} action="load" onRetry={() => void load()} />);
   const areaSelect = <Field label={ar ? "مجال الرعاية" : "Care area"}><select name="area"><option value="">{area()}</option>{careAreas.map((a) => <option key={a.slug} value={a.slug}>{ar ? a.nameAr : a.nameEn}</option>)}</select></Field>;
   const usd = (raw: FormDataEntryValue | null) => { const text = String(raw ?? "").trim(); return text === "" ? null : Number(text); };
-  const stage = (kind: Pending["kind"]) => (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const d = new FormData(e.currentTarget); setPending({ kind, area: String(d.get("area") || ""), value: Number(d.get("rate")) || 0, form: e.currentTarget, ...(kind === "deposit" ? { minimumUsd: usd(d.get("minimumUsd")), maximumUsd: usd(d.get("maximumUsd")) } : { manualBandEgp: usd(d.get("manualBandEgp")), finalQuoteValidityDays: Number(d.get("finalQuoteValidityDays")) || undefined, fxTolerancePercent: usd(d.get("fxTolerancePercent")) ?? undefined, bandPercent: usd(d.get("bandPercent")) ?? undefined, bandEgp: usd(d.get("bandEgp")) ?? undefined }) }); };
+  const stage = (kind: Pending["kind"]) => (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const d = new FormData(e.currentTarget); setPending({ kind, area: String(d.get("area") || ""), value: Number(d.get("rate")) || 0, form: e.currentTarget, ...(kind === "deposit" ? { minimumUsd: usd(d.get("minimumUsd")), maximumUsd: usd(d.get("maximumUsd")) } : { manualBandEgp: usd(d.get("manualBandEgp")), finalQuoteValidityDays: Number(d.get("finalQuoteValidityDays")) || undefined, fxTolerancePercent: usd(d.get("fxTolerancePercent")) ?? undefined, bandPercent: usd(d.get("bandPercent")) ?? undefined, bandEgp: usd(d.get("bandEgp")) ?? undefined, fitToFlyHours: usd(d.get("fitToFlyHours")) ?? undefined }) }); };
   const bounds = (min?: number | null, max?: number | null) => min == null && max == null ? (ar ? "بلا حد أدنى أو أقصى" : "No minimum or maximum")
     : `${min != null ? `${ar ? "الحد الأدنى" : "Minimum"} ${min} USD` : ""}${min != null && max != null ? " · " : ""}${max != null ? `${ar ? "الحد الأقصى" : "Maximum"} ${max} USD` : ""}`;
   const currentDefault = deposits.find((p) => p.active && !p.careCategory);
   const currentMargin = margins.find((p) => p.active && !p.careCategory);
   const validity = (days?: number, tolerance?: number) => days == null || tolerance == null ? ""
     : ar ? `العرض النهائي صالح ${days} يومًا · يراجع الفريق المالي سعر الصرف عند تغيّره بأكثر من ${(tolerance * 100).toFixed(2)}%` : `Final quote valid ${days} days · Finance re-approves a rate move beyond ${(tolerance * 100).toFixed(2)}%`;
+  const fitToFly = (hours?: number) => hours == null ? "" : ar ? `شهادة اللياقة للسفر صالحة ${hours} ساعة بعد الفحص` : `A fit to fly is valid ${hours} hours after the examination`;
   const changeBand = (rate?: number, cap?: number) => rate == null || cap == null ? ""
     : ar ? `أوامر التغيير حتى ${(rate * 100).toFixed(2)}% من الباقة أو ${cap} ج.م (أيهما أقل) تقررها المالية` : `Change orders up to ${(rate * 100).toFixed(2)}% of the package or EGP ${cap} (the lower) are Finance's to decide`;
   const band = (b?: number | null) => b == null ? (ar ? "كل بند يدوي يحتاج الفريق المالي" : "Every manual line needs Finance")
@@ -99,7 +104,7 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
     <SuccessNotice>{notice || null}</SuccessNotice>
     <ErrorNotice error={saveError} locale={locale} />
     <Section id="margin" title={ar ? "سياسة الهامش" : "Margin policy"} description={ar ? "يُدمج في سعر الباقة عند إنشاء التقدير المبدئي. يستخدم العرض النهائي الهامش نفسه المثبّت في التقدير المبدئي للحالة." : "Built into the package price when a preliminary estimate is created. The final quote reuses the margin locked in the case's preliminary estimate."}>
-      <ul className="cc-list">{margins.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.marginRate * 100).toFixed(2)}%</bdi> <span className="cc-meta">{band(p.manualBandEgp)}</span> <span className="cc-meta">{validity(p.finalQuoteValidityDays, p.fxToleranceRate)}</span> <span className="cc-meta">{changeBand(p.changeOrderBandRate, p.changeOrderBandEgp)}</span></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
+      <ul className="cc-list">{margins.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.marginRate * 100).toFixed(2)}%</bdi> <span className="cc-meta">{band(p.manualBandEgp)}</span> <span className="cc-meta">{validity(p.finalQuoteValidityDays, p.fxToleranceRate)}</span> <span className="cc-meta">{changeBand(p.changeOrderBandRate, p.changeOrderBandEgp)}</span> <span className="cc-meta">{fitToFly(p.fitToFlyHours)}</span></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
       {canEdit && <form className="cc-filterbar" onSubmit={stage("margin")} aria-label={ar ? "إصدار جديد من سياسة الهامش" : "New margin policy version"}>
         {areaSelect}
         <Field label={ar ? "الهامش %" : "Margin %"}><input name="rate" type="number" min="0" max="50" step="0.1" required dir="ltr" /></Field>
@@ -108,6 +113,7 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
         <Field label={ar ? "هامش تغيّر سعر الصرف (%)" : "Exchange-rate tolerance (%)"} hint={ar ? "إذا تحرّك سعر الصرف بأكثر من هذه النسبة عند قبول العرض النهائي، يوافق الفريق المالي من جديد قبل أن يقبل المريض." : "If the rate has moved by more than this when a final quote is accepted, Finance re-approves before the patient can accept."}><input name="fxTolerancePercent" type="number" min="0" max="50" step="0.1" required dir="ltr" defaultValue={currentMargin?.fxToleranceRate == null ? 3 : +(currentMargin.fxToleranceRate * 100).toFixed(2)} /></Field>
         <Field label={ar ? "نطاق أوامر التغيير (% من الباقة)" : "Change-order band (% of the package)"} hint={ar ? "أمر تغيير ضمن الأقل من هذه النسبة من باقة المنشأة والحد الأقصى أدناه تقرره المالية وحدها؛ وفوقه يقرر المريض. يُحسب تراكميًا لكل حالة." : "A change order within the lower of this share of the facility package and the cap below is Finance's alone; above it the patient decides. Counted cumulatively per case."}><input name="bandPercent" type="number" min="0" max="50" step="0.1" required dir="ltr" defaultValue={currentMargin?.changeOrderBandRate == null ? 10 : +(currentMargin.changeOrderBandRate * 100).toFixed(2)} /></Field>
         <Field label={ar ? "الحد الأقصى لنطاق أوامر التغيير (ج.م)" : "Change-order band cap (EGP)"}><input name="bandEgp" type="number" min="0" step="100" required dir="ltr" defaultValue={currentMargin?.changeOrderBandEgp ?? 15000} /></Field>
+        <Field label={ar ? "مدة صلاحية شهادة اللياقة للسفر (ساعات)" : "Fit-to-fly window (hours)"} hint={ar ? "تبقى شهادة اللياقة للسفر صالحة لرحلة العودة هذه المدة بعد فحص الاستشاري؛ لا تؤكد العمليات رحلة عودة بعدها." : "A fit to fly stays valid for the return flight this long after the Consultant's examination; Operations cannot confirm a flight after it."}><input name="fitToFlyHours" type="number" min="24" max="168" step="1" required dir="ltr" defaultValue={currentMargin?.fitToFlyHours ?? 72} /></Field>
         <button disabled={busy}>{ar ? "مراجعة الإصدار الجديد" : "Review new version"}</button>
       </form>}
     </Section>
@@ -123,7 +129,7 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
     </Section>
     {pending && <FocusTrapDialog label={ar ? "تأكيد الإصدار الجديد" : "Confirm new version"} onClose={busy ? () => undefined : () => setPending(null)}>
       <h2>{pending.kind === "margin" ? (ar ? "حفظ إصدار جديد من الهامش؟" : "Save a new margin version?") : (ar ? "حفظ إصدار جديد من دفعة التنسيق؟" : "Save a new coordination deposit version?")}</h2>
-      <p><strong>{area(pending.area || undefined)}</strong> · <bdi dir="ltr">{pending.value.toFixed(2)}%</bdi>{pending.kind === "deposit" ? (ar ? " من التقدير" : " of the estimate") : null}{pending.kind === "deposit" && <> · <bdi dir="ltr">{bounds(pending.minimumUsd, pending.maximumUsd)}</bdi></>}{pending.kind === "margin" && <> · {band(pending.manualBandEgp)} · {ar ? `صلاحية العرض النهائي ${pending.finalQuoteValidityDays} يومًا` : `final quote valid ${pending.finalQuoteValidityDays} days`} · {ar ? `هامش سعر الصرف ${pending.fxTolerancePercent}%` : `rate tolerance ${pending.fxTolerancePercent}%`}{pending.bandPercent != null && pending.bandEgp != null && <> · {changeBand(pending.bandPercent / 100, pending.bandEgp)}</>}</>}</p>
+      <p><strong>{area(pending.area || undefined)}</strong> · <bdi dir="ltr">{pending.value.toFixed(2)}%</bdi>{pending.kind === "deposit" ? (ar ? " من التقدير" : " of the estimate") : null}{pending.kind === "deposit" && <> · <bdi dir="ltr">{bounds(pending.minimumUsd, pending.maximumUsd)}</bdi></>}{pending.kind === "margin" && <> · {band(pending.manualBandEgp)} · {ar ? `صلاحية العرض النهائي ${pending.finalQuoteValidityDays} يومًا` : `final quote valid ${pending.finalQuoteValidityDays} days`} · {ar ? `هامش سعر الصرف ${pending.fxTolerancePercent}%` : `rate tolerance ${pending.fxTolerancePercent}%`}{pending.bandPercent != null && pending.bandEgp != null && <> · {changeBand(pending.bandPercent / 100, pending.bandEgp)}</>}{pending.fitToFlyHours != null && <> · {fitToFly(pending.fitToFlyHours)}</>}</>}</p>
       <ul className="cc-consequences">
         <li>{ar ? "يحل محل الإصدار الحالي لمجال الرعاية هذا فورًا." : "It replaces the current version for this care area immediately."}</li>
         <li>{pending.kind === "margin"

@@ -44,9 +44,11 @@ export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: strin
   /** P1-15: with "deposit-paid", the case is at an admission step (the stage follows it) and the patient admission API answers this view. */
   admission?: { code: "CONFIRM_ARRIVAL" | "PAY_BALANCE" | "WAIT_BALANCE_CHECK" | "CLEARED_FOR_ADMISSION"; view: Record<string, unknown> };
   /** P1-16: with "deposit-paid", the case is in treatment at this step; the patient treatment API answers `view`, and a decision answers `decided` (then read back). */
-  treatment?: { code: "IN_TREATMENT" | "REVIEW_CHANGE_ORDER"; view: Record<string, unknown>; decided?: Record<string, unknown> } };
+  treatment?: { code: "IN_TREATMENT" | "REVIEW_CHANGE_ORDER"; view: Record<string, unknown>; decided?: Record<string, unknown> };
+  /** P1-17: with "deposit-paid", the case is discharged (GOING_HOME) or in follow-up; the patient discharge and statements APIs answer these. */
+  discharge?: { code: "GOING_HOME" | "FOLLOW_UP"; view: Record<string, unknown>; statements: Record<string, unknown>[] } };
 
-export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, finalQuote, guardian, concerns = [], admission, treatment,
+export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, finalQuote, guardian, concerns = [], admission, treatment, discharge,
   documents = [{ documentId: "d1", fileName: "Echo_Report.pdf", status: "CLEAN", createdAt: "2026-09-01T09:00:00Z" }] }: PatientOptions = {}) {
   await page.addInitScript(({ authority }) => {
     sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({ access_token: "synthetic", token_type: "Bearer", scope: "openid",
@@ -58,7 +60,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
   // Before an estimate exists: no proposal, no deposit, and only the milestones reached so far.
   const early = scenario === "case-received" ? "RECEIVED" : scenario === "consultant-review" ? "CONSULTANT_REVIEW" : null;
   const caseSummary = early ? { ...summary, status: early, doctorName: early === "RECEIVED" ? null : summary.doctorName }
-    : ready ? { ...summary, status: "PATIENT_DECISION", waitingOn: "PATIENT" } : paid ? { ...summary, status: treatment ? "TREATMENT_IN_PROGRESS" : admissionStage(admission?.code) } : summary;
+    : ready ? { ...summary, status: "PATIENT_DECISION", waitingOn: "PATIENT" } : paid ? { ...summary, status: discharge ? (discharge.code === "GOING_HOME" ? "DISCHARGED" : "FOLLOW_UP") : treatment ? "TREATMENT_IN_PROGRESS" : admissionStage(admission?.code) } : summary;
   const milestones = { receivedAt: received, consultantReviewAt: early === "RECEIVED" ? null : consultantReview, estimateReadyAt: early ? null : stamp };
   const states = early
     ? { journeyStage: early, waitingOn: "STAFF", blockers: [], currentAction: { code: early === "RECEIVED" ? "WAIT_COORDINATOR_REVIEW" : "WAIT_CONSULTANT_REVIEW", kind: "WAIT", expectedWorkingDays: 2 }, availableActions: ["MESSAGE_COORDINATOR"] }
@@ -71,7 +73,8 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     ...(guardian ? { waitingOn: "PATIENT", currentAction: { code: "COMPLETE_PROFILE", kind: "FOCUS", blockerCode: guardian },
       blockers: [{ code: guardian, labelEn: "Guardian details required", labelAr: "مطلوب إدخال بيانات الوصي", owner: "PATIENT", gating: true }] } : {}),
     ...(admission ? { journeyStage: caseSummary.status, waitingOn: "PATIENT", currentAction: { code: admission.code, kind: ["CONFIRM_ARRIVAL", "PAY_BALANCE"].includes(admission.code) ? "FOCUS" : "WAIT" } } : {}),
-    ...(treatment ? { journeyStage: caseSummary.status, waitingOn: treatment.code === "REVIEW_CHANGE_ORDER" ? "PATIENT" : "STAFF", currentAction: { code: treatment.code, kind: treatment.code === "REVIEW_CHANGE_ORDER" ? "FOCUS" : "WAIT" } } : {}) };
+    ...(treatment ? { journeyStage: caseSummary.status, waitingOn: treatment.code === "REVIEW_CHANGE_ORDER" ? "PATIENT" : "STAFF", currentAction: { code: treatment.code, kind: treatment.code === "REVIEW_CHANGE_ORDER" ? "FOCUS" : "WAIT" } } : {}),
+    ...(discharge ? { journeyStage: caseSummary.status, waitingOn: "STAFF", currentAction: { code: discharge.code, kind: "WAIT" } } : {}) };
   const workspace = {
     caseSummary, timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: "2026-09-01T09:00:00Z" }, { type: "STATUS", label: caseSummary.status, status: caseSummary.status, occurredAt: stamp }],
     tasks: [], messages: [{ id: "m1", threadType: "PATIENT_COORDINATOR", senderRole: "COORDINATOR", senderName: "Sara Ahmed", direction: "INBOUND", body: "Welcome — I will send the deposit details shortly.", createdAt: stamp, internalOnly: false, read: false }],
@@ -149,6 +152,8 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (api === "/patient/cases/case-1/admission" && admission) return reply(admission.view);
     if (api === "/patient/cases/case-1/arrived" && admission) return route.fulfill({ status: 200, body: "" });
     if (api === "/patient/cases/case-1/treatment" && treatment) return reply(treatment.view);
+    if (api === "/patient/cases/case-1/discharge" && discharge) return reply(discharge.view);
+    if (api === "/patient/cases/case-1/statements" && discharge) return reply(discharge.statements);
     if (/^\/patient\/cases\/case-1\/change-orders\/[^/]+\/decision$/.test(api) && treatment) { if (treatment.decided) treatment.view = treatment.decided; return reply(treatment.view); }
     return reply({ message: `unstubbed ${api}` }, 404);
   });

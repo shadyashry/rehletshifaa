@@ -1392,6 +1392,80 @@ phases.
     platform fee figure. Templates `rs_discharge_pack_ready`, `rs_statement_ready` need Meta approval.
   - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `98958c3`) and rebuilds the dev backend for V101;
     then P1-17 session 2 (UI and copy, started in a new session; contract in the shared notes folder, `p1-17-session-1-handover.md`).
+- **Status (2026-10-16, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/p1-17-s2-discharge-ui`, cut from `423bbae`):** delivered,
+  frontend only (no wire gap blocked a screen). Amounts are shown exactly as the API returns them; the only sum in the browser is the
+  "lines entered: X of Y" input help on the reconciliation form (whole cents; the backend still checks `INVOICE_LINES_MISMATCH`). The
+  P1-15 money rule (deposit covers the platform fee first) is untouched and still awaits the owner.
+  - **Staff "Discharge" panel** (`DischargePanel`, after "Treatment" on the case page for Operations, the coordinator and the Consultant
+    while the case is `TREATMENT_IN_PROGRESS`, `DISCHARGED` or `FOLLOW_UP`, or for an open discharge item; reads
+    `GET /{role}/cases/{id}/discharge`): what still blocks discharge, in words (the seven blocker codes), with "discharge happens on its
+    own … there is no discharge button" instead of a button; the pack in the backend's order with each item's state (recorded / missing /
+    not needed / before a return flight) and its facts (diagnosis, procedures, pending results, warning signs, medicines, implants, note;
+    null for Finance), the fit to fly's examination time and "valid for a flight until"; the follow-up plan; the handover letter, English
+    and Arabic side by side (`lang`/`dir` per version), each printable on its own page (a blank window written through the DOM, never as
+    markup); the hospital's final invoice (number, EGP, issued, Finance's countersign); the return and the departure. Every command answers
+    with the view. One primary action: the viewer's next one (`DISCHARGE_WORK`, `#discharge-next`). **Consultant**: the pack form (type,
+    checked case document, and per type: diagnosis + warning signs with its plain-language hint + optional procedures and pending results;
+    1-30 medicines of name / dose / how often / how long, "None" allowed; 1-20 implants of description / maker / lot; the examination time
+    with "valid for a return flight within N hours" from `fitToFlyHours`; "recording this type again replaces the one on file"), opening on
+    the first missing item on `COMPLETE_DISCHARGE_PACK` / `DISCHARGE_PACK`; the follow-up plan form (due, video/phone/in person, tests,
+    instructions → `POST /doctor/cases/{id}/follow-ups`) while none is on file, leading once the pack is complete; generate / regenerate
+    the letter. **Operations**: final invoice (record, or correct with `replaces` until the reconciliation is settled) leading on
+    `RECORD_FINAL_INVOICE`; the return (flight or by land; for a flight "valid at departure: until …" from the fit to fly, or "the Consultant
+    records it first"; departure, booking reference) leading on `CONFIRM_RETURN`; the departure once the return is confirmed, leading on
+    `CONFIRM_DEPARTURE`. The coordinator reads only.
+  - **Finance reconciliation workbench** (`ReconciliationPanel`, for Finance, the coordinator and Operations once `DISCHARGED` /
+    `FOLLOW_UP`, and for Finance on any settlement item (`SETTLEMENT_WORK`, incl. an invoice recorded during treatment and Finance Manager
+    items that survive the exit); reads `GET /{role}/cases/{id}/reconciliation`): status badge, the final invoice line, two columns —
+    "What was authorised" (package with its voucher number, each counted change-order line) and "The hospital's invoice" (submitted lines
+    with invoiced / authorised / charged and the variance code as a badge); the figures as returned (authorised, charged, variance,
+    billed-not-charged, paid at the hospital, band limit, "above the band: a Finance Manager approves it") and the trail (opened /
+    submitted / countersigned / settled). **Finance**: "Open the reconciliation" (countersigns the invoice; again after a corrected
+    invoice) and the line form (description, signed EGP amount, "authorised by" = the package / a change-order line / nothing with
+    unapproved extra or billing error; add/remove up to 100; paid at the hospital with its receipts hint; note), leading on
+    `RECONCILE_INVOICE`; the credit reminder; the e-invoice reference on the current statement (once). **Finance Manager**: approve (after a
+    confirmation) or return with what to correct, from `COUNTERSIGN_RECONCILIATION`; settle the dispute (hospital withdrew / platform
+    absorbed + note) from `FACILITY_DISPUTE`; other viewers read "a Finance Manager approves / settles it". Every command is step-up
+    through the portal's re-sign-in and replay, and each form says so. Statements: every revision with current/replaced and the shared
+    `StatementSheet`.
+  - **My Care**: a `dischargeStep` slot (`DISCHARGE_STEPS` = `GOING_HOME`, `FOLLOW_UP`) renders `PatientGoingHome` (reads
+    `GET /patient/cases/{id}/discharge` and `/statements` in parallel): the warning signs first ("Get medical help at once if"), the
+    medicines, the follow-up ("By video on …"), the journey home, the pack documents with their file names and a link to Documents, the
+    letter for the home doctor (EN/AR, print), then the statement (lines with kind and the invoice's description, EGP and the patient's
+    currency per line, total charged, balance due or credit due or "nothing is owed either way") or "your statement is ready once the
+    hospital's final invoice has been checked". New step text `GOING_HOME`; no primary action on the step (nothing to do).
+  - **Status link**: in the `followup` phase (DISCHARGED / FOLLOW_UP) the link reads `POST /public/cases/{token}/discharge` and
+    `/statements` on the verified grant (each failing alone hides only itself) and shows "Going home" and the statement (`GoingHomeStory`,
+    `StatementSheet`, shared with My Care; the page passes `dischargeCopy`).
+  - **Control Center**: "Fit-to-fly window (hours)" (24-168, prefilled from the active version, 72 when none) on the margin-policy form,
+    sent as `fitToFlyHours`, listed on the version and stated in the confirmation (inline en/ar, as the rest of that screen).
+  - **Copy** (en + ar; **Arabic is a draft** pending native review): `portalWork.discharge`, `portalWork.reconciliation`,
+    `portalWork.statement`, `myCare.goingHome`, `myCare.steps.GOING_HOME`; the six work types in `workTitles`, `workCopy.items` and
+    `currentAction.work`; `workCopy.items` for `PATIENT_DISCHARGED` / `PATIENT_DEPARTED`; current actions `COMPLETE_DISCHARGE_PACK`,
+    `RECORD_FINAL_INVOICE`, `CONFIRM_RETURN`, `CONFIRM_DEPARTURE` (button + state); the ten evidence kinds on the trail; 32 error codes in
+    `portalWork.errorCodes` (the hand-over's list; `BILLED_IN_FUTURE` and `SELF_COUNTERSIGN_REFUSED` were already there), shown in the
+    viewer's language by the portal.
+  - Tests: new `DischargePanel.test.tsx` (8: blockers instead of a button and the pack states; pack form opening on the missing medication
+    list with medicine rows; fit to fly's window; follow-up plan and the bilingual letter with print; Operations invoice as the one primary;
+    return by land without a fit to fly and no departure before a return; departure in Arabic; read-only coordinator),
+    `ReconciliationPanel.test.tsx` (6: open after a step-up confirmation; three lines matched to package / change-order line / nothing and
+    submitted; variance codes and waiting for a Finance Manager; approve and return; dispute settled + statement + credit + e-invoice;
+    read-only Operations), `PatientGoingHome.test.tsx` (3, through `MyCare`: going home without an action, the statement in EGP and USD,
+    Arabic), +1 `CaseStatusAccess` (going home + statement on the grant), `PageHeaders` (fit-to-fly prefilled, listed and sent; four
+    bodies updated). Playwright `e2e/my-care-going-home.spec.ts` (6: en/ar × 390/1440 in follow-up with warning signs, medicines and the
+    statement as returned, no primary, no page scroll; en/ar going home before the statement) via the new `discharge` option of
+    `patient-fixture.ts`, green on a dev server together with `my-care-change-order.spec.ts`. `pnpm typecheck` clean, eslint clean on
+    touched files, vitest 84 files / 653 tests green (a pre-existing focus test in `CaseStatusAccess` failed once under the full
+    parallel run and passed alone and on the re-run). Reviewed with react-best-practices, composition-patterns, web-design-guidelines and Impeccable (detector: no
+    findings).
+  - Not done (later or owner): the final UX design of these screens (UX plan); no PDF of the statement or letter (print only); no
+    automatic invoice-line matching; pack documents download through My Care's Documents only if the patient documents endpoint lists
+    staff-uploaded case documents (not checked live); the status link still has no patient-safe step code of its own; not walked live —
+    needs the dev stack rebuilt at V101 with this frontend; Meta approval of `rs_discharge_pack_ready` / `rs_statement_ready`.
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/p1-17-s2-discharge-ui` (it contains `423bbae`), rebuilds backend and
+    frontend, and walks one case live (discharge planned → Consultant pack + plan → Operations final invoice → automatic discharge →
+    Finance opens, matches and submits → statement in My Care → Operations return and departure); then P1-18 (follow-up execution and
+    outcomes), started in a new session.
 
 ### P1-18  Follow-up execution and outcomes  (design §5 stage 6; architecture §5.6)
 - `FollowUpService`: scheduled contacts from the plan, `FOLLOW_UP_CONTACT` items and reminders, coordinator

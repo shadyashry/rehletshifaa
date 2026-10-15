@@ -527,3 +527,44 @@ describe("CaseStatusAccess treatment", () => {
     expect(screen.getByRole("link", { name: "Sign in to My Care" }).className).toContain("btn-secondary");
   });
 });
+
+// P1-17: after discharge the link reads going home and the statement on the verified grant; nothing to decide there.
+describe("CaseStatusAccess going home", () => {
+  beforeEach(() => vi.resetAllMocks());
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  const followUp = { caseNumber: "RS-10281", statusEn: "Follow-up", statusAr: "المتابعة", phase: "followup", actionRequired: false, action: null };
+  const home = { discharged: true, documents: [{ kind: "DISCHARGE_SUMMARY", documentId: "d1", recordedAt: "2026-10-24T09:00:00Z" }],
+    medications: [{ name: "Aspirin", dose: "75 mg", frequency: "Once a day", duration: "Lifelong" }], warningSigns: "Chest pain or breathlessness",
+    followUpDueAt: "2026-11-25T09:00:00Z", followUpMode: "VIDEO", returnMode: "FLIGHT", returnDepartureAt: "2026-10-27T09:00:00Z", departed: false, handoverLetter: null };
+  const statement = { id: "s1", kind: "DISCHARGE", statementNumber: "RS-ST-RS-10281-1", revision: 1, issuedAt: "2026-10-26T09:00:00Z", displayCurrency: "USD",
+    totals: { packageEgp: 200000, changeOrdersEgp: 0, medicalChargedEgp: 200000, platformFeeEgp: 30000, totalChargedEgp: 230000, totalChargedDisplay: 4692.31, depositPaidEgp: 34500,
+      feeBalancePaidEgp: 0, paidAtFacilityEgp: 190000, refundedEgp: 0, balanceDueEgp: 5500.5, balanceDueDisplay: 112.21, creditDueEgp: 0, creditDueDisplay: 0 },
+    lines: [{ kind: "PACKAGE", description: "Coronary stent package", amountEgp: 200000, amountDisplay: 4080.2 }] };
+
+  it("shows the warning signs, the medicines and the statement as returned", async () => {
+    const fetchMock = stub({
+      "/request-access": () => json(summary),
+      "/verify": () => json({ grant: "grant-1" }),
+      "/view": () => json(followUp),
+      "/discharge": () => json(home),
+      "/statements": () => json([statement]),
+      "tok-1": () => json(summary),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}
+                             dischargeCopy={{ goingHome: en.portalWork.myCare.goingHome, statement: en.portalWork.statement }}/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+    expect(await screen.findByRole("heading", { name: "Going home" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/public\/cases\/tok-1\/discharge$/), expect.objectContaining({ body: JSON.stringify({ grant: "grant-1" }) }));
+    expect(screen.getByRole("heading", { name: "Get medical help at once if" })).toBeTruthy();
+    expect(screen.getByText("Chest pain or breathlessness")).toBeTruthy();
+    expect(screen.getByText("Aspirin")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /Statement\W+RS-ST-RS-10281-1/ })).toBeTruthy();
+    expect(screen.getByText("Balance due")).toBeTruthy();
+    expect(screen.getByText(/5,500\.50/)).toBeTruthy();
+    expect(screen.getByText("$112.21")).toBeTruthy();
+  });
+});

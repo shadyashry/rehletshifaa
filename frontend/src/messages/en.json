@@ -1369,7 +1369,13 @@
         "PRICE_CHANGE_ORDER": "Price the change order",
         "EMERGENCY_CHANGE_ORDER_REVIEW": "Price and review",
         "CHANGE_ORDER_PATIENT_DECISION": "Open Treatment",
-        "COUNTERSIGN_INTERIM_BILL": "Check the bill"
+        "COUNTERSIGN_INTERIM_BILL": "Check the bill",
+        "DISCHARGE_PACK": "Complete the pack",
+        "RECORD_FINAL_INVOICE": "Record the final invoice",
+        "RECONCILE_INVOICE": "Reconcile the invoice",
+        "COUNTERSIGN_RECONCILIATION": "Check the reconciliation",
+        "FACILITY_DISPUTE": "Settle the dispute",
+        "REFUND_CREDIT": "Open the reconciliation"
       },
       "actions": {
         "ASSIGN_CONSULTANT": "Assign Consultant",
@@ -1384,7 +1390,11 @@
         "APPROVE_COMMERCIAL_TERMS": "Approve commercial terms",
         "RECORD_HOSPITAL_BALANCE": "Record the receipt",
         "RECORD_ADMISSION_NUMBER": "Record the admission number",
-        "RECORD_MILESTONE": "Record a milestone"
+        "RECORD_MILESTONE": "Record a milestone",
+        "COMPLETE_DISCHARGE_PACK": "Complete the discharge pack",
+        "RECORD_FINAL_INVOICE": "Record the final invoice",
+        "CONFIRM_RETURN": "Confirm the return",
+        "CONFIRM_DEPARTURE": "Confirm the departure"
       },
       "states": {
         "CLAIM_CASE": {
@@ -1486,6 +1496,22 @@
         "RECORD_MILESTONE": {
           "title": "Record the next treatment milestone",
           "body": "The patient is in treatment. Record each milestone as it happens: the patient reads a calm line for each one, and the next is due within 24 working hours."
+        },
+        "COMPLETE_DISCHARGE_PACK": {
+          "title": "Complete the discharge pack",
+          "body": "Discharge is planned. Record the pack documents and the follow-up plan under Discharge; the patient is discharged once nothing blocks it."
+        },
+        "RECORD_FINAL_INVOICE": {
+          "title": "Record the hospital's final invoice",
+          "body": "Discharge is planned. Record the final invoice once the hospital issues it; discharge waits for it."
+        },
+        "CONFIRM_RETURN": {
+          "title": "Confirm the return",
+          "body": "Confirm how and when the patient travels home. A flight needs a valid fit to fly."
+        },
+        "CONFIRM_DEPARTURE": {
+          "title": "Confirm the departure",
+          "body": "The return is confirmed. Confirm once the patient has left."
         }
       },
       "readiness": {
@@ -1827,6 +1853,11 @@
           "title": "Review a change to your treatment",
           "body": "Your Consultant recommends a change to your treatment that adds to its cost. Read why and what it costs, then accept or decline it.",
           "next": "Your care team is told your decision straight away."
+        },
+        "GOING_HOME": {
+          "title": "You are going home",
+          "body": "You have been discharged. Below are the warning signs to watch for, your medicines, your follow-up and your documents.",
+          "next": "Your coordinator stays in touch while you recover."
         }
       },
       "payment": {
@@ -2040,6 +2071,45 @@
           "session": "Your secure session has ended. Open the link again and confirm with a new code.",
           "failed": "Your decision could not be saved. Please try again."
         }
+      },
+      "goingHome": {
+        "title": "Going home",
+        "warningTitle": "Get medical help at once if",
+        "medicines": "Your medicines",
+        "dose": "Dose",
+        "frequency": "How often",
+        "duration": "For how long",
+        "followUp": "Your follow-up",
+        "followUpLine": "{mode} on {date}",
+        "modes": {
+          "VIDEO": "By video",
+          "PHONE": "By phone",
+          "IN_PERSON": "In person"
+        },
+        "travel": "Your journey home",
+        "returnLine": "{mode}, leaving {date}",
+        "travelModes": {
+          "FLIGHT": "Flight",
+          "GROUND": "By land"
+        },
+        "departed": "You have left. We wish you a safe journey.",
+        "documents": "Your discharge documents",
+        "documentsHint": "You can download them, or share them with your doctor, from Documents.",
+        "openDocuments": "Open Documents",
+        "kinds": {
+          "DISCHARGE_SUMMARY": "Discharge summary",
+          "MEDICATION_LIST": "Medication list",
+          "OPERATIVE_NOTE": "Operative note",
+          "IMPLANT_RECORD": "Implant record",
+          "FIT_TO_FLY": "Fit-to-fly certificate"
+        },
+        "letter": "Letter for your home doctor",
+        "letterHint": "Give it to your doctor at home. It is in English and Arabic.",
+        "english": "English",
+        "arabic": "العربية",
+        "print": "Print",
+        "statement": "Your statement",
+        "statementPending": "Your statement is ready once the hospital's final invoice has been checked. We will tell you when it is."
       }
     },
     "nav": {
@@ -2199,7 +2269,13 @@
       "PRICE_CHANGE_ORDER": "Price a change order",
       "EMERGENCY_CHANGE_ORDER_REVIEW": "Review an emergency change order",
       "CHANGE_ORDER_PATIENT_DECISION": "Change order awaiting the patient's decision",
-      "COUNTERSIGN_INTERIM_BILL": "Countersign an interim bill"
+      "COUNTERSIGN_INTERIM_BILL": "Countersign an interim bill",
+      "DISCHARGE_PACK": "Complete the discharge pack",
+      "RECORD_FINAL_INVOICE": "Record the hospital's final invoice",
+      "RECONCILE_INVOICE": "Reconcile the final invoice",
+      "COUNTERSIGN_RECONCILIATION": "Countersign a reconciliation above the band",
+      "FACILITY_DISPUTE": "Settle a disputed hospital charge",
+      "REFUND_CREDIT": "Refund the patient's credit"
     },
     "proposalVersion": "v{number}",
     "waitingReason": {
@@ -2564,6 +2640,38 @@
         "TREATMENT_COMPLICATION": {
           "title": "Complication recorded on {caseNumber}",
           "context": "The Consultant recorded a complication and an incident is open for review. The patient reads a care update only."
+        },
+        "DISCHARGE_PACK": {
+          "title": "Complete the discharge pack for {caseNumber}",
+          "context": "Discharge is planned. Record the discharge summary, the medication list and the other pack documents, and the follow-up plan, by 18:00 Cairo time on the day."
+        },
+        "RECORD_FINAL_INVOICE": {
+          "title": "Record the final invoice for {caseNumber}",
+          "context": "Discharge is planned. Record the hospital's final invoice with its document by 18:00 Cairo time on the day; discharge waits for it."
+        },
+        "RECONCILE_INVOICE": {
+          "title": "Reconcile the final invoice for {caseNumber}",
+          "context": "Operations recorded the hospital's final invoice. Open the reconciliation, match each line against what was authorised and submit it."
+        },
+        "COUNTERSIGN_RECONCILIATION": {
+          "title": "Countersign the reconciliation for {caseNumber}",
+          "context": "The variance is above the band. Approve it, or return it to Finance with what to correct."
+        },
+        "FACILITY_DISPUTE": {
+          "title": "Settle the disputed charge on {caseNumber}",
+          "context": "The hospital billed something that was not charged to the patient. Settle it with the hospital and record how it ended."
+        },
+        "REFUND_CREDIT": {
+          "title": "Refund the credit on {caseNumber}",
+          "context": "The statement shows a credit due to the patient. Refund it with the deposit refund."
+        },
+        "PATIENT_DISCHARGED": {
+          "title": "{caseNumber} is discharged",
+          "context": "The pack, the follow-up plan and the final invoice are in. Confirm the return and keep in touch with the patient."
+        },
+        "PATIENT_DEPARTED": {
+          "title": "The patient on {caseNumber} has left",
+          "context": "Operations confirmed the departure. Follow-up continues as planned."
         }
       }
     },
@@ -2724,7 +2832,17 @@
           "MILESTONE_STABLE": "Milestone: stable",
           "MILESTONE_DISCHARGE_PLANNED": "Milestone: discharge planned",
           "INTERIM_BILL": "Interim bill",
-          "CHANGE_ORDER": "Change order decision"
+          "CHANGE_ORDER": "Change order decision",
+          "DISCHARGE_SUMMARY": "Discharge summary",
+          "MEDICATION_LIST": "Medication list",
+          "OPERATIVE_NOTE": "Operative note",
+          "IMPLANT_RECORD": "Implant record",
+          "FIT_TO_FLY": "Fit to fly",
+          "HANDOVER_LETTER": "Handover letter",
+          "FINAL_INVOICE": "Final invoice",
+          "RECONCILIATION": "Reconciliation",
+          "RETURN_CONFIRMED": "Return confirmed",
+          "DEPARTURE_CONFIRMED": "Departure confirmed"
         }
       },
       "cancel": "Cancel"
@@ -2747,7 +2865,38 @@
       "CHANGE_ORDER_NOT_FOUND": "This change order was not found on the case.",
       "WITHDRAW_REASON_REQUIRED": "Say why the change order is withdrawn.",
       "BILLED_IN_FUTURE": "A bill cannot be issued in the future. Check its date.",
-      "CHANGE_ORDER_BAND_INVALID": "The band must be between 0% and 50%, and its cap 0 or more."
+      "CHANGE_ORDER_BAND_INVALID": "The band must be between 0% and 50%, and its cap 0 or more.",
+      "NOT_IN_DISCHARGE": "This can only be recorded while the patient is in treatment or discharged.",
+      "NOT_DISCHARGED": "This can only be done once the patient is discharged.",
+      "DISCHARGE_SUMMARY_DETAILS_REQUIRED": "A discharge summary needs the diagnosis and the warning signs.",
+      "MEDICATIONS_REQUIRED": "A medication list needs at least one medicine (write “None” if there is nothing to take).",
+      "IMPLANTS_REQUIRED": "An implant record needs at least one implant.",
+      "FIT_TO_FLY_DATE_REQUIRED": "A fit to fly needs the time of the examination.",
+      "FIT_TO_FLY_IN_FUTURE": "The examination cannot be in the future.",
+      "HANDOVER_PACK_INCOMPLETE": "The letter is written from the pack: record the missing pack documents first.",
+      "RECONCILIATION_SETTLED": "The invoice is already reconciled and can no longer change.",
+      "FIT_TO_FLY_REQUIRED": "A return flight needs a fit to fly. The Consultant records it in the pack first.",
+      "FIT_TO_FLY_NOT_VALID": "The fit to fly is not valid at that departure time. The Consultant records a new examination, or choose an earlier departure.",
+      "ALREADY_DEPARTED": "The patient has already left.",
+      "RETURN_NOT_CONFIRMED": "Confirm the return before the departure.",
+      "DEPARTURE_IN_FUTURE": "The departure cannot be in the future.",
+      "DISCHARGE_NOT_READY": "Something still blocks discharge.",
+      "SETTLEMENT_PENDING": "The final invoice is not reconciled yet.",
+      "FINAL_INVOICE_MISSING": "Operations has not recorded the hospital's final invoice yet.",
+      "RECONCILIATION_SUBMITTED": "This reconciliation is already submitted.",
+      "RECONCILIATION_NOT_OPEN": "Open the reconciliation first.",
+      "FINAL_INVOICE_CHANGED": "The final invoice was corrected: open the reconciliation again.",
+      "INVOICE_LINES_MISMATCH": "The lines do not add up to the invoice total.",
+      "PAID_AT_FACILITY_BELOW_RECEIPTS": "What was paid at the hospital cannot be less than the receipts countersigned at admission.",
+      "LINE_MATCHED_TWICE": "Each authorised line can be matched once only.",
+      "CHANGE_ORDER_LINE_NOT_COUNTED": "That change-order line is not authorised (it was declined or withdrawn).",
+      "RECONCILIATION_NOT_AWAITING": "This reconciliation is not waiting for a countersign.",
+      "NO_OPEN_DISPUTE": "There is no open dispute on this case.",
+      "RECONCILIATION_NOT_FOUND": "No reconciliation is open on this case.",
+      "STATEMENT_NOT_FOUND": "That statement was not found.",
+      "E_INVOICE_ALREADY_RECORDED": "The e-invoice reference is already recorded.",
+      "FIT_TO_FLY_WINDOW_INVALID": "The fit-to-fly window must be between 24 and 168 hours.",
+      "INVALID_EVIDENCE_DOCUMENT": "Choose a checked document of this case."
     },
     "treatment": {
       "title": "Treatment",
@@ -2932,6 +3081,289 @@
           "INTERIM_BILLS_COUNTERSIGNED": "Interim bills countersigned"
         }
       }
+    },
+    "discharge": {
+      "title": "Discharge",
+      "loadFailed": "The discharge details could not be loaded.",
+      "automatic": "Discharge happens on its own once nothing above blocks it; there is no discharge button.",
+      "state": {
+        "ready": "Nothing blocks discharge: the case moves to discharged on its own.",
+        "blocked": "Before discharge",
+        "discharged": "Discharged",
+        "awaitingSettlement": "The hospital's final invoice is being reconciled; the case moves to follow-up once it is settled.",
+        "settled": "The final invoice is reconciled."
+      },
+      "blockers": {
+        "TREATMENT_CHECKLIST_INCOMPLETE": "The treatment checklist is not complete",
+        "DISCHARGE_SUMMARY_MISSING": "The discharge summary is missing",
+        "MEDICATION_LIST_MISSING": "The medication list is missing",
+        "OPERATIVE_NOTE_MISSING": "The operative note is missing",
+        "IMPLANT_RECORD_MISSING": "The implant record is missing",
+        "FOLLOW_UP_PLAN_MISSING": "The follow-up plan is missing",
+        "FINAL_INVOICE_MISSING": "The hospital's final invoice is not recorded",
+        "RECONCILIATION_PENDING": "The final invoice is not reconciled yet"
+      },
+      "pack": {
+        "title": "Discharge pack",
+        "kinds": {
+          "DISCHARGE_SUMMARY": "Discharge summary",
+          "MEDICATION_LIST": "Medication list",
+          "OPERATIVE_NOTE": "Operative note",
+          "IMPLANT_RECORD": "Implant record",
+          "FIT_TO_FLY": "Fit to fly"
+        },
+        "status": {
+          "DONE": "Recorded",
+          "MISSING": "Missing",
+          "NOT_REQUIRED": "Not needed",
+          "BEFORE_RETURN": "Before a return flight"
+        },
+        "recorded": "Recorded {when}",
+        "examined": "Examined {when}",
+        "validUntil": "valid for a flight until {when}",
+        "diagnosis": "Diagnosis",
+        "procedures": "Procedures",
+        "pendingResults": "Results pending",
+        "warningSigns": "Warning signs",
+        "medications": "Medicines",
+        "implants": "Implants",
+        "note": "Note"
+      },
+      "packForm": {
+        "title": "Record a pack document",
+        "kind": "Document type",
+        "chooseKind": "Choose a type",
+        "document": "Checked case document",
+        "chooseDocument": "Choose a document",
+        "noDocuments": "No checked document on the case yet. Upload it under Documents first.",
+        "correction": "Recording this type again replaces the one on file.",
+        "diagnosis": "Diagnosis",
+        "procedures": "Procedures done (optional)",
+        "pendingResults": "Results still pending (optional)",
+        "warningSigns": "Warning signs, in plain language",
+        "warningSignsHint": "What should make the patient seek care at once. The patient reads it as you write it.",
+        "noneHint": "If the patient takes nothing home, write “None” as the medicine.",
+        "medicine": "Medicine {n}",
+        "medName": "Medicine",
+        "dose": "Dose",
+        "frequency": "How often",
+        "duration": "For how long",
+        "addMedicine": "Add a medicine",
+        "removeMedicine": "Remove medicine {n}",
+        "implant": "Implant {n}",
+        "implantDescription": "Implant",
+        "manufacturer": "Manufacturer (optional)",
+        "implantReference": "Lot or serial number (optional)",
+        "addImplant": "Add an implant",
+        "removeImplant": "Remove implant {n}",
+        "examinedAt": "Examined at",
+        "fitToFlyHint": "Valid for a return flight within {hours} hours of the examination.",
+        "note": "Note (optional)",
+        "record": "Record the document"
+      },
+      "followUp": {
+        "title": "Follow-up plan",
+        "none": "No follow-up plan yet.",
+        "due": "due {when}",
+        "modes": {
+          "VIDEO": "Video",
+          "PHONE": "Phone",
+          "IN_PERSON": "In person"
+        },
+        "form": "Record the follow-up plan",
+        "dueAt": "Follow-up due",
+        "mode": "How",
+        "tests": "Tests needed before it (optional)",
+        "instructions": "Instructions for the patient (optional)",
+        "save": "Record the plan"
+      },
+      "letter": {
+        "title": "Handover letter",
+        "hint": "A letter for the patient's home doctor, in English and Arabic, written from the pack.",
+        "none": "Not generated yet. It can be generated once the pack documents are recorded.",
+        "generate": "Generate the letter",
+        "regenerate": "Generate it again",
+        "generated": "Generated {when}",
+        "english": "English",
+        "arabic": "Arabic",
+        "print": "Print"
+      },
+      "invoice": {
+        "title": "Hospital's final invoice",
+        "none": "Not recorded yet.",
+        "countersigned": "Countersigned by Finance",
+        "awaiting": "Finance has not opened the reconciliation yet.",
+        "form": "Record the final invoice",
+        "formCorrect": "Correct the final invoice",
+        "document": "Invoice document",
+        "chooseDocument": "Choose a document",
+        "number": "Invoice number",
+        "amountEgp": "Total (EGP)",
+        "issuedAt": "Issued at",
+        "record": "Record the invoice"
+      },
+      "travel": {
+        "title": "Return and departure",
+        "none": "The return is not confirmed yet.",
+        "modes": {
+          "FLIGHT": "Flight",
+          "GROUND": "By land"
+        },
+        "returnLine": "{mode}, leaving {when}",
+        "reference": "reference",
+        "departed": "The patient left {when}",
+        "form": "Confirm the return",
+        "mode": "How the patient travels home",
+        "departureAt": "Departure",
+        "referenceField": "Booking reference (optional)",
+        "flightNeeds": "A flight needs the fit to fly to be valid at departure: until {when}.",
+        "flightMissing": "A flight needs a fit to fly. The Consultant records it in the pack first.",
+        "confirm": "Confirm the return",
+        "departureForm": "Confirm the departure",
+        "departedAt": "The patient left at",
+        "confirmDeparture": "Confirm the departure"
+      }
+    },
+    "reconciliation": {
+      "title": "Reconciliation",
+      "loadFailed": "The reconciliation could not be loaded.",
+      "cancel": "Cancel",
+      "freshSignIn": "You will be asked to sign in again to confirm.",
+      "noInvoice": "Operations has not recorded the hospital's final invoice yet.",
+      "invoice": "Final invoice {number} · {amount}",
+      "issued": "issued {when}",
+      "notOpened": "Not opened",
+      "status": {
+        "OPEN": "Open",
+        "AWAITING_COUNTERSIGN": "Awaiting a Finance Manager",
+        "DISPUTED": "Disputed with the hospital",
+        "CLOSED": "Settled"
+      },
+      "open": "Open the reconciliation",
+      "openTitle": "Open the reconciliation?",
+      "openBody": "You countersign the hospital's final invoice and start matching its lines against what was authorised.",
+      "quote": {
+        "title": "What was authorised",
+        "empty": "Nothing authorised on the quote.",
+        "sources": {
+          "PACKAGE": "Package",
+          "CHANGE_ORDER_LINE": "Change order"
+        }
+      },
+      "lines": {
+        "title": "The hospital's invoice",
+        "empty": "No line submitted yet.",
+        "description": "Line",
+        "invoice": "Invoiced",
+        "authorised": "Authorised",
+        "charged": "Charged",
+        "codes": {
+          "WITHIN_BAND": "At the package price",
+          "CHANGE_ORDER": "Approved change at its price",
+          "CREDIT": "Billed below the price",
+          "BILLING_ERROR": "Billing error · not charged",
+          "UNAPPROVED_EXTRA": "Unapproved extra · not charged"
+        }
+      },
+      "form": {
+        "title": "Match the invoice lines",
+        "hint": "Enter each line as the invoice shows it (a discount as a negative amount) and say what authorised it. The lines must add up to the invoice total.",
+        "line": "Line {n}",
+        "description": "Description on the invoice",
+        "amount": "Amount (EGP)",
+        "match": "Authorised by",
+        "chooseMatch": "Choose what authorised it",
+        "package": "The package ({voucher})",
+        "packagePlain": "The package",
+        "changeLine": "{order}: {description}",
+        "none": "Nothing (not authorised)",
+        "code": "Why it was not authorised",
+        "codes": {
+          "UNAPPROVED_EXTRA": "Unapproved extra",
+          "BILLING_ERROR": "Billing error"
+        },
+        "addLine": "Add a line",
+        "removeLine": "Remove line {n}",
+        "typed": "Lines entered: {sum} of {total}",
+        "paidAtFacility": "Paid at the hospital (EGP)",
+        "paidHint": "What the invoice shows the patient paid the hospital; at least the receipts countersigned at admission.",
+        "note": "Note",
+        "submit": "Submit the reconciliation"
+      },
+      "figures": {
+        "authorised": "Authorised",
+        "charged": "Charged to the patient",
+        "variance": "Variance",
+        "disputed": "Billed, not charged",
+        "paidAtFacility": "Paid at the hospital",
+        "band": "Band limit",
+        "needsCountersign": "The variance is above the band: a Finance Manager approves it."
+      },
+      "trail": {
+        "opened": "Opened {when}",
+        "submitted": "Submitted {when}",
+        "countersigned": "Countersigned {when}",
+        "settled": "Settled {when}"
+      },
+      "countersign": {
+        "title": "Finance Manager's countersign",
+        "waiting": "A Finance Manager approves it or returns it to Finance.",
+        "approve": "Approve",
+        "approveTitle": "Approve this reconciliation?",
+        "approveBody": "The variance stands, the statement is issued to the patient and the case moves to follow-up.",
+        "returnLabel": "Return to Finance",
+        "returnNote": "What Finance should correct",
+        "returnTitle": "Return this reconciliation?",
+        "returnBody": "Finance corrects the lines and submits it again."
+      },
+      "dispute": {
+        "title": "Dispute with the hospital",
+        "body": "{amount} was billed but not charged to the patient. Settle it with the hospital; the patient is never charged for it.",
+        "waiting": "A Finance Manager settles it with the hospital.",
+        "outcome": "How it ended",
+        "choose": "Choose an outcome",
+        "outcomes": {
+          "FACILITY_WITHDREW": "The hospital withdrew the charge",
+          "PLATFORM_ABSORBED": "The platform absorbed it"
+        },
+        "note": "Note (optional)",
+        "resolve": "Record the outcome",
+        "resolved": "Settled: {outcome} · {when}"
+      },
+      "credit": "The patient has a credit of {amount}: refund it with the deposit refund.",
+      "statements": {
+        "title": "Statements",
+        "empty": "No statement issued yet.",
+        "revision": "Revision {n}",
+        "current": "Current",
+        "superseded": "Replaced",
+        "eInvoice": "E-invoice reference",
+        "eInvoiceRecorded": "recorded {when}",
+        "eInvoiceForm": "Record the e-invoice reference",
+        "eInvoiceHint": "The tax authority's document id. It can be recorded once.",
+        "save": "Record the reference"
+      }
+    },
+    "statement": {
+      "number": "Statement {number}",
+      "issued": "Issued {date}",
+      "item": "Item",
+      "egp": "EGP",
+      "lineKinds": {
+        "PACKAGE": "Treatment package",
+        "CHANGE_ORDER": "Approved change",
+        "CREDIT": "Credit from the hospital",
+        "PLATFORM_FEE": "Platform fee",
+        "DEPOSIT_PAID": "Deposit paid",
+        "FEE_BALANCE_PAID": "Platform fee balance paid",
+        "PAID_AT_FACILITY": "Paid at the hospital",
+        "REFUNDED": "Refunded"
+      },
+      "totalCharged": "Total charged",
+      "balanceDue": "Balance due",
+      "creditDue": "Credit due",
+      "settled": "Nothing is owed either way.",
+      "rate": "The second column is at the exchange rate fixed on the quote."
     }
   },
   "secureLink": {

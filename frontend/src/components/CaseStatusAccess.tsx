@@ -17,7 +17,8 @@ import { apiUrl } from "@/lib/api";
 import { localeHref } from "@/lib/links";
 import { EmergencyGuidance } from "@/components/EmergencyGuidance";
 import { ChangeOrderDecision, TreatmentStory, type ChangeDecision, type TreatmentCopy } from "@/components/portal/TreatmentStory";
-import type { PatientTreatmentView } from "@/components/portal/portal-model";
+import { GoingHomeStory, StatementSheet, type GoingHomeCopy, type StatementCopy } from "@/components/portal/GoingHomeStory";
+import type { PatientDischargeView, PatientStatement, PatientTreatmentView } from "@/components/portal/portal-model";
 
 /** `channel`: where the backend sends the code (WHATSAPP or EMAIL); this link offers no other. */
 type Summary = { caseNumber: string; destinationHint: string; channel?: string | null };
@@ -52,6 +53,8 @@ export type StatusCopy = Dictionary["secureLink"]["status"] & {
 type Page = "loading" | "sealed" | "view" | "done" | "invalid";
 /** P1-16: the patient's treatment words (`portalWork.myCare.treatment`) and the decision step's own story. */
 export type LinkTreatmentCopy = TreatmentCopy & { review: { title: string; body: string; next?: string } };
+/** P1-17: the patient's going-home words (`portalWork.myCare.goingHome`) and the statement's (`portalWork.statement`). */
+export type LinkDischargeCopy = { goingHome: GoingHomeCopy; statement: StatementCopy };
 
 /**
  * The patient's secure, no-login status page: one page of the case file, sealed until the patient proves the contact.
@@ -61,10 +64,12 @@ export type LinkTreatmentCopy = TreatmentCopy & { review: { title: string; body:
  * after it, the current page of the file — where the case is (stamped on the three real moments, dated by the backend),
  * whether anything is needed, the journey, and only what this case's coordinator actually asked for.
  */
-export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCopy, treatmentCopy }: { locale: Locale; token: string;
+export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCopy, treatmentCopy, dischargeCopy }: { locale: Locale; token: string;
   copy: StatusCopy;
   /** P1-16: in the treatment phase, the timeline and a change awaiting the patient's decision (absent: the link shows neither). */
   treatmentCopy?: LinkTreatmentCopy;
+  /** P1-17: after discharge, going home and the statement (absent: the link shows neither). */
+  dischargeCopy?: LinkDischargeCopy;
   /** A-02: the bilingual emergency instruction (common.emergencyNotice), passed by the page so the client bundle carries no dictionary. */
   emergency?: { title: string; body: string; more?: string };
   /** The journey's words (secureLink.journey), passed by the page for the same reason. */
@@ -88,6 +93,9 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
   const [codeRound, setCodeRound] = useState(0);
   /** P1-16: the treatment page read with the verified grant in the treatment phase; null otherwise or when it could not be read. */
   const [treatment, setTreatment] = useState<PatientTreatmentView | null>(null);
+  /** P1-17: going home and the statements, read with the verified grant once discharged; null / empty otherwise. */
+  const [discharge, setDischarge] = useState<PatientDischargeView | null>(null);
+  const [statements, setStatements] = useState<PatientStatement[]>([]);
   const [deciding, setDeciding] = useState(false);
   const [decisionError, setDecisionError] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -157,6 +165,12 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
       const view = await post<Status>(`/view`, { grant: access.grant });
       // P1-16: in treatment, what has happened and any change awaiting the patient, on the same verified grant.
       if (treatmentCopy && view.phase === "treatment") setTreatment(await post<PatientTreatmentView>(`/treatment`, { grant: access.grant }).catch(() => null));
+      // P1-17: after discharge, going home and the statement on the same verified grant (each read on its own; one failing hides only itself).
+      if (dischargeCopy && view.phase === "followup") {
+        const [home, issued] = await Promise.all([post<PatientDischargeView>(`/discharge`, { grant: access.grant }).catch(() => null),
+          post<PatientStatement[]>(`/statements`, { grant: access.grant }).catch(() => [])]);
+        setDischarge(home); setStatements(issued ?? []);
+      }
       setStatus(view);
       setValues(Object.fromEntries((view.action?.items ?? []).map(item => [item.id, item.response ?? ""])));
       setPhase("view");
@@ -413,6 +427,17 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
               <ChangeOrderDecision key={awaitingChange.id} locale={locale} copy={treatmentCopy} order={awaitingChange} busy={deciding} error={decisionError || null}
                                    onDecide={(decision, note) => decide(awaitingChange.id, decision, note)}/>
             )}/>
+          </div>
+        )}
+        {discharge?.discharged && dischargeCopy && (
+          <div className="mt-5 border-t border-line pt-4">
+            <h2 className="mb-3 text-[1rem] font-bold text-brand-900">{dischargeCopy.goingHome.title}</h2>
+            <GoingHomeStory locale={locale} copy={dischargeCopy.goingHome} view={discharge}/>
+          </div>
+        )}
+        {statements.length > 0 && dischargeCopy && (
+          <div className="mt-5 space-y-5 border-t border-line pt-4">
+            {statements.map(s => <StatementSheet key={s.id} locale={locale} copy={dischargeCopy.statement} statement={s}/>)}
           </div>
         )}
         {proposalNote && <p id="status-proposal" className="mt-5 border-t border-line pt-4 text-[0.9375rem] leading-7 text-ink-600">{proposalNote}</p>}
