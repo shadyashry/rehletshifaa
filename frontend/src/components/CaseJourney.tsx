@@ -37,6 +37,7 @@ export function CaseJourney({ id, title, steps, current, completedLabel, current
                 {label}
                 {state === "reached" && <span className="sr-only"> ({completedLabel})</span>}
                 {state === "current" && <span className="sr-only"> ({currentLabel})</span>}
+                {state === "current" && yoursLabel && <span className="sr-only">, </span>}
                 {state === "current" && yoursLabel && <span className="mt-0.5 block text-[0.8125rem] font-semibold text-brand-700">{yoursLabel}</span>}
               </span>
             </li>

@@ -25,6 +25,8 @@ type Proposal = {
   depositDueDisplay?: number; depositPaidDisplay?: number; consultantName?: string | null;
   /** Day of the exchange rate frozen on this version at release; absent on legacy versions. */
   fxRateDate?: string | null;
+  /** D-1: when this version was released to the patient (the "Estimate ready" stamp, slice C). */
+  releasedAt?: string | null;
   /** When the patient asked their coordinator to go through the terms in Arabic (assisted path); absent until then. */
   assistance?: { requestedAt?: string | null } | null;
 };
@@ -108,6 +110,8 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
   const decisionRef = useRef<HTMLDivElement>(null);
   const [decisionVisible, setDecisionVisible] = useState(true);
   const [requestFailed, setRequestFailed] = useState(false);
+  // Each successful send starts a fresh code step (the typed code is kept when a resend fails).
+  const [codeRound, setCodeRound] = useState(0);
   const requestedRef = useRef<HTMLParagraphElement>(null);
   // Until the terms have approved Arabic wording, an Arabic page asks the coordinator to go through them with the
   // patient in Arabic and record the decision (owner decision, GATE P2-1) instead of asking for an acknowledgement.
@@ -178,7 +182,7 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
       const r = await fetch(apiUrl(`/public/proposals/${token}/request-access`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch }) });
       if (r.status === 429) throw new Error(t.tooMany);
       if (!r.ok) throw new Error(t.error);
-      setSummary((await r.json()) as Summary);
+      setSummary((await r.json()) as Summary); setCodeRound(round => round + 1);
       setPhase("code");
     } catch (e) { setError(e instanceof Error && e.message ? e.message : t.error); } finally { setBusy(false); }
   }
@@ -280,7 +284,7 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
             <p className="eyebrow">RehletShifaa · {summary.caseNumber}</p>
             <h1 className="headline mt-2">{t.verifyTitle}</h1>
             <div className="mt-3">
-              <OneTimeCodeStep
+              <OneTimeCodeStep key={codeRound}
                 copy={{ sendTo: channel === "WHATSAPP" ? t.verifyIntroWhatsapp : t.verifyIntroEmail, sentTo: t.codeSent, send: t.sendCode, sending: t.sending,
                         codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend }}
                 destination={(channel === "WHATSAPP" ? summary.whatsappHint : summary.emailHint) ?? summary.destinationHint}
@@ -290,7 +294,7 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                   // Before a code is sent the switch only changes where it will go; after, it sends one there.
                   onSwitch: () => { const other = channel === "WHATSAPP" ? "EMAIL" : "WHATSAPP"; setChannel(other); if (phase === "code") void requestAccess(other); },
                 } : null}
-                error={error ? <p role="alert" className="rounded-xl bg-alert-50 p-3 text-alert-800">{error}</p> : null}/>
+                error={error || null}/>
             </div>
           </div>
         )}

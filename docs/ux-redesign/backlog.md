@@ -517,3 +517,25 @@ Critique 23/40; plan `plans/patient-portal-file.md` (at the owner gate). In-area
 | LOW | `resolveAction` still separates `NONE` from `CONTINUE_IN_PORTAL` (both now land on the ready page); the local `Deposit` type keeps `amountPaid`. | React review | `ProfileActivation.tsx` | slice D |
 | LOW | Arabic: shadda in «منسّقك» is inconsistent across the moved strings; «وديعة التنسيق» vs "Your coordination deposit". | RTL/i18n | `messages/ar.json` `secureLink` | native review |
 | LOW | Staff fixture `portal-fixture.ts` (assisted path) and the env-gated `my-care-live.spec.ts` still use the retired `WAIT_DEPOSIT_ARRANGEMENT` / "Deposit arrangements"; the live spec needs a run against the tunnel stack to update. | slice T | `e2e/portal-fixture.ts`, `e2e/my-care-live.spec.ts` | area 2 / live run |
+
+## Area 1 — slices A/F, deferred review findings (2026-10-15)
+
+Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max) + detector (0). HIGHs and the cheap MEDIUMs were fixed in the same pass. Open:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| MEDIUM | D-1 backend (`milestones`, `PublicProposalView.releasedAt`) is on `feat/review-p0` @ `668e24c`, not on this branch: live, My Care stamps only "Estimate ready" (from `patientProposal.releasedAt`) until it is merged. Live check after the merge. | React, Pro Max | backend `CaseWorkspaceQueryService`, `PublicCaseAccessService` | merge + live run |
+| MEDIUM | Two Arabic names for the same journey: status link «استلمنا حالتك» / «مسار حالتك», My Care «استلام الحالة» / «مسار رعايتك»; the state word is "completed" on the link and "done" in My Care. One source of phase words for `CaseJourney`. | RTL/i18n, Pro Max | `messages/*.json` `secureLink.journey`, `portalWork.myCare.journey` | slice B (clarify) |
+| MEDIUM | Verify stays disabled until six digits, so Enter does nothing; enable it and say what is missing inline. | web guidelines | `OneTimeCodeStep.tsx` | slices B–D |
+| MEDIUM | Resend / channel switch gives no visible or announced confirmation ("New code sent to …"); needs copy en + ar. | web guidelines, Pro Max | `OneTimeCodeStep.tsx` | slices B–D |
+| MEDIUM | The proposal link keeps the channel switch after a code is sent (and resends silently); activation hides it. One rule. | Pro Max | `ProposalSign.tsx` | slice C |
+| MEDIUM | A wrapped stamp label ("Estimate ready" on two lines from 640px) still overhangs the 7rem reserve by about 3rem; checked at 390 and 1440 only. Check 640–1023 with long headings, or move the stamp into a header row beside the heading. | Pro Max | `brand/DossierPage.tsx`, `theme-petrol.css` | slice B (adapt) |
+| LOW | The confirmation stamp prints the browser's moment of acceptance: `SubmitCaseResponse` has no `submittedAt`. Add it (backend) and print the server's time. | Pro Max, React | `CaseForm.tsx`, backend `CaseDtos.SubmitCaseResponse` | backend |
+| LOW | The stamp's press replays when My Care's view changes or the case switches (the page remounts). | web guidelines | `theme-petrol.css` | /impeccable polish |
+| LOW | `careViewHref` reads `window.location` during render (client-only today); pass the role from Portal. | web guidelines, React | `portal/care-view.ts` | /impeccable optimize |
+| LOW | `.dossier-page` is unlayered, so padding utilities passed to `DossierPage` do nothing (CaseForm's `p-7 md:p-10`); use `--page-pad` or move the dossier rules into `@layer components`. | React | `theme-petrol.css`, `CaseForm.tsx` | slice B |
+| LOW | `CaseStamp` formats without a fixed `timeZone`; once a stamp renders on the server (slice B) server and browser can disagree on the day. | web guidelines | `brand/CaseStamp.tsx` | slice B |
+| LOW | The code step's words differ per link (verify / field label / resend). Unify. | Pro Max | `secureLink.*` | slices B–D (clarify) |
+| LOW | The code field is 24px (above the 20px ladder top) and its tracking pushes the centred digits off centre. | Pro Max | `OneTimeCodeStep.tsx` | /impeccable polish |
+| LOW | Arabic isolation: `DossierPage`'s reference `<p dir="ltr">` aligns left on /ar (wrap the number in `<bdi>` instead); case numbers not isolated in `CaseStatusAccess`/`ProfileActivation`; ProposalSign's "RehletShifaa · RS-…" eyebrow and its uppercase tracked labels without an RTL reset. | RTL/i18n | `DossierPage.tsx`, `CaseStatusAccess.tsx`, `ProfileActivation.tsx`, `ProposalSign.tsx` | slices B–D |
+| LOW | Screenshot runs show the Next.js dev indicator; disable it for capture runs. | Pro Max | `next.config` (dev only) | tooling |

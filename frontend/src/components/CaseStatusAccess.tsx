@@ -20,7 +20,9 @@ type ActionItem = { id: string; kind: "INFORMATION" | "DOCUMENT"; code: string; 
 type Action = { taskId: string; title: string; message: string | null; blocking: boolean; dueAt: string | null; items: ActionItem[] };
 type ProposalState = { state: string; action: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionNumber: number | null; validUntil: string | null; decidedAt: string | null };
 /** `expectedWorkingDays`: P1-6 (D-02), how long the team usually takes over this phase; null while the patient owes the step. */
-type Status = { caseNumber: string; statusEn: string; statusAr: string; phase?: string | null; actionRequired: boolean; action: Action | null; proposal?: ProposalState | null; expectedWorkingDays?: number | null };
+type Status = { caseNumber: string; statusEn: string; statusAr: string; phase?: string | null; actionRequired: boolean; action: Action | null; proposal?: ProposalState | null; expectedWorkingDays?: number | null;
+  /** D-1: when the stamped moments happened (stamped on this page in slice B). */
+  milestones?: { receivedAt?: string | null; consultantReviewAt?: string | null; estimateReadyAt?: string | null } | null };
 type ProposalHandoff = { token: string; grant: string; expiresAt: string };
 /** Hands the already-verified proposal grant to the proposal page in this browser session only — never through the URL. */
 export const PROPOSAL_HANDOFF_KEY = (token: string) => `rs-proposal-grant:${token}`;
@@ -56,6 +58,8 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [opening, setOpening] = useState(false);
+  // Each successful send starts a fresh code step (the typed code is kept when a resend fails).
+  const [codeRound, setCodeRound] = useState(0);
 
   /**
    * "Review proposal": the backend re-checks that a decidable version exists for THIS case and hands back a
@@ -85,7 +89,7 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
     try {
       const response = await fetch(apiUrl(`/public/cases/${token}/request-access`), { method: "POST" });
       if (!response.ok) throw new Error(await apiError(response, t.error));
-      setSummary(await response.json() as Summary); setPhase("code");
+      setSummary(await response.json() as Summary); setPhase("code"); setCodeRound(round => round + 1);
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
   }
 
@@ -189,9 +193,10 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
 
       {(phase === "summary" || phase === "code") && <>
         {phase === "summary" && <p className="mb-5 flex items-start gap-2 leading-7 text-ink-600"><LockKeyhole className="mt-1 flex-none" size={17} aria-hidden/>{t.private}</p>}
-        {/* The status endpoint takes no channel: the code goes to the contact the backend chose, named before it is sent. */}
-        <OneTimeCodeStep copy={{ sendTo: t.sendTo, sentTo: t.sent, send: t.send, sending: t.sending, codeLabel: t.code, verify: t.verify, verifying: t.verify, resend: t.resend }}
-                         destination={summary?.destinationHint} sent={phase === "code"} busy={busy}
+        {/* The link offers one contact (the summary names no other), so no channel switch: the code goes where the backend
+            chose, named before it is sent. */}
+        <OneTimeCodeStep key={codeRound} copy={{ sendTo: t.sendTo, sentTo: t.sent, send: t.send, sending: t.sending, codeLabel: t.code, verify: t.verify, verifying: t.verifying, resend: t.resend }}
+                         destination={summary?.destinationHint} sent={phase === "code"} busy={busy} error={error || null}
                          onSend={() => void request()} onVerify={code => void verify(code)}/>
       </>}
 
@@ -301,7 +306,7 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
         )}
       </>}
 
-      {error && <p role="alert" className="mt-5 rounded-xl bg-alert-50 p-4 text-alert-800">{error}</p>}
+      {error && phase !== "summary" && phase !== "code" && <p role="alert" className="mt-5 rounded-xl bg-alert-50 p-4 text-alert-800">{error}</p>}
     </Frame>
   );
 }

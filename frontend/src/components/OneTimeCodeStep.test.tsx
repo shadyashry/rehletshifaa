@@ -22,31 +22,35 @@ describe("OneTimeCodeStep", () => {
     expect(onSend).toHaveBeenCalledOnce();
   });
 
-  it("asks for six digits in one labelled field without a placeholder, verifies, and clears the field on resend", () => {
+  it("asks for six digits in one labelled field without a placeholder, keeps a pasted code whole, and resends", () => {
     const onVerify = vi.fn(), onSend = vi.fn();
     render(<OneTimeCodeStep copy={copy} destination="•••• 7898" sent busy={false} onSend={onSend} onVerify={onVerify}/>);
     expect(screen.getByText(/we sent a code to/i)).toBeTruthy();
     const field = screen.getByLabelText("Enter the 6-digit code") as HTMLInputElement;
     expect(field.getAttribute("placeholder")).toBeNull();
     expect(field.getAttribute("aria-label")).toBeNull();
-    fireEvent.change(field, { target: { value: "12a3456" } });
+    // A pasted "123 456" keeps all six digits (no maxLength cutting it first).
+    fireEvent.change(field, { target: { value: "123 456" } });
     expect(field.value).toBe("123456");
+    expect(field.getAttribute("aria-describedby")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     expect(onVerify).toHaveBeenCalledWith("123456");
     fireEvent.click(screen.getByRole("button", { name: "Resend code" }));
     expect(onSend).toHaveBeenCalledOnce();
-    expect(field.value).toBe("");
+    // The page remounts the step only after a successful send, so a failed resend keeps what was typed.
+    expect(field.value).toBe("123456");
   });
 
   it("offers the other channel where the link accepts one, and ties an error to the field", () => {
     const onSwitch = vi.fn();
     render(<OneTimeCodeStep copy={copy} destination="•••• 7898" sent busy={false} onSend={vi.fn()} onVerify={vi.fn()}
-                            channelSwitch={{ label: "Use email instead", onSwitch }} error={<p role="alert">That code is not right.</p>}/>);
+                            channelSwitch={{ label: "Use email instead", onSwitch }} error="That code is not right."/>);
     fireEvent.click(screen.getByRole("button", { name: "Use email instead" }));
     expect(onSwitch).toHaveBeenCalledOnce();
     const field = screen.getByLabelText("Enter the 6-digit code");
     expect(field.getAttribute("aria-invalid")).toBe("true");
-    expect(document.getElementById(field.getAttribute("aria-describedby") ?? "")?.textContent).toBe("That code is not right.");
+    expect(field.getAttribute("aria-describedby")?.split(" ").map(id => document.getElementById(id)?.textContent)).toEqual(["We sent a code to •••• 7898", "That code is not right."]);
+    expect(screen.getByRole("alert").textContent).toBe("That code is not right.");
   });
 });
 
@@ -54,7 +58,7 @@ describe("CaseJourney", () => {
   it("says each step's state in words and marks the patient's own step", () => {
     render(<CaseJourney id="j" title="Your case" steps={["One", "Two", "Three"]} current={1} completedLabel="completed" currentLabel="current" yoursLabel="Your step"/>);
     const items = screen.getAllByRole("listitem").map(li => li.textContent);
-    expect(items).toEqual(["1One (completed)", "2Two (current)Your step", "3Three"]);
+    expect(items).toEqual(["1One (completed)", "2Two (current), Your step", "3Three"]);
     expect(screen.getByRole("region", { name: "Your case" })).toBeTruthy();
   });
 
@@ -69,15 +73,15 @@ describe("CaseStamp", () => {
   it("prints the backend's date per locale, with the year only when it is not this year", () => {
     const thisYear = new Date().getFullYear();
     const { container, rerender } = render(<CaseStamp label="Received" date={`${thisYear}-03-04T10:00:00Z`} locale="en"/>);
-    expect(container.textContent).toBe("ReceivedMar 4");
+    expect(container.textContent).toBe("ReceivedMar 4Received, Mar 4");
     rerender(<CaseStamp label="تم الاستلام" date="2024-03-04T10:00:00Z" locale="ar"/>);
-    expect(container.textContent).toMatch(/^تم الاستلام4 .+ 2024$/);
+    expect(container.textContent).toMatch(/^تم الاستلام4 .+ 2024تم الاستلام، 4 .+ 2024$/);
   });
 
-  it("prints no date when there is none or it cannot be read", () => {
+  it("prints nothing when there is no date or it cannot be read", () => {
     const { container, rerender } = render(<CaseStamp label="Received" locale="en"/>);
-    expect(container.textContent).toBe("Received");
+    expect(container.textContent).toBe("");
     rerender(<CaseStamp label="Received" date="not a date" locale="en"/>);
-    expect(container.textContent).toBe("Received");
+    expect(container.textContent).toBe("");
   });
 });

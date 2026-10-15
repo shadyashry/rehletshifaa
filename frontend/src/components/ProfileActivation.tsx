@@ -85,6 +85,8 @@ export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; 
   const [notice, setNotice] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Each successful send starts a fresh code step (the typed code is kept when a resend fails).
+  const [codeRound, setCodeRound] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   // Move focus to the new step heading so keyboard and screen-reader users follow the flow.
@@ -127,7 +129,7 @@ export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; 
     try {
       const chosen = next ?? channel;
       const data: Summary = await call("/request-access", { channel: chosen });
-      setSummary(data); setChannel(chosen); setCodeSent(true);
+      setSummary(data); setChannel(chosen); setCodeSent(true); setCodeRound(round => round + 1);
     } catch (e) { setNotice(describe(e)); } finally { setBusy(false); }
   }
 
@@ -269,7 +271,7 @@ export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; 
     <Shell locale={locale}>
       {stage !== "done" && stage !== "activated" && <Steps labels={t.steps} current={stepIndex} stepOf={t.stepOf} of={t.of} />}
 
-      {notice && (
+      {notice && stage !== "verify" && (
         <p role="alert" className="mb-5 rounded-xl border border-alert-200 bg-alert-50 p-4 text-sm text-alert-800">{notice}</p>
       )}
 
@@ -279,7 +281,7 @@ export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; 
           <h1 ref={headingRef} tabIndex={-1} className="headline mt-2 outline-none">{t.verifyTitle}</h1>
           <div className="mt-3">
             {/* This endpoint accepts a channel: before a code is sent the other one is offered (and sends there). */}
-            <OneTimeCodeStep copy={{ sendTo: t.verifyIntro, sentTo: t.codeSent, send: t.sendCode, sending: t.sending, codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend }}
+            <OneTimeCodeStep key={codeRound} error={notice} copy={{ sendTo: t.verifyIntro, sentTo: t.codeSent, send: t.sendCode, sending: t.sending, codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend }}
                              destination={summary?.destinationHint} sent={codeSent} busy={busy}
                              onSend={() => void sendCode()} onVerify={code => void verify(code)}
                              channelSwitch={codeSent ? null : { label: channel === "WHATSAPP" ? t.useEmail : t.useWhatsapp, onSwitch: () => void sendCode(channel === "WHATSAPP" ? "EMAIL" : "WHATSAPP") }}/>

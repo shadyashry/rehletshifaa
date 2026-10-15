@@ -1324,6 +1324,11 @@
       "careFor": "Care for {name}"
     },
     "myCare": {
+      "stamp": {
+        "received": "Received",
+        "inReview": "In review",
+        "estimateReady": "Estimate ready"
+      },
       "nav": {
         "label": "My Care",
         "care": "My Care",
@@ -2031,6 +2036,7 @@
       "sent": "We sent a 6-digit code to",
       "code": "Verification code",
       "verify": "Verify and continue",
+      "verifying": "Verifying…",
       "private": "Your medical information is shown only after contact verification.",
       "status": "Current update",
       "action": "Your response",
