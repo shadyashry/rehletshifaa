@@ -137,6 +137,17 @@ describe("PatientDepositPayment — the payment slip (slice E)", () => {
     expect(screen.getByRole("button", { name: "Copied IBAN" })).toBeTruthy();
   });
 
+  it("copies through the selection where the browser denies the Clipboard API (in-app browsers)", async () => {
+    stubClipboard({ writeText: vi.fn(() => Promise.reject(new Error("denied"))) });
+    const execCommand = vi.fn(() => true);
+    Object.defineProperty(document, "execCommand", { value: execCommand, configurable: true });
+    renderPayment();
+    fireEvent.click(screen.getByRole("button", { name: "Copy IBAN" }));
+    expect(await screen.findByText("IBAN copied.")).toBeTruthy();
+    expect(execCommand).toHaveBeenCalledWith("copy");
+    Object.defineProperty(document, "execCommand", { value: () => false, configurable: true });
+  });
+
   it("tells the patient to select the value where the browser cannot copy", async () => {
     stubClipboard(undefined);
     renderPayment();

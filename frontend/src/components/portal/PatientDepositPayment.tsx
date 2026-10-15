@@ -241,11 +241,34 @@ function useCopy() {
   async function copy(label: string, value: string) {
     const n = ++count.current;
     try {
-      if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
-      await navigator.clipboard.writeText(value);
+      // In-app browsers (WhatsApp's among them) may deny the Clipboard API; the older selection copy still works there.
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
+        await navigator.clipboard.writeText(value);
+      } catch {
+        if (!legacyCopy(value)) throw new Error("copy refused");
+      }
       setFailed(null); setCopied({ label, n });
     } catch { setCopied(null); setFailed({ label, n }); }
     settle();
   }
   return { copied, failed, copy };
+}
+
+/** Copies through a hidden, selected text area (`execCommand`), then gives focus back; false where the browser refuses. */
+function legacyCopy(value: string): boolean {
+  if (typeof document.execCommand !== "function") return false;
+  const previous = document.activeElement as HTMLElement | null;
+  const area = document.createElement("textarea");
+  area.value = value;
+  area.setAttribute("readonly", "");
+  area.setAttribute("aria-hidden", "true");
+  Object.assign(area.style, { position: "fixed", insetBlockStart: "0", opacity: "0", pointerEvents: "none" });
+  document.body.appendChild(area);
+  area.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch { ok = false; }
+  area.remove();
+  previous?.focus?.();
+  return ok;
 }
