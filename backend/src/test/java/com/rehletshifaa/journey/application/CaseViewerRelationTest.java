@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.rehletshifaa.journey.api.JourneyDtos.AssignmentView;
 import com.rehletshifaa.journey.api.JourneyDtos.CaseView;
+import com.rehletshifaa.journey.api.JourneyDtos.TimelineEvent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
@@ -79,6 +81,33 @@ class CaseViewerRelationTest {
         if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, caseId, "coordinator-subject")) journey.claimCoordinatorCase(caseId, "pod");
         em.flush();
         assertThat(journey.workspace(caseId).actions().viewer()).isEqualTo("STAFF");
+    }
+
+    @Test void thePatientSideSeesWhenTheCaseMovedButNotWhoMovedItOrTheStaffOnIt() throws Exception {
+        UUID caseId = submittedCase("+254700000909", "viewer-i@local.test");
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        com.rehletshifaa.coordination.CoordinationTestData.eligibleCoordinator(jdbc, "coordinator-subject");
+        if (!com.rehletshifaa.coordination.CoordinationTestData.hasActiveCoordinator(jdbc, caseId, "coordinator-subject")) journey.claimCoordinatorCase(caseId, "pod");
+        em.flush();
+        var staff = journey.workspace(caseId);
+        assertThat(staff.assignments()).extracting(AssignmentView::assigneeSubject).contains("coordinator-subject");
+        assertThat(staff.timeline()).extracting(TimelineEvent::actorRole).contains("COORDINATOR");
+
+        linkPatient(caseId, "viewer-self-i");
+        represent(caseId, "viewer-rep-i", null, null);
+        for (var viewer : new Object[][] {{"viewer-self-i", Role.PATIENT}, {"viewer-rep-i", Role.PATIENT_REPRESENTATIVE}}) {
+            authenticate((String) viewer[0], (Role) viewer[1]);
+            var page = journey.workspace(caseId);
+            assertThat(page.assignments()).isEmpty();
+            assertThat(page.timeline()).hasSameSizeAs(staff.timeline())
+                    .extracting(TimelineEvent::status, TimelineEvent::occurredAt)
+                    .containsExactlyElementsOf(staff.timeline().stream().map(e -> tuple(e.status(), e.occurredAt())).toList());
+            assertThat(page.timeline()).allSatisfy(e -> {
+                assertThat(e.actorName()).isNull();
+                assertThat(e.actorRole()).isNull();
+                assertThat(e.note()).isNull();
+            });
+        }
     }
 
     // ---------------- fixtures (synthetic data only) ----------------

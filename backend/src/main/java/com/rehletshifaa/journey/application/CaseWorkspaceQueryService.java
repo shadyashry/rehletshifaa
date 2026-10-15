@@ -136,14 +136,17 @@ public class CaseWorkspaceQueryService {
                 .map(this::taskView).toList();
         Set<String> visibleThreads = allowedThreads(actor);
         var messageRows = messages.findRowsOf(caseId, actor.subject()).stream().filter(m -> visibleThreads.contains(m.getThreadType())).toList();
-        var assignmentRows = assignments.findOpenRowsOn(caseId);
+        // Staff work is not the patient's: no open assignments (staff subjects, offers) and no actor or reason on the timeline.
+        var assignmentRows = patientActor ? List.<CaseAssignmentRepository.OpenAssignmentRow>of() : assignments.findOpenRowsOn(caseId);
         var names = caseQueries.names(Stream.of(
-                timelineRows.stream().map(CaseStatusChangeRepository.TimelineRow::getActorSubject),
+                patientActor ? Stream.<String>empty() : timelineRows.stream().map(CaseStatusChangeRepository.TimelineRow::getActorSubject),
                 messageRows.stream().map(CaseMessageRepository.MessageRow::getSenderSubject),
                 assignmentRows.stream().map(CaseAssignmentRepository.OpenAssignmentRow::getSubject)).flatMap(s -> s).toList());
 
-        List<TimelineEvent> timeline = timelineRows.stream().map(r -> new TimelineEvent("STATUS", r.getToStatus(), r.getCreatedAt(), r.getToStatus(),
-                names.actor(r.getActorSubject(), r.getActorRole()), r.getActorRole(), r.getReason())).toList();
+        List<TimelineEvent> timeline = timelineRows.stream().map(r -> patientActor
+                ? new TimelineEvent("STATUS", r.getToStatus(), r.getCreatedAt(), r.getToStatus(), null, null, null)
+                : new TimelineEvent("STATUS", r.getToStatus(), r.getCreatedAt(), r.getToStatus(),
+                        names.actor(r.getActorSubject(), r.getActorRole()), r.getActorRole(), r.getReason())).toList();
         List<MessageView> messageViews = messageRows.stream().map(m -> {
             // A patient's own words are theirs whichever way they arrived (portal, secure link, WhatsApp).
             boolean mine = m.getSenderSubject().equals(actor.subject())
