@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { ProfileActivation } from "./ProfileActivation";
+import { getDictionary } from "@/lib/dictionary";
 
 /**
  * Drives the activation journey through a stubbed API: verify -> prefilled form -> validation errors ->
@@ -44,7 +45,7 @@ function stub(routes: Record<string, () => Promise<Response>>) {
 
 const summary = { caseNumber: "RS-2026-000123", purpose: "ONBOARDING", channel: "WHATSAPP", destinationHint: "***0020" };
 
-async function reachForm(overrides: Record<string, () => Promise<Response>> = {}, prefillOverride: Record<string, unknown> = {}) {
+async function reachForm(overrides: Record<string, () => Promise<Response>> = {}, prefillOverride: Record<string, unknown> = {}, guardianConsent?: string) {
   const fetchMock = stub({
     "/request-access": () => json(summary),
     "/verify": () => json({ grant: "grant-1", expiresAt: new Date().toISOString() }),
@@ -55,7 +56,7 @@ async function reachForm(overrides: Record<string, () => Promise<Response>> = {}
     "000": () => json(summary),
   });
   vi.stubGlobal("fetch", fetchMock);
-  render(<ProfileActivation locale="en" token="tok-000" />);
+  render(<ProfileActivation locale="en" token="tok-000" guardianConsent={guardianConsent} />);
 
   fireEvent.click(await screen.findByRole("button", { name: /send code/i }));
   const code = await screen.findByLabelText(/6-digit code/i);
@@ -103,6 +104,13 @@ describe("ProfileActivation", () => {
     expect(screen.queryByLabelText(/care area|condition|documents/i)).toBeNull();
     // No registration wording anywhere.
     expect(screen.queryByText(/register/i)).toBeNull();
+  });
+
+  it("asks a guardian's consent in the words from the message files (P1-13)", async () => {
+    const words = getDictionary("en").guardianConsent.text;
+    await reachForm({}, { requiredConsents: [...prefill.requiredConsents, "GUARDIAN_AUTHORIZATION"] }, words);
+    expect(screen.getByRole("checkbox", { name: words })).toBeTruthy();
+    expect(screen.queryByText("GUARDIAN_AUTHORIZATION")).toBeNull();
   });
 
   it("requires an account email when the case had none", async () => {

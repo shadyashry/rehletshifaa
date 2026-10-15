@@ -238,7 +238,7 @@ function stageFor(action: PatientAction): Stage {
   return "deposit"; // nothing for the patient to do, but the deposit stage is what they should see
 }
 
-export function ProfileActivation({ locale, token }: { locale: Locale; token: string }) {
+export function ProfileActivation({ locale, token, guardianConsent }: { locale: Locale; token: string; /** P1-13: the GUARDIAN_AUTHORIZATION wording, from `guardianConsent.text`. */ guardianConsent?: string }) {
   const t = copy[locale];
 
   const [stage, setStage] = useState<Stage>("loading");
@@ -631,7 +631,7 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
                       <input type="checkbox" className="mt-1 h-5 w-5 flex-none accent-brand-600" checked={checked}
                              aria-describedby={depositTermsConsent ? "activation-deposit-terms" : undefined}
                              onChange={e => setConsents(v => e.target.checked ? [...v, type] : v.filter(x => x !== type))} />
-                      <span className="text-sm leading-6 text-ink-700">{CONSENT_TEXT[type]?.[locale] ?? type}</span>
+                      <span className="text-sm leading-6 text-ink-700">{type === "GUARDIAN_AUTHORIZATION" && guardianConsent ? guardianConsent : CONSENT_TEXT[type]?.[locale] ?? type}</span>
                     </label>
                   </li>
                 );

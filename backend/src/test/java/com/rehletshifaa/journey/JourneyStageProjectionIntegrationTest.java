@@ -73,7 +73,7 @@ class JourneyStageProjectionIntegrationTest {
     @BeforeEach void signIn() { fixture.signIn("maker"); }
     @AfterEach void clear() { fixture.clear(); }
 
-    CreateCaseRequest intake() { return new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null); }
+    CreateCaseRequest intake() { return new CreateCaseRequest("MYSELF", "Synthetic", "Fixture", null, null, "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, null, null, "AGE_18_64"); }
     JourneyCaseVerificationService.Create command() { return new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(), intake()); }
     UUID admitAndStart() {
         var bound = verification.create(version.definitionId(), version.id(), command());

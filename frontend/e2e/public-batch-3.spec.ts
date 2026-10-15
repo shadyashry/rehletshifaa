@@ -69,6 +69,7 @@ test("Close: the upload says where files go and what is accepted, before any err
   await page.getByLabel(/^Family name \/ surname/).fill("Intake");
   await page.getByRole("combobox", { name: /country of residence/i }).fill("Kenya");
   await page.getByRole("listbox").getByRole("option", { name: /Kenya/ }).click();
+  await page.getByText("18 to 64", { exact: true }).click();
   await page.getByLabel("Phone number").fill("700000000");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText(/private storage.*checked for viruses.*PDF, JPG or PNG, up to 15 MB each/)).toBeVisible();
@@ -79,6 +80,7 @@ async function toReviewStep(page: Page) {
   await page.getByLabel(/^Family name \/ surname/).fill("Intake");
   await page.getByRole("combobox", { name: /country of residence/i }).fill("Kenya");
   await page.getByRole("listbox").getByRole("option", { name: /Kenya/ }).click();
+  await page.getByText("18 to 64", { exact: true }).click();
   await page.getByLabel("Phone number").fill("700000000");
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Continue" }).click();

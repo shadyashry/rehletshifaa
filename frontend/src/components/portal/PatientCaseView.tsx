@@ -9,10 +9,13 @@ import type { CaseViewProps } from "@/components/portal/StaffCaseView";
 import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 import type { Mutate } from "@/components/portal/portal-model";
+import { isGuardianStep } from "@/lib/guardian";
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
 // Role-specific panels, loaded on demand: a coordinator never downloads My Care, a patient never the clinical review.
 const MyCare=dynamic(()=>import("@/components/portal/MyCare").then(m=>m.MyCare));
+const GuardianStep=dynamic(()=>import("@/components/portal/GuardianStep").then(m=>m.GuardianStep));
+const PatientConcerns=dynamic(()=>import("@/components/portal/PatientConcerns").then(m=>m.PatientConcerns));
 const PatientIdentityStep=dynamic(()=>import("@/components/portal/PatientIdentityStep").then(m=>m.PatientIdentityStep));
 const PatientDepositPayment=dynamic(()=>import("@/components/portal/PatientDepositPayment").then(m=>m.PatientDepositPayment));
 const PatientProposal=dynamic(()=>import("@/components/portal/PatientProposal").then(m=>m.PatientProposal));
@@ -39,6 +42,8 @@ export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,m
     <MyCare locale={locale} caseSummary={c} actions={actions} patientAction={value.patientAction} patientProposal={value.patientProposal} proposal={value.proposal??null} deposit={value.deposit??null}
      documents={documents} unreadMessages={unread} cases={allCases} newCaseHref={sendsOwnCase?localeHref(locale,"send-my-case"):null} view={careView} onView={view=>onCareView?.(view)}
      onOpenCase={id=>openCaseById?.(id)} onOpenProposal={()=>setProposalOpen(true)} onWithdraw={()=>mutate(`/patient/cases/${c.id}/withdraw`,{})}
+     guardianStep={actions.currentAction.code==="COMPLETE_PROFILE"&&isGuardianStep(actions.currentAction.blockerCode)?<GuardianStep key={`${c.id}:${actions.currentAction.blockerCode}`} locale={locale} caseId={c.id} blockerCode={actions.currentAction.blockerCode??""} documents={documents} busy={busy} mutate={mutate} load={load}/>:undefined}
+     concerns={<PatientConcerns key={c.id} locale={locale} caseId={c.id} busy={busy} mutate={mutate} load={load}/>}
      identityStep={actions.currentAction.code==="VERIFY_IDENTITY"?<IdentityStep key={c.id} locale={locale} caseId={c.id} busy={busy} mutate={mutate} load={load}/>:undefined}
      paymentStep={actions.currentAction.code==="PAY_DEPOSIT"&&value.deposit?.bankTransfer?<PatientDepositPayment key={`${c.id}:${value.deposit.transfer?.id??"new"}`} locale={locale} caseId={c.id} currency={value.deposit.currency}
       amountDue={value.deposit.balanceDisplay??value.deposit.totalDisplay??null} totalDue={value.deposit.totalDisplay??null} received={value.deposit.paidDisplay??null}

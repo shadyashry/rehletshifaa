@@ -553,7 +553,17 @@
       "someoneElseSignedIn": "You will follow this case in My Care as their representative. We will reach you on your saved contact details.",
       "aboutThisCase": "About this case",
       "forName": "Patient",
-      "submittedBy": "Submitted by"
+      "submittedBy": "Submitted by",
+      "ageTitle": "The patient's age",
+      "ageTitleSelf": "Your age",
+      "ageHelp": "A parent or legal guardian acts for anyone under 18.",
+      "ageBands": {
+        "UNDER_12": "Under 12",
+        "AGE_12_17": "12 to 17",
+        "AGE_18_64": "18 to 64",
+        "AGE_65_PLUS": "65 or older"
+      },
+      "ageLabel": "Age"
     },
     "eyebrow": "A secure first step",
     "title": "Send your medical case",
@@ -621,7 +631,8 @@
       "upload": "We couldn't attach one of your files. Remove it and send your case, or try again — your details are saved.",
       "submitAfterUpload": "Your details reached us but the case wasn't finished. Press Send my case again — nothing will be duplicated.",
       "verifiedContactRequired": "To send a case for someone else, your WhatsApp number and email address must be confirmed first. Message your coordinator and they will confirm them with you.",
-      "forOthersLimit": "You have sent several cases for other people recently. Please try again later, or message your coordinator."
+      "forOthersLimit": "You have sent several cases for other people recently. Please try again later, or message your coordinator.",
+      "ageBand": "Choose an age range."
     },
     "category": {
       "label": "Which care area is your case about?",
@@ -1044,6 +1055,184 @@
     "text": "I confirm I am the patient's parent or legal guardian, that the document I provided is genuine, and that I consent on the patient's behalf to coordinating their care. (Placeholder text pending legal review.)"
   },
   "portalWork": {
+    "safety": {
+      "ageBand": {
+        "label": "Age",
+        "bands": {
+          "UNDER_12": "Under 12",
+          "AGE_12_17": "12 to 17",
+          "AGE_18_64": "18 to 64",
+          "AGE_65_PLUS": "65 or older"
+        },
+        "notStated": "Not stated",
+        "minor": "A parent or legal guardian acts for this patient."
+      },
+      "guardian": {
+        "stepTitle": "Confirm you act for the patient",
+        "stepBody": "The patient is under 18, so a parent or legal guardian decides about their care. Tell us how you are related and choose the document that shows it.",
+        "evidenceTitle": "We need the document that shows you are the guardian",
+        "evidenceBody": "Choose the document that shows you are the patient's parent or legal guardian, such as a birth certificate, a guardianship paper or a court order.",
+        "basisLegend": "You are the patient's",
+        "basis": {
+          "PARENT": "Parent",
+          "LEGAL_GUARDIAN": "Legal guardian",
+          "COURT_ORDER": "Guardian by court order"
+        },
+        "evidenceLegend": "The document that shows it",
+        "evidenceHelp": "Only documents already on this case and checked for viruses can be chosen.",
+        "noEvidence": "There is no checked document on this case yet. Message your coordinator and they will send you a secure link to upload it.",
+        "consentLegend": "Your statement",
+        "confirm": "Confirm",
+        "useDocument": "Use this document",
+        "chooseBasis": "Choose how you are related to the patient.",
+        "chooseDocument": "Choose a document.",
+        "acceptConsent": "Confirm the statement to continue.",
+        "loadFailed": "Your details could not be loaded. Refresh the page, or message your coordinator."
+      },
+      "guardianReview": {
+        "title": "Age and guardian",
+        "change": "Change age",
+        "save": "Save age",
+        "cancel": "Cancel",
+        "guardian": "Guardian",
+        "states": {
+          "NONE": "No parent or guardian has come forward yet",
+          "EVIDENCE_MISSING": "Named, but no document yet",
+          "EVIDENCE_UNVERIFIED": "Document waiting for your check",
+          "VERIFIED": "Verified"
+        },
+        "viewDocument": "View the document",
+        "verify": "Verify",
+        "refuse": "Refuse",
+        "refuseTitle": "Refuse this document?",
+        "refuseBody": "The guardian is asked for another document. Tell them why in the case messages.",
+        "verifiedOn": "Verified {date}",
+        "loadFailed": "The guardian details could not be loaded."
+      },
+      "concerns": {
+        "lead": "Something not right?",
+        "action": "Raise a concern",
+        "title": "Raise a concern",
+        "intro": "A care manager who is not your coordinator reads every concern and follows it up. In an emergency, seek local care now.",
+        "typeLegend": "What is it about?",
+        "types": {
+          "COMPLAINT": "A complaint about our service",
+          "ADVERSE_EVENT": "A health problem after treatment"
+        },
+        "typeShort": {
+          "COMPLAINT": "Complaint",
+          "ADVERSE_EVENT": "Health problem after treatment"
+        },
+        "summaryLabel": "What happened?",
+        "summaryHelp": "Up to 2,000 characters. Only the care managers read it.",
+        "send": "Send concern",
+        "cancel": "Cancel",
+        "chooseType": "Choose what the concern is about.",
+        "describe": "Tell us what happened.",
+        "listTitle": "Your concerns",
+        "raisedOn": "Raised {date}",
+        "resolvedOn": "Resolved {date}",
+        "status": {
+          "OPEN": "Received",
+          "UNDER_REVIEW": "Being reviewed",
+          "RESOLVED": "Resolved"
+        },
+        "loadFailed": "Your concerns could not be loaded."
+      },
+      "incidents": {
+        "title": "Incidents",
+        "intro": "Complaints, disputes and clinical incidents raised on cases. A Care Coordination Manager owns and resolves each one.",
+        "readOnly": "You can read every incident. A Care Coordination Manager works them.",
+        "filters": {
+          "label": "Filter incidents",
+          "status": "Status",
+          "type": "Type",
+          "any": "Any",
+          "mine": "Only incidents I own"
+        },
+        "types": {
+          "COMPLAINT": "Complaint",
+          "DISPUTE": "Dispute",
+          "ADVERSE_EVENT": "Adverse event",
+          "DEATH": "Death"
+        },
+        "severity": {
+          "LOW": "Low",
+          "MEDIUM": "Medium",
+          "HIGH": "High",
+          "CRITICAL": "Critical"
+        },
+        "status": {
+          "OPEN": "Open",
+          "UNDER_REVIEW": "Under review",
+          "RESOLVED": "Resolved"
+        },
+        "source": {
+          "PATIENT": "The patient",
+          "STAFF": "The case team",
+          "SYSTEM": "Recorded automatically"
+        },
+        "resolution": {
+          "NO_ACTION_NEEDED": "No action needed",
+          "EXPLAINED_TO_PATIENT": "Explained to the patient",
+          "CORRECTIVE_ACTION": "Corrective action taken",
+          "REFERRED_TO_PROVIDER": "Referred to the provider",
+          "REFERRED_TO_AUTHORITY": "Referred to an authority",
+          "WITHDRAWN_BY_PATIENT": "Withdrawn by the patient"
+        },
+        "empty": "No incidents match.",
+        "loading": "Loading…",
+        "loadFailed": "Incidents could not be loaded.",
+        "retry": "Try again",
+        "case": "Case",
+        "unowned": "Not assigned",
+        "you": "You",
+        "otherManager": "Another manager",
+        "open": "Open incident {caseNumber}",
+        "view": "Open",
+        "inControlCenter": "in the Control Center",
+        "back": "All incidents",
+        "detailTitle": "Incident on case {caseNumber}",
+        "reported": "What was reported",
+        "raisedBy": "Raised by",
+        "raisedOn": "Raised",
+        "stage": "Case stage then",
+        "owner": "Owner",
+        "takeIt": "Take this incident",
+        "startReview": "Start review",
+        "severityLabel": "Severity",
+        "changeSeverity": "Change severity",
+        "resolveTitle": "Resolve",
+        "resolutionLabel": "Outcome",
+        "noteLabel": "Resolution note",
+        "noteHelp": "Kept encrypted and never shown to the patient.",
+        "resolve": "Resolve incident",
+        "chooseResolution": "Choose the outcome.",
+        "writeNote": "Write what was done.",
+        "resolvedOn": "Resolved {date}",
+        "ownerOnly": "Only the incident's owner reviews it, changes its severity or resolves it.",
+        "saved": "Saved."
+      },
+      "reopen": {
+        "closed": "This case is closed.",
+        "action": "Reopen case",
+        "title": "Reopen this case?",
+        "body": "The case moves to follow-up and its Consultant is asked to review it. The coordinator is told.",
+        "reasonLegend": "Why",
+        "reasons": {
+          "COMPLICATION_REPORTED": "A complication was reported",
+          "PATIENT_REQUEST": "The patient asked",
+          "CLINICAL_FOLLOW_UP_NEEDED": "Clinical follow-up is needed",
+          "INCIDENT_REVIEW": "An incident review needs it"
+        },
+        "incidentLabel": "Related incident (optional)",
+        "noIncident": "None",
+        "noteLabel": "Note for the care team (optional)",
+        "confirm": "Reopen case",
+        "cancel": "Keep it closed",
+        "chooseReason": "Choose why the case is reopened."
+      }
+    },
     "empty": {
       "thread": "No messages in this conversation yet.",
       "noOperations": "No one on the Operations team can be assigned yet. Ask the team's manager to add someone.",
@@ -1281,6 +1470,22 @@
         "REPRESENTATIVE_AUTH_MISSING": {
           "title": "Waiting for representative authorization",
           "body": "A valid representative authorization is required before coordination continues."
+        },
+        "MINOR_REQUIRES_GUARDIAN": {
+          "title": "Waiting for a parent or legal guardian",
+          "body": "The patient is under 18. A parent or legal guardian confirms they act for the patient from My Care."
+        },
+        "GUARDIAN_AUTH_MISSING": {
+          "title": "Waiting for the guardian's details",
+          "body": "The guardian says how they are related to the patient and gives their consent from My Care."
+        },
+        "GUARDIAN_EVIDENCE_MISSING": {
+          "title": "Waiting for the guardian's document",
+          "body": "The guardian chooses the document that shows their authority. Without one on the case, send them a secure upload link."
+        },
+        "GUARDIAN_EVIDENCE_UNVERIFIED": {
+          "title": "The guardian's document needs your check",
+          "body": "Open Age and guardian on the case, look at the document, then verify or refuse it."
         },
         "DEPOSIT_UNPAID": {
           "title": "Waiting for the patient's deposit transfer",

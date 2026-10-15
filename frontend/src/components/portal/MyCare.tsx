@@ -12,6 +12,7 @@ import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { CareAreaMark, CaseSwitcher, phaseIndex, takeArrivalFocus } from "@/components/portal/CaseSwitcher";
 import { formatMoney } from "@/lib/money";
 import type { CaseActions } from "@/components/portal/CurrentAction";
+import { isGuardianStep } from "@/lib/guardian";
 /** The backend's one answer to "may the patient see a proposal, and which one" — rendered, never re-derived from the stage. */
 export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null };
 
@@ -41,12 +42,16 @@ type StepText = { title: string; body: string; next?: string; meanwhile?: string
 /** The steps whose subject is the deposit: its facts belong inside the current step, not in a second block. Paying it is the payment step's own panel. */
 const MONEY_STEPS = new Set(["PAY_DEPOSIT", "WAIT_PAYMENT_CHECK"]);
 
-export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, paymentStep, messagesPanel, newCaseHref = null, onWithdraw }: {
+export function MyCare({ locale, caseSummary, actions, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, guardianStep, paymentStep, messagesPanel, concerns, newCaseHref = null, onWithdraw }: {
   locale: Locale; caseSummary: CaseSummary; actions: CaseActions; patientAction?: PatientAction | null; patientProposal?: PatientProposalState | null;
   proposal?: ProposalSummaryData | null; deposit?: DepositSummaryData | null; documents: CaseDocument[]; unreadMessages: number;
   /** Every case the account can open, this one included; the switcher shows from two. */
   cases: CaseSummary[]; view: CareView; onView: (view: CareView) => void;
   onOpenCase: (id: string) => void; onOpenProposal: () => void; identityStep?: ReactNode;
+  /** P1-13: the guardian's step (legal basis, evidence, consent), rendered when the backend's step is a guardian blocker. */
+  guardianStep?: ReactNode;
+  /** P1-13: "Raise a concern" and the patient's own concerns; one quiet line on the page. */
+  concerns?: ReactNode;
   /** The deposit payment step (DEP-3), rendered when the backend says the patient owes it. */
   paymentStep?: ReactNode; messagesPanel: ReactNode;
   /** Where the account holder sends a new case of their own; null when it is not theirs to send from here. */
@@ -58,7 +63,12 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
   const t = work.myCare;
   const c = caseSummary;
   const code = actions.currentAction.code;
-  const step = stepText(code, t.steps, { proposalState: patientProposal?.state ?? null, status: c.status, exit: actions.currentAction.exit ?? null });
+  // P1-13: a guardian blocker is its own step in words (the backend still says COMPLETE_PROFILE; the blocker names which part).
+  const guardianCode = code === "COMPLETE_PROFILE" && isGuardianStep(actions.currentAction.blockerCode) ? actions.currentAction.blockerCode : null;
+  const guardianCopy = work.safety.guardian;
+  const step = guardianCode
+    ? (guardianCode === "GUARDIAN_EVIDENCE_MISSING" ? { title: guardianCopy.evidenceTitle, body: guardianCopy.evidenceBody } : { title: guardianCopy.stepTitle, body: guardianCopy.stepBody })
+    : stepText(code, t.steps, { proposalState: patientProposal?.state ?? null, status: c.status, exit: actions.currentAction.exit ?? null });
   const body = code === "PROVIDE_INFORMATION" ? patientAction?.message?.trim() || step.body : step.body;
   // A case closed or cancelled says nothing about how far it got, so its journey shows no step as reached or current.
   const phase = c.status === "CLOSED" || c.status === "CANCELLED" ? -1 : phaseIndex(c.status);
@@ -165,7 +175,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
                 ))}
               </ul>
             )}
-            {code === "COMPLETE_PROFILE" && actions.blockers.length > 0 && (
+            {code === "COMPLETE_PROFILE" && guardianCode && guardianStep && <div className="mt-6">{guardianStep}</div>}
+            {code === "COMPLETE_PROFILE" && !(guardianCode && guardianStep) && actions.blockers.length > 0 && (
               <ul className="mt-4 list-disc space-y-1 ps-5 text-[0.9375rem] text-ink-800">
                 {actions.blockers.map(b => <li key={b.code}>{locale === "ar" ? b.labelAr : b.labelEn}</li>)}
               </ul>
@@ -282,6 +293,8 @@ export function MyCare({ locale, caseSummary, actions, patientAction, patientPro
               <a href={newCaseHref} className="link-cta inline-flex min-h-11 items-center gap-2 text-[0.9375rem]"><Plus size={16} aria-hidden/>{t.cases.sendNew}</a>
             </p>
           )}
+
+          {concerns && <div className="lg:col-start-1">{concerns}</div>}
 
           {/* WITHDRAW — one quiet way out, in words, away from the step's own action; never a second call to action. */}
           {canWithdraw && (

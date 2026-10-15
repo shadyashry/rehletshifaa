@@ -13,7 +13,7 @@ import type { ControlCenterAccess } from "./control-center-access";
  */
 export type NavKey =
   | "overview" | "consultants"
-  | "identity"
+  | "identity" | "incidents"
   | "pricing" | "exchangeRates" | "marginDeposit" | "facilities"
   | "coordination"
   | "journeys"
@@ -41,6 +41,8 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { key: "reviews", label: ["Reviews & Safety", "المراجعات والسلامة"], icon: BadgeCheck, items: [
     { key: "identity", path: "/identity-checks", label: ["Identity Checks", "التحقق من الهوية"], summary: ["Patient and representative identity evidence waiting for a decision.", "أدلة هوية المرضى والممثلين التي تنتظر قرارًا."], visible: (a) => a.can("PATIENT_IDENTITY_READ") },
+    // P1-13 (A-06): managers work incidents here; Compliance reads them. The page's own words come from the message files.
+    { key: "incidents", path: "/incidents", label: ["Incidents", "الحوادث"], summary: ["Complaints, disputes and clinical incidents raised on cases.", "الشكاوى والنزاعات والحوادث السريرية المسجّلة على الحالات."], visible: (a) => a.can("INCIDENT_READ") },
   ] },
   { key: "commercial", label: ["Commercial", "الشؤون التجارية"], icon: Tags, items: [
     { key: "pricing", path: "/commercial/prices", label: ["Price Lists", "قوائم الأسعار"], summary: ["Consultant price lists and care-area service templates.", "قوائم أسعار الاستشاريين وقوالب الخدمات لكل مجال رعاية."], visible: (a) => a.can("CONSULTANT_CATALOG_MANAGE") },

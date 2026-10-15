@@ -36,9 +36,11 @@ import { copy, FeedbackContext, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Em
 const ClinicalReviewPanel=dynamic(()=>import("@/components/portal/ClinicalReview").then(m=>m.ClinicalReviewPanel));
 const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAssignmentDialog").then(m=>m.DeclineAssignmentDialog));
 const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnership").then(m=>m.TransferOwnership));
+const GuardianReview=dynamic(()=>import("@/components/portal/GuardianReview").then(m=>m.GuardianReview));
+const ReopenCase=dynamic(()=>import("@/components/portal/ReopenCase").then(m=>m.ReopenCase));
 const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatientResponse").then(m=>m.RecordPatientResponse));
 
-export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];/** P0-5: active facilities with their approved packages, for the travel/treatment pickers and the consultant's package lines. */facilities?:DirectoryFacility[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
+export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];/** P0-5: active facilities with their approved packages, for the travel/treatment pickers and the consultant's package lines. */facilities?:DirectoryFacility[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null;/** P1-13: holds CASE_REOPEN on the platform (a Care Coordination Manager); a Consultant's own case is checked by the backend. */canReopen?:boolean};
 
 /**
  * What every part of the staff case page shares — the viewer, the case and the one way to change it — provided once by
@@ -70,7 +72,7 @@ type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
  * Patients never load this module (`PatientCaseView` renders My Care instead).
  */
-export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
+export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref,canReopen=false}:CaseViewProps){
  const work=useWorkCopy();
  const c=value.caseSummary;
  const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,price:proposalCopy.price,fxRates,catalog,facilities,mySubject}),[locale,t,role,c,busy,mutate,proposalCopy.price,fxRates,catalog,facilities,mySubject]);
@@ -212,6 +214,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
      onApprove={()=>void mutate(`/finance/cases/${c.id}/proposals/${value.proposal!.versionId}/approve`)}/>
     :formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref} proposal={value.proposal} representatives={value.representatives}/>:undefined}/>
 
+  {/* P1-13: a closed case is reopened into follow-up by a manager or the case's own Consultant; one quiet line, never on another stage. */}
+  {c.status==="CLOSED"&&!value.preview&&(isDoctor||(isCoordinator&&canReopen))&&<ReopenCase locale={locale} caseId={c.id} side={isDoctor?"doctor":"coordinator"} busy={busy} mutate={mutate} load={load}/>}
+
   {isCoordinator&&<CaseBlockers locale={locale} blockers={actions.blockers} deposit={value.deposit}/>}
 
   <div aria-busy={busy||undefined} className="min-w-0">
@@ -255,6 +260,8 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
          total={value.proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0)} busy={busy} mutate={mutate}/>}
        {!isCoordinator&&!isDoctor&&(value.proposal||value.deposit)&&proposalPanel}
        {/* The case brief: the facts a coordinator decides ownership on, and the operational context once they own it. */}
+       {/* P1-13 (A-05): the age band (the owner corrects it) and, for a minor, the guardian and the evidence decision. */}
+       {isCoordinator&&!value.preview&&<GuardianReview key={c.id} locale={locale} caseId={c.id} ageBand={c.ageBand} canEdit={owned} busy={busy} mutate={mutate} load={load} viewDoc={viewDoc}/>}
        {isCoordinator&&<CoordinatorBrief actions={actions} documents={documents} preview={!!value.preview} intakeSummary={value.intakeSummary} consultantName={consultantOnCase} onClinical={()=>setTab("clinical")} onDocuments={()=>setTab("documents")}/>}
       </div>
 

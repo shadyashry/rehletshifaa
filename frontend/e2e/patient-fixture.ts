@@ -26,9 +26,13 @@ export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: strin
   /** The server refuses a new case with this error code (e.g. a limit on cases sent for others). */
   newCaseRefusal?: { status: number; code: string };
   /** With "proposal-ready": the proposal is a final quote in this state, and a decision on it may be refused with this code (P1-10). */
-  finalQuote?: { scopeChangeReason?: string; acceptableFrom?: string; fxReapprovalStatus?: string; decisionRefusal?: { status: number; code: string } } };
+  finalQuote?: { scopeChangeReason?: string; acceptableFrom?: string; fxReapprovalStatus?: string; decisionRefusal?: { status: number; code: string } };
+  /** P1-13: the case's current step is this guardian blocker (the patient is a minor; the account acts as their guardian). */
+  guardian?: "MINOR_REQUIRES_GUARDIAN" | "GUARDIAN_AUTH_MISSING" | "GUARDIAN_EVIDENCE_MISSING";
+  /** P1-13: concerns the patient already raised on the case. */
+  concerns?: { id: string; type: string; status: string; raisedAt: string; resolvedAt?: string | null }[] };
 
-export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, finalQuote }: PatientOptions = {}) {
+export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, finalQuote, guardian, concerns = [] }: PatientOptions = {}) {
   await page.addInitScript(({ authority }) => {
     sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({ access_token: "synthetic", token_type: "Bearer", scope: "openid",
       profile: { sub: "patient-1", name: "Maya Example", email: "maya@example.test", roles: ["PATIENT"] }, expires_at: Math.floor(Date.now() / 1000) + 3600 }));
@@ -40,7 +44,9 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     ? { journeyStage: "PATIENT_DECISION", waitingOn: "PATIENT", blockers: [], currentAction: { code: "REVIEW_PROPOSAL", kind: "FOCUS" }, availableActions: ["MESSAGE_COORDINATOR"] }
     : paid ? { journeyStage: "TRAVEL_COORDINATION", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_COORDINATION", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] }
     : { journeyStage: "ACCEPTED", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_PAYMENT_CHECK", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] };
-  const actions = { ...states, viewer, ...(identity !== undefined ? { currentAction: { code: "VERIFY_IDENTITY", kind: "FOCUS", blocker: "IDENTITY_NOT_VERIFIED" } } : {}) };
+  const actions = { ...states, viewer, ...(identity !== undefined ? { currentAction: { code: "VERIFY_IDENTITY", kind: "FOCUS", blocker: "IDENTITY_NOT_VERIFIED" } } : {}),
+    ...(guardian ? { waitingOn: "PATIENT", currentAction: { code: "COMPLETE_PROFILE", kind: "FOCUS", blockerCode: guardian },
+      blockers: [{ code: guardian, labelEn: "Guardian details required", labelAr: "مطلوب إدخال بيانات الوصي", owner: "PATIENT", gating: true }] } : {}) };
   const workspace = {
     caseSummary, timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: "2026-09-01T09:00:00Z" }, { type: "STATUS", label: caseSummary.status, status: caseSummary.status, occurredAt: stamp }],
     tasks: [], messages: [{ id: "m1", threadType: "PATIENT_COORDINATOR", senderRole: "COORDINATOR", senderName: "Sara Ahmed", direction: "INBOUND", body: "Welcome — I will send the deposit details shortly.", createdAt: stamp, internalOnly: false, read: false }],
@@ -96,7 +102,10 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (multipleCases && api === "/patient/cases/case-2") return reply(relativeWorkspace);
     if (multipleCases && api === "/patient/cases/case-3") return reply(closedWorkspace);
     if (api === "/patient/cases/case-1") return reply(workspace);
-    if (api === "/patient/cases/case-1/onboarding") return reply({ identity: identity ?? null });
+    if (api === "/patient/cases/case-1/onboarding") return reply({ identity: identity ?? null, version: 2, subjectType: guardian ? "GUARDIAN" : "PATIENT", completedConsentTypes: [] });
+    if (/^\/patient\/cases\/case-1\/onboarding\/(consents|subject|guardian-evidence)$/.test(api)) return reply({ version: 3, subjectType: "GUARDIAN", completedConsentTypes: ["GUARDIAN_AUTHORIZATION"] });
+    if (api === "/patient/cases/case-1/concerns" && request.method() === "POST") { concerns.unshift({ id: `c${concerns.length + 1}`, type: request.postDataJSON().type, status: "OPEN", raisedAt: stamp }); return reply(concerns[0]); }
+    if (api.endsWith("/concerns")) return reply(concerns);
     if (api === "/patient/cases/case-1/proposals/v1/decision" && finalQuote?.decisionRefusal) return reply({ code: finalQuote.decisionRefusal.code, message: "Server wording in English (must not reach the patient)" }, finalQuote.decisionRefusal.status);
     if (api === "/patient/cases/case-1/proposals/v1/decision") return reply({ ...proposal, status: "ACCEPTED" });
     // The Arabic assisted path: asking once opens the coordinator's work; the page then says it was asked.

@@ -9,7 +9,7 @@ P1-16 (treatment evidence) and P1-18 (follow-up execution) write to these models
 | Where | What |
 |---|---|
 | `medical_cases.age_band` | `UNDER_12`, `AGE_12_17`, `AGE_18_64`, `AGE_65_PLUS`, or NULL = not stated. `casemanagement.domain.AgeBand`. |
-| Intake | Optional `ageBand` on `CreateCaseRequest` and `NewCaseForPatientRequest` (signed-in next case, and the case sent for someone else). It becomes required on the wire when the form sends it (UI session). |
+| Intake | Required `ageBand` on `CreateCaseRequest` and `NewCaseForPatientRequest` (signed-in next case, and the case sent for someone else); both intake forms ask it (P1-13 session 2). |
 | Correction | `PUT /api/v1/coordinator/cases/{id}/age-band` (`CASE_COORDINATE`, case owner). Audited as `CASE_AGE_BAND_RECORDED` with `from -> to`. |
 | Staff view | `CaseView.ageBand` (coordinator and consultant views; null in the patient's own view). |
 | Rule | The two minor bands mean the patient cannot consent alone. A missing band is treated as an adult until a coordinator records it. |
@@ -85,3 +85,17 @@ Reasons: `COMPLICATION_REPORTED`, `PATIENT_REQUEST`, `CLINICAL_FOLLOW_UP_NEEDED`
 Endpoints: `POST /api/v1/coordinator/cases/{id}/reopen` (manager), `POST /api/v1/doctor/cases/{id}/reopen` (Consultant).
 
 Not touched (P1-18): the 30-day window, the closure statement and review request, patient-visible wording of a reopened case.
+
+## 5. Screens (session 2)
+
+| Who | Where | Component |
+|---|---|---|
+| Patient / guardian | Send my case and the signed-in new case: the age question | `CaseForm` |
+| Guardian | My Care current step for `MINOR_REQUIRES_GUARDIAN`, `GUARDIAN_AUTH_MISSING`, `GUARDIAN_EVIDENCE_MISSING`; activation page consent | `GuardianStep`, `ProfileActivation` |
+| Coordinator | Case overview: age band, guardian, evidence decision | `GuardianReview` |
+| Patient | My Care: "Raise a concern" and their concerns | `PatientConcerns` |
+| Manager, Compliance | Control Center › Reviews & Safety › Incidents | `IncidentsPage` |
+| Manager, Consultant | Closed case: "Reopen case" | `ReopenCase` |
+
+The guardian can only choose a document already on the case: the signed-in portal has no upload yet (open gap).
+

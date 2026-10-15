@@ -103,7 +103,7 @@ class JourneyActionDispatchIntegrationTest {
     @BeforeEach void resetRouting() { com.rehletshifaa.coordination.CoordinationTestData.reset(jdbc); }
     @AfterEach void clear() { SecurityContextHolder.clearContext(); com.rehletshifaa.coordination.CoordinationTestData.reset(jdbc); }
 
-    CreateCaseRequest intake() { return new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null); }
+    CreateCaseRequest intake() { return new CreateCaseRequest("MYSELF", "Synthetic", "Fixture", null, null, "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, null, null, "AGE_18_64"); }
     UUID admitAndStart() {
         var bound = verification.create(version.definitionId(), version.id(), new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(), intake()));
         verification.start(bound.caseId());
@@ -315,7 +315,7 @@ class JourneyActionDispatchIntegrationTest {
         fixture.signIn("maker");
         var bound = verification.create(assignVersion.definitionId(), assignVersion.id(),
                 new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(),
-                        new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology")));
+                        new CreateCaseRequest("MYSELF", "Synthetic", "Fixture", null, null, "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology", null, "AGE_18_64")));
         verification.start(bound.caseId());
         UUID initialConsultant = clinician();
         bindDoctor(bound.caseId(), initialConsultant); // the case's Consultant (routing preferences)
@@ -351,7 +351,7 @@ class JourneyActionDispatchIntegrationTest {
 
         var bound = verification.create(assignVersion.definitionId(), assignVersion.id(),
                 new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(),
-                        new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology")));
+                        new CreateCaseRequest("MYSELF", "Synthetic", "Fixture", null, null, "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology", null, "AGE_18_64")));
         verification.start(bound.caseId());
         var before = syncAsMaker(bound.caseId());
         assertThatThrownBy(() -> projections.completeWorkItem(bound.caseId(), "assign", Map.of(), null))

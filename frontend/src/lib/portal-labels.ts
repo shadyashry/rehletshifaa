@@ -2,7 +2,8 @@ import type { Dictionary } from "@/lib/dictionary";
 import { intlLocale, type Locale } from "@/lib/i18n";
 
 /** Staff work copy (`messages/*.json` → `portalWork`) plus the care-area titles for this locale, keyed by slug. */
-export type WorkCopy = Dictionary["portalWork"] & { careAreas: Record<string, string> };
+/** `guardianConsent`: P1-13, the GUARDIAN_AUTHORIZATION wording (`guardianConsent.text`, one key per locale; placeholder pending counsel). */
+export type WorkCopy = Dictionary["portalWork"] & { careAreas: Record<string, string>; guardianConsent: string };
 type PluralForms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string };
 
 export const fillTemplate = (template: string, values: Record<string, string | number>) =>

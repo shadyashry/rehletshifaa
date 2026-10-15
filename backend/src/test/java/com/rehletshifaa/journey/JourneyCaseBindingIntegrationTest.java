@@ -47,7 +47,7 @@ class JourneyCaseBindingIntegrationTest {
     }
     @BeforeEach void signIn() { fixture.signIn("maker"); }
     @AfterEach void clear() { fixture.clear(); }
-    CreateCaseRequest intake() { return new CreateCaseRequest("Synthetic","Fixture","AE","+971500000001","Synthetic verification only","en",true,null); }
+    CreateCaseRequest intake() { return new CreateCaseRequest("MYSELF","Synthetic","Fixture",null,null,"AE","+971500000001","Synthetic verification only","en",true,null,null,null,null,null,"AGE_18_64"); }
     JourneyCaseVerificationService.Create command() { return new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(),intake()); }
     JourneyCaseVerificationService.View create(JourneyCaseVerificationService.Create command) { return verification.create(version.definitionId(),version.id(),command); }
     long count(String table) { return jdbc.queryForObject("SELECT count(*) FROM "+table,Long.class); }
@@ -121,7 +121,7 @@ class JourneyCaseBindingIntegrationTest {
 
     @Test void conflictsInvalidInputUndeployedVersionAndMissingEngineFailClosed() {
         var command=command(); var bound=create(command);
-        var changed=new CreateCaseRequest("Different","Fixture","AE","+971500000001","Synthetic verification only","en",true,null);
+        var changed=new CreateCaseRequest("MYSELF","Different","Fixture",null,null,"AE","+971500000001","Synthetic verification only","en",true,null,null,null,null,null,"AGE_18_64");
         assertThatThrownBy(()->create(new JourneyCaseVerificationService.Create(command.commandKey(),changed))).hasMessageContaining("different case admission");
         assertThatThrownBy(()->create(new JourneyCaseVerificationService.Create("bad key",intake()))).hasMessageContaining("valid consenting intake");
         assertThatThrownBy(()->verification.create(UUID.randomUUID(),version.id(),command())).hasMessageContaining("not found");

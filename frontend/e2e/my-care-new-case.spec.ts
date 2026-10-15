@@ -10,6 +10,7 @@ import { setupPatient } from "./patient-fixture";
 const createBody = (writes: { path: string; body: unknown }[]) => writes.find(w => w.path === "/patient/cases")?.body as Record<string, unknown> | undefined;
 
 async function consentAndSend(page: Page) {
+  await page.getByText("18 to 64", { exact: true }).click();
   await page.getByText("I consent to RehletShifaa").click();
   await page.getByRole("button", { name: "Send my new case" }).click();
 }
@@ -62,7 +63,7 @@ test("the default is still the patient's own next case, with nothing about anoth
   await expect(page.getByLabel("Given name(s)")).toHaveCount(0);
   await consentAndSend(page);
   await expect(page.getByText("RS-2026-000120")).toBeVisible();
-  expect(createBody(writes)).toMatchObject({ caseFor: "MYSELF", someoneElse: null });
+  expect(createBody(writes)).toMatchObject({ caseFor: "MYSELF", someoneElse: null, ageBand: "AGE_18_64" });
 });
 
 test("in Arabic, the same choice reads right-to-left on a phone", async ({ page }) => {
