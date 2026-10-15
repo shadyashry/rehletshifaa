@@ -1356,7 +1356,14 @@
         "CONFIRM_SECOND_OPINION": "Choose a Consultant",
         "SECOND_OPINION": "Give your second opinion",
         "REVIEW": "Mark reviewed",
-        "INFORMATION_REQUEST": "Mark handled"
+        "INFORMATION_REQUEST": "Mark handled",
+        "CHECK_PROFORMA": "Check the letter",
+        "PRICE_VARIANCE": "Decide on the price",
+        "REVISE_ADMISSION_LETTER": "Record the new letter",
+        "COUNTERSIGN_BALANCE": "Check the receipt",
+        "APPROVE_POINT_OF_NO_RETURN": "Check the point of no return",
+        "EMERGENCY_ADMISSION_REVIEW": "Open Admission & money",
+        "ADMISSION_VOUCHER_BLOCKED": "Open Admission & money"
       },
       "actions": {
         "ASSIGN_CONSULTANT": "Assign Consultant",
@@ -1368,7 +1375,9 @@
         "ASSIGN_FINANCE": "Assign Finance",
         "RECORD_CLINICAL_DECISION": "Record clinical decision",
         "UPDATE_TRAVEL_PLAN": "Complete arrangements",
-        "APPROVE_COMMERCIAL_TERMS": "Approve commercial terms"
+        "APPROVE_COMMERCIAL_TERMS": "Approve commercial terms",
+        "RECORD_HOSPITAL_BALANCE": "Record the receipt",
+        "RECORD_ADMISSION_NUMBER": "Record the admission number"
       },
       "states": {
         "CLAIM_CASE": {
@@ -1458,6 +1467,14 @@
         "default": {
           "title": "Nothing needs you right now",
           "body": "The next step appears here as soon as it is due."
+        },
+        "RECORD_HOSPITAL_BALANCE": {
+          "title": "Record the hospital receipt",
+          "body": "The patient pays the balance at the hospital cashier against the voucher. Record the receipt; Finance then countersigns it."
+        },
+        "RECORD_ADMISSION_NUMBER": {
+          "title": "Record the admission number",
+          "body": "The patient is cleared for admission. Record the hospital's admission number once it is issued; treatment cannot start without it."
         }
       },
       "readiness": {
@@ -1772,6 +1789,28 @@
         "NONE": {
           "title": "You're all set for now",
           "body": "Our team is handling the next step and will keep you updated."
+        },
+        "CONFIRM_ARRIVAL": {
+          "title": "Tell us when you have arrived",
+          "body": "Once you are in Egypt, confirm your arrival here so your coordinator and the hospital can prepare your admission.",
+          "next": "You then pay the hospital balance at the cashier, using your admission voucher."
+        },
+        "PAY_BALANCE": {
+          "title": "Pay the balance at the hospital",
+          "body": "Show your voucher number at the hospital cashier and pay the amount below. Keep the receipt; the hospital sends us a copy.",
+          "next": "Our finance team checks the receipt, then you are cleared for admission."
+        },
+        "WAIT_BALANCE_CHECK": {
+          "title": "We are checking your hospital receipt",
+          "body": "The hospital's receipt for your balance is recorded. Our finance team is checking it.",
+          "next": "Once it is checked, you are cleared for admission.",
+          "meanwhile": "Keep your receipt and your reports with you."
+        },
+        "CLEARED_FOR_ADMISSION": {
+          "title": "You are cleared for admission",
+          "body": "Your balance is settled and everything is in place for your admission.",
+          "next": "The hospital admits you and your treatment begins as planned.",
+          "meanwhile": "Bring your passport, your voucher number and all your reports to the hospital."
         }
       },
       "payment": {
@@ -1906,6 +1945,28 @@
         "full": "This case holds as many files as it can. Message your coordinator.",
         "failed": "The file could not be uploaded. Try again, or message your coordinator.",
         "added": "{name} passed the check and is now in your documents."
+      },
+      "admission": {
+        "title": "Your admission",
+        "hospital": "Hospital",
+        "date": "Admission date",
+        "voucher": "Voucher number",
+        "payAtHospital": "Pay at the hospital cashier",
+        "inYourCurrency": "About {amount} at the rate fixed on your quote",
+        "feeBalance": "Platform fee still to pay",
+        "feeBalanceNote": "This part of the platform fee was not covered by your deposit. Your coordinator tells you how to pay it.",
+        "depositCredit": "Already covered by your deposit",
+        "clearedOn": "You are cleared for admission on {date}.",
+        "state": {
+          "DUE": "To pay",
+          "CHECKING": "Checking",
+          "PAID": "Paid"
+        },
+        "arrived": "I have arrived",
+        "arrivedTitle": "Confirm your arrival?",
+        "arrivedBody": "Confirm only once you are in Egypt. Your coordinator and the hospital are told straight away.",
+        "arrivedConfirm": "Yes, I have arrived",
+        "cancel": "Cancel"
       }
     },
     "nav": {
@@ -2052,7 +2113,14 @@
       "FX_REAPPROVAL": "Check the exchange rate on a final quote",
       "FINAL_QUOTE_EXPIRED": "Final quote expired: contact the patient",
       "INCIDENT_REVIEW": "Review an incident",
-      "FOLLOW_UP_REVIEW": "Review the reopened case"
+      "FOLLOW_UP_REVIEW": "Review the reopened case",
+      "CHECK_PROFORMA": "Check the hospital's admission letter",
+      "PRICE_VARIANCE": "Hospital price above the accepted estimate",
+      "REVISE_ADMISSION_LETTER": "Ask the hospital for a new admission letter",
+      "COUNTERSIGN_BALANCE": "Countersign the hospital receipt",
+      "APPROVE_POINT_OF_NO_RETURN": "Approve the point of no return",
+      "EMERGENCY_ADMISSION_REVIEW": "Review an emergency admission",
+      "ADMISSION_VOUCHER_BLOCKED": "The admission voucher could not be issued"
     },
     "proposalVersion": "v{number}",
     "waitingReason": {
@@ -2076,7 +2144,10 @@
         "TRANSFER_TO_VERIFY": "Transfer reference received — Finance to verify it",
         "DEPOSIT_BALANCE_DUE": "Part of the deposit received — the patient owes the balance",
         "DEPOSIT_TRANSFER_REJECTED": "Transfer not confirmed — the patient to check and resend the reference",
-        "PATIENT_INFO_UNANSWERED": "The patient did not answer the information request"
+        "PATIENT_INFO_UNANSWERED": "The patient did not answer the information request",
+        "ADMISSION_BALANCE_DUE": "Voucher issued — the patient pays the balance at the hospital",
+        "ADMISSION_BALANCE_TO_CHECK": "Hospital receipt recorded — Finance to countersign it",
+        "CLEARED_FOR_ADMISSION": "Cleared for admission — the hospital admits the patient"
       }
     },
     "leaveCase": {
@@ -2345,6 +2416,38 @@
         "CONSULTANT_NEEDS_INFORMATION": {
           "title": "The Consultant needs more information from the patient",
           "context": "{consultant} asked for more information before recommending."
+        },
+        "CHECK_PROFORMA": {
+          "title": "Check the hospital's admission letter for {caseNumber}",
+          "context": "Compare the hospital's quoted package with the accepted estimate, then accept or refuse the letter."
+        },
+        "PRICE_VARIANCE": {
+          "title": "Hospital price above the estimate on {caseNumber}",
+          "context": "The hospital quoted more than the estimate the patient accepted. Accept it with a reason or refuse it; travel cannot be confirmed until you decide."
+        },
+        "REVISE_ADMISSION_LETTER": {
+          "title": "Finance refused the admission letter for {caseNumber}",
+          "context": "Ask the hospital for a new letter, then record it under Admission & money."
+        },
+        "COUNTERSIGN_BALANCE": {
+          "title": "Countersign the hospital receipt for {caseNumber}",
+          "context": "Operations recorded the cashier's receipt for the hospital balance. Check it against the voucher, then countersign it."
+        },
+        "APPROVE_POINT_OF_NO_RETURN": {
+          "title": "Approve the point of no return for {caseNumber}",
+          "context": "Operations set the time after which travel is no longer refundable. Check it, then approve it."
+        },
+        "EMERGENCY_ADMISSION_REVIEW": {
+          "title": "Review the emergency admission on {caseNumber}",
+          "context": "The Consultant admitted the patient before the balance was evidenced. Settle the money with Operations and the hospital."
+        },
+        "ADMISSION_VOUCHER_BLOCKED": {
+          "title": "The admission voucher for {caseNumber} could not be issued",
+          "context": "The deposit is larger than the hospital package and the platform fee together, so no voucher was issued. The patient's acceptance stands; agree the next step with Operations."
+        },
+        "CLEARED_FOR_ADMISSION": {
+          "title": "{caseNumber} is cleared for admission",
+          "context": "The final quote, the consent and the balance are evidenced. The hospital can admit the patient; record the admission number once it is issued."
         }
       }
     },
@@ -2358,6 +2461,147 @@
       "otherArea": "Choose another care area",
       "seeConsultants": "See Consultants for {area} in the Control Center",
       "askLead": "Ask your coordinator lead to add or approve a Consultant for {area}."
+    },
+    "admission": {
+      "title": "Admission & money",
+      "notReserved": "No hospital is reserved yet.",
+      "loadFailed": "The admission details could not be loaded.",
+      "facility": "Hospital",
+      "plannedAt": "Planned admission",
+      "admissionStatus": {
+        "RESERVED": "Reserved",
+        "CONFIRMED": "Confirmed",
+        "ADMITTED": "Admitted",
+        "CANCELLED": "Cancelled"
+      },
+      "letter": "Admission letter",
+      "letterCheck": {
+        "NONE": "No letter yet",
+        "CHECK_PENDING": "Waiting for Finance's check",
+        "VARIANCE_OPEN": "Above the accepted estimate — Finance to decide",
+        "REFUSED": "Refused by Finance — a new letter is needed",
+        "WITHIN_ESTIMATE": "Checked, within the estimate",
+        "VARIANCE_ACCEPTED": "Checked, above the estimate (accepted with a reason)"
+      },
+      "referenceMax": "Accepted estimate maximum",
+      "voucher": "Voucher",
+      "voucherRevision": "revision {revision}",
+      "noVoucher": "No voucher issued yet.",
+      "money": {
+        "packageTotal": "Hospital package",
+        "platformFee": "Platform fee",
+        "depositPaid": "Deposit paid",
+        "depositCredit": "Deposit credited to the hospital",
+        "patientPays": "Patient pays at the cashier",
+        "feeBalance": "Platform fee balance",
+        "balanceOwed": "Hospital balance still owed",
+        "feeBalanceOwed": "Fee balance still owed",
+        "rate": "Frozen rate {rate} on {date}"
+      },
+      "pointOfNoReturn": "Point of no return",
+      "pnrApproved": "approved by Finance",
+      "pnrPending": "waiting for Finance",
+      "admissionNumber": "Admission number",
+      "emergencyRecorded": "Emergency admission recorded by the Consultant; Finance reviews it.",
+      "checklist": {
+        "title": "Before admission",
+        "clear": "Nothing stands between the patient and admission.",
+        "blockers": {
+          "FINAL_QUOTE_NOT_ACCEPTED": "The final quote is not accepted",
+          "PROCEDURE_CONSENT_MISSING": "Procedure consent is not on file",
+          "VOUCHER_NOT_ISSUED": "No admission voucher is issued",
+          "BALANCE_NOT_EVIDENCED": "The hospital balance is not evidenced (cashier receipt countersigned by Finance)",
+          "FEE_BALANCE_DUE": "The platform fee balance is not received",
+          "ADMISSION_NUMBER_MISSING": "The hospital admission number is not recorded"
+        }
+      },
+      "forms": {
+        "reserve": "Reserve the hospital",
+        "changeReservation": "Change the reservation",
+        "chooseFacility": "Choose a hospital",
+        "save": "Save",
+        "letter": "Record the admission letter",
+        "document": "Letter (a checked document on the case)",
+        "chooseDocument": "Choose the document",
+        "noDocuments": "Upload the hospital's letter to the case first; it can be chosen once it is checked.",
+        "quoted": "Quoted package (EGP)",
+        "reference": "Hospital reference (optional)",
+        "record": "Record",
+        "voucher": "Issue the voucher",
+        "voucherHint": "The voucher is issued on its own once the final quote is accepted and the letter is checked. Issue it by hand only for a case without a final quote.",
+        "receipt": "Record the hospital receipt",
+        "receiptNumber": "Receipt number",
+        "amountEgp": "Amount (EGP)",
+        "paidAt": "Paid at",
+        "method": "Method",
+        "methods": {
+          "CASH": "Cash",
+          "CARD": "Card",
+          "BANK_TRANSFER": "Bank transfer"
+        },
+        "receiptDocument": "Receipt copy (optional)",
+        "none": "None",
+        "paidCurrency": "Paid in currency (optional)",
+        "paidAmount": "Amount paid in that currency (optional)",
+        "pnr": "Set the point of no return",
+        "pnrAt": "No refund for travel after",
+        "number": "Record the admission number",
+        "numberField": "Hospital admission number",
+        "numberHint": "Needed before treatment starts."
+      },
+      "finance": {
+        "letterTitle": "Check the admission letter",
+        "quoted": "Quoted by the hospital",
+        "accept": "Accept the letter",
+        "refuse": "Refuse the letter",
+        "note": "Reason",
+        "noteRequired": "Give a reason: the price is above the accepted estimate.",
+        "refuseNoteRequired": "Give the reason for refusing the letter.",
+        "toCountersign": "To countersign",
+        "countersign": "Countersign",
+        "countersignTitle": "Countersign this record?",
+        "countersignBody": "You confirm you checked it against the voucher. You may be asked to sign in again.",
+        "feeTitle": "Record the platform fee balance",
+        "reference": "Payment reference",
+        "receivedAt": "Received at",
+        "freshSignIn": "You may be asked to sign in again to confirm."
+      },
+      "emergency": {
+        "title": "Emergency admission",
+        "body": "Admit before the balance is evidenced only when the patient's condition cannot wait. Finance reviews it afterwards. It never replaces the final quote or the consent.",
+        "reason": "Why the admission cannot wait",
+        "record": "Record emergency admission",
+        "confirmTitle": "Record an emergency admission?",
+        "confirmBody": "The hospital may admit the patient before the balance is evidenced. Finance is asked to review it."
+      },
+      "trail": {
+        "title": "Evidence trail",
+        "empty": "Nothing recorded yet.",
+        "recorded": "Recorded by {role}",
+        "countersigned": "Countersigned by {role}",
+        "awaiting": "Not countersigned",
+        "superseded": "Replaced",
+        "roles": {
+          "OPERATIONS": "Operations",
+          "FINANCE": "Finance",
+          "CONSULTANT": "Consultant",
+          "COORDINATOR": "Coordinator",
+          "PATIENT": "Patient",
+          "SYSTEM": "System"
+        },
+        "kinds": {
+          "FACILITY_ADMISSION_LETTER": "Admission letter",
+          "PRICE_VARIANCE_CHECK": "Price check",
+          "ARRIVAL_ATTESTED": "Arrival confirmed by Operations",
+          "PATIENT_ARRIVED": "Patient confirmed arrival",
+          "BALANCE_EVIDENCED": "Hospital receipt",
+          "FEE_BALANCE_RECEIVED": "Platform fee balance received",
+          "ADMISSION_NUMBER": "Admission number",
+          "POINT_OF_NO_RETURN": "Point of no return",
+          "EMERGENCY_ADMISSION_OVERRIDE": "Emergency admission"
+        }
+      },
+      "cancel": "Cancel"
     }
   },
   "secureLink": {
@@ -2722,7 +2966,7 @@
         },
         "treatment": {
           "title": "We are arranging your treatment",
-          "body": "Your coordinator is organising your appointments and arrival.",
+          "body": "Your coordinator is organising your appointments and arrival. When you arrive, confirm it in My Care, where your admission voucher and what to pay at the hospital also appear.",
           "next": "You will receive your dates and arrival details."
         },
         "followup": {
@@ -2736,7 +2980,8 @@
         "consultant": "Keep following your own doctor's advice, and tell your coordinator if your symptoms change.",
         "proposal": "Check that your passport is valid and think about who would travel with you.",
         "treatment": "Keep your passport and phone to hand; your coordinator will message you with dates."
-      }
+      },
+      "inMyCare": "Sign in to My Care"
     }
   }
 }

@@ -149,6 +149,28 @@ describe("CurrentActionPanel", () => {
     expect(screen.getByRole("button", { name: /التحقق من التحويل/ })).toBeTruthy();
   });
 
+  // P1-15: Operations' admission steps and Finance's admission work read in the team's words, in English and Arabic.
+  it("words the admission steps and Finance's admission work (P1-15)", () => {
+    const onFocusAction = vi.fn();
+    renderWithWork(<CurrentActionPanel locale="en" role="operations" onFocusAction={onFocusAction} action={{ code: "RECORD_HOSPITAL_BALANCE", kind: "FOCUS" }}/>);
+    expect(screen.getByRole("heading", { name: "Record the hospital receipt" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /record the receipt/i }));
+    expect(onFocusAction).toHaveBeenCalled();
+    cleanup();
+    renderWithWork(<CurrentActionPanel locale="en" role="operations" onFocusAction={vi.fn()} action={{ code: "RECORD_ADMISSION_NUMBER", kind: "FOCUS" }}/>);
+    expect(screen.getByRole("heading", { name: "Record the admission number" })).toBeTruthy();
+    cleanup();
+    const work: CurrentActionView = { code: "WORK_ITEM", kind: "FOCUS", workItemId: "w9", workItemVersion: 0, workType: "PRICE_VARIANCE", title: "Hospital price above the accepted estimate",
+      copy: { code: "PRICE_VARIANCE", params: { caseNumber: "RS-2026-000123" } } };
+    renderWithWork(<CurrentActionPanel locale="en" role="finance" action={work} onFocusAction={vi.fn()}/>);
+    expect(screen.getByRole("heading", { name: /Hospital price above the estimate on .*RS-2026-000123/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /decide on the price/i })).toBeTruthy();
+    cleanup();
+    renderWithWork(<CurrentActionPanel locale="ar" role="finance" action={{ ...work, workType: "COUNTERSIGN_BALANCE", copy: { code: "COUNTERSIGN_BALANCE", params: { caseNumber: "RS-2026-000123" } } }} onFocusAction={vi.fn()}/>, "ar");
+    expect(screen.getByRole("heading", { name: /وقّع على إيصال المستشفى للحالة/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /راجع الإيصال/ })).toBeTruthy();
+  });
+
   it("reads right-to-left with Arabic copy for the same contract", () => {
     renderWithWork(<CurrentActionPanel locale="ar" role="coordinator" action={{ code: "WAIT_PATIENT_READINESS", kind: "WAIT", blockerCode: "PROFILE_NOT_ACTIVATED" }}/>, "ar");
     expect(screen.getByText("الإجراء الحالي")).toBeTruthy();

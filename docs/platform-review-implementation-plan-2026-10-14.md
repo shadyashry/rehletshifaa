@@ -1120,6 +1120,52 @@ phases.
   - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `feat/review-p0`) and rebuilds the dev stack backend
     for V99 (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`); confirm the money rule (Owner decisions still
     open); then P1-15 session 2 (UI and copy).
+- **Status (2026-10-15, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/p1-15-s2-ui`, cut from `1653760`):** delivered,
+  frontend only (no wire gap blocked the brief; the status link's one gap is below). Amounts are shown exactly as the API returns them;
+  nothing is recomputed in the browser. The money rule (deposit covers the platform fee first) is still awaiting the owner's confirmation.
+  - **Patient (My Care).** New `PatientAdmission` block inside the current step (one `admissionStep` slot in `MyCare`, loaded on demand by
+    `PatientCaseView`, keyed by the backend's step code; `admission-steps.ts` holds the four codes). It reads
+    `GET /patient/cases/{id}/admission` (an empty answer = no reservation = the step alone) and shows the hospital, the admission date, the
+    voucher number (`translate="no"`), what to pay at the cashier in EGP and "about … at the rate fixed on your quote" in the patient's
+    currency, the deposit credit and any platform fee balance, with the balance state (To pay / Checking / Paid). `CONFIRM_ARRIVAL` carries
+    the step's one primary action, "I have arrived", behind a confirmation (`POST /patient/cases/{id}/arrived`); `PAY_BALANCE` has no button
+    (paid at the cashier); `WAIT_BALANCE_CHECK` says the receipt is being checked; `CLEARED_FOR_ADMISSION` says "You are cleared for
+    admission on {date}". Step texts in `myCare.steps`, block copy in `myCare.admission`. `ADMISSION_READY` is in the staff `STATUS_LABELS`,
+    the journey snapshot and the patient's Treatment phase (`CaseSwitcher` `PHASES`).
+  - **Status link.** The public status carries no admission step, so in the treatment phase `CaseStatusAccess` no longer says "nothing is
+    needed": the treatment explanation tells the patient to confirm arrival in My Care, where the voucher and the amount appear, with one quiet
+    "Sign in to My Care" link (as DEP-3 did for the deposit). Open gap: showing the step itself on the link needs a patient-safe step code
+    on `PublicCaseStatus` (backend).
+  - **Staff "Admission & money" panel** (`AdmissionPanel`, on the case page for Operations, Finance, coordinator and Consultant from
+    `TRAVEL_COORDINATION` to `TREATMENT_IN_PROGRESS`, reading `GET /{role}/cases/{id}/admission`): reservation, letter check, reference
+    maximum, point of no return, admission number; the voucher with its frozen split and rate; the checklist from `admissionBlockers`; the
+    emergency flag; the evidence trail (kind, amount, reference, recorded/countersigned by role and time, replaced rows). Every command
+    answers with the view and the panel shows it. One primary action: the next task's disclosure opens first and is the "do it" target of
+    the current-action panel (`ADMISSION_WORK`, `#admission-next`). Operations: reserve (facility + date), record the letter (clean case
+    document + quoted EGP + reference), issue the voucher by hand (estimate-only cases), cashier receipt (number, EGP, paid at, method,
+    optional copy, paid currency and amount), point of no return, admission number (after clearance). Finance (step-up through the portal's
+    re-sign-in and replay): letter accept/refuse (a reason required for every refusal and for accepting `VARIANCE_OPEN`), countersign a
+    receipt or the point of no return after a confirmation, fee balance (reference, EGP, received at). Consultant: "Emergency admission"
+    with a required reason and a confirmation; the treatment episode form now opens at `ADMISSION_READY` and sends
+    `TreatmentRequest.admissionNumber`.
+  - **Copy** (en + ar; **Arabic is a draft** pending native review): `portalWork.workTitles` and `workCopy.items` for `CHECK_PROFORMA`,
+    `PRICE_VARIANCE`, `REVISE_ADMISSION_LETTER`, `COUNTERSIGN_BALANCE`, `APPROVE_POINT_OF_NO_RETURN`, `EMERGENCY_ADMISSION_REVIEW`,
+    `ADMISSION_VOUCHER_BLOCKED` (+ their `currentAction.work` button words), the `CLEARED_FOR_ADMISSION` notification, current-action states
+    and buttons `RECORD_HOSPITAL_BALANCE` / `RECORD_ADMISSION_NUMBER`, waiting reasons `ADMISSION_BALANCE_DUE` / `ADMISSION_BALANCE_TO_CHECK`
+    / `CLEARED_FOR_ADMISSION`, `portalWork.admission` (panel), `myCare.admission` and the four steps, `secureLink.journey.inMyCare`.
+  - Tests: new `AdmissionPanel.test.tsx` (11: Operations reserve/letter/receipt/number with one primary, amounts as returned, pending
+    documents never offered; Finance variance reason, refusal reason, countersign after confirmation, fee balance; read-only coordinator;
+    Consultant emergency; Arabic), `PatientAdmission.test.tsx` (6, through `MyCare`), +1 `CaseWorkflowActions` (admission number), +1
+    `CaseStatusAccess` (treatment phase), +1 `StaffOperationalUi` (current-action words en/ar). Playwright `e2e/my-care-admission.spec.ts`
+    (6, route mocks via the new `admission` option of `patient-fixture.ts`: pay-balance en/ar × 390/1440 with no page scroll, arrival
+    confirmation sent, cleared date in Arabic) green on the dev server. `pnpm typecheck` clean, eslint clean on touched files, vitest 79 files
+    / 617 tests green. Reviewed with react-best-practices, composition-patterns, web-design-guidelines and Impeccable (fixes: no spell-check on
+    codes and references, `translate="no"` on the voucher number, point of no return hidden once cleared).
+  - Not done (later or owner): the final UX design of these screens (UX plan); the status link's own admission step (backend field above);
+    no voucher PDF (session 1); staff panel not walked live — needs the dev stack rebuilt at V99 with this frontend.
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/p1-15-s2-ui` (it contains `1653760`), rebuilds backend and frontend,
+    and walks one case live (reserve → letter → final quote → voucher → arrival → receipt → countersign → cleared → admission number); then
+    P1-16 (treatment evidence: milestones and change orders), started in a new session.
 
 ### P1-16  Treatment evidence: milestones and change orders  (design §5 stage 4; architecture §5.2–5.3)
 - `TreatmentMilestoneService` (eight milestone kinds, Consultant or Operations-with-countersign, 24-working-hour

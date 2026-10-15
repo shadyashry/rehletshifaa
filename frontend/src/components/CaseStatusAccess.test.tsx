@@ -443,4 +443,16 @@ describe("CaseStatusAccess journey", () => {
     expect(screen.queryByText(/usually takes/i)).toBeNull();
     expect(screen.getByRole("link", { name: "Sign in to pay" }).getAttribute("href")).toBe("/en/portal?signin=1");
   });
+
+  // P1-15: arrival and the hospital balance are the patient's own steps in My Care, and this link cannot tell which is due.
+  it("in the treatment phase points to My Care for arrival and the voucher, and never says nothing is needed", async () => {
+    await reachStatus({ ...consultantStatus, statusEn: "Cleared for admission", phase: "treatment", expectedWorkingDays: 2 });
+    expect(await screen.findByRole("heading", { name: "We are arranging your treatment" })).toBeTruthy();
+    expect(screen.getByText(/confirm it in My Care, where your admission voucher and what to pay at the hospital also appear/i)).toBeTruthy();
+    expect(screen.queryByText(/no action is required/i)).toBeNull();
+    expect(screen.queryByText(/usually takes/i)).toBeNull();
+    const link = screen.getByRole("link", { name: "Sign in to My Care" });
+    expect(link.getAttribute("href")).toBe("/en/portal?signin=1");
+    expect(link.className).toContain("btn-secondary");
+  });
 });

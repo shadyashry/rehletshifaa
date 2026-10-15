@@ -10,6 +10,7 @@ import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 import type { Mutate } from "@/components/portal/portal-model";
 import { isGuardianStep } from "@/lib/guardian";
+import { ADMISSION_STEPS } from "@/components/portal/admission-steps";
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
 // Role-specific panels, loaded on demand: a coordinator never downloads My Care, a patient never the clinical review.
@@ -18,6 +19,7 @@ const GuardianStep=dynamic(()=>import("@/components/portal/GuardianStep").then(m
 const CaseDocumentUpload=dynamic(()=>import("@/components/portal/CaseDocumentUpload").then(m=>m.CaseDocumentUpload));
 const PatientConcerns=dynamic(()=>import("@/components/portal/PatientConcerns").then(m=>m.PatientConcerns));
 const PatientIdentityStep=dynamic(()=>import("@/components/portal/PatientIdentityStep").then(m=>m.PatientIdentityStep));
+const PatientAdmission=dynamic(()=>import("@/components/portal/PatientAdmission").then(m=>m.PatientAdmission));
 const PatientDepositPayment=dynamic(()=>import("@/components/portal/PatientDepositPayment").then(m=>m.PatientDepositPayment));
 const PatientProposal=dynamic(()=>import("@/components/portal/PatientProposal").then(m=>m.PatientProposal));
 const PatientProposalDecision=dynamic(()=>import("@/components/portal/PatientProposal").then(m=>m.PatientProposalDecision));
@@ -50,6 +52,7 @@ export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,m
      paymentStep={actions.currentAction.code==="PAY_DEPOSIT"&&value.deposit?.bankTransfer?<PatientDepositPayment key={`${c.id}:${value.deposit.transfer?.id??"new"}`} locale={locale} caseId={c.id} currency={value.deposit.currency}
       amountDue={value.deposit.balanceDisplay??value.deposit.totalDisplay??null} totalDue={value.deposit.totalDisplay??null} received={value.deposit.paidDisplay??null}
       bank={value.deposit.bankTransfer} transfer={value.deposit.transfer} busy={busy} mutate={mutate}/>:undefined}
+     admissionStep={ADMISSION_STEPS.has(actions.currentAction.code)?<PatientAdmission key={`${c.id}:${actions.currentAction.code}`} locale={locale} caseId={c.id} code={actions.currentAction.code} busy={busy} mutate={mutate} load={load}/>:undefined}
      messagesPanel={<div aria-busy={busy||undefined} className="min-w-0"><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={true} busy={busy} mutate={mutate}/></div>}/>
     {proposalOpen&&value.proposal&&<CaseDrawer locale={locale} title={proposalCopy.title} onClose={()=>setProposalOpen(false)}>
      <div aria-busy={busy||undefined} className="min-w-0"><PatientProposal locale={locale} copy={proposalCopy} proposal={value.proposal}

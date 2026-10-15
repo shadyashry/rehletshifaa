@@ -329,8 +329,11 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
   // DEP-3: in the deposit phase the payment is the patient's own step (paid in My Care), and this link cannot tell whether it
   // was made: no "nothing needed", no team timing, and one way to My Care.
   const depositStep = !status.actionRequired && !story && status.phase === "deposit";
+  // P1-15: in the treatment phase the patient confirms their arrival and pays the hospital balance against the voucher in
+  // My Care, and this link cannot tell which of those is due: no "nothing needed", and one quiet way to My Care.
+  const admissionStep = !status.actionRequired && !story && status.phase === "treatment";
   // P1-6 (D-02): while the team has the step, how long it usually takes and what the patient can do meanwhile.
-  const teamStep = !status.actionRequired && !ready && !depositStep;
+  const teamStep = !status.actionRequired && !ready && !depositStep && !admissionStep;
   const usually = teamStep && !settled && status.expectedWorkingDays ? t.usuallyWithin.replace("{duration}", plural(locale, status.expectedWorkingDays, t.workingDays)) : null;
   const meanwhile = teamStep && !settled ? phaseMeanwhile(status.phase, false, journeyCopy) : null;
   // The estimate in one line where it is not the page's own story: acknowledged (any phase), or decided while the
@@ -367,6 +370,7 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
           {proposalError}
         </>}
         {depositStep && <a className="btn-primary mt-6 w-full sm:w-auto" href={`${localeHref(locale, "portal")}?signin=1`}>{journeyCopy.payInMyCare}</a>}
+        {admissionStep && <a className="btn-secondary mt-6 w-full sm:w-auto" href={`${localeHref(locale, "portal")}?signin=1`}>{journeyCopy.inMyCare}</a>}
         {teamStep && (
           <p className="mt-5 flex items-center gap-2.5 text-[0.9375rem] font-semibold text-brand-800">
             <span aria-hidden className="grid h-6 w-6 flex-none place-items-center rounded-full bg-brand-100 text-brand-700"><Check size={14} strokeWidth={3}/></span>
