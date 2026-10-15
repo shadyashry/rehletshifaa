@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { ArrowLeft, Check, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import { AdmissionPanel, ADMISSION_STAGES, ADMISSION_WORK, type AdmissionRole } from "@/components/portal/AdmissionPanel";
+import { TreatmentPanel, TREATMENT_WORK } from "@/components/portal/TreatmentPanel";
 import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageEstimate } from "@/components/portal/FacilityPackagePicker";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
@@ -106,6 +107,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  // P1-15: the reservation, the voucher, the balance and its evidence, for every staff role on the case from travel coordination to treatment.
  const admissionRole=(["operations","finance","coordinator","doctor"] as string[]).includes(role)?role as AdmissionRole:null;
  const admissionPanel=admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview?<AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load}/>:null;
+ // P1-16: milestones, change orders, the running money and the evidence checklist while the patient is in treatment (and for an
+ // open Treatment work item afterwards, such as Finance's emergency change-order review, which survives the case's exit).
+ const treatmentPanel=admissionRole&&!value.preview&&(c.status==="TREATMENT_IN_PROGRESS"||TREATMENT_WORK.has(current.workType??""))?<TreatmentPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/>:null;
  // P0-5: the destination and the treatment episodes read back with their facility named, for every staff role on the case.
  const when=(v?:string|null)=>v?new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
  const episodes=value.treatmentEpisodes??[];
@@ -150,7 +154,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   const newestDocument=documents.length?documents[documents.length-1]:undefined;
   // The clinical review form lives in the Clinical tab, so send a consultant there rather than to an
   // overview panel that does not exist for them.
-  const focusAction=()=>{setTab(isDoctor&&!workflowBlock?"clinical":"overview");requestAnimationFrame(()=>{const target=(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel");scrollIntoView(target,{behavior:"smooth",block:"center"});(target?.querySelector("button,select,input,textarea") as HTMLElement|null)?.focus();});};
+  const focusAction=()=>{setTab(isDoctor&&!workflowBlock?"clinical":"overview");requestAnimationFrame(()=>{const target=(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel");scrollIntoView(target,{behavior:"smooth",block:"center"});(target?.querySelector("button,select,input,textarea") as HTMLElement|null)?.focus();});};
   const completeWork=(evidence:string)=>{if(current.workItemId!=null)void mutate(`/tasks/${current.workItemId}/cases/${c.id}/complete`,{evidence,expectedVersion:current.workItemVersion??0});};
   const openMessages=()=>setOverlay("messages");
   const caseTabs=[{id:"overview" as const,label:locale==="ar"?"نظرة عامة":"Overview",count:0},{id:"clinical" as const,label:locale==="ar"?"الملف السريري":"Clinical",count:0},{id:"documents" as const,label:locale==="ar"?"المستندات":"Documents",count:documents.length},{id:"activity" as const,label:locale==="ar"?"السجل":"Activity",count:0}].filter(item=>!value.paymentOnly||item.id==="overview"); // the payment view has no record behind the other tabs
@@ -258,6 +262,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
        {logistics}
        {workflowBlock}
        {admissionPanel}
+       {treatmentPanel}
        {/* The proposal is the work while it is being prepared or released; afterwards it is reference. */}
        {isCoordinator&&(proposalIsWork?<div id={current.kind==="FOCUS"&&!formAction?"case-actions":undefined}>{proposalPanel}</div>
          :(value.proposal||value.deposit)?<ProposalSummary proposal={value.proposal} deposit={value.deposit} delivery={value.delivery} available={available} onView={()=>setOverlay("proposal")}/>:null)}

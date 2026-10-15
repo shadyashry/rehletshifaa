@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, configure, fireEvent, render, screen } from "@testing-library/react";
 
 import { CaseStatusAccess } from "./CaseStatusAccess";
@@ -454,5 +454,76 @@ describe("CaseStatusAccess journey", () => {
     const link = screen.getByRole("link", { name: "Sign in to My Care" });
     expect(link.getAttribute("href")).toBe("/en/portal?signin=1");
     expect(link.className).toContain("btn-secondary");
+  });
+});
+
+// P1-16: in the treatment phase the link reads the treatment page on the verified grant; a change above the band is decided here.
+describe("CaseStatusAccess treatment", () => {
+  beforeAll(() => {
+    HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new Event("close")); };
+  });
+  beforeEach(() => vi.resetAllMocks());
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  const inTreatment = { caseNumber: "RS-10281", statusEn: "In treatment", statusAr: "قيد العلاج", phase: "treatment", actionRequired: false, action: null };
+  const order = { id: "o2", orderNumber: "RS-CO-RS-10281-2", status: "AWAITING_PATIENT", emergency: false, reason: "One more night of observation.",
+    lines: [{ kind: "EXTRA_NIGHT", description: "Extra ICU night", quantity: 1, lineEgp: 12345.5, lineDisplay: 251.86 }], totalEgp: 12345.5, totalDisplay: 251.86,
+    displayCurrency: "USD", awaitingDecision: true };
+  const treatment = { facilityName: "Nile Heart Hospital", facilityCity: "Cairo", awaitingDecisionId: "o2",
+    timeline: [{ kind: "ADMITTED", occurredAt: "2026-10-20T08:00:00Z", reportedBy: "CONSULTANT" }], changeOrders: [order] };
+  const decided = { ...treatment, awaitingDecisionId: null, changeOrders: [{ ...order, status: "ACCEPTED", awaitingDecision: false, decidedAt: "2026-10-21T13:00:00Z" }] };
+  const treatmentCopy = { ...en.portalWork.myCare.treatment, review: en.portalWork.myCare.steps.REVIEW_CHANGE_ORDER };
+
+  async function reachTreatment(page: unknown, decision: () => Promise<Response> = () => json(decided)) {
+    const fetchMock = stub({
+      "/request-access": () => json(summary),
+      "/verify": () => json({ grant: "grant-1" }),
+      "/view": () => json(inTreatment),
+      "/treatment": () => json(page),
+      "/decision": decision,
+      "tok-1": () => json(summary),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey} treatmentCopy={treatmentCopy}/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+    return fetchMock;
+  }
+
+  it("makes a change awaiting the patient the page's one action, decided on the verified grant", async () => {
+    const fetchMock = await reachTreatment(treatment);
+    expect(await screen.findByRole("heading", { name: "Review a change to your treatment" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/public\/cases\/tok-1\/treatment$/), expect.objectContaining({ body: JSON.stringify({ grant: "grant-1" }) }));
+    expect(screen.getByText("One more night of observation.")).toBeTruthy();
+    expect(screen.getByText(/About.*\$251\.86.*at the rate fixed on your quote/)).toBeTruthy();
+    expect(screen.getByText("You were admitted to hospital")).toBeTruthy();
+    // No "nothing needed", no second way out: the decision is the page's one filled action.
+    expect(screen.queryByText(/no action is required/i)).toBeNull();
+    expect(screen.queryByRole("link", { name: "Sign in to My Care" })).toBeNull();
+    const accept = screen.getByRole("button", { name: "Accept the change" });
+    expect([...document.querySelectorAll(".btn-primary")]).toEqual([accept]);
+    fireEvent.click(accept);
+    fireEvent.click(screen.getByRole("alertdialog", { name: "Accept this change?" }).querySelector(".btn-primary") as HTMLElement);
+    await screen.findByText("Accepted");
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/public\/cases\/tok-1\/change-orders\/o2\/decision$/),
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ grant: "grant-1", decision: "ACCEPT", note: null }) }));
+    expect(screen.queryByRole("button", { name: "Accept the change" })).toBeNull();
+  });
+
+  it("says so when the change is no longer waiting for a decision", async () => {
+    await reachTreatment(treatment, () => json({ code: "CHANGE_ORDER_NOT_AWAITING" }, false, 409));
+    fireEvent.click(await screen.findByRole("button", { name: "Decline" }));
+    fireEvent.click(screen.getByRole("alertdialog", { name: "Decline this change?" }).querySelector(".btn-primary") as HTMLElement);
+    expect((await screen.findByRole("alert")).textContent).toBe("This change is no longer waiting for a decision.");
+  });
+
+  it("with nothing to decide shows the timeline and keeps the quiet way to My Care", async () => {
+    await reachTreatment(decided);
+    expect(await screen.findByText("You were admitted to hospital")).toBeTruthy();
+    expect(screen.getByText("Accepted")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Accept the change" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Sign in to My Care" }).className).toContain("btn-secondary");
   });
 });

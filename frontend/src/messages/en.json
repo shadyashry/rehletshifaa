@@ -1363,7 +1363,13 @@
         "COUNTERSIGN_BALANCE": "Check the receipt",
         "APPROVE_POINT_OF_NO_RETURN": "Check the point of no return",
         "EMERGENCY_ADMISSION_REVIEW": "Open Admission & money",
-        "ADMISSION_VOUCHER_BLOCKED": "Open Admission & money"
+        "ADMISSION_VOUCHER_BLOCKED": "Open Admission & money",
+        "RECORD_MILESTONE": "Record a milestone",
+        "COUNTERSIGN_MILESTONE": "Check the milestone",
+        "PRICE_CHANGE_ORDER": "Price the change order",
+        "EMERGENCY_CHANGE_ORDER_REVIEW": "Price and review",
+        "CHANGE_ORDER_PATIENT_DECISION": "Open Treatment",
+        "COUNTERSIGN_INTERIM_BILL": "Check the bill"
       },
       "actions": {
         "ASSIGN_CONSULTANT": "Assign Consultant",
@@ -1377,7 +1383,8 @@
         "UPDATE_TRAVEL_PLAN": "Complete arrangements",
         "APPROVE_COMMERCIAL_TERMS": "Approve commercial terms",
         "RECORD_HOSPITAL_BALANCE": "Record the receipt",
-        "RECORD_ADMISSION_NUMBER": "Record the admission number"
+        "RECORD_ADMISSION_NUMBER": "Record the admission number",
+        "RECORD_MILESTONE": "Record a milestone"
       },
       "states": {
         "CLAIM_CASE": {
@@ -1475,6 +1482,10 @@
         "RECORD_ADMISSION_NUMBER": {
           "title": "Record the admission number",
           "body": "The patient is cleared for admission. Record the hospital's admission number once it is issued; treatment cannot start without it."
+        },
+        "RECORD_MILESTONE": {
+          "title": "Record the next treatment milestone",
+          "body": "The patient is in treatment. Record each milestone as it happens: the patient reads a calm line for each one, and the next is due within 24 working hours."
         }
       },
       "readiness": {
@@ -1811,6 +1822,11 @@
           "body": "Your balance is settled and everything is in place for your admission.",
           "next": "The hospital admits you and your treatment begins as planned.",
           "meanwhile": "Bring your passport, your voucher number and all your reports to the hospital."
+        },
+        "REVIEW_CHANGE_ORDER": {
+          "title": "Review a change to your treatment",
+          "body": "Your Consultant recommends a change to your treatment that adds to its cost. Read why and what it costs, then accept or decline it.",
+          "next": "Your care team is told your decision straight away."
         }
       },
       "payment": {
@@ -1967,6 +1983,63 @@
         "arrivedBody": "Confirm only once you are in Egypt. Your coordinator and the hospital are told straight away.",
         "arrivedConfirm": "Yes, I have arrived",
         "cancel": "Cancel"
+      },
+      "treatment": {
+        "title": "Your treatment",
+        "hospital": "Hospital",
+        "timelineTitle": "Your treatment so far",
+        "empty": "Your care team adds each step here as it happens.",
+        "lines": {
+          "ADMITTED": "You were admitted to hospital",
+          "PROCEDURE_STARTED": "Your procedure started",
+          "PROCEDURE_COMPLETED": "Your procedure is complete",
+          "ICU": "You are being cared for in intensive care",
+          "WARD": "You moved to the ward",
+          "CARE_UPDATE": "Care update: your Consultant will talk it through with you",
+          "STABLE": "You are stable",
+          "DISCHARGE_PLANNED": "Your discharge is planned for {date}"
+        },
+        "careTeam": "reported by the care team",
+        "change": {
+          "title": "The change your Consultant recommends",
+          "reason": "Why",
+          "lines": "What it adds",
+          "total": "Added cost",
+          "inYourCurrency": "About {amount} at the rate fixed on your quote",
+          "accept": "Accept the change",
+          "decline": "Decline",
+          "note": "Anything your care team should know (optional)",
+          "acceptTitle": "Accept this change?",
+          "acceptBody": "The added cost becomes part of your treatment and your care team goes ahead with it.",
+          "declineTitle": "Decline this change?",
+          "declineBody": "Your care team does not go ahead with it. Your coordinator contacts you about what happens next.",
+          "acceptConfirm": "Yes, accept",
+          "declineConfirm": "Yes, decline",
+          "freshSignIn": "You may be asked to sign in again to confirm.",
+          "cancel": "Cancel"
+        },
+        "orders": {
+          "title": "Changes to your treatment",
+          "status": {
+            "AWAITING_PATIENT": "Waiting for you",
+            "ACCEPTED": "Accepted",
+            "REJECTED": "Declined",
+            "EMERGENCY": "Done in an emergency"
+          },
+          "priceToFollow": "Price to follow",
+          "lineKinds": {
+            "PROCEDURE": "Procedure",
+            "IMPLANT": "Implant",
+            "EXTRA_NIGHT": "Extra night in hospital",
+            "MEDICATION": "Medication",
+            "OTHER": "Other"
+          }
+        },
+        "errors": {
+          "notAwaiting": "This change is no longer waiting for a decision.",
+          "session": "Your secure session has ended. Open the link again and confirm with a new code.",
+          "failed": "Your decision could not be saved. Please try again."
+        }
       }
     },
     "nav": {
@@ -2120,7 +2193,13 @@
       "COUNTERSIGN_BALANCE": "Countersign the hospital receipt",
       "APPROVE_POINT_OF_NO_RETURN": "Approve the point of no return",
       "EMERGENCY_ADMISSION_REVIEW": "Review an emergency admission",
-      "ADMISSION_VOUCHER_BLOCKED": "The admission voucher could not be issued"
+      "ADMISSION_VOUCHER_BLOCKED": "The admission voucher could not be issued",
+      "RECORD_MILESTONE": "Record the next treatment milestone",
+      "COUNTERSIGN_MILESTONE": "Countersign a treatment milestone",
+      "PRICE_CHANGE_ORDER": "Price a change order",
+      "EMERGENCY_CHANGE_ORDER_REVIEW": "Review an emergency change order",
+      "CHANGE_ORDER_PATIENT_DECISION": "Change order awaiting the patient's decision",
+      "COUNTERSIGN_INTERIM_BILL": "Countersign an interim bill"
     },
     "proposalVersion": "v{number}",
     "waitingReason": {
@@ -2147,7 +2226,8 @@
         "PATIENT_INFO_UNANSWERED": "The patient did not answer the information request",
         "ADMISSION_BALANCE_DUE": "Voucher issued — the patient pays the balance at the hospital",
         "ADMISSION_BALANCE_TO_CHECK": "Hospital receipt recorded — Finance to countersign it",
-        "CLEARED_FOR_ADMISSION": "Cleared for admission — the hospital admits the patient"
+        "CLEARED_FOR_ADMISSION": "Cleared for admission — the hospital admits the patient",
+        "CHANGE_ORDER_DECISION": "Change order above the band — waiting for the patient's decision"
       }
     },
     "leaveCase": {
@@ -2448,6 +2528,42 @@
         "CLEARED_FOR_ADMISSION": {
           "title": "{caseNumber} is cleared for admission",
           "context": "The final quote, the consent and the balance are evidenced. The hospital can admit the patient; record the admission number once it is issued."
+        },
+        "RECORD_MILESTONE": {
+          "title": "Record the next milestone for {caseNumber}",
+          "context": "A milestone is due within 24 working hours of the last one. Record what has happened under Treatment."
+        },
+        "COUNTERSIGN_MILESTONE": {
+          "title": "Countersign a milestone on {caseNumber}",
+          "context": "Operations recorded a milestone on your behalf. Check it, then countersign it; until then the patient reads it as reported by the care team."
+        },
+        "PRICE_CHANGE_ORDER": {
+          "title": "Price the change order on {caseNumber}",
+          "context": "The Consultant proposed a change order. Price every line in EGP: within the band it is accepted, above it the patient decides."
+        },
+        "EMERGENCY_CHANGE_ORDER_REVIEW": {
+          "title": "Review the emergency change order on {caseNumber}",
+          "context": "The Consultant made a change that could not wait. Price its lines and review it; the patient has been told."
+        },
+        "CHANGE_ORDER_PATIENT_DECISION": {
+          "title": "Change order on {caseNumber} awaits the patient",
+          "context": "A priced change order is above the band. Make sure the patient has seen it in My Care or on their secure link and can decide."
+        },
+        "COUNTERSIGN_INTERIM_BILL": {
+          "title": "Countersign the interim bill on {caseNumber}",
+          "context": "Operations recorded the hospital's interim bill. Check it against the hospital's statement, then countersign it."
+        },
+        "CHANGE_ORDER_ACCEPTED": {
+          "title": "The patient accepted the change order on {caseNumber}",
+          "context": "The change is authorised and the running money includes it. The care team can go ahead."
+        },
+        "CHANGE_ORDER_REJECTED": {
+          "title": "The patient declined the change order on {caseNumber}",
+          "context": "Do not go ahead with the change. The Consultant and the coordinator agree the next step with the patient."
+        },
+        "TREATMENT_COMPLICATION": {
+          "title": "Complication recorded on {caseNumber}",
+          "context": "The Consultant recorded a complication and an incident is open for review. The patient reads a care update only."
         }
       }
     },
@@ -2598,10 +2714,224 @@
           "FEE_BALANCE_RECEIVED": "Platform fee balance received",
           "ADMISSION_NUMBER": "Admission number",
           "POINT_OF_NO_RETURN": "Point of no return",
-          "EMERGENCY_ADMISSION_OVERRIDE": "Emergency admission"
+          "EMERGENCY_ADMISSION_OVERRIDE": "Emergency admission",
+          "MILESTONE_ADMITTED": "Milestone: admitted",
+          "MILESTONE_PROCEDURE_STARTED": "Milestone: procedure started",
+          "MILESTONE_PROCEDURE_COMPLETED": "Milestone: procedure completed",
+          "MILESTONE_ICU": "Milestone: intensive care",
+          "MILESTONE_WARD": "Milestone: ward",
+          "MILESTONE_COMPLICATION": "Milestone: complication",
+          "MILESTONE_STABLE": "Milestone: stable",
+          "MILESTONE_DISCHARGE_PLANNED": "Milestone: discharge planned",
+          "INTERIM_BILL": "Interim bill",
+          "CHANGE_ORDER": "Change order decision"
         }
       },
       "cancel": "Cancel"
+    },
+    "errorCodes": {
+      "NOT_IN_TREATMENT": "This can only be recorded while the patient is in treatment.",
+      "MILESTONE_IN_FUTURE": "A milestone cannot be in the future. Check the time it happened.",
+      "OPERATIVE_NOTE_REQUIRED": "A completed procedure needs the operative note: give its reference or choose its document.",
+      "COMPLICATION_DETAILS_REQUIRED": "A complication needs what happened and its severity.",
+      "DISCHARGE_DATE_REQUIRED": "A planned discharge needs its date.",
+      "DISCHARGE_DATE_IN_PAST": "The planned discharge date cannot be in the past.",
+      "EVIDENCE_NOT_COUNTERSIGNABLE": "This entry cannot be countersigned here.",
+      "SELF_COUNTERSIGN_REFUSED": "You recorded this entry, so someone else countersigns it.",
+      "CHANGE_ORDER_REASON_REQUIRED": "Give the clinical reason for the change.",
+      "CHANGE_ORDER_LINES_REQUIRED": "Add at least one line to the change order.",
+      "CHANGE_ORDER_LINES_MISMATCH": "Price every line of the order once.",
+      "CHANGE_ORDER_NOT_PRICEABLE": "This change order is already priced or decided.",
+      "CHANGE_ORDER_NOT_OPEN": "Only a change order nobody has decided yet can be withdrawn.",
+      "CHANGE_ORDER_NOT_AWAITING": "This change order is no longer waiting for a decision.",
+      "CHANGE_ORDER_NOT_FOUND": "This change order was not found on the case.",
+      "WITHDRAW_REASON_REQUIRED": "Say why the change order is withdrawn.",
+      "BILLED_IN_FUTURE": "A bill cannot be issued in the future. Check its date.",
+      "CHANGE_ORDER_BAND_INVALID": "The band must be between 0% and 50%, and its cap 0 or more."
+    },
+    "treatment": {
+      "title": "Treatment",
+      "loadFailed": "The treatment details could not be loaded.",
+      "nextDue": "Next milestone due {when}",
+      "clockStopped": "Discharge is planned: no further milestone is due.",
+      "cancel": "Cancel",
+      "freshSignIn": "You will be asked to sign in again to confirm.",
+      "milestones": {
+        "title": "Milestones",
+        "empty": "No milestone recorded yet.",
+        "kinds": {
+          "ADMITTED": "Admitted",
+          "PROCEDURE_STARTED": "Procedure started",
+          "PROCEDURE_COMPLETED": "Procedure completed",
+          "ICU": "Intensive care",
+          "WARD": "Ward",
+          "COMPLICATION": "Complication",
+          "STABLE": "Stable",
+          "DISCHARGE_PLANNED": "Discharge planned"
+        },
+        "recorded": "Recorded by {role}",
+        "countersigned": "Countersigned",
+        "awaiting": "Awaiting the Consultant's countersign",
+        "superseded": "Corrected",
+        "operativeNote": "Operative note",
+        "implants": "Implants",
+        "dischargeOn": "Planned discharge",
+        "note": "Note",
+        "incident": "Incident opened for review",
+        "countersign": "Countersign",
+        "countersignTitle": "Countersign this milestone?",
+        "countersignBody": "You confirm the milestone Operations recorded on your behalf. The patient then reads it as reported by you."
+      },
+      "milestoneForm": {
+        "title": "Record a milestone",
+        "titleOnBehalf": "Record a milestone for the Consultant",
+        "onBehalfHint": "The Consultant countersigns what you record; until then the patient reads it as reported by the care team.",
+        "kind": "Milestone",
+        "chooseKind": "Choose a milestone",
+        "occurredAt": "When it happened",
+        "operativeNote": "Operative note reference",
+        "operativeDocument": "Operative note document",
+        "operativeHint": "Give the operative note reference, choose its document, or both.",
+        "implants": "Implants used (optional)",
+        "complicationSummary": "What happened",
+        "severity": "Severity",
+        "chooseSeverity": "Choose a severity",
+        "severities": {
+          "LOW": "Low",
+          "MEDIUM": "Medium",
+          "HIGH": "High",
+          "CRITICAL": "Critical"
+        },
+        "complicationHint": "A complication opens an incident for review. The patient reads a care update only and hears the details from the Consultant in person.",
+        "dischargeOn": "Planned discharge date",
+        "note": "Note (optional)",
+        "correction": "Recording this again corrects the one on file.",
+        "none": "None",
+        "record": "Record milestone"
+      },
+      "orders": {
+        "title": "Change orders",
+        "empty": "No change order.",
+        "status": {
+          "PROPOSED": "With Finance for pricing",
+          "AWAITING_PATIENT": "Awaiting the patient",
+          "ACCEPTED": "Accepted",
+          "REJECTED": "Declined by the patient",
+          "EMERGENCY": "Emergency",
+          "WITHDRAWN": "Withdrawn"
+        },
+        "lineKinds": {
+          "PROCEDURE": "Procedure",
+          "IMPLANT": "Implant",
+          "EXTRA_NIGHT": "Extra night",
+          "MEDICATION": "Medication",
+          "OTHER": "Other"
+        },
+        "reason": "Clinical reason",
+        "description": "Line",
+        "quantity": "Qty",
+        "unit": "Unit",
+        "lineTotal": "Amount",
+        "total": "Total",
+        "notPriced": "Not priced yet",
+        "withinBand": "Within the band: Finance decides",
+        "aboveBand": "Above the band: the patient decides",
+        "proposed": "Proposed {when}",
+        "decided": "{channel} · {when}",
+        "channels": {
+          "FINANCE": "Accepted by Finance",
+          "MY_CARE": "Patient's decision in My Care",
+          "SECURE_LINK": "Patient's decision on the secure link",
+          "CONSULTANT": "Consultant's emergency decision"
+        },
+        "withdraw": "Withdraw",
+        "withdrawReason": "Why it is withdrawn",
+        "withdrawTitle": "Withdraw this change order?",
+        "withdrawBody": "Nobody has decided it yet. It is withdrawn for everyone and the patient is no longer asked."
+      },
+      "orderForm": {
+        "title": "Propose a change order",
+        "hint": "Finance prices each line. Within the band Finance accepts it; above it the patient decides.",
+        "emergencyTitle": "Emergency change order",
+        "emergencyHint": "Only for a change that cannot wait. It goes ahead now on your clinical decision; Finance prices and reviews it afterwards and the patient is told.",
+        "reason": "Clinical reason",
+        "reasonHint": "The patient reads this when deciding.",
+        "lines": "Lines",
+        "line": "Line {n}",
+        "kind": "Kind",
+        "description": "Description",
+        "quantity": "Quantity",
+        "addLine": "Add a line",
+        "removeLine": "Remove line {n}",
+        "send": "Send to Finance",
+        "recordEmergency": "Record emergency change",
+        "emergencyConfirmTitle": "Record an emergency change order?",
+        "emergencyConfirmBody": "The change is recorded as done on your clinical decision. Finance prices and reviews it, and the patient is told."
+      },
+      "pricing": {
+        "title": "Price {orderNumber}",
+        "hint": "Enter an EGP unit price for every line. The total and the band are worked out when you save.",
+        "unitEgp": "Unit price (EGP) for {line}",
+        "save": "Save prices"
+      },
+      "money": {
+        "title": "Running money",
+        "package": "Facility package",
+        "changeOrders": "Change orders",
+        "authorised": "Authorised total",
+        "billed": "Billed to date",
+        "pending": "Bill awaiting countersign",
+        "variance": "Variance (billed less authorised)",
+        "over": "over",
+        "band": "Change-order band",
+        "bandUsed": "Band used"
+      },
+      "bills": {
+        "title": "Interim bills",
+        "empty": "No interim bill recorded.",
+        "countersigned": "Countersigned",
+        "awaiting": "Awaiting Finance",
+        "countersign": "Countersign",
+        "countersignTitle": "Countersign this interim bill?",
+        "countersignBody": "You confirm the bill matches the hospital's statement. It becomes the billed-to-date figure.",
+        "form": "Record an interim bill",
+        "document": "Bill (case document)",
+        "chooseDocument": "Choose a document",
+        "noDocuments": "Add the bill to the case's documents first; only checked files can be chosen.",
+        "billNumber": "Bill number",
+        "amountEgp": "Amount to date (EGP)",
+        "billedAt": "Issued at",
+        "record": "Record bill"
+      },
+      "checklist": {
+        "title": "Evidence checklist",
+        "stages": {
+          "ADMISSION": "Admission",
+          "TREATMENT": "Treatment"
+        },
+        "complete": "Complete",
+        "incomplete": "Incomplete",
+        "optional": "optional",
+        "done": "On file",
+        "missing": "Missing",
+        "items": {
+          "ADMISSION_RESERVED": "Admission reserved",
+          "LETTER_CHECKED": "Admission letter checked",
+          "ARRIVAL_RECORDED": "Arrival recorded",
+          "FINAL_QUOTE_ACCEPTED": "Final quote accepted",
+          "PROCEDURE_CONSENT": "Procedure consent",
+          "VOUCHER_ISSUED": "Voucher issued",
+          "BALANCE_EVIDENCED": "Hospital balance evidenced",
+          "ADMISSION_NUMBER": "Admission number",
+          "MILESTONE_ADMITTED": "Admitted",
+          "MILESTONE_PROCEDURE_STARTED": "Procedure started",
+          "MILESTONE_PROCEDURE_COMPLETED": "Procedure completed",
+          "MILESTONE_DISCHARGE_PLANNED": "Discharge planned",
+          "MILESTONES_COUNTERSIGNED": "Milestones countersigned",
+          "CHANGE_ORDERS_SETTLED": "Change orders settled",
+          "INTERIM_BILLS_COUNTERSIGNED": "Interim bills countersigned"
+        }
+      }
     }
   },
   "secureLink": {

@@ -1391,7 +1391,13 @@
         "COUNTERSIGN_BALANCE": "راجع الإيصال",
         "APPROVE_POINT_OF_NO_RETURN": "راجع نقطة اللاعودة",
         "EMERGENCY_ADMISSION_REVIEW": "افتح الدخول والمدفوعات",
-        "ADMISSION_VOUCHER_BLOCKED": "افتح الدخول والمدفوعات"
+        "ADMISSION_VOUCHER_BLOCKED": "افتح الدخول والمدفوعات",
+        "RECORD_MILESTONE": "سجّل مرحلة",
+        "COUNTERSIGN_MILESTONE": "راجع المرحلة",
+        "PRICE_CHANGE_ORDER": "سعّر أمر التغيير",
+        "EMERGENCY_CHANGE_ORDER_REVIEW": "سعّر وراجع",
+        "CHANGE_ORDER_PATIENT_DECISION": "افتح العلاج",
+        "COUNTERSIGN_INTERIM_BILL": "راجع الفاتورة"
       },
       "actions": {
         "ASSIGN_CONSULTANT": "تعيين استشاري",
@@ -1405,7 +1411,8 @@
         "UPDATE_TRAVEL_PLAN": "استكمال الترتيبات",
         "APPROVE_COMMERCIAL_TERMS": "اعتماد الشروط المالية",
         "RECORD_HOSPITAL_BALANCE": "سجّل الإيصال",
-        "RECORD_ADMISSION_NUMBER": "سجّل رقم الدخول"
+        "RECORD_ADMISSION_NUMBER": "سجّل رقم الدخول",
+        "RECORD_MILESTONE": "سجّل مرحلة"
       },
       "states": {
         "CLAIM_CASE": {
@@ -1503,6 +1510,10 @@
         "RECORD_ADMISSION_NUMBER": {
           "title": "سجّل رقم الدخول",
           "body": "المريض جاهز للدخول. سجّل رقم الدخول من المستشفى فور صدوره؛ لا يبدأ العلاج بدونه."
+        },
+        "RECORD_MILESTONE": {
+          "title": "سجّل المرحلة التالية من العلاج",
+          "body": "المريض في مرحلة العلاج. سجّل كل مرحلة عند حدوثها: يقرأ المريض سطرًا هادئًا عن كل واحدة، والمرحلة التالية مستحقة خلال 24 ساعة عمل."
         }
       },
       "readiness": {
@@ -1839,6 +1850,11 @@
           "body": "تمت تسوية رصيدك وكل شيء جاهز لدخولك.",
           "next": "يُدخلك المستشفى ويبدأ علاجك كما هو مخطط.",
           "meanwhile": "أحضر جواز سفرك ورقم القسيمة وجميع تقاريرك إلى المستشفى."
+        },
+        "REVIEW_CHANGE_ORDER": {
+          "title": "راجع تغييرًا في علاجك",
+          "body": "يوصي استشاريك بتغيير في علاجك يزيد تكلفته. اقرأ السبب والتكلفة، ثم اقبل التغيير أو ارفضه.",
+          "next": "يُبلَّغ فريق رعايتك بقرارك فورًا."
         }
       },
       "payment": {
@@ -1995,6 +2011,63 @@
         "arrivedBody": "أكّد فقط بعد وصولك إلى مصر. سيُبلَّغ منسقك والمستشفى فورًا.",
         "arrivedConfirm": "نعم، لقد وصلت",
         "cancel": "إلغاء"
+      },
+      "treatment": {
+        "title": "علاجك",
+        "hospital": "المستشفى",
+        "timelineTitle": "علاجك حتى الآن",
+        "empty": "يضيف فريق رعايتك كل خطوة هنا عند حدوثها.",
+        "lines": {
+          "ADMITTED": "دخلت المستشفى",
+          "PROCEDURE_STARTED": "بدأ إجراؤك",
+          "PROCEDURE_COMPLETED": "اكتمل إجراؤك",
+          "ICU": "تتلقى الرعاية في العناية المركزة",
+          "WARD": "انتقلت إلى الجناح",
+          "CARE_UPDATE": "تحديث عن رعايتك: سيشرحه لك استشاريك بنفسه",
+          "STABLE": "حالتك مستقرة",
+          "DISCHARGE_PLANNED": "خروجك مخطط له في {date}"
+        },
+        "careTeam": "بحسب فريق الرعاية",
+        "change": {
+          "title": "التغيير الذي يوصي به استشاريك",
+          "reason": "السبب",
+          "lines": "ما يضيفه",
+          "total": "التكلفة الإضافية",
+          "inYourCurrency": "حوالي {amount} بالسعر المثبّت في عرضك",
+          "accept": "اقبل التغيير",
+          "decline": "ارفض",
+          "note": "ما تودّ أن يعرفه فريق رعايتك (اختياري)",
+          "acceptTitle": "هل تقبل هذا التغيير؟",
+          "acceptBody": "تصبح التكلفة الإضافية جزءًا من علاجك ويمضي فريق رعايتك فيه.",
+          "declineTitle": "هل ترفض هذا التغيير؟",
+          "declineBody": "لن يمضي فريق رعايتك فيه. يتواصل معك منسقك بشأن الخطوة التالية.",
+          "acceptConfirm": "نعم، أقبل",
+          "declineConfirm": "نعم، أرفض",
+          "freshSignIn": "قد يُطلب منك تسجيل الدخول مجددًا للتأكيد.",
+          "cancel": "إلغاء"
+        },
+        "orders": {
+          "title": "التغييرات في علاجك",
+          "status": {
+            "AWAITING_PATIENT": "بانتظارك",
+            "ACCEPTED": "مقبول",
+            "REJECTED": "مرفوض",
+            "EMERGENCY": "نُفّذ في حالة طارئة"
+          },
+          "priceToFollow": "السعر لاحقًا",
+          "lineKinds": {
+            "PROCEDURE": "إجراء",
+            "IMPLANT": "غرسة",
+            "EXTRA_NIGHT": "ليلة إضافية في المستشفى",
+            "MEDICATION": "دواء",
+            "OTHER": "أخرى"
+          }
+        },
+        "errors": {
+          "notAwaiting": "لم يعد هذا التغيير بانتظار قرار.",
+          "session": "انتهت جلستك الآمنة. افتح الرابط مجددًا وأكّد برمز جديد.",
+          "failed": "تعذّر حفظ قرارك. حاول مرة أخرى."
+        }
       }
     },
     "nav": {
@@ -2148,7 +2221,13 @@
       "COUNTERSIGN_BALANCE": "التوقيع المقابل على إيصال المستشفى",
       "APPROVE_POINT_OF_NO_RETURN": "اعتماد نقطة اللاعودة",
       "EMERGENCY_ADMISSION_REVIEW": "مراجعة دخول طارئ",
-      "ADMISSION_VOUCHER_BLOCKED": "تعذّر إصدار قسيمة الدخول"
+      "ADMISSION_VOUCHER_BLOCKED": "تعذّر إصدار قسيمة الدخول",
+      "RECORD_MILESTONE": "سجّل المرحلة التالية من العلاج",
+      "COUNTERSIGN_MILESTONE": "وقّع على مرحلة علاج",
+      "PRICE_CHANGE_ORDER": "سعّر أمر تغيير",
+      "EMERGENCY_CHANGE_ORDER_REVIEW": "راجع أمر تغيير طارئًا",
+      "CHANGE_ORDER_PATIENT_DECISION": "أمر تغيير بانتظار قرار المريض",
+      "COUNTERSIGN_INTERIM_BILL": "وقّع على فاتورة مرحلية"
     },
     "proposalVersion": "الإصدار {number}",
     "waitingReason": {
@@ -2175,7 +2254,8 @@
         "PATIENT_INFO_UNANSWERED": "لم يردّ المريض على طلب المعلومات",
         "ADMISSION_BALANCE_DUE": "صدرت القسيمة — يدفع المريض الرصيد في المستشفى",
         "ADMISSION_BALANCE_TO_CHECK": "سُجّل إيصال المستشفى — بانتظار توقيع المالية",
-        "CLEARED_FOR_ADMISSION": "جاهز للدخول — يُدخل المستشفى المريض"
+        "CLEARED_FOR_ADMISSION": "جاهز للدخول — يُدخل المستشفى المريض",
+        "CHANGE_ORDER_DECISION": "أمر تغيير فوق النطاق — بانتظار قرار المريض"
       }
     },
     "leaveCase": {
@@ -2476,6 +2556,42 @@
         "CLEARED_FOR_ADMISSION": {
           "title": "الحالة {caseNumber} جاهزة للدخول إلى المستشفى",
           "context": "تم إثبات عرض السعر النهائي والموافقة والرصيد. يمكن للمستشفى إدخال المريض؛ سجّل رقم الدخول فور صدوره."
+        },
+        "RECORD_MILESTONE": {
+          "title": "سجّل المرحلة التالية للحالة {caseNumber}",
+          "context": "المرحلة مستحقة خلال 24 ساعة عمل من آخر مرحلة. سجّل ما حدث في قسم العلاج."
+        },
+        "COUNTERSIGN_MILESTONE": {
+          "title": "وقّع على مرحلة في الحالة {caseNumber}",
+          "context": "سجّلت العمليات مرحلة نيابةً عنك. راجعها ثم وقّع عليها؛ وحتى ذلك يقرأها المريض بحسب فريق الرعاية."
+        },
+        "PRICE_CHANGE_ORDER": {
+          "title": "سعّر أمر التغيير في الحالة {caseNumber}",
+          "context": "اقترح الاستشاري أمر تغيير. سعّر كل بند بالجنيه المصري: داخل النطاق يُقبل، وفوقه يقرر المريض."
+        },
+        "EMERGENCY_CHANGE_ORDER_REVIEW": {
+          "title": "راجع أمر التغيير الطارئ في الحالة {caseNumber}",
+          "context": "أجرى الاستشاري تغييرًا لا يحتمل الانتظار. سعّر بنوده وراجعه؛ وقد أُبلغ المريض."
+        },
+        "CHANGE_ORDER_PATIENT_DECISION": {
+          "title": "أمر تغيير في الحالة {caseNumber} بانتظار المريض",
+          "context": "أمر تغيير مسعَّر فوق النطاق. تأكد أن المريض اطّلع عليه في رعايتي أو على رابطه الآمن ويستطيع أن يقرر."
+        },
+        "COUNTERSIGN_INTERIM_BILL": {
+          "title": "وقّع على الفاتورة المرحلية للحالة {caseNumber}",
+          "context": "سجّلت العمليات فاتورة المستشفى المرحلية. طابقها مع كشف المستشفى، ثم وقّع عليها."
+        },
+        "CHANGE_ORDER_ACCEPTED": {
+          "title": "قبل المريض أمر التغيير في الحالة {caseNumber}",
+          "context": "التغيير معتمد ويشمله الحساب الجاري. يستطيع فريق الرعاية المضي فيه."
+        },
+        "CHANGE_ORDER_REJECTED": {
+          "title": "رفض المريض أمر التغيير في الحالة {caseNumber}",
+          "context": "لا تمضوا في التغيير. يتفق الاستشاري والمنسق مع المريض على الخطوة التالية."
+        },
+        "TREATMENT_COMPLICATION": {
+          "title": "سُجّلت مضاعفة في الحالة {caseNumber}",
+          "context": "سجّل الاستشاري مضاعفة وفُتح حادث للمراجعة. لا يقرأ المريض إلا تحديثًا عن رعايته."
         }
       }
     },
@@ -2626,10 +2742,224 @@
           "FEE_BALANCE_RECEIVED": "استُلم المتبقي من رسوم المنصة",
           "ADMISSION_NUMBER": "رقم الدخول",
           "POINT_OF_NO_RETURN": "نقطة اللاعودة",
-          "EMERGENCY_ADMISSION_OVERRIDE": "دخول طارئ"
+          "EMERGENCY_ADMISSION_OVERRIDE": "دخول طارئ",
+          "MILESTONE_ADMITTED": "مرحلة: الدخول",
+          "MILESTONE_PROCEDURE_STARTED": "مرحلة: بدء الإجراء",
+          "MILESTONE_PROCEDURE_COMPLETED": "مرحلة: اكتمال الإجراء",
+          "MILESTONE_ICU": "مرحلة: العناية المركزة",
+          "MILESTONE_WARD": "مرحلة: الجناح",
+          "MILESTONE_COMPLICATION": "مرحلة: مضاعفة",
+          "MILESTONE_STABLE": "مرحلة: استقرار",
+          "MILESTONE_DISCHARGE_PLANNED": "مرحلة: خروج مخطط له",
+          "INTERIM_BILL": "فاتورة مرحلية",
+          "CHANGE_ORDER": "قرار أمر تغيير"
         }
       },
       "cancel": "إلغاء"
+    },
+    "errorCodes": {
+      "NOT_IN_TREATMENT": "لا يُسجّل هذا إلا والمريض في مرحلة العلاج.",
+      "MILESTONE_IN_FUTURE": "لا يمكن أن تكون المرحلة في المستقبل. تحقّق من وقت حدوثها.",
+      "OPERATIVE_NOTE_REQUIRED": "يحتاج الإجراء المكتمل إلى تقرير العملية: أدخل مرجعه أو اختر مستنده.",
+      "COMPLICATION_DETAILS_REQUIRED": "تحتاج المضاعفة إلى وصف ما حدث ودرجة خطورتها.",
+      "DISCHARGE_DATE_REQUIRED": "يحتاج الخروج المخطط له إلى تاريخه.",
+      "DISCHARGE_DATE_IN_PAST": "لا يمكن أن يكون تاريخ الخروج المخطط له في الماضي.",
+      "EVIDENCE_NOT_COUNTERSIGNABLE": "لا يمكن التوقيع على هذا الإدخال هنا.",
+      "SELF_COUNTERSIGN_REFUSED": "أنت من سجّل هذا الإدخال، لذا يوقّع عليه شخص آخر.",
+      "CHANGE_ORDER_REASON_REQUIRED": "اذكر السبب السريري للتغيير.",
+      "CHANGE_ORDER_LINES_REQUIRED": "أضف بندًا واحدًا على الأقل إلى أمر التغيير.",
+      "CHANGE_ORDER_LINES_MISMATCH": "سعّر كل بند من الأمر مرة واحدة.",
+      "CHANGE_ORDER_NOT_PRICEABLE": "أمر التغيير هذا مسعَّر أو محسوم بالفعل.",
+      "CHANGE_ORDER_NOT_OPEN": "لا يُسحب إلا أمر تغيير لم يُحسم بعد.",
+      "CHANGE_ORDER_NOT_AWAITING": "لم يعد أمر التغيير هذا بانتظار قرار.",
+      "CHANGE_ORDER_NOT_FOUND": "لم يُعثر على أمر التغيير هذا في الحالة.",
+      "WITHDRAW_REASON_REQUIRED": "اذكر سبب سحب أمر التغيير.",
+      "BILLED_IN_FUTURE": "لا يمكن أن تصدر فاتورة في المستقبل. تحقّق من تاريخها.",
+      "CHANGE_ORDER_BAND_INVALID": "يجب أن يكون النطاق بين 0% و50%، وحدّه الأقصى 0 أو أكثر."
+    },
+    "treatment": {
+      "title": "العلاج",
+      "loadFailed": "تعذّر تحميل تفاصيل العلاج.",
+      "nextDue": "المرحلة التالية مستحقة {when}",
+      "clockStopped": "الخروج مخطط له: لا مرحلة أخرى مستحقة.",
+      "cancel": "إلغاء",
+      "freshSignIn": "سيُطلب منك تسجيل الدخول مجددًا للتأكيد.",
+      "milestones": {
+        "title": "المراحل",
+        "empty": "لم تُسجّل أي مرحلة بعد.",
+        "kinds": {
+          "ADMITTED": "الدخول",
+          "PROCEDURE_STARTED": "بدء الإجراء",
+          "PROCEDURE_COMPLETED": "اكتمال الإجراء",
+          "ICU": "العناية المركزة",
+          "WARD": "الجناح",
+          "COMPLICATION": "مضاعفة",
+          "STABLE": "استقرار",
+          "DISCHARGE_PLANNED": "خروج مخطط له"
+        },
+        "recorded": "سجّلته {role}",
+        "countersigned": "موقَّع",
+        "awaiting": "بانتظار توقيع الاستشاري",
+        "superseded": "صُحّح",
+        "operativeNote": "تقرير العملية",
+        "implants": "الغرسات",
+        "dischargeOn": "الخروج المخطط له",
+        "note": "ملاحظة",
+        "incident": "فُتح حادث للمراجعة",
+        "countersign": "وقّع",
+        "countersignTitle": "هل توقّع على هذه المرحلة؟",
+        "countersignBody": "تؤكد المرحلة التي سجّلتها العمليات نيابةً عنك. يقرأها المريض بعد ذلك على أنها منك."
+      },
+      "milestoneForm": {
+        "title": "سجّل مرحلة",
+        "titleOnBehalf": "سجّل مرحلة نيابةً عن الاستشاري",
+        "onBehalfHint": "يوقّع الاستشاري على ما تسجّله؛ وحتى ذلك يقرأه المريض بحسب فريق الرعاية.",
+        "kind": "المرحلة",
+        "chooseKind": "اختر مرحلة",
+        "occurredAt": "وقت حدوثها",
+        "operativeNote": "مرجع تقرير العملية",
+        "operativeDocument": "مستند تقرير العملية",
+        "operativeHint": "أدخل مرجع تقرير العملية، أو اختر مستنده، أو كليهما.",
+        "implants": "الغرسات المستخدمة (اختياري)",
+        "complicationSummary": "ما الذي حدث",
+        "severity": "درجة الخطورة",
+        "chooseSeverity": "اختر درجة الخطورة",
+        "severities": {
+          "LOW": "منخفضة",
+          "MEDIUM": "متوسطة",
+          "HIGH": "عالية",
+          "CRITICAL": "حرجة"
+        },
+        "complicationHint": "تفتح المضاعفة حادثًا للمراجعة. لا يقرأ المريض إلا تحديثًا عن رعايته، ويسمع التفاصيل من الاستشاري بنفسه.",
+        "dischargeOn": "تاريخ الخروج المخطط له",
+        "note": "ملاحظة (اختياري)",
+        "correction": "تسجيلها مجددًا يصحّح المسجّلة.",
+        "none": "لا شيء",
+        "record": "سجّل المرحلة"
+      },
+      "orders": {
+        "title": "أوامر التغيير",
+        "empty": "لا أوامر تغيير.",
+        "status": {
+          "PROPOSED": "لدى المالية للتسعير",
+          "AWAITING_PATIENT": "بانتظار المريض",
+          "ACCEPTED": "مقبول",
+          "REJECTED": "رفضه المريض",
+          "EMERGENCY": "طارئ",
+          "WITHDRAWN": "مسحوب"
+        },
+        "lineKinds": {
+          "PROCEDURE": "إجراء",
+          "IMPLANT": "غرسة",
+          "EXTRA_NIGHT": "ليلة إضافية",
+          "MEDICATION": "دواء",
+          "OTHER": "أخرى"
+        },
+        "reason": "السبب السريري",
+        "description": "البند",
+        "quantity": "الكمية",
+        "unit": "سعر الوحدة",
+        "lineTotal": "المبلغ",
+        "total": "الإجمالي",
+        "notPriced": "لم يُسعَّر بعد",
+        "withinBand": "داخل النطاق: تقرر المالية",
+        "aboveBand": "فوق النطاق: يقرر المريض",
+        "proposed": "اقتُرح {when}",
+        "decided": "{channel} · {when}",
+        "channels": {
+          "FINANCE": "قبلته المالية",
+          "MY_CARE": "قرار المريض في رعايتي",
+          "SECURE_LINK": "قرار المريض على الرابط الآمن",
+          "CONSULTANT": "قرار الاستشاري الطارئ"
+        },
+        "withdraw": "اسحب",
+        "withdrawReason": "سبب السحب",
+        "withdrawTitle": "هل تسحب أمر التغيير هذا؟",
+        "withdrawBody": "لم يُحسم بعد. يُسحب للجميع ولن يُطلب من المريض قرار."
+      },
+      "orderForm": {
+        "title": "اقترح أمر تغيير",
+        "hint": "تسعّر المالية كل بند. داخل النطاق تقبله المالية؛ وفوقه يقرر المريض.",
+        "emergencyTitle": "أمر تغيير طارئ",
+        "emergencyHint": "فقط لتغيير لا يحتمل الانتظار. يُنفّذ الآن بقرارك السريري؛ وتسعّره المالية وتراجعه لاحقًا ويُبلَّغ المريض.",
+        "reason": "السبب السريري",
+        "reasonHint": "يقرأ المريض هذا عندما يقرر.",
+        "lines": "البنود",
+        "line": "البند {n}",
+        "kind": "النوع",
+        "description": "الوصف",
+        "quantity": "الكمية",
+        "addLine": "أضف بندًا",
+        "removeLine": "احذف البند {n}",
+        "send": "أرسل إلى المالية",
+        "recordEmergency": "سجّل التغيير الطارئ",
+        "emergencyConfirmTitle": "هل تسجّل أمر تغيير طارئًا؟",
+        "emergencyConfirmBody": "يُسجّل التغيير على أنه نُفّذ بقرارك السريري. تسعّره المالية وتراجعه، ويُبلَّغ المريض."
+      },
+      "pricing": {
+        "title": "سعّر {orderNumber}",
+        "hint": "أدخل سعر الوحدة بالجنيه المصري لكل بند. يُحسب الإجمالي والنطاق عند الحفظ.",
+        "unitEgp": "سعر الوحدة (ج.م) لـ {line}",
+        "save": "احفظ الأسعار"
+      },
+      "money": {
+        "title": "الحساب الجاري",
+        "package": "باقة المنشأة",
+        "changeOrders": "أوامر التغيير",
+        "authorised": "الإجمالي المعتمد",
+        "billed": "المفوتر حتى الآن",
+        "pending": "فاتورة بانتظار التوقيع",
+        "variance": "الفرق (المفوتر ناقص المعتمد)",
+        "over": "زيادة",
+        "band": "نطاق أوامر التغيير",
+        "bandUsed": "المستخدم من النطاق"
+      },
+      "bills": {
+        "title": "الفواتير المرحلية",
+        "empty": "لم تُسجّل فاتورة مرحلية.",
+        "countersigned": "موقَّعة",
+        "awaiting": "بانتظار المالية",
+        "countersign": "وقّع",
+        "countersignTitle": "هل توقّع على هذه الفاتورة المرحلية؟",
+        "countersignBody": "تؤكد أن الفاتورة تطابق كشف المستشفى. تصبح هي المفوتر حتى الآن.",
+        "form": "سجّل فاتورة مرحلية",
+        "document": "الفاتورة (مستند في الحالة)",
+        "chooseDocument": "اختر مستندًا",
+        "noDocuments": "أضف الفاتورة إلى مستندات الحالة أولًا؛ لا يُختار إلا ملف اجتاز الفحص.",
+        "billNumber": "رقم الفاتورة",
+        "amountEgp": "المبلغ حتى الآن (ج.م)",
+        "billedAt": "تاريخ الإصدار",
+        "record": "سجّل الفاتورة"
+      },
+      "checklist": {
+        "title": "قائمة الإثباتات",
+        "stages": {
+          "ADMISSION": "الدخول",
+          "TREATMENT": "العلاج"
+        },
+        "complete": "مكتملة",
+        "incomplete": "غير مكتملة",
+        "optional": "اختياري",
+        "done": "في الملف",
+        "missing": "ناقص",
+        "items": {
+          "ADMISSION_RESERVED": "حجز الدخول",
+          "LETTER_CHECKED": "مراجعة خطاب الدخول",
+          "ARRIVAL_RECORDED": "تسجيل الوصول",
+          "FINAL_QUOTE_ACCEPTED": "قبول العرض النهائي",
+          "PROCEDURE_CONSENT": "الموافقة على الإجراء",
+          "VOUCHER_ISSUED": "إصدار القسيمة",
+          "BALANCE_EVIDENCED": "إثبات رصيد المستشفى",
+          "ADMISSION_NUMBER": "رقم الدخول",
+          "MILESTONE_ADMITTED": "الدخول",
+          "MILESTONE_PROCEDURE_STARTED": "بدء الإجراء",
+          "MILESTONE_PROCEDURE_COMPLETED": "اكتمال الإجراء",
+          "MILESTONE_DISCHARGE_PLANNED": "الخروج المخطط له",
+          "MILESTONES_COUNTERSIGNED": "توقيع المراحل",
+          "CHANGE_ORDERS_SETTLED": "حسم أوامر التغيير",
+          "INTERIM_BILLS_COUNTERSIGNED": "توقيع الفواتير المرحلية"
+        }
+      }
     }
   },
   "secureLink": {

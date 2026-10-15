@@ -17,7 +17,7 @@ import { CareAreaMark, CaseSwitcher, phaseIndex, takeArrivalFocus } from "@/comp
 import { formatMoney } from "@/lib/money";
 import type { CaseActions } from "@/components/portal/CurrentAction";
 import { isGuardianStep } from "@/lib/guardian";
-import { ADMISSION_STEPS } from "@/components/portal/admission-steps";
+import { ADMISSION_STEPS, TREATMENT_STEPS } from "@/components/portal/admission-steps";
 /** The backend's one answer to "may the patient see a proposal, and which one" — rendered, never re-derived from the stage. */
 export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null; releasedAt?: string | null;
   /** PRELIMINARY_ESTIMATE or FINAL_TREATMENT_QUOTE: which noun the step uses (one noun per document). */
@@ -54,7 +54,7 @@ type StepText = { title: string; body: string; next?: string; meanwhile?: string
 /** The steps whose subject is the deposit: its facts belong inside the current step, not in a second block. Paying it is the payment step's own panel. */
 const MONEY_STEPS = new Set(["PAY_DEPOSIT", "WAIT_PAYMENT_CHECK"]);
 
-export function MyCare({ locale, caseSummary, actions, milestones, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, guardianStep, paymentStep, admissionStep, messagesPanel, concerns, documentUpload, newCaseHref = null, onWithdraw }: {
+export function MyCare({ locale, caseSummary, actions, milestones, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, guardianStep, paymentStep, admissionStep, treatmentStep, messagesPanel, concerns, documentUpload, newCaseHref = null, onWithdraw }: {
   locale: Locale; caseSummary: CaseSummary; actions: CaseActions; milestones?: CaseMilestones | null; patientAction?: PatientAction | null; patientProposal?: PatientProposalState | null;
   proposal?: ProposalSummaryData | null; deposit?: DepositSummaryData | null; documents: CaseDocument[]; unreadMessages: number;
   /** Every case the account can open, this one included; the switcher shows from two. */
@@ -70,6 +70,8 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
   paymentStep?: ReactNode;
   /** P1-15: arrival, the voucher and the hospital balance, rendered when the backend's step is one of the admission steps. */
   admissionStep?: ReactNode;
+  /** P1-16: the treatment timeline and, on REVIEW_CHANGE_ORDER, the change awaiting the patient's decision. */
+  treatmentStep?: ReactNode;
   messagesPanel: ReactNode;
   /** Where the account holder sends a new case of their own; null when it is not theirs to send from here. */
   newCaseHref?: string | null;
@@ -218,6 +220,8 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
             {code === "PAY_DEPOSIT" && focus && paymentStep}
             {/* P1-15: where and when, the voucher and what to pay at the hospital; on CONFIRM_ARRIVAL, the step's one action. */}
             {ADMISSION_STEPS.has(code) && admissionStep}
+            {/* P1-16: what has happened in treatment; on REVIEW_CHANGE_ORDER, the change to decide is the step's one action. */}
+            {TREATMENT_STEPS.has(code) && treatmentStep}
 
             {/* Exactly one primary action, and only when the backend says the patient owes something. */}
             {focus && code === "REVIEW_PROPOSAL" && (
@@ -408,7 +412,7 @@ function stepText(code: string, steps: LocalizedWorkCopy["myCare"]["steps"], ctx
     case "WAIT_PROPOSAL": return ctx.proposalState === "REVISION_REQUESTED" ? s.WAIT_PROPOSAL_REVISION : ctx.proposalState === "EXPIRED" ? s.WAIT_PROPOSAL_EXPIRED : s.WAIT_PROPOSAL;
     case "PROVIDE_INFORMATION": case "REVIEW_PROPOSAL": case "COMPLETE_PROFILE": case "VERIFY_IDENTITY": case "WAIT_CONSULTANT_REVIEW":
     case "PAY_DEPOSIT": case "WAIT_PAYMENT_CHECK": case "WAIT_COORDINATION": case "WAIT_TREATMENT": case "IN_TREATMENT": case "FOLLOW_UP":
-    case "CONFIRM_ARRIVAL": case "PAY_BALANCE": case "WAIT_BALANCE_CHECK": case "CLEARED_FOR_ADMISSION": return s[code];
+    case "CONFIRM_ARRIVAL": case "PAY_BALANCE": case "WAIT_BALANCE_CHECK": case "CLEARED_FOR_ADMISSION": case "REVIEW_CHANGE_ORDER": return s[code];
     default:
       // A journey that ended after acceptance says so with the backend's word for how (withdrawn, cancelled, expired, completed).
       if (ctx.exit && s[ctx.exit]) return s[ctx.exit];

@@ -1,17 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
+import { DocumentPicker, Fact, Money, Task as PanelTask, instant, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import type { AdmissionEvidence, AdmissionView, DirectoryFacility, Mutate } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["admission"];
-type Doc = { documentId: string; fileName: string; status: string };
+type Doc = PanelDocument;
 export type AdmissionRole = "operations" | "finance" | "coordinator" | "doctor";
 
 /** The case stages the panel belongs to (P1-15): from travel coordination, where Operations reserves, to treatment. */
@@ -73,7 +74,8 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
   const next = role === "operations"
     ? (!reserved ? "reserve" : ["NONE", "REFUSED"].includes(view.letterCheck ?? "NONE") ? "letter" : currentCode === "RECORD_HOSPITAL_BALANCE" ? "receipt"
       : currentCode === "RECORD_ADMISSION_NUMBER" ? "number" : null)
-    : role === "finance" ? (pendingLetter ? "decide" : toCountersign.length > 0 ? `countersign:${toCountersign[0].id}` : feeOwed ? "fee" : null)
+    // In treatment, Finance's current work may be the Treatment panel's (P1-16): this panel then leads only for its own work.
+    : role === "finance" && (caseStatus !== "TREATMENT_IN_PROGRESS" || ADMISSION_WORK.has(currentCode ?? "")) ? (pendingLetter ? "decide" : toCountersign.length > 0 ? `countersign:${toCountersign[0].id}` : feeOwed ? "fee" : null)
     : null;
   const btn = (key: string) => next === key ? "btn-primary" : "btn-secondary";
   const cleared = ["ADMISSION_READY", "TREATMENT_IN_PROGRESS"].includes(view.caseStatus ?? caseStatus);
@@ -246,14 +248,9 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
   );
 }
 
-/** One recording task: a disclosure whose summary names the outcome; the next task opens first (and is the focus target). */
+/** A recording task of this panel: its next one carries the panel's "do it" anchor. */
 function Task({ title, next, children }: { title: string; next: boolean; children: ReactNode }) {
-  return (
-    <details className="border-t border-line" open={next || undefined} id={next ? "admission-next" : undefined}>
-      <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-bold text-brand-700">{title}</summary>
-      <div className="pb-3">{children}</div>
-    </details>
-  );
+  return <PanelTask title={title} next={next} anchor="admission-next">{children}</PanelTask>;
 }
 
 function LetterDecision({ t, letter, variance, referenceMax, egp, busy, primary, onDecide }: {
@@ -329,29 +326,4 @@ function EmergencyAdmission({ t, busy, onRecord }: { t: Copy; busy: boolean; onR
   );
 }
 
-function DocumentPicker({ name, label, empty, documents, required = false }: { name: string; label: string; empty: string; documents: Doc[]; required?: boolean }) {
-  return (
-    <label className="block text-sm font-semibold">{label}
-      <select className="field" name={name} required={required} defaultValue="">
-        <option value="">{empty}</option>
-        {documents.filter(d => d.status === "CLEAN").map(d => <option key={d.documentId} value={d.documentId}>{d.fileName}</option>)}
-      </select>
-    </label>
-  );
-}
-
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return <div><dt className="text-ink-500">{label}</dt><dd className="font-semibold text-ink-900">{children}</dd></div>;
-}
-function Money({ children }: { children: ReactNode }) {
-  return <bdi dir="ltr" className="tabular-nums">{children}</bdi>;
-}
-
-const pick = (table: Record<string, string>, key: string) => Object.hasOwn(table, key) ? table[key] : key.replaceAll("_", " ").toLowerCase();
 function letterTone(check?: string | null): StatusTone { return check === "VARIANCE_OPEN" || check === "REFUSED" ? "warning" : "neutral"; }
-function instant(value: FormDataEntryValue | null) { return value ? new Date(String(value)).toISOString() : null; }
-function text(value: FormDataEntryValue | null) { const v = String(value ?? "").trim(); return v || null; }
-/** Submits a form's data; the form is cleared once the command succeeded. */
-function submit(action: (data: FormData) => Promise<boolean>) {
-  return (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; void action(new FormData(form)).then(done => { if (done) form.reset(); }); };
-}

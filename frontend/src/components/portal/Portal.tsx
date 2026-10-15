@@ -250,7 +250,8 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     }catch(e){const message=e instanceof Error?e.message:t.error;if(path.endsWith("/claim"))setWorkspace(null);
       if(e instanceof Error&&"passkeyPending" in e){setPasskeyNeeded({pending:(e as Error&{passkeyPending:PendingChange|null}).passkeyPending});return undefined;}await refreshAfterRejectedAction(path,workspace,refresh,openCase);
       const code=e instanceof Error&&"code" in e?String((e as Error&{code?:string}).code??""):"";
-      if(code&&refusalExplainedInPlace(code,path))setRefusal({code,path});else setError(message);return undefined;}
+      // A code the copy words (P1-16 onward) reads in the viewer's language; any other keeps the backend's message.
+      if(code&&refusalExplainedInPlace(code,path))setRefusal({code,path});else setError((code&&Object.hasOwn(work.errorCodes,code)?work.errorCodes[code as keyof typeof work.errorCodes]:null)??message);return undefined;}
     finally{mutationPending.current=false;setBusyCount(n=>n-1);}
   }
   // Staff views (My work, My cases, Team queue) in one place: the header navigation, the inline phone navigation and

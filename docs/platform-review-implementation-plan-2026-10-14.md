@@ -1245,6 +1245,67 @@ phases.
   - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `2aacb41`) and rebuilds the dev backend for V100;
     then P1-16 session 2 (UI and copy, started in a new session; contract in the shared notes folder,
     `p1-16-session-1-handover.md`).
+- **Status (2026-10-15, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/p1-16-s2-ui-aca50e`, cut from `b8dcf2d`):** delivered,
+  frontend only (no wire gap blocked a screen). Amounts are shown exactly as the API returns them; nothing is added up or converted in the
+  browser. The P1-15 money rule (deposit covers the platform fee first) is untouched and still awaits the owner.
+  - **Staff "Treatment" panel** (`TreatmentPanel`, on the case page after "Admission & money" for Operations, Finance, the coordinator and
+    the Consultant while the case is `TREATMENT_IN_PROGRESS`, and for an open Treatment work item afterwards, e.g. Finance's emergency
+    review that survives the exit; reads `GET /{role}/cases/{id}/treatment`): milestones with who recorded them, countersign state, the
+    clinical details (null for Finance) and "Incident opened for review" on a complication; the next milestone due (or "discharge is
+    planned: no further milestone is due"); change orders (number, status, clinical reason, the lines table, total in EGP and the patient's
+    currency, within/above the band, proposed and decided by channel); the running money (package, change orders, authorised, billed to
+    date, bill awaiting countersign, variance marked "over" when positive, band and band used); interim bills; and the evidence checklist
+    per stage (done/missing in words for screen readers, optional items marked). Every command answers with the view and the panel shows
+    it. One primary action: the viewer's next task, and the "do it" target of the current-action panel (`TREATMENT_WORK`,
+    `#treatment-next`). **Consultant**: the milestone form (eight kinds; the operative note reference or document for a completed
+    procedure, checked before the round trip; implants; summary + severity for a complication with its incident hint; the date for a
+    planned discharge; "recording this again corrects the one on file" for the four single facts), opening first on `RECORD_MILESTONE`;
+    countersign Operations' milestones after a confirmation (step-up via the portal's re-sign-in and replay); the change-order form (reason
+    the patient reads, 1-20 lines of kind / description / quantity) and its emergency variant behind a confirmation; withdraw an undecided
+    order with a reason and a confirmation. **Operations**: the milestone form on the Consultant's behalf (with the countersign hint) and
+    the interim-bill form (checked case document, bill number, EGP to date, issued at). **Finance**: line pricing per order (every line,
+    EGP unit price; step-up) and the interim-bill countersign after a confirmation (step-up). In treatment the Finance primary goes to this
+    panel only for `PRICE_CHANGE_ORDER` / `EMERGENCY_CHANGE_ORDER_REVIEW` / `COUNTERSIGN_INTERIM_BILL`, and "Admission & money" leads
+    only for its own work, so the page never shows two filled actions. The shared panel pieces (task disclosure, facts, money, document
+    picker, confirm-then-act, form helpers) moved to `panel-parts.tsx`; `AdmissionPanel` uses them unchanged in behaviour.
+  - **My Care**: a `treatmentStep` slot (`TREATMENT_STEPS` = `IN_TREATMENT`, `REVIEW_CHANGE_ORDER` in `admission-steps.ts`) renders
+    `PatientTreatment` (reads `GET /patient/cases/{id}/treatment`): the calm timeline (one line per milestone, `CARE_UPDATE` as "Care
+    update: your Consultant will talk it through with you", "reported by the care team" for `CARE_TEAM`, the planned discharge date) and
+    the decided changes ("Done in an emergency", "Price to follow" until priced). On `REVIEW_CHANGE_ORDER` (new step text) the change
+    awaiting the patient comes first: the reason, the lines with EGP and the patient's currency per line, the added cost in EGP and "about
+    … at the rate fixed on your quote", an optional note, then "Accept the change" (the step's one primary) and "Decline", each behind its
+    own confirmation; `POST /patient/cases/{id}/change-orders/{orderId}/decision` with the portal's step-up replay; the answer is shown.
+  - **Status link**: in the treatment phase the link reads `POST /public/cases/{token}/treatment` with the verified grant and shows the same
+    timeline; when a change awaits the patient (and the coordinator is not asking for something) it is the page's story and its one action,
+    decided with `POST /public/cases/{token}/change-orders/{id}/decision` on the grant (the one-time code is the fresh proof); "nothing is
+    needed" and the My Care link are hidden then; refusals in the patient's words (`CHANGE_ORDER_NOT_AWAITING`, an ended session).
+    `TreatmentStory` / `ChangeOrderDecision` are shared by both surfaces.
+  - **Control Center**: the margin-policy form carries "Change-order band (% of the package)" and "Change-order band cap (EGP)", prefilled
+    from the active version (10% / EGP 15,000 when none), sent as `changeOrderBandRate` / `changeOrderBandEgp`, listed and stated in the
+    confirmation (inline en/ar, as the rest of that screen).
+  - **Copy** (en + ar; **Arabic is a draft** pending native review): `portalWork.workTitles`, `workCopy.items` and `currentAction.work` for
+    the six work types; `workCopy.items` for `CHANGE_ORDER_ACCEPTED`, `CHANGE_ORDER_REJECTED`, `TREATMENT_COMPLICATION`; waiting reason
+    `CHANGE_ORDER_DECISION`; current actions `RECORD_MILESTONE` (state + button) and `REVIEW_CHANGE_ORDER` (`myCare.steps`); the panel
+    (`portalWork.treatment`), the patient block (`myCare.treatment`), the ten evidence kinds on the admission trail; and a new
+    `portalWork.errorCodes` (the 17 treatment codes + `CHANGE_ORDER_BAND_INVALID`), which the portal now shows in the viewer's language
+    in place of the backend's English message (other codes unchanged).
+  - Tests: new `TreatmentPanel.test.tsx` (9: Consultant countersign as the one primary after a confirmation, milestone per-kind fields and
+    the operative-note check, change order with lines + emergency after a confirmation, withdraw; Finance money as returned + pricing,
+    interim-bill countersign; Operations on-behalf milestone + interim bill from a checked document; read-only coordinator; Arabic and no
+    primary without Finance's own work), `PatientTreatment.test.tsx` (4, through `MyCare`: accept, decline with note, timeline, Arabic),
+    +3 `CaseStatusAccess` (decide on the grant, not-awaiting refusal, timeline only), +1 `StaffOperationalUi` (current-action words
+    en/ar), +1 and 2 updated `PageHeaders` (band fields). Playwright `e2e/my-care-change-order.spec.ts` (4: en/ar × 390/1440, one primary,
+    amounts as returned, no page scroll, the decision sent after the confirmation and read back) via the new `treatment` option of
+    `patient-fixture.ts`, green on a dev server together with `my-care-admission.spec.ts` (10/10). `pnpm typecheck` clean, eslint clean on
+    touched files, vitest 81 files / 635 tests green. Reviewed with react-best-practices, composition-patterns, web-design-guidelines and
+    Impeccable (detector: no findings; fixes: one filled action across the two panels in treatment, `autocomplete="off"` on line
+    descriptions, hoisted number format, generated heading ids, no glyphs standing in for icons).
+  - Not done (later or owner): the final UX design of these screens (UX plan); no assisted (coordinator-recorded) change-order decision
+    (backend has none); the status link still has no patient-safe step code of its own (`PublicCaseStatus`); staff panel not walked live —
+    needs the dev stack rebuilt at V100 with this frontend; Meta approval of `rs_treatment_update` / `rs_change_order_review`.
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/p1-16-s2-ui-aca50e` (it contains `b8dcf2d`), rebuilds backend and
+    frontend, and walks one case live (Operations milestone → Consultant countersign → change order → Finance price above the band →
+    patient accepts in My Care); then P1-17 (discharge pack, reconciliation and statements), started in a new session.
 
 ### P1-17  Discharge pack, reconciliation and statements  (design §5 stage 5, §6; architecture §5.4–5.5)
 - `DischargeService` pack completeness (summary, medication list, operative note, implant record, fit-to-fly with the
