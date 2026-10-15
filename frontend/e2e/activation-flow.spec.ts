@@ -23,7 +23,7 @@ const prefill = {
   candidateEmail: "m@local.test", emailVerified: false, knownMobile: "+201010447898", mobileOwner: "PATIENT", phoneVerified: true,
   dateOfBirth: "1985-04-02", nationality: "EG", countryOfResidence: "KE", preferredLanguage: "en", sex: "MALE",
   submittedBy: "PATIENT", representativeName: null, representativeRelationship: null,
-  requiredConsents: ["COORDINATION"], completedConsents: [], deposit,
+  requiredConsents: ["PRIVACY_DATA_PROCESSING"], completedConsents: [], deposit,
 };
 
 type Stage = "SET_UP_ACCOUNT" | "CONTINUE_IN_PORTAL";

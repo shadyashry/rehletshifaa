@@ -156,7 +156,10 @@ describe("ProfileActivation", () => {
     });
     await fillRequired();
     submit();
-    expect(await screen.findByText(/date of birth cannot be in the future/i)).toBeTruthy();
+    // The backend names the field; the words are the page's own, never its English message.
+    expect(await screen.findByText(en.secureLink.activation.errDobInvalid)).toBeTruthy();
+    expect(screen.queryByText(/date of birth cannot be in the future/i)).toBeNull();
+    await waitFor(() => expect(document.activeElement?.id).toBe("act-dateOfBirth"));
     // The form is still populated — nothing the patient typed was lost.
     expect((screen.getByLabelText(/given name/i) as HTMLInputElement).value).toBe("Link");
   });
@@ -277,5 +280,112 @@ describe("ProfileActivation", () => {
     vi.stubGlobal("fetch", stub({ "000": () => json(summary) }));
     render(<ProfileActivation locale="ar" token="tok-000" copy={ar.secureLink.activation} />);
     expect(await screen.findByRole("heading", { name: /لنتأكد أنه أنت/ })).toBeTruthy();
+  });
+});
+
+describe("ProfileActivation — completing the file (slice D)", () => {
+  beforeEach(() => vi.resetAllMocks());
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  const t = en.secureLink.activation;
+
+  it("seals the page with the case, where the code goes, the never-ask line, and steps drawn as the journey", async () => {
+    vi.stubGlobal("fetch", stub({ "000": () => json(summary) }));
+    render(<ProfileActivation locale="en" token="tok-000" copy={t} />);
+    await screen.findByRole("heading", { level: 1, name: t.verifyTitle });
+    expect(screen.getByText("RS-2026-000123")).toBeTruthy();
+    expect(screen.getByText(t.neverAsk)).toBeTruthy();
+    const steps = screen.getByRole("list", { name: "Step 1 of 3" });
+    expect(steps.querySelector("[aria-current=step]")?.textContent).toContain(t.steps[0]);
+    expect(steps.textContent).not.toContain("✓");
+  });
+
+  it("says a wrong code in its own words", async () => {
+    vi.stubGlobal("fetch", stub({
+      "/request-access": () => json(summary),
+      "/verify": () => json({ code: "VERIFICATION_INVALID", message: "The verification code is invalid or has expired" }, false, 400),
+      "000": () => json(summary),
+    }));
+    render(<ProfileActivation locale="en" token="tok-000" copy={t} />);
+    fireEvent.click(await screen.findByRole("button", { name: /send code/i }));
+    fireEvent.change(await screen.findByLabelText(/6-digit code/i), { target: { value: "000000" } });
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+    expect(await screen.findByText(t.codeInvalid)).toBeTruthy();
+    expect(screen.queryByText(/verification code is invalid/)).toBeNull();
+  });
+
+  it("ends on the no-longer-works page with the reason when the case can no longer be activated", async () => {
+    vi.stubGlobal("fetch", stub({
+      "/request-access": () => json({ code: "CASE_NOT_ACTIVATABLE", message: "This case is no longer active." }, false, 409),
+      "000": () => json(summary),
+    }));
+    render(<ProfileActivation locale="en" token="tok-000" copy={t} />);
+    fireEvent.click(await screen.findByRole("button", { name: /send code/i }));
+    expect(await screen.findByRole("heading", { level: 1, name: t.invalidTitle })).toBeTruthy();
+    expect(screen.getByText(t.invalidInactive)).toBeTruthy();
+  });
+
+  it("marks the details step current and the verify step completed, in words", async () => {
+    await reachForm();
+    const steps = screen.getByRole("list", { name: "Step 2 of 3" });
+    expect(steps.querySelector("[aria-current=step]")?.textContent).toContain(t.steps[1]);
+    expect(steps.textContent).toContain(`(${t.stepCompleted})`);
+  });
+
+  it("offers the known email and the number's owner as choice cards", async () => {
+    await reachForm();
+    const email = screen.getByRole("radiogroup", { name: t.accountEmail });
+    expect(within(email).getAllByRole("radio")).toHaveLength(2);
+    expect(within(email).getByText("li***@local.test")).toBeTruthy();
+    const owner = screen.getByRole("radiogroup", { name: t.belongsTo });
+    expect(within(owner).getByRole("radio", { name: t.ownerMe })).toBeTruthy();
+  });
+
+  it("never renders a consent's code; one with no words is named generically", async () => {
+    await reachForm({}, { requiredConsents: ["PRIVACY_DATA_PROCESSING", "SOMETHING_NEW"] });
+    expect(screen.queryByText("SOMETHING_NEW")).toBeNull();
+    expect(screen.getByText(t.consentUnknown)).toBeTruthy();
+  });
+
+  it("with no number on file, an empty phone is a phone error on the phone field", async () => {
+    await reachForm({}, { knownMobile: null, mobileOwner: null });
+    submit();
+    expect(await screen.findByText(t.errPhone)).toBeTruthy();
+    await waitFor(() => expect(document.activeElement?.id).toBe("act-dateOfBirth"));
+    expect(screen.queryByText(t.errOwner)).toBeNull();
+  });
+
+  it("an agreement without words cannot be accepted, and says why", async () => {
+    await reachForm({}, { requiredConsents: ["SOMETHING_NEW"] });
+    const box = screen.getByRole("checkbox", { name: t.consentUnknown }) as HTMLInputElement;
+    expect(box.disabled).toBe(true);
+    await fillRequired();
+    submit();
+    expect(await screen.findByText(t.consentBlocked)).toBeTruthy();
+  });
+
+  it("returns to the code step, without an error tone, when the session lapses on account setup", async () => {
+    await reachForm({ "/resend-setup": () => json({ code: "VERIFICATION_REQUIRED" }, false, 401) });
+    await fillRequired();
+    submit();
+    fireEvent.click(await screen.findByRole("button", { name: t.accountResend }));
+    expect(await screen.findByText(t.sessionExpired)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: t.verifyTitle })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("never prints a placeholder address when the account email is unknown", async () => {
+    await reachForm({ "/activate": () => json(completed({ ...setupPending, emailHint: null })) });
+    await fillRequired();
+    submit();
+    expect(await screen.findByText(t.accountSentNoAddress)).toBeTruthy();
+    expect(screen.queryByText("***")).toBeNull();
+  });
+
+  it("moves focus to the first missing field", async () => {
+    await reachForm();
+    submit();
+    await screen.findByText(t.errDob);
+    await waitFor(() => expect(document.activeElement?.id).toBe("act-dateOfBirth"));
+    expect(document.activeElement?.getAttribute("aria-invalid")).toBe("true");
   });
 });

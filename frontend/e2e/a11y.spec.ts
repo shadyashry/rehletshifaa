@@ -6,6 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { setupPatient } from "./patient-fixture";
 import { setupPortal } from "./portal-fixture";
+import { ACTIVATION_TOKEN, openActivationForm, setupActivationLink } from "./activation-fixture";
 import { openProposalView, PROPOSAL_TOKEN, setupProposalLink } from "./proposal-fixture";
 import { INFORMATION_REQUESTED, openStatusView, setupStatusLink, STATUS_TOKEN } from "./status-fixture";
 
@@ -51,6 +52,8 @@ const PUBLIC: Target[] = [
   { name: "status-link", path: `/status/${STATUS_TOKEN}`, prepare: page => setupStatusLink(page, INFORMATION_REQUESTED), ready: openStatusView },
   // The secure proposal link after the code: the estimate as a document, with its decision (Arabic: the assisted path).
   { name: "proposal-link", path: `/proposal/${PROPOSAL_TOKEN}`, prepare: page => setupProposalLink(page), ready: openProposalView },
+  // Profile activation after the code: the form (representative-submitted case, choice cards, agreements).
+  { name: "activation-form", path: `/activate/${ACTIVATION_TOKEN}`, prepare: page => setupActivationLink(page), ready: openActivationForm },
   { name: "cardiology", path: "/cardiology" },
 ];
 const PORTAL: Target[] = [
