@@ -682,6 +682,28 @@ phases.
 - Files: `JourneyService.createFinalQuote`, `ProposalExpiryService` (final quotes), `CommercialPolicyService`
   settings, `ProposalSign.tsx`, homepage, copy.
 - Sessions: 2. Model: Fable 5.1, high (rule) then Sonnet 5.5 (copy/UI).
+- **Decisions (owner, 2026-10-15; recommendations accepted):**
+  - **D-A, the fee: yes, before launch.** The 15% stops being a markup baked into each Consultant line. Each medical
+    line carries the provider's own price (Consultant and facility at their own prices). The platform charges the
+    patient one disclosed line, the **coordination and guarantee fee** (`PLATFORM_FEE` category on `proposal_items`),
+    equal to today's margin rate times the provider total. The rate still comes from the locked commercial policy
+    version. The patient's total, the deposit (15% of that total, `DepositCalculator`), Finance's margin figures and the
+    EGP ledger stay numerically the same; only the structure and what the patient sees change.
+  - **Guarantee wording: a placeholder until counsel approves it.** Each locale keeps it under one key so the approved
+    text is a copy change. Placeholder (EN): "Our no-surprise promise: your final quote will not be higher than the
+    maximum shown here unless your Consultant finds, when they examine you, that your treatment needs to change. If it
+    does, they will tell you why in writing, and you will have at least 24 hours to decide." It promises only what
+    the rule enforces; no refund promise until counsel and the owner decide one.
+  - **Final-quote validity: 14 days** after release, a setting on the commercial policy (`final_quote_validity_days`,
+    default 14). The coordinator may shorten it but never lengthen it. `ProposalExpiryService` expires final quotes the
+    same way it expires estimates.
+  - **FX tolerance band: 3%**, a setting on the commercial policy (`fx_tolerance_rate`, default 0.03). When a final
+    quote is accepted, its display-currency total is re-computed at the day's rate. If that total differs from the
+    frozen one by more than the band in either direction, acceptance pauses and Finance re-approves: either confirm
+    the frozen rate or re-release at the new rate. The no-surprise cap is compared in EGP (provider total plus fee),
+    so a currency move can never count as a scope change and a scope change can never hide behind one.
+  - **Still open:** counsel on the VAT rate of the fee (the design assumes 14%). P1-10 shows the fee without VAT;
+    the VAT line comes with the platform e-invoice in P1-17. The final wording of the guarantee is also open.
 
 ### P1-11  Split `JourneyService`  (E-06)
 - Extract `ConsultantAssignmentService`, `ClinicalReviewService`, `ProposalService` (create / release / decide /
@@ -822,7 +844,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
 | 1 | P1-8 Metrics, alerts, scheduler leadership | done: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
-| 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: D-A (platform fee line), guarantee wording, final-quote validity; counsel on the VAT rate of the fee |
+| 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2 | Fable 5.1 high, then Sonnet 5.5 | Ready (2026-10-15): D-A yes, placeholder guarantee wording, 14-day validity, 3% FX band; kickoff block in `docs/platform-review-phase-prompts.md`. Counsel on the fee's VAT rate does not block it |
 | — | UI/UX (all areas) | own plan | see `docs/ux-redesign/PLAN.md` | Runs in parallel in its own worktree; Finance and Operations areas wait for P1-15 / P1-17 |
 | 3 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
 | 5 | **P1-15 Admission, voucher, balance, `ADMISSION_READY`** | 2 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |
@@ -844,10 +866,13 @@ the licence now; the credential type is a one-line addition in P1-19.
 
 ### Owner decisions still open
 
-- [ ] D-A…D-H from `docs/post-deposit-journey-design.md` §12 (fee restructuring, voucher model, pay to admit, new
-      stage, change-order band, fit-to-fly window, free follow-up window, affiliations as eligibility).
+- [x] D-A (fee restructuring): yes, before launch (owner, 2026-10-15); see the P1-10 entry.
+- [ ] D-B…D-H from `docs/post-deposit-journey-design.md` §12 (voucher model, pay to admit, new stage, change-order
+      band, fit-to-fly window, free follow-up window, affiliations as eligibility).
 - [ ] D-I: start the PDPL licence application and the Law 13/2025 liability-fund subscription (owner action).
-- [ ] P1-10: guarantee wording on the proposal and final-quote validity; counsel: VAT rate on the platform fee.
+- [x] P1-10: final-quote validity 14 days and FX band 3% (owner, 2026-10-15); guarantee wording ships as a placeholder.
+- [ ] P1-10: counsel approves the guarantee wording and the VAT rate on the platform fee; owner decides whether the
+      guarantee carries a refund when a patient declines a final quote above the preliminary maximum.
 - [ ] P1-12: payer terms and partner commission.
 - [ ] Consent for Consultant and coordinator photographs (UX plan area 1b; P1-14).
 - [ ] P2-15: when a second destination is added.
@@ -883,7 +908,7 @@ Next: 7. P1-8 (metrics + ShedLock) → 8. P1-10 (commercial truth + fee restruct
 (profile data) → 20. P2-24 (refund enforcement) → P2 in table order. The UX plan runs beside this sequence in its
 own worktree (`docs/ux-redesign/PLAN.md`); its Finance and Operations areas start after P1-15 and P1-17.
 
-Owner decisions that gate a slice: D-A (P1-10), D-B/D-C/D-D (P1-15), D-E (P1-16), D-F (P1-17), D-G (P1-18), D-H
+Owner decisions that gate a slice: D-A (P1-10, decided 2026-10-15), D-B/D-C/D-D (P1-15), D-E (P1-16), D-F (P1-17), D-G (P1-18), D-H
 (P1-19), P1-12 (payer terms, partner commission), P2-15 (second destination timing).
 
 Roughly 25 sessions for the rest of P1 (including the six new phases), 19 for P2.

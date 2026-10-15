@@ -343,7 +343,7 @@ and for anything Operations records on the Consultant's behalf), `recorded_at`, 
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D-A | Restructure the 15% as a disclosed platform fee charged to the patient (Consultant and hospital at their own prices)? | **Yes, before launch.** Required by the ethics regulation reading in §3.1 and by consumer-protection price disclosure; it also makes VAT/e-invoicing clean. Counsel to confirm the reading and the VAT rate on the fee. |
+| D-A | Restructure the 15% as a disclosed platform fee charged to the patient (Consultant and hospital at their own prices)? | **Yes, before launch.** Required by the ethics regulation reading in §3.1 and by consumer-protection price disclosure; it also makes VAT/e-invoicing clean. Counsel to confirm the reading and the VAT rate on the fee. **Decided 2026-10-15: yes** (owner); built in P1-10. |
 | D-B | Phase 1: hospital package paid at the hospital against a platform voucher, platform never holding hospital money? | **Yes.** Avoids CBE payment-facilitation licensing at launch; keeps price control through the voucher and reconciliation. Move to platform collection with a licensed PSP in phase 2. |
 | D-C | "Pay to admit": the balance must be evidenced before the treatment episode opens? | **Yes**, with the same emergency override pattern as consent. Bumrungrad/Apollo practice; protects the hospital relationship and the refund logic. |
 | D-D | Add `ADMISSION_READY` as a macro state? | **Yes** (one state, well-defined); everything else as milestones in the evidence ledger. |
