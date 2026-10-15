@@ -1,16 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { CaseDocumentUpload, type Send } from "./CaseDocumentUpload";
 import { renderWithWork } from "./test-copy";
+import { putWithProgress } from "@/lib/upload";
+
+vi.mock("@/lib/upload", () => ({ putWithProgress: vi.fn() }));
 
 /** The Documents tab's upload: presign, the bytes, confirm (the scan); the case's list reloads once the file is clean. */
 describe("CaseDocumentUpload", () => {
-  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  afterEach(() => { cleanup(); vi.mocked(putWithProgress).mockReset(); });
   const presigned = { documentId: "d7", uploadUrl: "https://upload.test/put/d7", requiredHeaders: { "Content-Type": "image/png" } };
 
-  function setup(confirm: () => Promise<unknown>, put = vi.fn().mockResolvedValue({ ok: true })) {
-    vi.stubGlobal("fetch", put);
+  function setup(confirm: () => Promise<unknown>, stored = true) {
+    const put = vi.mocked(putWithProgress).mockResolvedValue(stored);
     const send = vi.fn((path: string) => path.endsWith("/presign") ? Promise.resolve(presigned) : confirm());
     const onUploaded = vi.fn();
     renderWithWork(<CaseDocumentUpload caseId="c1" send={send as unknown as Send} onUploaded={onUploaded}/>);
@@ -26,8 +29,23 @@ describe("CaseDocumentUpload", () => {
     expect(onUploaded).toHaveBeenCalledWith(expect.objectContaining({ documentId: "d7", fileName: "lab-results.png", status: "CLEAN" }));
   });
 
+  it("shows how much of the file has gone while it uploads", async () => {
+    let report: (fraction: number) => void = () => {};
+    let done: (stored: boolean) => void = () => {};
+    setup(() => Promise.resolve({ documentId: "d7", status: "CLEAN" }));
+    vi.mocked(putWithProgress).mockImplementation((_url, _headers, _file, onProgress) => { report = onProgress; return new Promise(resolve => { done = resolve; }); });
+    fireEvent.change(screen.getByLabelText("Choose a file"), { target: { files: [png()] } });
+    const bar = await screen.findByRole("progressbar", { name: "Uploading lab-results.png…" });
+    expect(bar.getAttribute("aria-valuenow")).toBe("0");
+    act(() => report(0.42));
+    expect(bar.getAttribute("aria-valuenow")).toBe("42");
+    await act(async () => done(true));
+    expect(await screen.findByText("lab-results.png passed the check and is now in your documents.")).toBeTruthy();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
   it("says when the storage refused the bytes, and when the case is full, without confirming anything", async () => {
-    const { send, onUploaded } = setup(() => Promise.resolve({}), vi.fn().mockResolvedValue({ ok: false }));
+    const { send, onUploaded } = setup(() => Promise.resolve({}), false);
     fireEvent.change(screen.getByLabelText("Choose a file"), { target: { files: [png()] } });
     expect(await screen.findByText("The file could not be uploaded. Try again, or message your coordinator.")).toBeTruthy();
     expect(send).toHaveBeenCalledTimes(1);

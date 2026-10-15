@@ -1084,7 +1084,8 @@
         "upload": {
           "none": "No document on this case has passed the virus check yet. Upload it here.",
           "another": "Not in the list? Upload it here.",
-          "ready": "{name} passed the check and is selected."
+          "ready": "{name} passed the check and is selected.",
+          "stillChecking": "Still being checked for viruses. You can choose a file here once it has passed, so you can leave and come back."
         },
         "consentLegend": "Your statement",
         "confirm": "Confirm",
@@ -2212,6 +2213,10 @@
         "CASE_MARKED_URGENT": {
           "title": "Case {caseNumber} was marked urgent",
           "context": "Its coordinator judged it time-critical. Make room for its work today."
+        },
+        "DOCUMENT_CLEARED": {
+          "title": "A file on case {caseNumber} passed the virus check",
+          "context": "It was uploaded while the check was unavailable and is now on the case. Tell the patient it arrived; a guardian can now choose it as evidence."
         },
         "INCIDENT_REVIEW": {
           "title": "Review an incident on case {caseNumber}",

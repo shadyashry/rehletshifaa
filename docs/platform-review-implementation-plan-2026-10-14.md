@@ -954,9 +954,16 @@ phases.
     migration. The outage message now says the file is checked automatically. Tests: `DocumentServiceTest` +5, new `PendingDocumentSweeperTest`
     (arrived, never arrived, stuck in quarantine, in flight untouched, quota), `SchedulerLeaseTest` lists the job; `PostgresJpaMappingTest` green on a
     disposable PostgreSQL 17; backend `mvn -o -q test` (JVM in UTC) 886 tests, 0 failures, 3 skips (880 before, 6 new).
-  - Open gaps: no byte-level progress bar (the PUT is one fetch; files are at most 15 MB); the sweeper writes no audit row (the status change
-    is the record) and tells nobody when a deferred upload becomes clean; the guardian step does not list the guardian's own uploads that are
-    still being checked (they appear once clean).
+  - Minor gaps closed, same branch (2026-10-15): **progress bar**: the PUT goes through `putWithProgress` (`lib/upload.ts`,
+    XMLHttpRequest, because fetch has no upload progress) and `CaseDocumentUpload` shows a progress bar (`role="progressbar"`, outside the live
+    region); **sweeper audit and notice**: each decision is audited `DOCUMENT_RECHECKED` (actor `SYSTEM` / `DOCUMENT_SWEEPER`, the outcome as
+    reason) and a file cleared in the sweep publishes `DocumentEvents.UploadCleared`, which `UploadNotices` (journey) turns into an in-app
+    notification `DOCUMENT_CLEARED` for the case's coordinators (copy in `workCopy.items`, en and ar draft); patients have no notification
+    centre, so they see it in My Care; **guardian step**: files of the case still PENDING or QUARANTINED are listed under "Still being checked",
+    not choosable. Tests: `upload.test` (2), `CaseDocumentUpload.test` +1 (progress), `GuardianStep.test` +1, `PendingDocumentSweeperTest`
+    asserts the audit rows and the notices; frontend 75 files, 541 tests; backend `mvn -o -q test` (JVM in UTC) 886 tests, 0 failures, 3 skips.
+  - Open gaps: a patient-facing notice when a deferred upload clears (needs a patient channel: a WhatsApp template or a patient notification
+    centre); the uploader is not recorded on `medical_documents`, so the notice goes to the coordinator, not to whoever uploaded.
   - Next exact action: owner fast-forwards `feat/review-p0` to `claude/guardian-upload` and rebuilds backend and frontend; live walk: a minor's case with no
     document, the guardian uploads the guardianship paper from My Care, sees it checked, attaches it, the coordinator verifies; a patient
     uploads from the Documents tab; with ClamAV stopped, an upload shows the outage and is finished by the sweeper within ~5 minutes of

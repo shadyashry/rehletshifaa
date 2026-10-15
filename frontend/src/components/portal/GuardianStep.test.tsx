@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { GuardianStep } from "./GuardianStep";
+import { putWithProgress } from "@/lib/upload";
 import { MyCare } from "./MyCare";
 import { renderWithWork, workCopyFor } from "./test-copy";
 import type { CaseActions } from "./CurrentAction";
 import { GUARDIAN_CONSENT_VERSION } from "@/lib/guardian";
+
+vi.mock("@/lib/upload", () => ({ putWithProgress: vi.fn() }));
 
 /** P1-13 (A-05): the guardian's step in My Care — legal basis, a document already on the case, and the guardian consent. */
 const clean = { documentId: "d1", fileName: "birth-certificate.pdf", status: "CLEAN", createdAt: "2026-10-10T09:00:00Z" };
@@ -69,14 +72,13 @@ describe("GuardianStep", () => {
 });
 
 describe("GuardianStep upload", () => {
-  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  afterEach(() => { cleanup(); vi.mocked(putWithProgress).mockReset(); });
   const consented = { version: 4, completedConsentTypes: ["GUARDIAN_AUTHORIZATION"] };
   const pdf = () => new File(["%PDF-1.7"], "guardianship.pdf", { type: "application/pdf" });
   const presigned = { documentId: "d9", uploadUrl: "https://upload.test/put/d9", requiredHeaders: { "Content-Type": "application/pdf" } };
 
   function setupUpload(confirm: () => Promise<unknown>, documents = [scanning]) {
-    const put = vi.fn().mockResolvedValue({ ok: true });
-    vi.stubGlobal("fetch", put);
+    const put = vi.mocked(putWithProgress).mockResolvedValue(true);
     const send = vi.fn((path: string) => path.endsWith("/presign") ? Promise.resolve(presigned) : confirm());
     const mutate = vi.fn().mockResolvedValue({ status: "SAVED" });
     const load = vi.fn().mockResolvedValue(consented) as unknown as <T>(path: string) => Promise<T>;
@@ -94,7 +96,7 @@ describe("GuardianStep upload", () => {
     expect(await screen.findByText("Checking guardianship.pdf for viruses…")).toBeTruthy();
     expect(send).toHaveBeenCalledWith("/patient/cases/c1/documents/presign",
       { method: "POST", body: JSON.stringify({ originalFileName: "guardianship.pdf", contentType: "application/pdf", sizeBytes: 8 }) });
-    expect(put).toHaveBeenCalledWith("https://upload.test/put/d9", expect.objectContaining({ method: "PUT", headers: presigned.requiredHeaders }));
+    expect(put).toHaveBeenCalledWith("https://upload.test/put/d9", presigned.requiredHeaders, expect.any(File), expect.any(Function));
     expect(send).toHaveBeenLastCalledWith("/patient/cases/c1/documents/confirm", { method: "POST", body: JSON.stringify({ documentId: "d9" }) });
     finish({ documentId: "d9", status: "CLEAN" });
     const radio = await screen.findByRole("radio", { name: /guardianship\.pdf/ }) as HTMLInputElement;
@@ -126,6 +128,15 @@ describe("GuardianStep upload", () => {
     expect(send).not.toHaveBeenCalled();
     fireEvent.change(input, { target: { files: [pdf()] } });
     expect(await screen.findByText("guardianship.pdf did not pass the virus check and was removed. Choose another file.")).toBeTruthy();
+    expect(screen.queryByRole("radio")).toBeNull();
+  });
+
+  it("lists files still being checked without letting them be chosen", async () => {
+    setupUpload(() => Promise.resolve({}), [scanning, { ...scanning, documentId: "d3", fileName: "stuck.pdf", status: "QUARANTINED" }]);
+    expect(await screen.findByText(/Still being checked for viruses/)).toBeTruthy();
+    expect(screen.getByText("scan-pending.pdf")).toBeTruthy();
+    expect(screen.getByText("stuck.pdf")).toBeTruthy();
+    expect(screen.getAllByText("Being checked")).toHaveLength(2);
     expect(screen.queryByRole("radio")).toBeNull();
   });
 

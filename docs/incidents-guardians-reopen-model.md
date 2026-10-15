@@ -47,8 +47,9 @@ Rules (`GuardianService`, `CustomerReadinessService`, `OnboardingService`):
   (`pending-sweep-grace-seconds`), or QUARANTINED that long (a scan that never finished), and runs
   `DocumentService.recheckStale` on each in its own transaction: bytes stored → the confirm's own checks and scan (CLEAN, or
   SCAN_FAILED/REJECTED and deleted); no bytes → REJECTED (never arrived; frees the case's file and storage quota); no verdict or
-  storage down → left for the next run. Storage lost between quarantine and read now returns the upload to PENDING in the confirm
-  path too, instead of leaving it stuck in quarantine. Query `MedicalDocumentRepository.findStaleUploads` (JPQL, index
+  storage down → left for the next run. Each decision is audited `DOCUMENT_RECHECKED`; a file cleared this way publishes
+  `DocumentEvents.UploadCleared`, and `UploadNotices` notifies the case's coordinators (`DOCUMENT_CLEARED`). Storage lost between
+  quarantine and read now returns the upload to PENDING in the confirm path too, instead of leaving it stuck in quarantine. Query `MedicalDocumentRepository.findStaleUploads` (JPQL, index
   `idx_documents_status_created`).
 - Consent: `GUARDIAN_AUTHORIZATION` is its own consent type (replaces `REPRESENTATIVE_AUTHORIZATION` for a GUARDIAN subject), recorded
   in `consent_records` with policy version `guardian-v0-placeholder`. **The wording is a placeholder** (backend
@@ -117,5 +118,5 @@ focused, and attached with the step's own button. A scanner outage offers "Check
 or wrong-type file says so. The upload is offered under the list too, since the case's documents are usually medical files. The
 same `CaseDocumentUpload` sits on My Care's Documents tab (the `documentUpload` slot; a clean upload reloads the case's documents
 through `reloadDocuments`); that list marks files still being checked or condemned and hides REJECTED rows (uploads that never
-arrived).
+arrived). The guardian step lists files still being checked (not choosable), and the upload shows a progress bar (`putWithProgress`).
 

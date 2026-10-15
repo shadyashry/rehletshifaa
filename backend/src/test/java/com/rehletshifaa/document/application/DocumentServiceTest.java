@@ -44,32 +44,32 @@ class DocumentServiceTest {
     @Test void aStaleUploadWhoseBytesArrivedIsScannedAndBecomesUsable(){
         var document=stale();
         when(inspector.inspect(any(),eq("application/pdf"))).thenReturn(new DocumentInspectionPort.InspectionResult(true,"CLEAN"));
-        assertThat(service.recheckStale(document.getId())).isEqualTo(DocumentService.Recheck.CLEAN);
+        assertThat(service.recheckStale(document.getId()).outcome()).isEqualTo(DocumentService.Recheck.CLEAN);
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.CLEAN);
         verify(storage).markClean("medical/2026/08/key");
     }
     @Test void aStaleUploadWithNoBytesNeverArrivedAndStopsCountingAgainstTheCase(){
         var document=stale();
         when(storage.verify("medical/2026/08/key")).thenThrow(new ApiException(422,"UPLOAD_NOT_FOUND","Uploaded document could not be verified"));
-        assertThat(service.recheckStale(document.getId())).isEqualTo(DocumentService.Recheck.NEVER_ARRIVED);
+        assertThat(service.recheckStale(document.getId()).outcome()).isEqualTo(DocumentService.Recheck.NEVER_ARRIVED);
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.REJECTED);
         verifyNoInteractions(inspector);
     }
     @Test void noVerdictAgainLeavesItForTheNextRunAndAMalwareVerdictCondemnsIt(){
         var document=stale();
         when(inspector.inspect(any(),eq("application/pdf"))).thenReturn(DocumentInspectionPort.InspectionResult.unavailable("SCANNER_UNAVAILABLE"));
-        assertThat(service.recheckStale(document.getId())).isEqualTo(DocumentService.Recheck.STILL_UNAVAILABLE);
+        assertThat(service.recheckStale(document.getId()).outcome()).isEqualTo(DocumentService.Recheck.STILL_UNAVAILABLE);
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.PENDING);
         when(inspector.inspect(any(),eq("application/pdf"))).thenReturn(new DocumentInspectionPort.InspectionResult(false,"MALWARE_FOUND"));
-        assertThat(service.recheckStale(document.getId())).isEqualTo(DocumentService.Recheck.CONDEMNED);
+        assertThat(service.recheckStale(document.getId()).outcome()).isEqualTo(DocumentService.Recheck.CONDEMNED);
         assertThat(document.getStatus()).isEqualTo(DocumentStatus.SCAN_FAILED);
         verify(storage).delete("medical/2026/08/key");
     }
     @Test void aScanThatNeverFinishedIsTakenUpAgainAndAConfirmedOneIsLeftAlone(){
         var document=stale();document.quarantine(Instant.now()); // the process stopped mid-scan
         when(inspector.inspect(any(),eq("application/pdf"))).thenReturn(new DocumentInspectionPort.InspectionResult(true,"CLEAN"));
-        assertThat(service.recheckStale(document.getId())).isEqualTo(DocumentService.Recheck.CLEAN);
-        assertThat(service.recheckStale(document.getId())).isEqualTo(DocumentService.Recheck.SKIPPED);
+        assertThat(service.recheckStale(document.getId()).outcome()).isEqualTo(DocumentService.Recheck.CLEAN);
+        assertThat(service.recheckStale(document.getId()).outcome()).isEqualTo(DocumentService.Recheck.SKIPPED);
         verify(inspector,times(1)).inspect(any(),any());
     }
     @Test void storageLostBetweenQuarantineAndReadIsNoVerdictNotAStuckQuarantine(){

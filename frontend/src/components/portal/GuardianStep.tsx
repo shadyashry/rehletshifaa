@@ -41,6 +41,9 @@ export function GuardianStep({ locale, caseId, blockerCode, documents, busy, mut
     const own = new Set(uploaded.map(doc => doc.documentId));
     return [...uploaded, ...documents.filter(doc => doc.status === "CLEAN" && !own.has(doc.documentId))];
   }, [documents, uploaded]);
+  // Uploaded but not cleared yet (the scanner was down, or the page closed before the check): shown, not choosable.
+  const checking = useMemo(() => documents.filter(doc => (doc.status === "PENDING" || doc.status === "QUARANTINED")
+    && !uploaded.some(own => own.documentId === doc.documentId)), [documents, uploaded]);
   const dateFormat = useMemo(() => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }), [locale]);
 
   useEffect(() => {
@@ -131,6 +134,20 @@ export function GuardianStep({ locale, caseId, blockerCode, documents, busy, mut
                 ))}
               </ul>
             </>}
+        {checking.length > 0 && (
+          <div className="mt-3">
+            <p className="max-w-[65ch] text-[0.875rem] leading-6 text-ink-500">{t.upload.stillChecking}</p>
+            <ul className="mt-1 divide-y divide-line border-y border-line">
+              {checking.map(doc => (
+                <li key={doc.documentId} className="flex min-h-11 items-center gap-3 py-2.5">
+                  <FileText size={17} aria-hidden className="flex-none text-ink-400"/>
+                  <span className="min-w-0 flex-1 truncate text-ink-600" dir="auto">{doc.fileName}</span>
+                  <span className="flex-none text-[0.8125rem] font-semibold text-ink-600">{work.myCare.documents.status.checking}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {send && <CaseDocumentUpload caseId={caseId} send={send} lead={usable.length > 0 ? t.upload.another : null} ready={t.upload.ready}
           onUploaded={doc => { setUploaded(current => [doc, ...current]); setDocumentId(doc.documentId); }}/>}
         {error(missingDocument, "document", t.chooseDocument)}

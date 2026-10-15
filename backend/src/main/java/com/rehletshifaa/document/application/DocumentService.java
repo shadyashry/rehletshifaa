@@ -44,6 +44,8 @@ public class DocumentService {
 
     /** What {@link #recheckStale} did with one upload nobody finished confirming. */
     public enum Recheck { CLEAN, CONDEMNED, NEVER_ARRIVED, STILL_UNAVAILABLE, SKIPPED }
+    /** The outcome and the case it concerns (null when the document is gone). */
+    public record Rechecked(Recheck outcome, UUID caseId) {}
 
     /**
      * The sweeper's second look at an upload left unconfirmed (PENDING: never confirmed, or the scanner had no verdict) or
@@ -52,16 +54,17 @@ public class DocumentService {
      * stops counting against the case's limits. No verdict, or storage down, leaves it for the next run. A row someone
      * confirmed meanwhile is skipped; a concurrent confirm loses on the row version, never both.
      */
-    @Transactional(noRollbackFor=ApiException.class) public Recheck recheckStale(UUID documentId){
+    @Transactional(noRollbackFor=ApiException.class) public Rechecked recheckStale(UUID documentId){
         var document=documents.findById(documentId).orElse(null);
-        if(document==null)return Recheck.SKIPPED;
+        if(document==null)return new Rechecked(Recheck.SKIPPED,null);
+        UUID caseId=document.getMedicalCase().getId();
         if(document.getStatus()==DocumentStatus.QUARANTINED)document.scanDeferred();
-        if(document.getStatus()!=DocumentStatus.PENDING)return Recheck.SKIPPED;
-        try{inspectStored(document);return Recheck.CLEAN;}
-        catch(ApiException e){return switch(e.code()){
+        if(document.getStatus()!=DocumentStatus.PENDING)return new Rechecked(Recheck.SKIPPED,caseId);
+        try{inspectStored(document);return new Rechecked(Recheck.CLEAN,caseId);}
+        catch(ApiException e){return new Rechecked(switch(e.code()){
             case "UPLOAD_NOT_FOUND"->{document.reject();documents.save(document);yield Recheck.NEVER_ARRIVED;}
             case "DOCUMENT_SCAN_UNAVAILABLE","STORAGE_UNAVAILABLE"->Recheck.STILL_UNAVAILABLE;
-            default->Recheck.CONDEMNED;};}
+            default->Recheck.CONDEMNED;},caseId);}
     }
 
     /** Checks the stored bytes against the presign and scans them; leaves the document CLEAN or throws why it is not. */

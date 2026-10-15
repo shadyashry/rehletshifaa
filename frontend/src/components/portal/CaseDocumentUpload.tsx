@@ -5,6 +5,7 @@ import { LoaderCircle, Upload } from "lucide-react";
 
 import { allowedFileTypes, maxFileBytes } from "@/lib/case-form-schema";
 import { fillTemplate } from "@/lib/portal-labels";
+import { putWithProgress } from "@/lib/upload";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import type { CaseDocument } from "@/components/portal/MyCare";
 
@@ -15,7 +16,8 @@ type Presign = { documentId: string; uploadUrl: string; requiredHeaders: Record<
 type Pending = { documentId: string; name: string };
 type UploadState =
   | { phase: "idle" }
-  | { phase: "sending" | "checking" | "ready"; name: string }
+  | { phase: "sending"; name: string; sent: number }
+  | { phase: "checking" | "ready"; name: string }
   | { phase: "failed"; message: string; retry?: Pending };
 
 const ACCEPT = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
@@ -56,12 +58,13 @@ export function CaseDocumentUpload({ caseId, send, lead, ready, onUploaded }: {
   async function choose(file: File) {
     if (!allowedFileTypes.includes(file.type)) { setState({ phase: "failed", message: t.wrongType }); return; }
     if (file.size <= 0 || file.size > maxFileBytes) { setState({ phase: "failed", message: t.tooLarge }); return; }
-    setState({ phase: "sending", name: file.name });
+    setState({ phase: "sending", name: file.name, sent: 0 });
     let pending: Pending;
     try {
       const presign = await send<Presign>(`${base}/presign`, { method: "POST", body: JSON.stringify({ originalFileName: file.name, contentType: file.type, sizeBytes: file.size }) });
-      const stored = await fetch(presign.uploadUrl, { method: "PUT", headers: presign.requiredHeaders, body: file });
-      if (!stored.ok) throw new Error("UPLOAD_FAILED");
+      const stored = await putWithProgress(presign.uploadUrl, presign.requiredHeaders, file,
+        sent => setState(current => current.phase === "sending" ? { ...current, sent } : current));
+      if (!stored) throw new Error("UPLOAD_FAILED");
       pending = { documentId: presign.documentId, name: file.name };
     } catch (failure) {
       const code = codeOf(failure);
@@ -83,6 +86,13 @@ export function CaseDocumentUpload({ caseId, send, lead, ready, onUploaded }: {
         <input type="file" className="sr-only" accept={ACCEPT} disabled={working} aria-describedby={`${id}-rules`}
                onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void choose(file); }}/>
       </label>
+      {state.phase === "sending" && (
+        // How much of the file has gone, outside the live region so a screen reader is not read every step.
+        <div role="progressbar" aria-label={fillTemplate(t.sending, { name: state.name })} aria-valuemin={0} aria-valuemax={100}
+             aria-valuenow={Math.round(state.sent * 100)} className="mt-3 h-1.5 max-w-[24rem] overflow-hidden rounded-full bg-line">
+          <div className="h-full rounded-full bg-brand-600 motion-safe:transition-[inline-size] motion-safe:duration-200" style={{ inlineSize: `${Math.round(state.sent * 100)}%` }}/>
+        </div>
+      )}
       {/* Always rendered, so the live region exists before the first message lands in it. */}
       <p role="status" className="mt-2 flex items-center gap-2 text-[0.875rem] leading-6 text-ink-600">
         {working && <LoaderCircle size={15} aria-hidden className="flex-none text-brand-700 motion-safe:animate-spin"/>}
