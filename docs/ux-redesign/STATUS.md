@@ -631,3 +631,34 @@ each en/ar × 390/1440, synthetic fixtures (fee line, range, deposit).
 **Gate:** owner instruction 2026-10-15 — continue without asking; shots above for the owner's later review. **Area 1c is complete**
 (1c-0, 1c-1, 1c-2). Open: V-4 (category labels), V-5 (spread sentence). Follow-ups: the fee-line merge note above; the payment
 reference wrap (1c-1). **Next:** area 2 — coordinator workspace (PLAN.md recommended sequence 1 → 1c → 2).
+
+## UX area 2 — coordinator workspace: critique, plan, slice 2-0 (2026-10-15, worktree `focused-jackson-a4d85d`, branch `claude/focused-jackson-a4d85d` fast-forwarded to 1c-2 @ `cd7e6cb`)
+
+**Critique** (dual-agent: design review + `impeccable detect` and mechanical scan; synthetic `e2e/coordinator-fixture.ts`, 24 before
+shots in `screenshots/area-2/before/`): **21/40** (`.impeccable/critique/2026-10-15T19-06-05Z__frontend-src-components-portal-staffcaseview-tsx.md`).
+On-palette, off-concept: the staff side has none of the file's signatures (tab edge, stamps, journey markers), and is card-in-card.
+P1 no working loop (no list keyboard model, no next item, focus not returned to the row); P1 no single "now" line and nothing
+mirrors the patient's page (waiting-on said three times, once in the patient's voice); P1 messaging split (thread `<select>`, no
+"awaiting your reply" or reply-window state in conversations, Arabic bidi garbled in the list); P2 heavy chrome (role as h1,
+repeated subtitle and count line, Out of office on My work, 40px header buttons with a sub-3:1 edge); P2 Arabic parity (~155 inline
+copy ternaries, English fallbacks). Detector 0 (regex-only on .tsx; the overlay needs the mocked OIDC session); scan: 70 off-ladder
+sizes, ~12 tinted notices, 0 physical-direction classes.
+
+**Plan** `plans/coordinator-workspace.md` (no owner gate, standing instruction; assumptions O-1 patient step for coordinators only,
+O-2 shortcuts on with an off switch): the file cover + one-next-action strip (your step · waiting on · the patient's page), a sticky
+strip with Next in My work, a keyboard loop (roving lists, return to row, physical-key shortcuts, `?` help, off switch), messages
+that show who is owed a reply, quieter chrome. Slices 2-0 backend → 2-1 cover + strip → 2-2 keyboard → 2-3 messages +
+conversations → 2-4 chrome + convergence; reply templates stay backend data (P2-22).
+
+**Slice 2-0 built (backend, small):** `CaseActionsView.patientStep` — for a coordinator viewer, the step the patient's own page
+shows now, resolved by the patient's rule (`patientCurrentAction`) with its usual window, reduced to code, kind, work type, due,
+overdue, readiness step and exit word (never the information request's title or message); null for every other staff role and
+for patients (8-argument constructor kept). Frontend: typed as `CaseActions.patientStep`; the area fixture carries it. No UI change
+in this slice (rendered in 2-1). Reviews: data minimisation checked by hand (free text dropped, coordinators only, same
+authorization as the workspace); the UI reviews do not apply to a typing-only change.
+
+**Verify.** `CoordinatorCaseActionsTest` 36/36 (new: `theCoordinatorSeesThePatientsCurrentStepAndNoOtherStaffDoes`); full backend
+suite: 859 tests, 0 failures, 3 skipped (113 classes); frontend typecheck ok; eslint 0 on touched files; vitest 69 files / 538 (one jsdom test flaked once while
+Maven ran in parallel, green on rerun).
+
+**Next:** slice 2-1 — the file cover and the one-next-action strip (`StaffCaseView`, `CurrentAction`, `JourneySnapshot`, `Portal`).

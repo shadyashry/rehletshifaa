@@ -218,8 +218,15 @@ public final class JourneyDtos {
     /**
      * {@code viewer}: who is looking at this case — SELF (the patient), REPRESENTATIVE (acting for them) or STAFF.
      * {@code waitingReasonCode}: the code the portal words {@code waitingReason} from (see {@link WorkDtos.WaitingReason}).
+     * {@code patientStep}: UX area 2 (D-06), coordinators only — the step the patient's own page shows now, from the same
+     * rule that answers the patient (code, kind, due, exit word, usual window; never the request's free text). Null for
+     * every other viewer.
      */
-    public record CaseActionsView(String journeyStage,String waitingOn,String waitingReason,CurrentActionView currentAction,List<BlockerView>blockers,List<String>availableActions,String viewer,String waitingReasonCode) {}
+    public record CaseActionsView(String journeyStage,String waitingOn,String waitingReason,CurrentActionView currentAction,List<BlockerView>blockers,List<String>availableActions,String viewer,String waitingReasonCode,CurrentActionView patientStep) {
+        public CaseActionsView(String journeyStage,String waitingOn,String waitingReason,CurrentActionView currentAction,List<BlockerView>blockers,List<String>availableActions,String viewer,String waitingReasonCode){
+            this(journeyStage,waitingOn,waitingReason,currentAction,blockers,availableActions,viewer,waitingReasonCode,null);
+        }
+    }
     public record IdResponse(UUID id,String status) {}
     // --- Consultant price catalog, specialty templates, and FX (Phase 2) ---
     public record CatalogServiceView(UUID id,String serviceCode,String serviceName,String category,BigDecimal priceEgp,boolean active,LocalDate validUntil) {}

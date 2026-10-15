@@ -24,7 +24,12 @@ export type BlockerView = { code: string; labelEn: string; labelAr: string; owne
 export type CaseViewer = "SELF" | "REPRESENTATIVE" | "STAFF";
 export type CaseActions = { journeyStage: string; waitingOn?: string | null; waitingReason?: string | null; currentAction: CurrentActionView; blockers: BlockerView[]; availableActions: string[]; viewer?: CaseViewer;
   /** The code `waitingReason` is worded from (see `waitingReasonText`). */
-  waitingReasonCode?: string | null };
+  waitingReasonCode?: string | null;
+  /**
+   * UX area 2 (D-06), coordinators only: the step the patient's own page shows now, resolved by the patient's rule (code,
+   * kind, due, exit word, usual window; never the request's free text). Absent for every other viewer.
+   */
+  patientStep?: CurrentActionView | null };
 export type ResponseContext = { message?: string | null; documentName?: string | null; receivedAt?: string | null };
 export type SecondaryAction = { label: string; onClick: () => void };
 
