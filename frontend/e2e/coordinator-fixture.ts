@@ -23,11 +23,15 @@ const messages = [
 ];
 
 const conversations = [
-  { id: "c1", name: "Ahmed Example", phoneHint: "+218 •••• 4417", language: "ar", ownerSubject: subject, ownerName: "Layla Hassan", lastInboundAt: at(2), windowExpiresAt: at(-22), windowOpen: true },
-  { id: "c2", name: null, phoneHint: "+249 •••• 0912", language: "ar", ownerSubject: subject, ownerName: "Layla Hassan", lastInboundAt: at(40), windowExpiresAt: at(16), windowOpen: false },
+  { id: "c1", name: "Ahmed Example", phoneHint: "+218 •••• 4417", language: "ar", ownerSubject: subject, ownerName: "Layla Hassan", lastInboundAt: at(2), windowExpiresAt: at(-22), windowOpen: true, awaitingReply: true },
+  { id: "c2", name: null, phoneHint: "+249 •••• 0912", language: "ar", ownerSubject: subject, ownerName: "Layla Hassan", lastInboundAt: at(40), windowExpiresAt: at(16), windowOpen: false, awaitingReply: false },
+];
+// The intake queue: an Arabic name beside a Latin phone hint and date (the bidi case of UX 2-3).
+const queued = [
+  { id: "c3", name: "سارة مثال", phoneHint: "+964 •••• 2208", language: "ar", ownerSubject: null, ownerName: null, lastInboundAt: at(1), windowExpiresAt: at(-23), windowOpen: true, awaitingReply: true },
 ];
 const conversationDetail = (id: string) => {
-  const summary = conversations.find(c => c.id === id) ?? conversations[0];
+  const summary = [...conversations, ...queued].find(c => c.id === id) ?? conversations[0];
   return { summary, status: "OPEN", coverName: null, canReply: true, canClaim: false, canReassign: true, canClose: true,
     messages: [
       { id: "cm1", direction: "IN", senderName: null, kind: "TEXT", body: "Hello, my father needs knee surgery. Can a Consultant in Egypt look at his X-rays?", language: "en", createdAt: at(3) },
@@ -36,14 +40,15 @@ const conversationDetail = (id: string) => {
     ] };
 };
 
-export async function setupCoordinatorDay(page: Page, role: "COORDINATOR" | "COORDINATOR_LEAD" = "COORDINATOR_LEAD") {
+/** `currentAction` replaces the owned case's resolved action (UX 2-3: the patient's reply as the step). */
+export async function setupCoordinatorDay(page: Page, role: "COORDINATOR" | "COORDINATOR_LEAD" = "COORDINATOR_LEAD", options: { currentAction?: Record<string, unknown> } = {}) {
   const portal = await setupPortal(page, role, { pendingWork: false });
   await page.route("**/api/v1/**", async route => {
     const url = new URL(route.request().url()), api = url.pathname.replace("/api/v1", "");
     const reply = (data: unknown) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
     if (route.request().method() !== "GET") return route.fallback();
     if (api === "/work/mine") return reply(workItems);
-    if (api === "/coordinator/conversations") return reply(url.searchParams.get("scope") === "mine" ? conversations : []);
+    if (api === "/coordinator/conversations") { const scope = url.searchParams.get("scope"); return reply(scope === "mine" ? conversations : scope === "queue" ? queued : []); }
     const conversation = api.match(/^\/coordinator\/conversations\/(c\d)$/);
     if (conversation) return reply(conversationDetail(conversation[1]));
     if (api === "/coordinator/cases/owned") {
@@ -51,7 +56,7 @@ export async function setupCoordinatorDay(page: Page, role: "COORDINATOR" | "COO
         id: "owned", caseNumber: "RS-2026-000002", patientName: "Maya Example", status: "INTAKE_REVIEW", coordinatorSubject: subject, coordinatorName: "Layla Hassan" };
       return reply({ caseSummary, intakeSummary: "Adult patient with a known mitral valve condition; recent echo shows worsening regurgitation. Asking for a surgical opinion in Egypt.",
         actions: { journeyStage: "INTAKE_REVIEW", waitingOn: "STAFF", blockers: [], waitingReason: "Waiting for our team", waitingReasonCode: "DEFAULT_STAFF",
-          currentAction: { code: "ASSIGN_CONSULTANT", kind: "FOCUS", workItemId: "w2", workItemVersion: 0 },
+          currentAction: options.currentAction ?? { code: "ASSIGN_CONSULTANT", kind: "FOCUS", workItemId: "w2", workItemVersion: 0 },
           patientStep: { code: "WAIT_COORDINATOR_REVIEW", kind: "WAIT", expectedWorkingDays: 2, overdue: false }, availableActions: ["REQUEST_INFORMATION", "ASSIGN_CONSULTANT", "SET_TRAVEL_PACKAGE", "CANCEL_CASE"] },
         tasks: [], assignments: [], clinicalReviews: [], messages,
         timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: at(80) }, { type: "STATUS", label: "Intake review", status: "INTAKE_REVIEW", occurredAt: at(50) }],

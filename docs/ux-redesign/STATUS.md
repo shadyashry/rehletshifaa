@@ -792,3 +792,67 @@ Portal (2-4).
 
 **Next:** slice 2-3 — messages + conversations (thread tabs with unread counts, Consultant naming, reply from the strip,
 conversation list states, underline scope tabs, focus/live region, bidi; both components' copy to messages).
+
+## UX area 2 — slice 2-3: messages that show who is owed a reply (2026-10-16, worktree `angry-murdock-1ed3d9`, branch `claude/angry-murdock-1ed3d9` fast-forwarded to 2-2 @ `05015e6`)
+
+**Built (enhances the accepted views; Petrol & Paper unchanged, no new token).**
+- **Case messages** (`CaseMessages.tsx`): `MessageThreads` is the frameless thread view the staff drawer renders (the drawer names it;
+  the card-in-card and the repeated "Secure messages" title are gone); `CaseMessages` keeps the card and title for the patient's page.
+  A coordinator reads the threads as underline tabs — Patient · Consultant · Operations · Finance ("Doctor" is gone; the internal ones
+  carry a lock and a screen-reader "(internal)") — each with its unread count as a quiet bold petrol number (`UnreadTally`, also on the
+  cover's Messages button; the patient side keeps its `UnreadCount`). The drawer opens on the thread a reply is owed in (the first with
+  unread messages), the tabs keep one row and scroll sideways on a phone with the selected one in view, arrows mirror in Arabic. Messages
+  are hairline cards — ours on paper, theirs on white (no tinted bubbles); an unread inbound one has a petrol dot; Mark read keeps its
+  44px target without the dead band, and the focus goes to the next Mark read (or the thread) when its button leaves. The composer's
+  hint ("The patient sees this message." / "Internal: the patient does not see this conversation.") is its description; a send is
+  confirmed beside it in a polite status ("Message sent.", the drawer's generic "Saved" cleared) and the focus stays in it. The cover
+  note is a hairline note. One date form: "14 Oct, 2:00 PM" (`messageTime`).
+- **Reply from the strip** (`StaffCaseView.tsx`): when the backend's current action is the patient's reply (`workType`
+  `REVIEW_PATIENT_RESPONSE`, never the stage) and `patientReply.canReply` says this viewer answers the patient, the strip carries a
+  quiet "Reply to the patient" (`btn-secondary` beside the step's one filled action); it opens the drawer on the patient's thread with
+  the composer focused (overlay `"reply"`; Escape returns to the button).
+- **Conversations** (`ConversationsView.tsx`): rows say **"Awaiting your reply"** (Mine; "Awaiting a reply" in the queue and team)
+  with a petrol dot, and **"Reply window closes {time}"** / "Reply window closed", then owner and last message on their own lines. The
+  scope switch is the case page's underline tablist (selection follows the arrows, mirrored in Arabic); the list is a 2-2 roving list
+  (`useRovingList`, `data-row` = conversation id: one tab stop, arrows, Home/End, `j`/`k`, Enter); picking a conversation moves the
+  focus to the thread heading (16px) once it has loaded, the selected row has the file-tab edge (`border-s-2` petrol), a send or
+  follow-up is confirmed beside the composer ("Reply sent." / "Follow-up sent.") with the focus kept there; Take focuses the thread,
+  Close returns to the list's current row. Only the latest list/detail request may land (a late answer for an earlier pick never shows
+  under another row). Each run is isolated (`<bdi>` for names and times, `dir="ltr"` phone hints, U+2068/2069 in templates, coordinator
+  names in the hand-over select). A loading row; "Open file" says it opens a new tab; Hand over / Close have a disclosure chevron.
+- **Backend (small):** `ConversationSummary.awaitingReply` — the person wrote last and no one on the team has answered since
+  (`IntakeConversation.awaitingReply()`: last inbound after last staff outbound; the out-of-hours auto-reply does not count). The list
+  could not say it from `windowOpen`/`lastInboundAt` alone (the window stays open after a reply).
+- **Copy:** both components' inline copy (and the attachment notes) moved to `portalWork.caseMessages` and `portalWork.conversations`
+  in en + ar (Arabic per the RTL review: "جهة الاتصال", "تنتهي مهلة الرد في {time}", "آخر رسالة في {time}", "تولّي هذه المحادثة",
+  "تعليم كمقروءة", "محادثة داخلية: لا يراها المريض.", "سيرى المريض هذه الرسالة.", the intro and cover notes reworded). No new plurals.
+  `.case-drawer` gets `scroll-padding-block-start` so a control reached by keyboard lands below the pinned drawer header (2.4.11).
+
+**Reviews** (Impeccable + Vercel skills loaded before code; four read-only reviews; no HIGH; MEDIUM fixed): React/composition (stale
+detail response under another row → request counters + render only the picked thread; re-picking kept the draft; formatters memoised;
+refs/`useId` for ids), web guidelines (focus after Mark read/send/claim/close, drawer scroll padding, hint described, stale list
+response, tabpanel focusable when empty, loading row, text-action hover, textarea names, isolated option names), RTL/i18n (the last
+inline ternary → `markReadContext`; Arabic wording above), Pro Max (tabs in one scrolling row; unread as a quiet number, not a second
+filled petrol mark; selected row by the file-tab edge, not a wash; one date format; unread dot; Mark read band; chevrons; new-tab note;
+16px thread heading). Visual pass on the EN/AR 390/1440 shots. Impeccable detector: 0 findings.
+
+**Verify.** `IntakeConversationIntegrationTest` 9/9 (new: `theListSaysWhoIsOwedAReplyUntilStaffAnswer`); `pnpm typecheck` ok; eslint 0
+on touched files; vitest 70 files / 555 (CaseMessages + ConversationsView tests extended: tabs, Consultant naming, unread counts, open
+where owed, arrows mirrored, reply focus + confirmation, list cues, focus to thread, roving list, scope tabs, Arabic bidi); Playwright on
+:3115 (new `e2e/messages-conversations.spec.ts` with axe on the drawer and the view, staff-home, portal-ux, portal-p2-pass-3,
+portal-reliability, care-coordination, workspace-case-switch, ux8-commercial-journeys, case-cover, staff-keyboard, a11y en + ar):
+116/117 in the full run (the one failure a `newPage` timeout under load before the test body, the 2-2 flake) and 8/8 for the new spec on rerun; earlier full run 117/117. Fixture: `setupCoordinatorDay(page, role, { currentAction })`, `awaitingReply` on the conversations, an Arabic-named queued
+conversation. Overwritten pass-2/pass-3, 2-1 and 2-2 shots restored.
+
+**Screenshots:** `screenshots/area-2/2-3/` — `case-messages-{en,ar}-{390,1440}` (drawer), `strip-reply-{en,ar}-{390,1440}` (the cover
+with the reply action), `conversations-{en,ar}-{390,1440}`.
+
+**Follow-ups (not in 2-3):** on phones the strip shows Waiting on / the patient's page between the step and the reply under review
+(2-1's order in `CurrentAction`; consider facts after the work when a response shows); `SecondaryAction` has no `aria-haspopup`
+(the strip's reply opens a dialog); the patient side still uses the filled `UnreadCount` disc (patient screens, not this area); per
+message Mark read stays (no bulk endpoint); conversation ↔ case link and reply templates (P2-22) remain backend work; the header view
+pills still use `aria-pressed` (2-4, one tab style).
+
+**Next:** slice 2-4 — chrome + convergence (place as heading, role subtitle out, count line only on My work and in ink, Out of office
+as a disclosure, one tab style, ladder sizes and hairline notices in the remaining files, remaining inline staff copy), then the area's
+closing pass (re-critique ≥ 28/40, `screenshots/area-2/after/`, STATUS).

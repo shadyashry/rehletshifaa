@@ -9,7 +9,7 @@ import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageE
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
 import { RecordProposalDecision } from "@/components/portal/RecordProposalDecision";
-import { CaseMessages } from "@/components/portal/CaseMessages";
+import { MessageThreads, UnreadTally } from "@/components/portal/CaseMessages";
 import { IntakeHistory } from "@/components/portal/IntakeHistory";
 import type { ConversationDetail } from "@/components/portal/ConversationsView";
 import type { ProposalCopy } from "@/components/portal/PatientProposal";
@@ -31,7 +31,7 @@ import { countryName } from "@/lib/countries";
 import { PROPOSAL_PAYMENT_TERMS_RECORD } from "@/lib/commercial-terms";
 import { type CaseView, type CatalogService, type DirectoryFacility, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
 import { useStaffShortcut } from "@/components/portal/StaffShortcuts";
-import { copy, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, UnreadCount, LockedSection } from "@/components/portal/portal-ui";
+import { copy, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, LockedSection } from "@/components/portal/portal-ui";
 
 const ClinicalReviewPanel=dynamic(()=>import("@/components/portal/ClinicalReview").then(m=>m.ClinicalReviewPanel));
 const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAssignmentDialog").then(m=>m.DeclineAssignmentDialog));
@@ -68,7 +68,7 @@ function useCaseWorkspace():CaseWorkspace{
 /** A proposal or final quote's validity end, read when it is sent (never while rendering). */
 const validUntilInDays=(days:number)=>new Date(Date.now()+days*86400000).toISOString();
 
-type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"|"decline"|"recordResponse"|"recordDecision"|"cancel"|"urgency";
+type CaseOverlay="journey"|"messages"|"reply"|"more"|"transfer"|"requestInfo"|"proposal"|"decline"|"recordResponse"|"recordDecision"|"cancel"|"urgency";
 
 /**
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
@@ -151,6 +151,10 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   const focusAction=()=>{setTab(isDoctor&&!workflowBlock?"clinical":"overview");requestAnimationFrame(()=>{const target=(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel");scrollIntoView(target,{behavior:"smooth",block:"center"});(target?.querySelector("button,select,input,textarea") as HTMLElement|null)?.focus();});};
   const completeWork=(evidence:string)=>{if(current.workItemId!=null)void mutate(`/tasks/${current.workItemId}/cases/${c.id}/complete`,{evidence,expectedVersion:current.workItemVersion??0});};
   const openMessages=()=>setOverlay("messages");
+  // When the step is the patient's reply (the backend's action, never the stage) and this viewer is the one who answers the
+  // patient, the reply is one quiet step from the strip: the drawer opens on the patient's thread with the composer focused.
+  const replyFromStrip=isCoordinator&&current.workType==="REVIEW_PATIENT_RESPONSE"&&!!value.patientReply?.canReply
+    ?[{label:work.caseMessages.replyToPatient,onClick:()=>setOverlay("reply")}]:[];
   const caseTabs=[{id:"overview" as const,label:locale==="ar"?"نظرة عامة":"Overview",count:0},{id:"clinical" as const,label:locale==="ar"?"الملف السريري":"Clinical",count:0},{id:"documents" as const,label:locale==="ar"?"المستندات":"Documents",count:documents.length},{id:"activity" as const,label:locale==="ar"?"السجل":"Activity",count:0}].filter(item=>!value.paymentOnly||item.id==="overview"); // the payment view has no record behind the other tabs
   // Utilities live in one place each: the secure-link row owns "resend", the header owns messages, and the
   // "More" drawer owns everything else the backend listed for this state.
@@ -212,7 +216,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
     </div>
     <div className="flex flex-none flex-wrap items-center gap-2">
      {!value.preview&&<button type="button" className="btn-secondary" onClick={openMessages}>
-      <MessageSquare size={16} aria-hidden/>{cover.messages}{unreadMessages>0&&<UnreadCount count={unreadMessages}/>}
+      <MessageSquare size={16} aria-hidden/>{cover.messages}{unreadMessages>0&&<UnreadTally count={unreadMessages}/>}
      </button>}
      {showMore&&<button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={()=>setOverlay("more")}><MoreHorizontal size={16} aria-hidden/>{cover.more}</button>}
      {isCoordinator&&!owned&&canRebalance&&!value.preview&&<button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={()=>setOverlay("transfer")}>{cover.transfer}</button>}
@@ -222,7 +226,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
    <div className="mt-5 border-t border-line pt-5">
   <CurrentActionPanel locale={locale} role={role} action={current} facts={facts}
    response={current.workType==="REVIEW_PATIENT_RESPONSE"?{message:latestPatientMessage?.body,documentName:newestDocument?.fileName}:null}
-   busy={busy} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
+   busy={busy} secondary={replyFromStrip} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
    respondBy={myPending?.offerExpiresAt??null}
    onAcceptAssignment={()=>{if(!myPending)return;void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:true}).then(result=>{if(result&&isDoctor)setTab("clinical");});}}
    onDeclineAssignment={()=>setOverlay("decline")}
@@ -311,7 +315,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   </div>
 
   {overlay==="journey"&&<FullJourneyDialog locale={locale} timeline={value.timeline} caseNumber={c.caseNumber} onClose={()=>closeOverlay("journey")}/>}
-  {overlay==="messages"&&<CaseDrawer locale={locale} title={locale==="ar"?"الرسائل الآمنة":"Secure messages"} onClose={()=>closeOverlay("messages")}><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={showActions} patientReply={value.patientReply} busy={busy} mutate={mutate}/>{isCoordinator&&loadIntakeHistory&&<IntakeHistory locale={locale} caseId={c.id} load={loadIntakeHistory}/>}</CaseDrawer>}
+  {(overlay==="messages"||overlay==="reply")&&<CaseDrawer locale={locale} title={work.caseMessages.title} onClose={()=>closeOverlay(overlay)}><MessageThreads key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={showActions} patientReply={value.patientReply} busy={busy} mutate={mutate} replyTo={overlay==="reply"?"PATIENT_COORDINATOR":undefined}/>{isCoordinator&&loadIntakeHistory&&<IntakeHistory locale={locale} caseId={c.id} load={loadIntakeHistory}/>}</CaseDrawer>}
   {overlay==="more"&&<CaseDrawer locale={locale} title={locale==="ar"?"إجراءات إضافية":"More actions"} onClose={()=>closeOverlay("more")}>
    <MoreActions locale={locale} caseId={c.id} available={moreAvailable} travelPackage={!!c.travelPackageRequested} version={c.version} busy={busy} mutate={mutate}
     onRequestInformation={()=>setOverlay("requestInfo")} onRecordResponse={()=>setOverlay("recordResponse")}

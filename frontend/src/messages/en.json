@@ -1898,6 +1898,93 @@
         "tab": "Tab"
       }
     },
+    "caseMessages": {
+      "title": "Secure messages",
+      "threadsLabel": "Conversations on this case",
+      "threads": {
+        "PATIENT_COORDINATOR": "Patient",
+        "COORDINATOR_DOCTOR": "Consultant",
+        "COORDINATOR_OPERATIONS": "Operations",
+        "COORDINATOR_FINANCE": "Finance"
+      },
+      "internal": "internal",
+      "careTeam": "Care team",
+      "viaWhatsApp": "via WhatsApp",
+      "markRead": "Mark read",
+      "markReadContext": ": {sender}, {time}",
+      "yourMessage": "Your message",
+      "visibleToPatient": "The patient sees this message.",
+      "internalOnly": "Internal: the patient does not see this conversation.",
+      "send": "Send message",
+      "sent": "Message sent.",
+      "replyToPatient": "Reply to the patient",
+      "coverYou": "You are covering for {owner} until {until}. Only you reply to this patient meanwhile.",
+      "coverOther": "{cover} is covering for {owner} until {until} and is the only one replying to the patient. You can read the conversation.",
+      "attachments": {
+        "CLEAN": "Attachment saved to the case documents.",
+        "UNSUPPORTED_TYPE": "This attachment type is not kept. Please send files as PDF, JPG or PNG.",
+        "UNSUPPORTED_CONTENT": "This message type cannot be shown here.",
+        "TOO_LARGE": "This file was too large to keep. Please send a smaller file.",
+        "EXPIRED": "This attachment could not be retrieved. Please send it again.",
+        "UNAVAILABLE": "This attachment could not be retrieved. Please send it again.",
+        "REJECTED": "This attachment did not pass the security check and was not kept.",
+        "CASE_FILE_LIMIT": "This file was not kept because the case has reached its file limit."
+      }
+    },
+    "conversations": {
+      "title": "Conversations",
+      "intro": "WhatsApp conversations with people who have not sent a case yet. Each has one coordinator; only they, or their cover, reply.",
+      "scopes": {
+        "mine": "Mine",
+        "queue": "Queue",
+        "team": "My team"
+      },
+      "empty": {
+        "mine": "No conversations are waiting for you.",
+        "queue": "Nobody is waiting in the queue.",
+        "team": "Your team has no open conversations."
+      },
+      "pick": "Choose a conversation to read it.",
+      "loading": "Loading conversations…",
+      "unknown": "WhatsApp contact",
+      "unowned": "In the queue",
+      "owner": "Owner",
+      "awaitingYou": "Awaiting your reply",
+      "awaiting": "Awaiting a reply",
+      "windowCloses": "Reply window closes {time}",
+      "windowClosedShort": "Reply window closed",
+      "lastMessage": "Last message {time}",
+      "covered": "{name} is covering and replies meanwhile.",
+      "windowOpen": "You can reply until {time}.",
+      "windowClosed": "WhatsApp’s 24-hour reply window has closed. You can send one follow-up asking them to reply.",
+      "reply": "Your reply",
+      "send": "Send reply",
+      "sent": "Reply sent.",
+      "followUp": "Send follow-up",
+      "followUpSent": "Follow-up sent.",
+      "take": "Take this conversation",
+      "them": "Them",
+      "you": "You",
+      "openFile": "Open file",
+      "opensNewTab": "(opens in a new tab)",
+      "template": "Follow-up template",
+      "caseLink": "Insert case form link",
+      "handOver": "Hand over",
+      "to": "To",
+      "chooseCoordinator": "Choose a coordinator",
+      "reason": "Reason",
+      "confirmHandOver": "Hand over conversation",
+      "close": "Close conversation",
+      "closeAs": "Why",
+      "confirmClose": "Close",
+      "reasons": {
+        "RESOLVED": "Answered",
+        "NOT_A_PATIENT": "Not a patient enquiry",
+        "NO_RESPONSE": "No response",
+        "SPAM": "Spam"
+      },
+      "readOnly": "You can read this conversation; its coordinator replies."
+    },
     "leaveCase": {
       "title": "Leave this case?",
       "body": "Text you typed in this case hasn’t been sent. If you leave now, it will be lost.",

@@ -68,6 +68,9 @@ public class IntakeConversation extends AssignedIdEntity {
 
     public boolean windowOpen(Instant now) { return windowExpiresAt != null && now.isBefore(windowExpiresAt); }
 
+    /** The person wrote last: their latest message has had no answer from staff yet (the out-of-hours auto-reply is not one). */
+    public boolean awaitingReply() { return lastInboundAt != null && (lastOutboundAt == null || lastInboundAt.isAfter(lastOutboundAt)); }
+
     public boolean isOpen() { return "OPEN".equals(status); }
     public String getWaDigits() { return waDigits; }
     public String getProfileName() { return profileName; }

@@ -903,6 +903,8 @@
   .portal-account summary::-webkit-details-marker { display: none; }
   .account-dialog { margin: auto; padding: var(--dialog-padding); width: min(var(--dialog-max-width), calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius); background: var(--dialog-bg); color: var(--dialog-fg); box-shadow: var(--dialog-shadow); }
   .account-dialog::backdrop { background: var(--dialog-backdrop); }
+  /* The drawer's header stays pinned while its content scrolls: a control reached by keyboard lands below it (WCAG 2.4.11). */
+  .case-drawer { scroll-padding-block-start: 5.5rem; }
   .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: .5rem; }
   .icon-button:hover { background: var(--color-brand-50); }
   /* My Care: the file's tab — a petrol top edge on the one card that matters now, and on the open case in the switcher. */

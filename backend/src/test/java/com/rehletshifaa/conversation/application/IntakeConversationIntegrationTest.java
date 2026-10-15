@@ -127,6 +127,20 @@ class IntakeConversationIntegrationTest {
         assertThat(code(() -> intake.followUp(old))).isEqualTo("FOLLOW_UP_SENT");
     }
 
+    @Test void theListSaysWhoIsOwedAReplyUntilStaffAnswer() {
+        UUID c = receive("wamid.a1", "201000000015", "Hello");
+        as(EN);
+        assertThat(intake.list("mine")).filteredOn(s -> s.id().equals(c)).singleElement()
+                .satisfies(s -> { assertThat(s.awaitingReply()).isTrue(); assertThat(s.windowOpen()).isTrue(); });
+        intake.reply(c, "Hello, I can help.");
+        em.flush();
+        assertThat(intake.list("mine")).filteredOn(s -> s.id().equals(c)).singleElement()
+                .satisfies(s -> { assertThat(s.awaitingReply()).as("answered").isFalse(); assertThat(s.windowOpen()).as("the window stays open").isTrue(); });
+        receive("wamid.a2", "201000000015", "Thank you, one more question");
+        as(EN);
+        assertThat(intake.list("mine")).filteredOn(s -> s.id().equals(c)).singleElement().satisfies(s -> assertThat(s.awaitingReply()).isTrue());
+    }
+
     @Test void whileTheOwnerIsCoveredTheirCoverAnswers() {
         UUID c = receive("wamid.c1", "201000000007", "Hello");
         as(EN);

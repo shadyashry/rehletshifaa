@@ -89,7 +89,7 @@ public class IntakeConversationService implements HandoverCheck {
     }
 
     public record ConversationSummary(UUID id, String name, String phoneHint, String language, String ownerSubject, String ownerName,
-                                      Instant lastInboundAt, Instant windowExpiresAt, boolean windowOpen) {}
+                                      Instant lastInboundAt, Instant windowExpiresAt, boolean windowOpen, boolean awaitingReply) {}
     public record ConversationMessage(UUID id, String direction, String senderName, String kind, String body, String language,
                                       String attachmentStatus, UUID mediaId, String fileName, Instant createdAt) {}
     public record ConversationDetail(ConversationSummary summary, String status, List<ConversationMessage> messages, String coverName,
@@ -437,7 +437,7 @@ public class IntakeConversationService implements HandoverCheck {
         String digits = c.getWaDigits();
         String hint = "•••• " + digits.substring(Math.max(0, digits.length() - 4));
         return new ConversationSummary(c.getId(), EncryptedText.decodeNullable(crypto, c.getProfileName()), hint, c.getLanguage(), c.getOwnerSubject(),
-                c.getOwnerSubject() == null ? null : name(c.getOwnerSubject()), c.getLastInboundAt(), c.getWindowExpiresAt(), c.windowOpen(now));
+                c.getOwnerSubject() == null ? null : name(c.getOwnerSubject()), c.getLastInboundAt(), c.getWindowExpiresAt(), c.windowOpen(now), c.awaitingReply());
     }
 
     private String name(String subject) {
