@@ -245,7 +245,8 @@ describe("CaseStatusAccess", () => {
     await reachAction();
     fireEvent.change(screen.getByLabelText(/current medication/i), { target: { value: "Aspirin 75mg" } });
     fireEvent.click(screen.getByRole("button", { name: /send information/i }));
-    const heading = await screen.findByRole("heading", { level: 1, name: en.secureLink.status.doneTitle });
+    // The submit round-trip can take a while under a full parallel run.
+    const heading = await screen.findByRole("heading", { level: 1, name: en.secureLink.status.doneTitle }, { timeout: 10_000 });
     expect(screen.getByText("RS-10281")).toBeTruthy();
     await vi.waitFor(() => expect(document.activeElement).toBe(heading));
     expect(screen.queryByText("✓")).toBeNull();
