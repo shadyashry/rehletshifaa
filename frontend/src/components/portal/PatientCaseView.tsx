@@ -26,7 +26,7 @@ const PatientProposalDecision=dynamic(()=>import("@/components/portal/PatientPro
  * the proposal itself opens on demand in a drawer, where the decision (when one is owed) is the only control. Patients
  * enter their care journey, not a console, so this module never loads the staff workspace.
  */
-export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,mutate,load,careView="care",onCareView,otherCases=[],openCaseById}:CaseViewProps){
+export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,mutate,load,send,careView="care",onCareView,otherCases=[],openCaseById}:CaseViewProps){
   const feedback=useContext(FeedbackContext);
   const [proposalOpen,setProposalOpen]=useState(false);
   const c=value.caseSummary;const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
@@ -42,7 +42,7 @@ export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,m
     <MyCare locale={locale} caseSummary={c} actions={actions} patientAction={value.patientAction} patientProposal={value.patientProposal} proposal={value.proposal??null} deposit={value.deposit??null}
      documents={documents} unreadMessages={unread} cases={allCases} newCaseHref={sendsOwnCase?localeHref(locale,"send-my-case"):null} view={careView} onView={view=>onCareView?.(view)}
      onOpenCase={id=>openCaseById?.(id)} onOpenProposal={()=>setProposalOpen(true)} onWithdraw={()=>mutate(`/patient/cases/${c.id}/withdraw`,{})}
-     guardianStep={actions.currentAction.code==="COMPLETE_PROFILE"&&isGuardianStep(actions.currentAction.blockerCode)?<GuardianStep key={`${c.id}:${actions.currentAction.blockerCode}`} locale={locale} caseId={c.id} blockerCode={actions.currentAction.blockerCode??""} documents={documents} busy={busy} mutate={mutate} load={load}/>:undefined}
+     guardianStep={actions.currentAction.code==="COMPLETE_PROFILE"&&isGuardianStep(actions.currentAction.blockerCode)?<GuardianStep key={`${c.id}:${actions.currentAction.blockerCode}`} locale={locale} caseId={c.id} blockerCode={actions.currentAction.blockerCode??""} documents={documents} busy={busy} mutate={mutate} load={load} send={send}/>:undefined}
      concerns={<PatientConcerns key={c.id} locale={locale} caseId={c.id} busy={busy} mutate={mutate} load={load}/>}
      identityStep={actions.currentAction.code==="VERIFY_IDENTITY"?<IdentityStep key={c.id} locale={locale} caseId={c.id} busy={busy} mutate={mutate} load={load}/>:undefined}
      paymentStep={actions.currentAction.code==="PAY_DEPOSIT"&&value.deposit?.bankTransfer?<PatientDepositPayment key={`${c.id}:${value.deposit.transfer?.id??"new"}`} locale={locale} caseId={c.id} currency={value.deposit.currency}

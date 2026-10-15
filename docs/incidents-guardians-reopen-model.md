@@ -36,6 +36,12 @@ Rules (`GuardianService`, `CustomerReadinessService`, `OnboardingService`):
 - Evidence: `PUT /api/v1/patient/cases/{id}/onboarding/guardian-evidence {documentId}` (or `evidenceDocumentId` when choosing GUARDIAN);
   decision: `POST /api/v1/coordinator/cases/{id}/guardian/evidence-decision {VERIFY|REJECT}`; read: `GET .../guardian`.
   Re-attaching clears a verification; a refusal drops the document link (the coordinator explains in the case thread).
+- Upload from My Care: `POST /api/v1/patient/cases/{id}/documents/presign|confirm` (`PatientDocumentController` →
+  `PatientDocumentService`): `PATIENT_SELF_SERVICE` and the patient-on-case check (`findPatientIdAccessibleTo`: the patient, or an
+  unrevoked, unexpired representative or guardian), then `DocumentService.presignAdditional|confirmAdditional`, so the case must be
+  submitted and the type, size, per-case limits and scan (ClamAV in production) are those of every channel. A clean confirm is audited
+  `PATIENT_DOCUMENT_UPLOADED`. Not transactional itself, so a scanner outage (503, upload kept PENDING, the same confirm retried) or a
+  malware verdict (422, SCAN_FAILED, object deleted) stays recorded.
 - Consent: `GUARDIAN_AUTHORIZATION` is its own consent type (replaces `REPRESENTATIVE_AUTHORIZATION` for a GUARDIAN subject), recorded
   in `consent_records` with policy version `guardian-v0-placeholder`. **The wording is a placeholder** (backend
   `PatientActivationService.consentText`, frontend `guardianConsent.text` in `en.json` and `ar.json`, same words). Counsel and a
@@ -97,5 +103,9 @@ Not touched (P1-18): the 30-day window, the closure statement and review request
 | Manager, Compliance | Control Center › Reviews & Safety › Incidents | `IncidentsPage` |
 | Manager, Consultant | Closed case: "Reopen case" | `ReopenCase` |
 
-The guardian can only choose a document already on the case: the signed-in portal has no upload yet (open gap).
+In `GuardianStep` the guardian chooses a clean document of the case or uploads one (`EvidenceUpload`, through the portal `api` passed
+as `send`): "Uploading…", then "Checking … for viruses…" while confirm runs the scan; a clean file is listed first, selected and
+focused, and attached with the step's own button. A scanner outage offers "Check again" (same upload, no second presign); a condemned
+or wrong-type file says so. The upload is offered under the list too, since the case's documents are usually medical files. The
+generic Documents tab of My Care still has no upload.
 

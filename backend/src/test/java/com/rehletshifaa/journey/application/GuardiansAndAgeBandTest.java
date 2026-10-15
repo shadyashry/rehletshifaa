@@ -4,6 +4,10 @@ import com.rehletshifaa.authority.domain.Role;
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.api.CaseDtos.RepresentativeContact;
 import com.rehletshifaa.casemanagement.application.CaseService;
+import com.rehletshifaa.document.api.DocumentDtos.ConfirmRequest;
+import com.rehletshifaa.document.api.DocumentDtos.PresignRequest;
+import com.rehletshifaa.document.application.PatientDocumentService;
+import com.rehletshifaa.document.infrastructure.LocalStorageAdapter;
 import com.rehletshifaa.journey.api.JourneyDtos.BlockerView;
 import com.rehletshifaa.journey.api.JourneyDtos.OnboardingSubjectRequest;
 import com.rehletshifaa.journey.api.SafetyDtos.GuardianView;
@@ -19,6 +23,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -37,7 +42,7 @@ class GuardiansAndAgeBandTest {
 
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired OnboardingService onboarding; @Autowired GuardianService guardians;
     @Autowired CustomerReadinessService readiness; @Autowired CaseActionService caseActions; @Autowired JdbcTemplate jdbc;
-    @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired CryptoService crypto; @Autowired EntityManager em; @Autowired PatientDocumentService patientDocuments; @Autowired LocalStorageAdapter storage;
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
     // ---------- age band ----------
@@ -174,6 +179,36 @@ class GuardiansAndAgeBandTest {
         assertThat(codes(caseId)).contains("GUARDIAN_EVIDENCE_UNVERIFIED");
     }
 
+    @Test void aGuardianWithNothingOnTheCaseUploadsTheEvidenceFromMyCareAndAttachesItOnceScanned() throws Exception {
+        UUID caseId = childCase("+254700002014", "AGE_12_17");
+        onboarding.createForAcknowledgement(caseId, null); em.flush();
+        guardians.grantAtIntake(caseId, patientOf(caseId), PARENT, "PARENT", Instant.now()); em.flush();
+        byte[] pdf = "%PDF-1.7 birth certificate".getBytes(StandardCharsets.US_ASCII);
+        var request = new PresignRequest("birth-certificate.pdf", "application/pdf", (long) pdf.length);
+
+        // Someone who acts for another patient, not this one, cannot add to the case.
+        UUID other = adultCase("+254700002015");
+        guardians.grantAtIntake(other, patientOf(other), "guardian-stranger", "SIBLING", Instant.now()); em.flush();
+        authenticate("guardian-stranger", Role.PATIENT_REPRESENTATIVE);
+        assertThatThrownBy(() -> patientDocuments.presign(caseId, request))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("CASE_ACCESS_DENIED"));
+
+        // A file that is not what it claims to be is condemned by the scanner and cannot become evidence.
+        authenticate(PARENT, Role.PATIENT_REPRESENTATIVE);
+        UUID fake = upload(caseId, new PresignRequest("scan.pdf", "application/pdf", 9L), "not a pdf".getBytes(StandardCharsets.US_ASCII));
+        assertThatThrownBy(() -> patientDocuments.confirm(caseId, new ConfirmRequest(fake)))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("DOCUMENT_INSPECTION_FAILED"));
+        assertThatThrownBy(() -> guardians.attachEvidence(caseId, fake))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("GUARDIAN_EVIDENCE_INVALID"));
+
+        // The real document: uploaded, scanned clean, attached as the guardian's evidence for the coordinator to check.
+        UUID evidence = upload(caseId, request, pdf);
+        assertThat(patientDocuments.confirm(caseId, new ConfirmRequest(evidence)).status()).isEqualTo("CLEAN");
+        assertThat(guardians.attachEvidence(caseId, evidence).state()).isEqualTo("EVIDENCE_UNVERIFIED"); em.flush();
+        assertThat(codes(caseId)).contains("GUARDIAN_EVIDENCE_UNVERIFIED").doesNotContain("GUARDIAN_EVIDENCE_MISSING");
+        assertThat(count("SELECT count(*) FROM audit_events WHERE event_type='PATIENT_DOCUMENT_UPLOADED' AND case_id=? AND actor_subject=?", caseId, PARENT)).isEqualTo(1);
+    }
+
     @Test void theDatabaseRefusesAGuardianWithoutABasisAndVerificationWithoutEvidence() throws Exception {
         UUID caseId = childCase("+254700002013", "UNDER_12");
         assertThatThrownBy(() -> jdbc.update("INSERT INTO patient_representatives(id,patient_id,representative_subject,relationship,permissions,effective_from,created_at,delegation_type) "
@@ -214,6 +249,12 @@ class GuardiansAndAgeBandTest {
         return id;
     }
 
+    /** My Care's upload as the browser does it: presign, then the bytes to the presigned URL. Not confirmed yet. */
+    private UUID upload(UUID caseId, PresignRequest request, byte[] body) {
+        var presigned = patientDocuments.presign(caseId, request);
+        storage.upload(presigned.uploadUrl().substring(presigned.uploadUrl().lastIndexOf('/') + 1), request.contentType(), body);
+        return presigned.documentId();
+    }
     private List<String> codes(UUID caseId) {
         em.flush(); em.clear();
         return readiness.compute(caseId).blockingItems().stream().map(b -> b.code()).toList();

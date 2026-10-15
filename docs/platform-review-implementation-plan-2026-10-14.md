@@ -925,6 +925,27 @@ phases.
   - Next exact action: owner fast-forwards `feat/review-p0` to this session's commit (it contains `76d6289`) and rebuilds the dev stack (backend for V97 and the
     required `ageBand`, frontend for the screens: `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`); then walks a minor's
     case (send for a child as PARENT, acknowledge, guardian step, coordinator verifies) and a concern to resolution. Then P1-15 / P1-16 per "Remaining work".
+- **Status (2026-10-15, follow-up = My Care upload for guardian evidence, Opus 5.5; committed on `claude/guardian-upload`, cut from `ee11261`):** the
+  session-2 gap "the signed-in portal has no document upload" is closed for the guardian step. No migration; V97 stays the newest.
+  - Delivered: **backend** `POST /api/v1/patient/cases/{caseId}/documents/presign|confirm` (`PatientDocumentController`, `PatientDocumentService` in the
+    document module): `PATIENT_SELF_SERVICE` plus `MedicalCaseRepository.findPatientIdAccessibleTo` (the patient, or an active representative or guardian),
+    then `DocumentService.presignAdditional|confirmAdditional` (submitted case only; same type, size, per-case limits and scan as every channel); a clean confirm
+    is audited `PATIENT_DOCUMENT_UPLOADED`. **Frontend** `GuardianStep` gains `EvidenceUpload` (prop `send`, the portal `api`, passed by `Portal` →
+    `PatientCaseView`): choose a PDF/JPG/PNG up to 15 MB, status "Uploading…" then "Checking … for viruses…", the clean file is listed first, selected and
+    focused, then attached with "Use this document" (or sent with the guardian declaration). Scanner outage: "Check again" re-confirms the same upload;
+    condemned file, wrong type, size and case-limit errors each have their own line. With documents already on the case the upload is offered under the list
+    ("Not in the list? Upload it here."), because intake files are usually medical reports, not the guardianship paper. Copy `portalWork.safety.guardian.upload.*`
+    in `en.json` and `ar.json` (Arabic is a draft); `noEvidence` (coordinator link) stays for a view without `send`.
+  - Tests and numbers: new `PatientDocumentServiceTest` (3: stranger refused with no storage touched, upload rules and draft refusal, scanner outage kept
+    PENDING and unaudited until the same confirm succeeds) and `GuardiansAndAgeBandTest.aGuardianWithNothingOnTheCaseUploadsTheEvidenceFromMyCareAndAttachesItOnceScanned`
+    (presign, bytes to the local store, condemned fake refused as evidence, clean upload attached, audit row). Backend `mvn -o -q test` (JVM in UTC):
+    880 tests, 0 failures, 3 skips (876 before, 4 new), `ArchitectureRulesTest` green. Frontend: `pnpm typecheck` clean, eslint clean on touched files, `vitest run` 73 files, 533 tests (5 new in `GuardianStep.test`: upload →
+    check → selected, focused and attached; scanner outage and "Check again" with one presign; wrong type and condemned file; upload under an existing list;
+    Arabic label). Not run: Playwright (`my-care-safety.spec.ts` still covers the step without an upload) and a live walk with ClamAV.
+  - Open gaps: the Documents tab of My Care has no upload of its own (the endpoint is ready for it); no byte-level progress (the PUT is one fetch); a file
+    left PENDING by a scanner outage and never re-checked stays PENDING (as on the secure link).
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/guardian-upload` and rebuilds backend and frontend; live walk: a minor's case with no
+    document, the guardian uploads the guardianship paper from My Care, sees it checked, attaches it, the coordinator verifies.
 
 ### P1-14  Consultant public profiles — data and endpoint  (D-03, §16.2 item 5)
 - Backend only: a public read of the published profile ("Credentials reviewed · current" derived from the credential
@@ -1048,7 +1069,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | 1 | P1-8 Metrics, alerts, scheduler leadership | done: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
 | 2 | ~~P1-10 Commercial truth + fee restructuring~~ (D-A) | **done**: sessions 1 and 2 (2026-10-15) | Fable 5.1 high, then Sonnet 5.5 | Owner fast-forwards `feat/review-p0` to the session-2 commit, rebuilds the frontend and walks the flow; counsel on the guarantee wording and the fee's VAT rate; native Arabic review |
 | — | UI/UX (all areas) | own plan | see `docs/ux-redesign/PLAN.md` | Runs in parallel in its own worktree; Finance and Operations areas wait for P1-15 / P1-17 |
-| 3 | ~~P1-13 Minors, guardians, incidents, reopen~~ | **done**: sessions 1 (backend) and 2 (UI, copy), 2026-10-15 | Opus 5.5; guardian consent reviewed by Fable | Owner fast-forwards `feat/review-p0` to the session-2 commit and rebuilds backend and frontend; counsel on the guardian consent, native Arabic review; open: My Care document upload for guardian evidence |
+| 3 | ~~P1-13 Minors, guardians, incidents, reopen~~ | **done**: sessions 1 (backend) and 2 (UI, copy), 2026-10-15 | Opus 5.5; guardian consent reviewed by Fable | Owner fast-forwards `feat/review-p0` to the session-2 commit and rebuilds backend and frontend; counsel on the guardian consent, native Arabic review; My Care upload for guardian evidence done on `claude/guardian-upload` |
 | 5 | **P1-15 Admission, voucher, balance, `ADMISSION_READY`** | 2 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |
 | 6 | **P1-16 Treatment evidence: milestones, change orders** | 2 | Fable 5.1 high; forms by Opus | D-E band; P1-13 |
 | 7 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths by Fable | Owner: payer terms, partner commission |
