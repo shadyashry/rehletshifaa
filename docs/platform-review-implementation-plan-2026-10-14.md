@@ -704,6 +704,79 @@ phases.
     so a currency move can never count as a scope change and a scope change can never hide behind one.
   - **Still open:** counsel on the VAT rate of the fee (the design assumes 14%). P1-10 shows the fee without VAT;
     the VAT line comes with the platform e-invoice in P1-17. The final wording of the guarantee is also open.
+- **Status (2026-10-15, session 1 of 2, Opus 5.5 high; the plan named Fable 5.1; committed on `claude/p1-10-fee-fb4348`, a
+  worktree fast-forwarded from `feat/review-p0` f938fad, so the owner fast-forwards `feat/review-p0` to this commit):** the money
+  rule, the cap, validity and the FX band delivered; the patient-facing panel and copy are session 2.
+  - Delivered: `V96__platform_fee_line_and_final_quote_rules.sql`: `proposal_items` source widened to PLATFORM (named check
+    replaced), named checks `ck_proposal_items_category` (MEDICAL/PLATFORM_FEE), `ck_proposal_items_fee_source` (fee ⇔ PLATFORM)
+    and `ck_proposal_items_fee_mandatory` (a fee line is never optional); `commercial_policies.final_quote_validity_days` (default
+    14, 1–90) and `fx_tolerance_rate` (default 0.0300, 0–0.5); `proposal_versions.above_estimate_maximum` and
+    `fx_reapproval_status` (PENDING/CONFIRMED) with rate, requested-at, decided-by/at.
+    **Fee line (D-A).** New `ProposalPricing` is the one price rule for the estimate and the final quote: medical lines carry the
+    provider's own price (`unitPriceEgp = providerPriceEgp`, min/max likewise); one `PLATFORM_FEE` line "Coordination and guarantee
+    fee" = margin rate x provider total, separately for expected, lowest and highest, sorted last, never optional, provider price 0
+    (`ProposalItem.platformFee`). `marginAmount` = the expected fee; the patient totals = provider totals + fee; the locked margin of
+    the estimate is still reused by the final quote. The "never itemized" comment is replaced; `DepositCalculator` javadoc says
+    "provider lines plus the fee". Proposal views (staff workspace, My Care, the public token view, the rendered HTML) list the fee
+    line through the existing item list; Finance's commercial view shows it as source PLATFORM; the Consultant and their practice
+    manager get the workspace proposal without the fee line, so they see only their own price.
+    **No-surprise cap (A-08).** `createFinalQuote` compares the final expected EGP total (provider + fee) with the accepted
+    estimate's EGP maximum (falling back to the latest estimate's when none is accepted) and refuses above it without a scope
+    change reason (`409 SCOPE_CHANGE_REASON_REQUIRED`); with one the version is flagged `above_estimate_maximum`, the reason is
+    stored trimmed and shown on the patient's views as before, and the audit records both totals. Such a quote cannot be accepted
+    until 24 h after release (`409 COOLING_PERIOD` naming the time it opens; `ProposalView`/`PublicProposalView.acceptableFrom`)
+    on all three decision paths: signed in, secure link, and recorded by the coordinator. Declining or asking for changes is never held.
+    **Validity (B-05).** `CommercialPolicyRequest` takes `finalQuoteValidityDays` and `fxToleranceRate` (left out: carried over from
+    the version being replaced, else the defaults; `QUOTE_VALIDITY_INVALID`, `FX_TOLERANCE_INVALID`; audited; same
+    COMMERCIAL_POLICY_MANAGE holders, System Administrator and Finance Manager); `Policy` carries them boxed so older cache entries
+    read the defaults. `FinalQuoteRequest.validUntil` is now optional; a date beyond policy days from now is refused
+    (`400 QUOTE_VALIDITY_TOO_LONG`); at release `validUntil` = min(release + policy days, coordinator's date), a passed date
+    refuses the release (`409 QUOTE_VALIDITY_PASSED`); a final quote's share token expires no later than the quote. The inline
+    expiry (decision past validity) no longer tries to move an ARRIVAL_CONFIRMED case to EXPIRED. `ProposalExpiryService`
+    (workflow-builder subagent, reviewed) expires final quotes in its scan without touching the macro case, closes a pending
+    FX re-approval and opens one coordinator work item `FINAL_QUOTE_EXPIRED` (audit `FINAL_QUOTE_EXPIRED`).
+    **FX band (B-05).** On acceptance of a non-EGP final quote the display total is re-priced at today's rate; beyond the policy band
+    in either direction (or with no rate today) the acceptance pauses: `409 FX_REAPPROVAL_REQUIRED` with a calm "our Finance team
+    is checking" message, the request recorded on the version, one blocking Finance work item `FX_REAPPROVAL` and audit
+    `FINAL_QUOTE_FX_REAPPROVAL_REQUESTED`; repeated attempts open nothing new. Finance (`FINANCE_SETTLE` on the case):
+    `POST /api/v1/finance/cases/{caseId}/final-quotes/{versionId}/fx-rate/confirm` keeps the frozen rate (the next acceptance
+    proceeds without a new check; audit `FINAL_QUOTE_FX_RATE_CONFIRMED`) or `.../fx-rate/reprice` re-releases at today's rate
+    (lines and document re-fixed, EGP figures, cap and validity unchanged, old link replaced and the patient sent the quote again;
+    audit `FINAL_QUOTE_REPRICED`). EGP quotes skip the check.
+    **Defect found and fixed:** `ProposalItemRepository.priceAt` was a JPQL `round(unitPriceEgp * :rate, 2)` that bound the rate as
+    a scale-2 decimal on H2, so a release at 0.0204 priced every line at 0.02 (the snapshot stored the right rate). It is now
+    computed in Java on the entity (`ProposalItem.priceAt`). Existing fixtures all used two-decimal rates, so nothing caught it.
+  - Tests: new `FinalQuoteRulesTest` (15: fee line arithmetic and before/after on a fixed case with totals, margin and deposit
+    equal to the old per-line markup; range and USD figures; Consultant sees only their line; released document lists the fee;
+    cap refused without reason, flagged with one, none needed at or under the maximum; cap in EGP so an FX move alone never trips
+    it; cooling period on the signed-in and the secure-link paths; validity default 14 days, shorter coordinator date kept and
+    the link with it, longer refused, a 7-day policy shortens it; policy settings refused for coordinator, Finance and Consultant,
+    allowed for System Administrator and Finance Manager, carried over when omitted, validated; FX inside the band accepts,
+    outside pauses and opens the Finance item, Finance confirms and the patient accepts at the frozen rate, Finance re-releases at
+    today's rate and the patient accepts through the new link; EGP skips the band), `FinalQuoteExpiryTest` (3, workflow-builder:
+    the scan expires a final quote, revokes its links, leaves the case ARRIVAL_CONFIRMED, opens one coordinator item and audits;
+    idempotent; closes a pending FX item), `ProposalPricingTest` (3: whole-pound totals equal the old markup; the one-cent case;
+    ranges). Updated for the fee line: `JourneyServiceIntegrationTest`, `SecureJourneyCorrectionsTest` (SEC-10 keeps the EGP base,
+    the rate and every internal field forbidden; the display line price and fee are disclosed by D-A),
+    `UatDefectCorrectionsTest`, `FacilityPackageLineGateTest`, `CoordinatorCaseActionsTest` (Finance's view shows the fee line).
+    Verification: `mvn -o -q test` (JVM in UTC) 853 tests, 0 failures, 3 pre-existing skips (832 + 21 new);
+    `PostgresJpaMappingTest` on postgres:17-alpine with V96 applied: green (1/1; Flyway at 96, the two policy columns and the five named `ck_proposal_items_*` checks present).
+  - Open gaps: the totals equal the old figures for every price whose 15% does not round (whole pounds never do); a line priced in
+    piastres can now differ by a cent, in the direction of total = provider + margin, which the old markup did not guarantee
+    (`ProposalPricingTest`). Display totals in a foreign currency are summed per line, so the fee line can move a converted total
+    by a cent against the single marked-up line. The fee line's stored description is English; the patient wording per language,
+    the "How your price works" panel, the guarantee placeholder, the cooling and FX-pause states on `ProposalSign.tsx` and the
+    minimum Finance UI for the re-approval are session 2 (the API already returns `acceptableFrom` and `fxReapprovalStatus`). The
+    scope-change reason is entered by the coordinator on the final quote (as before), not by the Consultant on the final
+    assessment. The validity and the band are read from the care area's active policy at release and acceptance, not
+    snapshotted on the version (the margin is). No SLA level for `FX_REAPPROVAL` / `FINAL_QUOTE_EXPIRED`, and no portal copy key
+    for them yet (English title only). The scheduled expiry does not close an open proposal-assistance item (the inline one does).
+    The fee shows without VAT until P1-17.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev stack
+    (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`) so V96 runs; then P1-10 session 2 in a new
+    session (Sonnet 5.5 for copy/UI, per the UX plan): the three-step "How your price works" panel and the guarantee placeholder on
+    `ProposalSign.tsx` and the homepage (EN/AR, one key each, logical CSS, WCAG 2.2 AA), the fee line's patient wording, the
+    cooling-period and FX-pause states, and the minimum Finance UI for the FX re-approval item. V97 is the next free Flyway version.
 
 ### P1-11  Split `JourneyService`  (E-06)
 - Extract `ConsultantAssignmentService`, `ClinicalReviewService`, `ProposalService` (create / release / decide /
@@ -830,7 +903,9 @@ export on demand (C-07); region-per-market deployment (E-10); video consultation
 
 Delivered on `feat/review-p0` (pushed at `e68dbc5`, local beyond that; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped),
 P0-5, P1-6, and P1-8 sessions 1 and 2 (meters, internal metrics port, alert rules; `5919bf1`; scheduler lease V95, Prometheus
-registry, Prometheus + Grafana, rules file, dashboard on `claude/p1-8-lease-5e9409`). Everything below is still to do.
+registry, Prometheus + Grafana, rules file, dashboard on `claude/p1-8-lease-5e9409`) and its verification (`df40908`). P1-10 session 1
+(fee line, no-surprise cap, cooling period, validity, FX band; V96) is committed on `claude/p1-10-fee-fb4348` for the owner to
+fast-forward. Everything below is still to do.
 
 **Why the order changed.** The owner's two priorities are (1) a complete, auditable journey after the deposit —
 today nothing collects, proves or reconciles money after the 15%, and the Consultant's hospital deal is invisible —
@@ -844,7 +919,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
 | 1 | P1-8 Metrics, alerts, scheduler leadership | done: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
-| 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2 | Fable 5.1 high, then Sonnet 5.5 | Ready (2026-10-15): D-A yes, placeholder guarantee wording, 14-day validity, 3% FX band; kickoff block in `docs/platform-review-phase-prompts.md`. Counsel on the fee's VAT rate does not block it |
+| 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2: session 1 done (2026-10-15, V96), session 2 next | Fable 5.1 high, then Sonnet 5.5 | Session 2 (panel, guarantee placeholder, fee wording, cooling/FX states, Finance UI) after the owner fast-forwards `feat/review-p0` and rebuilds the dev stack (V96). Counsel on the fee's VAT rate does not block it |
 | — | UI/UX (all areas) | own plan | see `docs/ux-redesign/PLAN.md` | Runs in parallel in its own worktree; Finance and Operations areas wait for P1-15 / P1-17 |
 | 3 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
 | 5 | **P1-15 Admission, voucher, balance, `ADMISSION_READY`** | 2 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |

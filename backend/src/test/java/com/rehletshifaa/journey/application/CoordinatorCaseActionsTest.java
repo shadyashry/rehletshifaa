@@ -412,9 +412,17 @@ class CoordinatorCaseActionsTest {
         var commercial = journey.workspace(caseId).commercial();
         assertThat(commercial).isNotNull();
         assertThat(commercial.requiresFinanceApproval()).isTrue();
-        assertThat(commercial.lines()).singleElement().satisfies(line -> {
+        // P1-10 (D-A): the Consultant's line at its own price, then the platform's fee line (15% of 3,500), which pays the provider nothing.
+        assertThat(commercial.lines()).hasSize(2);
+        assertThat(commercial.lines().get(0)).satisfies(line -> {
             assertThat(line.source()).isEqualTo("MANUAL");
             assertThat(line.baseEgp()).isEqualByComparingTo("3500.00");
+            assertThat(line.patientEgp()).isEqualByComparingTo("3500.00");
+        });
+        assertThat(commercial.lines().get(1)).satisfies(line -> {
+            assertThat(line.source()).isEqualTo("PLATFORM");
+            assertThat(line.baseEgp()).isEqualByComparingTo("0");
+            assertThat(line.patientEgp()).isEqualByComparingTo(commercial.marginEgp());
         });
         assertThat(commercial.baseTotalEgp()).isEqualByComparingTo("3500.00");
         assertThat(commercial.patientTotalEgp()).isEqualByComparingTo(commercial.baseTotalEgp().add(commercial.marginEgp()));

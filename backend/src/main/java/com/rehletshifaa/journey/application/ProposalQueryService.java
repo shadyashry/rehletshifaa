@@ -37,6 +37,8 @@ public class ProposalQueryService {
     /** The versions a patient may see: released to them, and every outcome after. */
     private static final Set<String> PATIENT_VISIBLE = Set.of("RELEASED", "VIEWED", "ACCEPTED", "DECLINED", "REVISION_REQUESTED", "EXPIRED");
     private static final Set<String> IN_APPROVAL = Set.of("CLINICALLY_APPROVED", "OPERATIONS_COMPLETED", "FINANCE_APPROVED");
+    /** P1-10 (A-08): the least time a patient has to decide on a final quote above the maximum of the estimate they accepted. */
+    static final java.time.Duration FINAL_QUOTE_COOLING_PERIOD = java.time.Duration.ofHours(24);
 
     private final ProposalVersionRepository versions;
     private final ProposalItemRepository items;
@@ -63,7 +65,10 @@ public class ProposalQueryService {
                 .toList();
         return new ProposalView(v.getProposalId(), v.getId(), v.getVersionNumber(), v.getStatus(), v.getLanguage(), v.getCurrency(),
                 v.getValidUntil(), v.getOperationalPlan(), v.getIncludedServices(), v.getExcludedServices(), v.getPaymentTerms(),
-                v.getRefundTerms(), v.getDisclaimers(), lines, v.getCoordinatorNotes(), v.getDocumentType(), v.getScopeChangeReason(), assistance(versionId));
+                v.getRefundTerms(), v.getDisclaimers(), lines, v.getCoordinatorNotes(), v.getDocumentType(), v.getScopeChangeReason(), assistance(versionId),
+                // P1-10 (A-08): a final quote above the accepted estimate's maximum opens for acceptance 24 hours after release.
+                Boolean.TRUE.equals(v.getAboveEstimateMaximum()) && v.getReleasedAt() != null ? v.getReleasedAt().plus(FINAL_QUOTE_COOLING_PERIOD) : null,
+                v.getFxReapprovalStatus());
     }
 
     /** QA #19: the version as Finance approves it — each line's source and base price, the margin and the totals. */

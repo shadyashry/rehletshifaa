@@ -66,6 +66,14 @@ public class ProposalVersion extends AssignedIdEntity {
     @Column(name = "patient_total_min_egp") private BigDecimal patientTotalMinEgp;
     @Column(name = "patient_total_expected_egp") private BigDecimal patientTotalExpectedEgp;
     @Column(name = "patient_total_max_egp") private BigDecimal patientTotalMaxEgp;
+    /** P1-10 (A-08): a final quote above the accepted estimate's maximum, allowed only with a scope-change reason; 24 h cooling period. */
+    @Column(name = "above_estimate_maximum", nullable = false) private boolean aboveEstimateMaximum;
+    /** P1-10 (B-05): PENDING while Finance re-approves a non-EGP final quote outside the FX band, CONFIRMED once it keeps the frozen rate. */
+    @Column(name = "fx_reapproval_status", length = 20) private String fxReapprovalStatus;
+    @Column(name = "fx_reapproval_rate") private BigDecimal fxReapprovalRate;
+    @Column(name = "fx_reapproval_requested_at") private Instant fxReapprovalRequestedAt;
+    @Column(name = "fx_reapproval_decided_by") private String fxReapprovalDecidedBy;
+    @Column(name = "fx_reapproval_decided_at") private Instant fxReapprovalDecidedAt;
 
     protected ProposalVersion() {}
 

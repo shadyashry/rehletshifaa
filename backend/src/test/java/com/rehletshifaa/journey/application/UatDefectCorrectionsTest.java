@@ -171,14 +171,18 @@ class UatDefectCorrectionsTest {
         var ctx = openViaStatusLink(caseId, "+254700000506");
         PublicProposalView view = journey.viewProposal(ctx.token(), ctx.grant());
         assertThat(view.currency()).isEqualTo("USD");
-        // 390,000 EGP provider price × 1.15 default margin = 448,500 EGP inclusive; × 0.02 snapshot = 8,970 USD per line. Totals follow the same snapshot.
-        assertThat(view.items()).isNotEmpty().allSatisfy(item -> assertThat(item.unitPrice()).isEqualByComparingTo("8970.00"));
+        // P1-10 (D-A): 390,000 EGP provider price × 0.02 snapshot = 7,800 USD, and the coordination and guarantee fee (15% = 58,500 EGP)
+        // = 1,170 USD as its own line; the total is the 8,970 USD the marked-up line showed before. Totals follow the same snapshot.
+        assertThat(view.items()).extracting(ProposalItemView::unitPrice).usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("7800.00"), new BigDecimal("1170.00"));
+        assertThat(view.items()).extracting(ProposalItemView::category).containsExactly("MEDICAL", "PLATFORM_FEE");
         assertThat(view.totalExpected()).isEqualByComparingTo("8970.00");
         assertThat(view.totalMin()).isEqualByComparingTo("8970.00");
         assertThat(view.totalMax()).isEqualByComparingTo("8970.00");
         // The base-currency amounts are preserved alongside, not destroyed.
-        assertThat(jdbc.queryForObject("SELECT provider_price_egp FROM proposal_items WHERE proposal_version_id=?", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("390000.00");
-        assertThat(jdbc.queryForObject("SELECT unit_price_egp FROM proposal_items WHERE proposal_version_id=?", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("448500.00");
+        assertThat(jdbc.queryForObject("SELECT provider_price_egp FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("390000.00");
+        assertThat(jdbc.queryForObject("SELECT unit_price_egp FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("390000.00");
+        assertThat(jdbc.queryForObject("SELECT unit_price_egp FROM proposal_items WHERE proposal_version_id=? AND category='PLATFORM_FEE'", BigDecimal.class, proposal.versionId())).isEqualByComparingTo("58500.00");
     }
 
     /** QA #12: one rounding rule — the patient's total is the sum of the lines they see, never the EGP total converted in one go. */
@@ -189,12 +193,14 @@ class UatDefectCorrectionsTest {
         ClinicalReviewView review = journey.workspace(caseId).clinicalReviews().stream().filter(r -> "APPROVED".equals(r.status())).findFirst().orElseThrow();
         var proposal = journey.createProposal(caseId, draftRequest(review.id()));
         // Two lines of 1,000.25 EGP: each is 20.005 USD → 20.01 at the 0.02 snapshot; the EGP total 2,000.50 alone would give 40.01.
+        // (The fee line is set aside: this case is about the rounding of two lines.)
+        jdbc.update("DELETE FROM proposal_items WHERE proposal_version_id=? AND category='PLATFORM_FEE'", proposal.versionId());
         jdbc.update("UPDATE proposal_items SET unit_price_egp=1000.25,unit_price_min_egp=1000.25,unit_price_max_egp=1000.25 WHERE proposal_version_id=?", proposal.versionId());
         jdbc.update("""
                 INSERT INTO proposal_items(id,proposal_version_id,category,description,quantity,unit_price,optional,sort_order,source,unit_price_egp,
                     provider_price_egp,unit_price_min_egp,unit_price_max_egp,conditional)
                 SELECT ?,proposal_version_id,category,'Second line',quantity,unit_price,optional,1,source,unit_price_egp,provider_price_egp,
-                    unit_price_min_egp,unit_price_max_egp,conditional FROM proposal_items WHERE proposal_version_id=?""", UUID.randomUUID(), proposal.versionId());
+                    unit_price_min_egp,unit_price_max_egp,conditional FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'""", UUID.randomUUID(), proposal.versionId());
         jdbc.update("UPDATE proposal_versions SET requires_finance_approval=FALSE,patient_total_min_egp=2000.50,patient_total_expected_egp=2000.50,patient_total_max_egp=2000.50 WHERE id=?",
                 proposal.versionId());
         journey.releaseProposal(caseId, proposal.versionId()); em.flush();
@@ -227,11 +233,11 @@ class UatDefectCorrectionsTest {
         var ctx = openViaStatusLink(caseId, "+254700000508");
         journey.decideProposalPublic(ctx.token(), ctx.grant(), new PublicProposalDecisionRequest(ctx.grant(), "ACKNOWLEDGED", null, true));
         em.flush();
-        BigDecimal frozenLine = jdbc.queryForObject("SELECT unit_price FROM proposal_items WHERE proposal_version_id=?", BigDecimal.class, versionId);
+        BigDecimal frozenLine = jdbc.queryForObject("SELECT unit_price FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'", BigDecimal.class, versionId);
         BigDecimal frozenRate = jdbc.queryForObject("SELECT fx_rate FROM proposal_versions WHERE id=?", BigDecimal.class, versionId);
 
         seedFxRate("USD", new BigDecimal("0.0300")); evictFxCache(); // the market moves after acknowledgement
-        assertThat(jdbc.queryForObject("SELECT unit_price FROM proposal_items WHERE proposal_version_id=?", BigDecimal.class, versionId)).isEqualByComparingTo(frozenLine);
+        assertThat(jdbc.queryForObject("SELECT unit_price FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'", BigDecimal.class, versionId)).isEqualByComparingTo(frozenLine);
         assertThat(jdbc.queryForObject("SELECT fx_rate FROM proposal_versions WHERE id=?", BigDecimal.class, versionId)).isEqualByComparingTo(frozenRate);
         assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?", String.class, versionId)).isEqualTo("ACCEPTED");
         // The patient-visible answer is now the acknowledged version, read-only.

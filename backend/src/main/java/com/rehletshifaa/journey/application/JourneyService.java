@@ -99,6 +99,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     private final CaseAssignmentRepository assignments;
     private final MedicalCaseRepository cases;
     private final JourneyMetrics metrics;
+    private final ProposalExpiryService expiry;
     private final PatientProfileRepository patients;
     private final QueuedNotificationRepository outboxMessages;
     private final NotificationOutbox notificationOutbox;
@@ -124,7 +125,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     private final SecureRandom random = new SecureRandom();
     // The case lifecycle and its entry invariants live in CaseTransitionPolicy — one copy, validated by every path that moves a case.
 
-    public JourneyService(JourneyCaseQueryService caseQueries,CaseWorkspaceQueryService workspaces,ProposalQueryService proposalQueries,PractitionerProfileRepository practitioners,CatalogEntryRepository catalog,MedicalDocumentRepository documents,Authority authority,IntakeLifecycleService intake,Clock clock,com.rehletshifaa.shared.crypto.CryptoService crypto,PublicCaseAccessService publicCases,PricingCatalogService pricingCatalog,com.rehletshifaa.shared.currency.CurrencyService currency,CommercialPolicyService commercialPolicy,com.rehletshifaa.facility.application.FacilityPackagePricing facilityPackages,com.rehletshifaa.facility.application.FacilityDirectory facilityDirectory,PaymentService payment,OnboardingService onboarding,CustomerReadinessService readiness,PatientActionService patientActions,StaffWorkService work,PortalExperienceService portalExperience,CareCategoryCatalog careCategories,CaseActionService caseActions,CaseTransitionPolicy transitions,CaseContactResolver caseContacts,ProposalAccessService proposalAccess,org.springframework.context.ApplicationEventPublisher events,ConsultantEligibilityService consultants,ConsultantReferralService referrals,VirtualClinicService clinics,ConsultantOperationsOwnershipService consultantOwnership,com.rehletshifaa.workforce.application.WorkforceDirectory workforceDirectory,CoordinatorRoutingPort coordinatorRouting, AuditTrail auditTrail, NotificationOutbox notificationOutbox, QueuedNotificationRepository outboxMessages, PatientProfileRepository patients, MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseTaskRepository tasks, CaseStatusLog statusLog, ConsentRecordRepository consents, CaseMessageRepository messages, CaseMessageReadRepository messageReads, TravelPlanRepository travelPlans, TreatmentEpisodeRepository episodes, FollowUpPlanRepository followUps, ClinicalReviewVersionRepository clinicalReviews, ClinicalReviewCostEstimateRepository costEstimates, ProposalRepository proposalRecords, ProposalVersionRepository proposalVersions, ProposalItemRepository proposalItems, ProposalDecisionRepository proposalDecisions, ProposalShareTokenRepository shareTokens, ProposalAccessChallengeRepository accessChallenges, ReplyCoverService replyCovers, CaseExitService exits, JourneyMetrics metrics){ this.metrics = metrics; this.exits = exits; this.replyCovers = replyCovers; this.accessChallenges = accessChallenges; this.shareTokens = shareTokens; this.proposalDecisions = proposalDecisions; this.proposalItems = proposalItems; this.proposalVersions = proposalVersions; this.proposalRecords = proposalRecords; this.costEstimates = costEstimates; this.clinicalReviews = clinicalReviews; this.followUps = followUps; this.episodes = episodes; this.travelPlans = travelPlans; this.messageReads = messageReads; this.messages = messages; this.consents = consents; this.statusLog = statusLog; this.tasks = tasks; this.assignments = assignments; this.cases = cases; this.patients = patients; this.outboxMessages = outboxMessages; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;this.workforceDirectory=workforceDirectory;this.consultantOwnership=consultantOwnership;this.consultants=consultants;this.referrals=referrals;this.clinics=clinics;this.transitions=transitions;this.caseContacts=caseContacts;this.proposalAccess=proposalAccess;this.events=events;this.caseActions=caseActions;this.careCategories=careCategories;this.patientActions=patientActions;this.work=work;this.portalExperience=portalExperience;this.caseQueries=caseQueries;this.workspaces=workspaces;this.proposalQueries=proposalQueries;this.practitioners=practitioners;this.catalog=catalog;this.documents=documents;this.authority=authority;this.intake=intake;this.clock=clock;this.crypto=crypto;this.publicCases=publicCases;this.pricingCatalog=pricingCatalog;this.currency=currency;this.commercialPolicy=commercialPolicy;this.facilityPackages=facilityPackages;this.facilityDirectory=facilityDirectory;this.payment=payment;this.onboarding=onboarding;this.readiness=readiness;this.coordinatorRouting=coordinatorRouting;}
+    public JourneyService(JourneyCaseQueryService caseQueries,CaseWorkspaceQueryService workspaces,ProposalQueryService proposalQueries,PractitionerProfileRepository practitioners,CatalogEntryRepository catalog,MedicalDocumentRepository documents,Authority authority,IntakeLifecycleService intake,Clock clock,com.rehletshifaa.shared.crypto.CryptoService crypto,PublicCaseAccessService publicCases,PricingCatalogService pricingCatalog,com.rehletshifaa.shared.currency.CurrencyService currency,CommercialPolicyService commercialPolicy,com.rehletshifaa.facility.application.FacilityPackagePricing facilityPackages,com.rehletshifaa.facility.application.FacilityDirectory facilityDirectory,PaymentService payment,OnboardingService onboarding,CustomerReadinessService readiness,PatientActionService patientActions,StaffWorkService work,PortalExperienceService portalExperience,CareCategoryCatalog careCategories,CaseActionService caseActions,CaseTransitionPolicy transitions,CaseContactResolver caseContacts,ProposalAccessService proposalAccess,org.springframework.context.ApplicationEventPublisher events,ConsultantEligibilityService consultants,ConsultantReferralService referrals,VirtualClinicService clinics,ConsultantOperationsOwnershipService consultantOwnership,com.rehletshifaa.workforce.application.WorkforceDirectory workforceDirectory,CoordinatorRoutingPort coordinatorRouting, AuditTrail auditTrail, NotificationOutbox notificationOutbox, QueuedNotificationRepository outboxMessages, PatientProfileRepository patients, MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseTaskRepository tasks, CaseStatusLog statusLog, ConsentRecordRepository consents, CaseMessageRepository messages, CaseMessageReadRepository messageReads, TravelPlanRepository travelPlans, TreatmentEpisodeRepository episodes, FollowUpPlanRepository followUps, ClinicalReviewVersionRepository clinicalReviews, ClinicalReviewCostEstimateRepository costEstimates, ProposalRepository proposalRecords, ProposalVersionRepository proposalVersions, ProposalItemRepository proposalItems, ProposalDecisionRepository proposalDecisions, ProposalShareTokenRepository shareTokens, ProposalAccessChallengeRepository accessChallenges, ReplyCoverService replyCovers, CaseExitService exits, JourneyMetrics metrics, ProposalExpiryService expiry){ this.expiry = expiry; this.metrics = metrics; this.exits = exits; this.replyCovers = replyCovers; this.accessChallenges = accessChallenges; this.shareTokens = shareTokens; this.proposalDecisions = proposalDecisions; this.proposalItems = proposalItems; this.proposalVersions = proposalVersions; this.proposalRecords = proposalRecords; this.costEstimates = costEstimates; this.clinicalReviews = clinicalReviews; this.followUps = followUps; this.episodes = episodes; this.travelPlans = travelPlans; this.messageReads = messageReads; this.messages = messages; this.consents = consents; this.statusLog = statusLog; this.tasks = tasks; this.assignments = assignments; this.cases = cases; this.patients = patients; this.outboxMessages = outboxMessages; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;this.workforceDirectory=workforceDirectory;this.consultantOwnership=consultantOwnership;this.consultants=consultants;this.referrals=referrals;this.clinics=clinics;this.transitions=transitions;this.caseContacts=caseContacts;this.proposalAccess=proposalAccess;this.events=events;this.caseActions=caseActions;this.careCategories=careCategories;this.patientActions=patientActions;this.work=work;this.portalExperience=portalExperience;this.caseQueries=caseQueries;this.workspaces=workspaces;this.proposalQueries=proposalQueries;this.practitioners=practitioners;this.catalog=catalog;this.documents=documents;this.authority=authority;this.intake=intake;this.clock=clock;this.crypto=crypto;this.publicCases=publicCases;this.pricingCatalog=pricingCatalog;this.currency=currency;this.commercialPolicy=commercialPolicy;this.facilityPackages=facilityPackages;this.facilityDirectory=facilityDirectory;this.payment=payment;this.onboarding=onboarding;this.readiness=readiness;this.coordinatorRouting=coordinatorRouting;}
     @Transactional(readOnly=true) public CustomerReadiness customerReadiness(UUID caseId){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));return readiness.compute(caseId);}
     @Transactional(readOnly=true) public DepositView depositView(UUID caseId){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));return payment.depositForCase(caseId);}
 
@@ -505,33 +506,24 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         String displayCurrency=requireIssuableCurrency(hasText(request.currency())?request.currency():recommendedCurrency);
         java.time.LocalDate rateDate=java.time.LocalDate.now(clock);
         BigDecimal rate=com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(displayCurrency)?BigDecimal.ONE:currency.effectiveRate(displayCurrency,rateDate);
-        // Central commercial policy: the internal margin is baked into the inclusive patient package and never itemized.
+        // Central commercial policy: the margin rate is snapshotted on the version and charged as one disclosed line (P1-10, D-A).
         String careArea=cases.findCareCategory(caseId).orElse(null);
         var policy=commercialPolicy.activePolicyFor(careArea);
         BigDecimal marginRate=policy!=null?policy.marginRate():BigDecimal.ZERO;
         if(policy==null)requiresFinance=true; // a missing applicable policy forces finance review
         // P0-5 (B-02 / A-07): catalogue lines, still-approved facility packages and manual lines inside the pre-approved band release without Finance.
         {java.time.LocalDate gateDate=java.time.LocalDate.now(clock);BigDecimal manualBand=policy!=null?policy.manualBandEgp():null;requiresFinance=requiresFinance||consultantItems.stream().anyMatch(i->lineNeedsFinance(i.requiresFinance(),i.catalogServiceId(),i.facilityPackageId(),i.priceEgp(),manualBand,gateDate));}
-        BigDecimal markup=BigDecimal.ONE.add(marginRate);
-        record ItemCalc(String description,String source,UUID catalogServiceId,BigDecimal providerEgp,BigDecimal inclusiveExp,BigDecimal inclusiveMin,BigDecimal inclusiveMax,BigDecimal displayUnit,UUID facilityPackageId){}
-        List<ItemCalc> calc=new ArrayList<>();
-        BigDecimal providerNet=BigDecimal.ZERO,patientMin=BigDecimal.ZERO,patientExp=BigDecimal.ZERO,patientMax=BigDecimal.ZERO;
-        for(EstRow item:consultantItems){
-            BigDecimal pExp=item.priceEgp();BigDecimal pMin=item.priceEgpMin()==null?pExp:item.priceEgpMin();BigDecimal pMax=item.priceEgpMax()==null?pExp:item.priceEgpMax();
-            BigDecimal incExp=pExp.multiply(markup).setScale(2,java.math.RoundingMode.HALF_UP);
-            BigDecimal incMin=pMin.multiply(markup).setScale(2,java.math.RoundingMode.HALF_UP);
-            BigDecimal incMax=pMax.multiply(markup).setScale(2,java.math.RoundingMode.HALF_UP);
-            calc.add(new ItemCalc(item.description(),lineSource(item.catalogServiceId(),item.facilityPackageId()),item.catalogServiceId(),pExp,incExp,incMin,incMax,incExp.multiply(rate).setScale(2,java.math.RoundingMode.HALF_UP),item.facilityPackageId()));
-            providerNet=providerNet.add(pExp);patientMin=patientMin.add(incMin);patientExp=patientExp.add(incExp);patientMax=patientMax.add(incMax);
-        }
-        BigDecimal marginAmount=providerNet.multiply(marginRate).setScale(2,java.math.RoundingMode.HALF_UP);
+        // P1-10 (D-A): each medical line at the provider's own price; the fee is marginRate x the provider totals (ProposalPricing).
+        List<ProposalPricing.ProviderLine> providerLines=consultantItems.stream().map(i->ProposalPricing.ProviderLine.of(i.priceEgp(),i.priceEgpMin(),i.priceEgpMax())).toList();
+        ProposalPricing.Totals priced=ProposalPricing.of(providerLines,marginRate);
+        BigDecimal providerNet=priced.providerExpected(),marginAmount=priced.feeExpected();
         UUID policyId=policy!=null?policy.id():null;Integer policyVersion=policy!=null?policy.version():null;
         UUID proposalId=proposalRecords.findIdByCaseId(caseId).orElseGet(()->{UUID id=UUID.randomUUID();Instant now=clock.instant();proposalRecords.saveAndFlush(new Proposal(id,caseId,now));return id;});
         int version=nextProposalVersion(proposalId);UUID versionId=UUID.randomUUID();Instant now=clock.instant();
         proposalVersions.supersedeLive(proposalId,micros(now));
         String includedServices=consultantItems.stream().map(EstRow::description).collect(java.util.stream.Collectors.joining("; "));
-        createVersion(new ProposalVersion.Document(proposalId,version,"PRELIMINARY_ESTIMATE",null,request.language()==null?"en":request.language(),request.clinicalReviewId()),versionId,new ProposalVersion.Terms(request.operationalPlan(),displayCurrency,includedServices,request.excludedServices(),request.paymentTerms(),request.refundTerms(),request.disclaimers(),request.coordinatorNotes(),request.validUntil()),new ProposalVersion.Pricing(requiresFinance,providerNet,policyId,policyVersion,marginRate,marginAmount,patientMin,patientExp,patientMax),actor.subject(),now);
-        for(int order=0;order<calc.size();order++){ItemCalc item=calc.get(order);proposalItems.saveAndFlush(ProposalItem.medical(versionId,item.description(),item.displayUnit(),order,item.source(),new ProposalItem.Prices(item.inclusiveExp(),item.providerEgp(),item.inclusiveMin(),item.inclusiveMax()),item.catalogServiceId(),item.facilityPackageId()));}
+        createVersion(new ProposalVersion.Document(proposalId,version,"PRELIMINARY_ESTIMATE",null,request.language()==null?"en":request.language(),request.clinicalReviewId()),versionId,new ProposalVersion.Terms(request.operationalPlan(),displayCurrency,includedServices,request.excludedServices(),request.paymentTerms(),request.refundTerms(),request.disclaimers(),request.coordinatorNotes(),request.validUntil()),new ProposalVersion.Pricing(requiresFinance,providerNet,policyId,policyVersion,marginRate,marginAmount,priced.patientMin(),priced.patientExpected(),priced.patientMax()),actor.subject(),now);
+        saveLines(versionId,consultantItems.stream().map(i->new PricedLine(i.description(),lineSource(i.catalogServiceId(),i.facilityPackageId()),i.catalogServiceId(),i.facilityPackageId())).toList(),providerLines,priced,rate);
         proposalRecords.advanceTo(proposalId,version,micros(now));transitionWithoutVersion(caseId,"PROPOSAL_PREPARATION","Proposal draft created from consultant-approved services",actor);
         // The coordinator's "prepare the proposal" work is done the moment the draft exists; a revision request
         // is answered the same way. Closing it here is what stops a finished item from driving the page later.
@@ -588,7 +580,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         BigDecimal depositDueDisplay=isFinal?null:payment.depositDueDisplay(share.caseId(),share.versionId());
         BigDecimal depositPaidDisplay=isFinal?conv.apply(payment.netPaidEgp(share.caseId())):null;
         var totals=proposalQueries.displayTotals(share.versionId(),fx); // QA #12: the totals are the sum of the lines shown
-        return new PublicProposalView(m.getCaseNumber(),m.getPatientName(),m.getDocumentType(),m.getVersionNumber(),m.getCurrency(),view.items(),totals.min(),totals.expected(),totals.max(),m.getAssumptions(),m.getIncludedServices(),m.getExcludedServices(),m.getScopeChangeReason(),m.getPaymentTerms(),m.getRefundTerms(),m.getDisclaimers(),m.getValidUntil(),decided,decisionState,m.getRecommendedTreatment(),m.getRisksAndLimitations(),view.coordinatorNotes(),depositDueDisplay,depositPaidDisplay,m.getConsultantName(),m.getFxRateDate(),proposalQueries.assistance(share.versionId()));}
+        return new PublicProposalView(m.getCaseNumber(),m.getPatientName(),m.getDocumentType(),m.getVersionNumber(),m.getCurrency(),view.items(),totals.min(),totals.expected(),totals.max(),m.getAssumptions(),m.getIncludedServices(),m.getExcludedServices(),m.getScopeChangeReason(),m.getPaymentTerms(),m.getRefundTerms(),m.getDisclaimers(),m.getValidUntil(),decided,decisionState,m.getRecommendedTreatment(),m.getRisksAndLimitations(),view.coordinatorNotes(),depositDueDisplay,depositPaidDisplay,m.getConsultantName(),m.getFxRateDate(),proposalQueries.assistance(share.versionId()),view.acceptableFrom(),view.fxReapprovalStatus());}
 
     /** Records the decision against the exact released version; on ACCEPTED, sends an activation invite. */
     @Transactional(noRollbackFor=ApiException.class) public IdResponse decideProposalPublic(String token,String grant,PublicProposalDecisionRequest request){ShareToken share=requireGrant(token,grant);Instant now=clock.instant();ProposalView view=proposal(share.versionId());if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal can no longer be decided");if(view.validUntil()!=null&&!view.validUntil().isAfter(now)){expireProposal(share.caseId(),share.versionId());throw new ApiException(410,"PROPOSAL_EXPIRED","This proposal has expired");}
@@ -599,6 +591,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         // way. Declining or asking for changes commits the patient to nothing and needs no acknowledgement.
         if(acceptish&&!Boolean.TRUE.equals(request.acknowledgementAccepted()))
             throw new ApiException(400,"ACKNOWLEDGEMENT_REQUIRED","Confirm the acknowledgement before continuing");
+        if(acceptish&&isFinalQuote(share.versionId()))requireFinalQuoteAcceptable(share.caseId(),share.versionId(),now,"SECURE_LINK","PATIENT");
         int decided=proposalVersions.decide(share.versionId(),versionStatus);if(decided!=1)throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal can no longer be decided");work.closeWorkItems(share.caseId(),ProposalAssistanceService.WORK_TYPE,"Superseded — the patient decided");proposalDecisions.saveAndFlush(new ProposalDecision(UUID.randomUUID(),share.versionId(),"SECURE_LINK",request.decision(),null,request.comment(),now,now).acknowledged(acceptish,acceptish?now:null,acceptish?ACKNOWLEDGEMENT_VERSION:null));shareTokens.consume(share.shareId(),micros(now));accessChallenges.revokeAll(share.shareId(),micros(now));if(!isFinalQuote(share.versionId())){publicTransition(share.caseId(),versionStatus,"Patient proposal decision (secure link)");if(acceptish){onProposalAccepted(share.caseId());payment.createDepositForAcknowledgement(share.caseId(),share.versionId());onboarding.createForAcknowledgement(share.caseId(),share.versionId());
             // The deposit stage opens with the patient's profile steps outstanding: the ball is theirs first,
             // and only then the offline deposit becomes our team's move. Derived, never assumed from the stage.
@@ -673,7 +666,9 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
             "proposal-decision-recorded:"+versionId,now);
     }
     private static String jsonText(String value){return value==null?"null":"\""+value.replace("\\","\\\\").replace("\"","\\\"")+"\"";}
-    private void expireProposal(UUID caseId,UUID versionId){int changed=proposalVersions.expire(versionId);if(changed==1){work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Superseded — the proposal expired");shareTokens.revokeForVersion(versionId,micros(clock.instant()));publicTransition(caseId,"EXPIRED","Proposal expired");auditPublic("PROPOSAL_EXPIRED",caseId,versionId.toString(),"EXPIRE");}}
+    private void expireProposal(UUID caseId,UUID versionId){int changed=proposalVersions.expire(versionId);if(changed==1){work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Superseded — the proposal expired");shareTokens.revokeForVersion(versionId,micros(clock.instant()));
+        // P1-10 (B-05): a final quote expires as a commercial sub-workflow; the macro case stays where it is (ARRIVAL_CONFIRMED).
+        if(isFinalQuote(versionId))expiry.onFinalQuoteExpired(caseId,versionId,clock.instant());else publicTransition(caseId,"EXPIRED","Proposal expired");auditPublic("PROPOSAL_EXPIRED",caseId,versionId.toString(),"EXPIRE");}}
     private void auditPublic(String type,UUID caseId,String entityId,String action){auditTrail.event(type).actor("SECURE_LINK", "PATIENT").caseId(caseId).entity("ProposalVersion", entityId).action(action).record();}
     private record Contact(String caseNumber,String whatsapp,String email,String language){}
     private record ShareToken(UUID shareId,UUID versionId,UUID caseId,Instant consumedAt,Instant revokedAt,Instant expiresAt){}
@@ -696,6 +691,16 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         if(facilityId==null){if(required)throw new ApiException(400,"FACILITY_REQUIRED","Choose the facility");return;}
         if(facilityDirectory.active(facilityId).isEmpty())throw new ApiException(409,"FACILITY_INVALID","This facility does not exist or is suspended");
     }
+    private record PricedLine(String description,String source,UUID catalogServiceId,UUID facilityPackageId){}
+    /**
+     * P1-10 (D-A): the medical lines at the provider's own price (the Consultant's and the facility's figures, unchanged), then the
+     * coordination and guarantee fee as the last line, never optional. Display prices are provisional until release fixes them.
+     */
+    private void saveLines(UUID versionId,List<PricedLine> lines,List<ProposalPricing.ProviderLine> prices,ProposalPricing.Totals priced,BigDecimal rate){
+        for(int order=0;order<lines.size();order++){PricedLine line=lines.get(order);ProposalPricing.ProviderLine price=prices.get(order);
+            proposalItems.saveAndFlush(ProposalItem.medical(versionId,line.description(),ProposalPricing.display(price.expected(),rate),order,line.source(),new ProposalItem.Prices(price.expected(),price.expected(),price.min(),price.max()),line.catalogServiceId(),line.facilityPackageId()));}
+        proposalItems.saveAndFlush(ProposalItem.platformFee(versionId,ProposalPricing.FEE_DESCRIPTION,ProposalPricing.display(priced.feeExpected(),rate),lines.size(),priced.feeExpected(),priced.feeMin(),priced.feeMax()));
+    }
     private static String lineSource(UUID catalogServiceId,UUID facilityPackageId){return facilityPackageId!=null?"FACILITY_PACKAGE":catalogServiceId!=null?"CATALOG":"MANUAL";}
     private boolean operationsCompleted(UUID versionId){return proposalQueries.operationsCompleted(versionId);}
     @Transactional public ProposalView releaseProposal(UUID caseId,UUID versionId){var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("PROPOSAL_PREPARATION","PROPOSAL_INTERNAL_APPROVAL"));ensureProposalBelongs(caseId,versionId);ProposalView view=proposal(versionId);if(!Set.of("CLINICALLY_APPROVED","OPERATIONS_COMPLETED","FINANCE_APPROVED").contains(view.status()))throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal is not ready for release");
@@ -717,7 +722,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         // Releasing (and only releasing) mints the random, expiring, case-scoped secure link and
         // moves the case to PATIENT_DECISION. The delivered notification carries only the link.
         shareTokens.revokeOpenForCase(caseId,micros(now));String token=randomToken();shareTokens.saveAndFlush(new ProposalShareToken(UUID.randomUUID(),versionId,caseId,intake.hash(token),now.plus(Duration.ofDays(14)),now));Contact contact=proposalContact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination=channel.equals("WHATSAPP")?contact.whatsapp():contact.email();if(hasText(destination))notificationOutbox.enqueueOnce("PROPOSAL_READY", channel, destination, "proposal-ready", intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+view.language()+"\"}"), "proposal-ready:"+versionId, now);transitionWithoutVersion(caseId,"PATIENT_DECISION","Proposal released to patient",actor);metrics.proposalReleased(cases.findById(caseId).map(MedicalCase::getSubmittedAt).orElse(null),view.versionNumber(),now);audit("PROPOSAL_RELEASED",actor,caseId,"ProposalVersion",versionId.toString(),"RELEASE","SUCCESS",null);return proposal(versionId);}
-    @Transactional(noRollbackFor=ApiException.class) public ProposalView decideProposal(UUID caseId,UUID versionId,ProposalDecisionRequest request){var actor=authority.authorize(Permission.PATIENT_DECIDE,Resource.ofCase(caseId));ensureProposalBelongs(caseId,versionId);ProposalView view=proposal(versionId);if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal version can no longer be decided");Instant now=clock.instant();if(view.validUntil()!=null&&!view.validUntil().isAfter(now)){expireProposal(caseId,versionId);throw new ApiException(410,"PROPOSAL_EXPIRED","This proposal has expired");}validateSelectedOptionalItems(versionId,request.selectedOptionalItemIds());String decision=request.decision();boolean acceptish="ACCEPTED".equals(decision)||"ACKNOWLEDGED".equals(decision);String versionStatus=acceptish?"ACCEPTED":("DECLINED".equals(decision)?"DECLINED":"REVISION_REQUESTED");int decided=proposalVersions.decide(versionId,versionStatus);if(decided!=1)throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal version can no longer be decided");work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Superseded — the patient decided");UUID id=UUID.randomUUID();proposalDecisions.saveAndFlush(new ProposalDecision(id,versionId,actor.subject(),request.decision(),request.selectedOptionalItemIds()==null?null:request.selectedOptionalItemIds().toString(),request.comment(),actor.authenticatedAt(),now));shareTokens.revokeForVersion(versionId,micros(now));if(!isFinalQuote(versionId)){transitionWithoutVersion(caseId,versionStatus,"Patient proposal decision",actor);if(acceptish){onProposalAccepted(caseId);payment.createDepositForAcknowledgement(caseId,versionId);onboarding.createForAcknowledgement(caseId,versionId);}}audit("PROPOSAL_DECIDED",actor,caseId,"ProposalVersion",versionId.toString(),decision,"SUCCESS",null);return proposal(versionId);}
+    @Transactional(noRollbackFor=ApiException.class) public ProposalView decideProposal(UUID caseId,UUID versionId,ProposalDecisionRequest request){var actor=authority.authorize(Permission.PATIENT_DECIDE,Resource.ofCase(caseId));ensureProposalBelongs(caseId,versionId);ProposalView view=proposal(versionId);if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal version can no longer be decided");Instant now=clock.instant();if(view.validUntil()!=null&&!view.validUntil().isAfter(now)){expireProposal(caseId,versionId);throw new ApiException(410,"PROPOSAL_EXPIRED","This proposal has expired");}validateSelectedOptionalItems(versionId,request.selectedOptionalItemIds());String decision=request.decision();boolean acceptish="ACCEPTED".equals(decision)||"ACKNOWLEDGED".equals(decision);String versionStatus=acceptish?"ACCEPTED":("DECLINED".equals(decision)?"DECLINED":"REVISION_REQUESTED");if(acceptish&&isFinalQuote(versionId))requireFinalQuoteAcceptable(caseId,versionId,now,actor.subject(),actor.label());int decided=proposalVersions.decide(versionId,versionStatus);if(decided!=1)throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal version can no longer be decided");work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Superseded — the patient decided");UUID id=UUID.randomUUID();proposalDecisions.saveAndFlush(new ProposalDecision(id,versionId,actor.subject(),request.decision(),request.selectedOptionalItemIds()==null?null:request.selectedOptionalItemIds().toString(),request.comment(),actor.authenticatedAt(),now));shareTokens.revokeForVersion(versionId,micros(now));if(!isFinalQuote(versionId)){transitionWithoutVersion(caseId,versionStatus,"Patient proposal decision",actor);if(acceptish){onProposalAccepted(caseId);payment.createDepositForAcknowledgement(caseId,versionId);onboarding.createForAcknowledgement(caseId,versionId);}}audit("PROPOSAL_DECIDED",actor,caseId,"ProposalVersion",versionId.toString(),decision,"SUCCESS",null);return proposal(versionId);}
     /**
      * A decision the owning coordinator records for the patient after going through the terms with them in Arabic
      * ({@link ProposalAssistanceService} authorizes and validates first). The state change is exactly the patient's own:
@@ -733,6 +738,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         if(releasedAt!=null&&request.conversationAt().isBefore(releasedAt))throw new ApiException(400,"CONVERSATION_BEFORE_RELEASE","The conversation time is before this proposal was sent to the patient");
         String decision=request.decision();boolean acceptish="ACCEPTED".equals(decision)||"ACKNOWLEDGED".equals(decision);
         String versionStatus=acceptish?"ACCEPTED":("DECLINED".equals(decision)?"DECLINED":"REVISION_REQUESTED");
+        if(acceptish&&isFinalQuote(versionId))requireFinalQuoteAcceptable(caseId,versionId,now,actor.subject(),actor.label());
         int decided=proposalVersions.decide(versionId,versionStatus);if(decided!=1)throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal version can no longer be decided");
         String comment=hasText(request.comment())?request.comment().trim():null;
         proposalDecisions.saveAndFlush(new ProposalDecision(UUID.randomUUID(),versionId,"COORDINATOR_RECORDED",decision,null,comment,actor.authenticatedAt(),now)
@@ -782,22 +788,31 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         if(locked!=null){marginRate=locked.rate();policyId=locked.policyId();policyVersion=locked.policyVersion();}
         else{String careArea=cases.findCareCategory(caseId).orElse(null);var pol=commercialPolicy.activePolicyFor(careArea);marginRate=pol!=null?pol.marginRate():BigDecimal.ZERO;policyId=pol!=null?pol.id():null;policyVersion=pol!=null?pol.version():null;if(pol==null)requiresFinance=true;}
         {java.time.LocalDate gateDate=java.time.LocalDate.now(clock);var bandPolicy=commercialPolicy.activePolicyFor(cases.findCareCategory(caseId).orElse(null));BigDecimal manualBand=bandPolicy!=null?bandPolicy.manualBandEgp():null;requiresFinance=requiresFinance||items.stream().anyMatch(i->lineNeedsFinance(i.requiresFinance(),i.catalogServiceId(),i.facilityPackageId(),i.priceEgp(),manualBand,gateDate));}
-        BigDecimal markup=BigDecimal.ONE.add(marginRate);
-        record ItemCalc(String description,String source,UUID catalogServiceId,BigDecimal providerEgp,BigDecimal incExp,BigDecimal incMin,BigDecimal incMax,BigDecimal displayUnit,UUID facilityPackageId){}
-        List<ItemCalc> calc=new ArrayList<>();BigDecimal providerNet=BigDecimal.ZERO,pMin=BigDecimal.ZERO,pExp=BigDecimal.ZERO,pMax=BigDecimal.ZERO;
-        for(EstRow it:items){BigDecimal e=it.priceEgp();BigDecimal mn=it.priceEgpMin()==null?e:it.priceEgpMin();BigDecimal mx=it.priceEgpMax()==null?e:it.priceEgpMax();
-            BigDecimal ie=e.multiply(markup).setScale(2,java.math.RoundingMode.HALF_UP),imn=mn.multiply(markup).setScale(2,java.math.RoundingMode.HALF_UP),imx=mx.multiply(markup).setScale(2,java.math.RoundingMode.HALF_UP);
-            calc.add(new ItemCalc(it.description(),lineSource(it.catalogServiceId(),it.facilityPackageId()),it.catalogServiceId(),e,ie,imn,imx,ie.multiply(rate).setScale(2,java.math.RoundingMode.HALF_UP),it.facilityPackageId()));
-            providerNet=providerNet.add(e);pMin=pMin.add(imn);pExp=pExp.add(ie);pMax=pMax.add(imx);}
-        BigDecimal marginAmount=providerNet.multiply(marginRate).setScale(2,java.math.RoundingMode.HALF_UP);
+        List<ProposalPricing.ProviderLine> providerLines=items.stream().map(i->ProposalPricing.ProviderLine.of(i.priceEgp(),i.priceEgpMin(),i.priceEgpMax())).toList();
+        ProposalPricing.Totals priced=ProposalPricing.of(providerLines,marginRate);
+        BigDecimal providerNet=priced.providerExpected(),marginAmount=priced.feeExpected();
+        // P1-10 (B-05): the policy's validity runs from release; the coordinator may ask for an earlier end, never a later one.
+        int validityDays=quoteValidityDays(caseId);
+        if(request.validUntil()!=null&&request.validUntil().isAfter(clock.instant().plus(Duration.ofDays(validityDays))))
+            throw new ApiException(400,"QUOTE_VALIDITY_TOO_LONG","A final quote stays open at most "+validityDays+" days after it is sent; choose an earlier date or leave it empty");
+        // P1-10 (A-08), the no-surprise cap: compared in EGP (provider lines plus the fee), so a currency move can never count as a
+        // scope change and a scope change can never hide behind one. Above the accepted estimate's maximum only with the reason.
+        BigDecimal estimateMaximum=proposalVersions.findAcceptedEstimateMaximum(caseId,Limit.of(1)).stream().findFirst()
+            .or(()->proposalVersions.findLatestEstimateMaximum(caseId,Limit.of(1)).stream().findFirst()).orElse(null);
+        boolean aboveMaximum=estimateMaximum!=null&&priced.patientExpected().compareTo(estimateMaximum)>0;
+        String scopeChangeReason=hasText(request.scopeChangeReason())?request.scopeChangeReason().trim():null;
+        if(aboveMaximum&&scopeChangeReason==null)
+            throw new ApiException(409,"SCOPE_CHANGE_REASON_REQUIRED","This final quote is above the maximum of the estimate the patient accepted; record the Consultant's reason for the change in treatment, which the patient will see");
         UUID proposalId=proposalRecords.findIdByCaseId(caseId).orElseThrow();
         int version=nextProposalVersion(proposalId);UUID versionId=UUID.randomUUID();Instant now=clock.instant();
         proposalVersions.supersedeLiveFinalQuotes(proposalId,micros(now));
         String includedServices=items.stream().map(EstRow::description).collect(java.util.stream.Collectors.joining("; "));
-        createVersion(new ProposalVersion.Document(proposalId,version,"FINAL_TREATMENT_QUOTE",request.scopeChangeReason(),"en",request.clinicalReviewId()),versionId,new ProposalVersion.Terms(null,displayCurrency,includedServices,request.excludedServices(),request.paymentTerms(),request.refundTerms(),request.disclaimers(),request.coordinatorNotes(),request.validUntil()),new ProposalVersion.Pricing(requiresFinance,providerNet,policyId,policyVersion,marginRate,marginAmount,pMin,pExp,pMax),actor.subject(),now);
-        for(int o=0;o<calc.size();o++){ItemCalc it=calc.get(o);proposalItems.saveAndFlush(ProposalItem.medical(versionId,it.description(),it.displayUnit(),o,it.source(),new ProposalItem.Prices(it.incExp(),it.providerEgp(),it.incMin(),it.incMax()),it.catalogServiceId(),it.facilityPackageId()));}
+        createVersion(new ProposalVersion.Document(proposalId,version,"FINAL_TREATMENT_QUOTE",scopeChangeReason,"en",request.clinicalReviewId()),versionId,new ProposalVersion.Terms(null,displayCurrency,includedServices,request.excludedServices(),request.paymentTerms(),request.refundTerms(),request.disclaimers(),request.coordinatorNotes(),request.validUntil()),new ProposalVersion.Pricing(requiresFinance,providerNet,policyId,policyVersion,marginRate,marginAmount,priced.patientMin(),priced.patientExpected(),priced.patientMax()),actor.subject(),now);
+        saveLines(versionId,items.stream().map(i->new PricedLine(i.description(),lineSource(i.catalogServiceId(),i.facilityPackageId()),i.catalogServiceId(),i.facilityPackageId())).toList(),providerLines,priced,rate);
+        if(aboveMaximum)proposalVersions.markAboveEstimateMaximum(versionId);
         proposalRecords.advanceTo(proposalId,version,micros(now));
-        audit("FINAL_QUOTE_CREATED",actor,caseId,"ProposalVersion",versionId.toString(),"CREATE","SUCCESS",null);return proposal(versionId);
+        audit("FINAL_QUOTE_CREATED",actor,caseId,"ProposalVersion",versionId.toString(),"CREATE","SUCCESS",
+            aboveMaximum?"aboveEstimateMaximum=true; expectedEgp="+priced.patientExpected()+"; estimateMaximumEgp="+estimateMaximum:null);return proposal(versionId);
     }
     @Transactional public ProposalView releaseFinalQuote(UUID caseId,UUID versionId){
         var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));requireState(caseId,"ARRIVAL_CONFIRMED");ensureProposalBelongs(caseId,versionId);
@@ -805,6 +820,10 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         ProposalView view=proposal(versionId);if(!Set.of("CLINICALLY_APPROVED","FINANCE_APPROVED").contains(view.status()))throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Final quote is not ready for release");
         if(requiresFinanceApproval(versionId)&&!"FINANCE_APPROVED".equals(view.status()))throw new ApiException(409,"FINANCE_APPROVAL_REQUIRED","Finance must approve the manually-priced services before release");
         Instant now=clock.instant();String snapCurrency=view.currency();BigDecimal fxRate;String fxSource;java.time.LocalDate fxDate=java.time.LocalDate.now(clock);
+        // P1-10 (B-05): validity is fixed now: the policy's days from release, or the coordinator's earlier date; never later.
+        Instant policyEnd=now.plus(Duration.ofDays(quoteValidityDays(caseId)));
+        Instant validUntil=view.validUntil()!=null&&view.validUntil().isBefore(policyEnd)?view.validUntil():policyEnd;
+        if(!validUntil.isAfter(now))throw new ApiException(409,"QUOTE_VALIDITY_PASSED","The date this final quote was to stay open until has passed; prepare it again with a later date");
         // Same rule as the preliminary estimate: no snapshot rate, no release.
         if(snapCurrency==null||com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(snapCurrency)){fxRate=BigDecimal.ONE;fxSource="BASE";}
         else{fxRate=currency.effectiveRate(snapCurrency,fxDate);fxSource="SNAPSHOT";}
@@ -812,6 +831,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         String html=renderProposal(proposal(versionId));
         int changed=proposalVersions.release(versionId,List.of("CLINICALLY_APPROVED","FINANCE_APPROVED"),actor.subject(),html,fxRate,fxDate,fxSource,micros(now));
         if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Final quote changed before release");
+        proposalVersions.limitValidity(versionId,micros(validUntil));
         mintShareAndNotify(caseId,versionId,view.language()==null?"en":view.language(),"final-quote-ready","FINAL_QUOTE_READY","final-quote-ready:"+versionId);
         // The macro case intentionally stays ARRIVAL_CONFIRMED; the final quote is a commercial sub-workflow.
         audit("FINAL_QUOTE_RELEASED",actor,caseId,"ProposalVersion",versionId.toString(),"RELEASE","SUCCESS",null);return proposal(versionId);
@@ -819,9 +839,80 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     private void mintShareAndNotify(UUID caseId,UUID versionId,String lang,String templateKey,String notificationType,String idemKey){
         Instant now=clock.instant();
         shareTokens.revokeOpenForCase(caseId,micros(now));
-        String token=randomToken();shareTokens.saveAndFlush(new ProposalShareToken(UUID.randomUUID(),versionId,caseId,intake.hash(token),now.plus(Duration.ofDays(14)),now));
+        // P1-10 (B-05): a final quote's link lives no longer than the quote itself.
+        Instant expires=now.plus(Duration.ofDays(14));
+        if(isFinalQuote(versionId)){Instant until=proposal(versionId).validUntil();if(until!=null&&until.isBefore(expires))expires=until;}
+        String token=randomToken();shareTokens.saveAndFlush(new ProposalShareToken(UUID.randomUUID(),versionId,caseId,intake.hash(token),expires,now));
         Contact contact=proposalContact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination=channel.equals("WHATSAPP")?contact.whatsapp():contact.email();
         if(hasText(destination))notificationOutbox.enqueueOnce(notificationType, channel, destination, templateKey, intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+lang+"\"}"), idemKey, now);
+    }
+    // --- P1-10: acceptance rules of a final quote (cooling period A-08, FX band B-05) and Finance's re-approval ---
+    static final String FX_REAPPROVAL_WORK="FX_REAPPROVAL";
+    private int quoteValidityDays(UUID caseId){var p=commercialPolicy.activePolicyFor(cases.findCareCategory(caseId).orElse(null));return p!=null?p.quoteValidityDays():com.rehletshifaa.journey.domain.CommercialPolicy.DEFAULT_FINAL_QUOTE_VALIDITY_DAYS;}
+    private BigDecimal fxTolerance(UUID caseId){var p=commercialPolicy.activePolicyFor(cases.findCareCategory(caseId).orElse(null));return p!=null?p.fxTolerance():com.rehletshifaa.journey.domain.CommercialPolicy.DEFAULT_FX_TOLERANCE_RATE;}
+    private static ApiException fxReapprovalRequired(){return new ApiException(409,"FX_REAPPROVAL_REQUIRED","The exchange rate has moved since your quote was prepared, so our Finance team is checking it. We will contact you shortly; there is nothing you need to do.");}
+    /**
+     * Whether a released final quote may be accepted now, on every decision path (signed in, secure link, recorded by the coordinator):
+     * <ul>
+     *   <li>A-08: above the accepted estimate's maximum, not before 24 hours after release ({@code COOLING_PERIOD}, with the time it opens);</li>
+     *   <li>B-05: in a currency other than EGP, the total re-priced at today's rate must stay within the policy's band of the frozen total,
+     *       in either direction. Outside it (or with no rate today) acceptance pauses: one Finance work item opens and the request is
+     *       recorded on the version ({@code FX_REAPPROVAL_REQUIRED}). Callers do not roll back on ApiException, so the pause persists.
+     *       Once Finance confirms the frozen rate, acceptance proceeds at it without a new check.</li>
+     * </ul>
+     */
+    private void requireFinalQuoteAcceptable(UUID caseId,UUID versionId,Instant now,String actorSubject,String actorLabel){
+        var terms=proposalVersions.findAcceptanceTerms(versionId).orElseThrow(()->new ApiException(404,"PROPOSAL_NOT_FOUND","Proposal version was not found"));
+        if(Boolean.TRUE.equals(terms.getAboveEstimateMaximum())&&terms.getReleasedAt()!=null){
+            Instant opens=terms.getReleasedAt().plus(ProposalQueryService.FINAL_QUOTE_COOLING_PERIOD);
+            if(now.isBefore(opens))throw new ApiException(409,"COOLING_PERIOD","Your treatment plan changed after your Consultant examined you, so you have at least 24 hours to decide. You can accept this quote from "+opens+".");
+        }
+        String quoted=terms.getCurrency();
+        if(quoted==null||com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(quoted)||"CONFIRMED".equals(terms.getFxReapprovalStatus()))return;
+        if("PENDING".equals(terms.getFxReapprovalStatus()))throw fxReapprovalRequired();
+        if(terms.getFxRate()==null)throw new ApiException(409,"PROPOSAL_FX_SNAPSHOT_MISSING","This proposal has no exchange-rate snapshot and cannot be accepted");
+        BigDecimal todayRate=null;
+        try{todayRate=currency.effectiveRate(quoted,java.time.LocalDate.now(clock));}catch(ApiException e){/* no rate today: Finance decides */}
+        BigDecimal band=fxTolerance(caseId);BigDecimal frozen=proposalQueries.displayTotals(versionId,terms.getFxRate()).expected();BigDecimal current=null;
+        if(todayRate!=null){current=proposalQueries.displayTotals(versionId,todayRate).expected();
+            if(frozen.signum()==0||current.subtract(frozen).abs().compareTo(frozen.multiply(band))<=0)return;}
+        if(proposalVersions.requestFxReapproval(versionId,todayRate,micros(now))==1){
+            work.openWorkItem(new NewWorkItem(caseId,FX_REAPPROVAL_WORK,"Re-approve the final quote's exchange rate",
+                "The patient tried to accept their final quote in "+quoted+", but at today's rate its total moves outside the "+band.movePointRight(2).stripTrailingZeros().toPlainString()
+                    +"% band. Confirm the frozen rate (the patient's acceptance then proceeds at it) or re-release the quote at today's rate.",
+                null,"FINANCE",true,null,"SYSTEM","FINAL_QUOTE_FX_REAPPROVAL","fx-reapproval:"+versionId+":"+now.toEpochMilli(),true));
+            auditTrail.event("FINAL_QUOTE_FX_REAPPROVAL_REQUESTED").actor(actorSubject,actorLabel).caseId(caseId).entity("ProposalVersion",versionId.toString()).action("PAUSE_ACCEPTANCE").outcome("SUCCESS")
+                .reason("currency="+quoted+"; frozenRate="+terms.getFxRate()+"; todayRate="+todayRate+"; frozenTotal="+frozen+"; todayTotal="+current+"; band="+band).record();
+        }
+        throw fxReapprovalRequired();
+    }
+    /** Finance keeps the rate frozen at release; the patient's next acceptance proceeds at it. */
+    @Transactional public ProposalView confirmFinalQuoteFxRate(UUID caseId,UUID versionId){
+        var actor=authority.authorize(Permission.FINANCE_SETTLE,Resource.ofCase(caseId));ensureProposalBelongs(caseId,versionId);
+        if(!isFinalQuote(versionId))throw new ApiException(409,"NOT_A_FINAL_QUOTE","This version is not a final treatment quote");
+        if(proposalVersions.confirmFxRate(versionId,actor.subject(),micros(clock.instant()))!=1)throw new ApiException(409,"FX_REAPPROVAL_NOT_PENDING","No exchange-rate re-approval is waiting on this quote");
+        work.closeWorkItems(caseId,FX_REAPPROVAL_WORK,"Finance kept the frozen exchange rate");
+        audit("FINAL_QUOTE_FX_RATE_CONFIRMED",actor,caseId,"ProposalVersion",versionId.toString(),"CONFIRM_FX_RATE","SUCCESS",null);return proposal(versionId);
+    }
+    /**
+     * Finance re-releases the final quote at today's rate: the lines and the document are fixed again at the new snapshot (the EGP figures,
+     * the cap and the validity do not change), the old link is replaced and the patient is sent the quote again.
+     */
+    @Transactional public ProposalView repriceFinalQuoteAtTodaysRate(UUID caseId,UUID versionId){
+        var actor=authority.authorize(Permission.FINANCE_SETTLE,Resource.ofCase(caseId));ensureProposalBelongs(caseId,versionId);
+        if(!isFinalQuote(versionId))throw new ApiException(409,"NOT_A_FINAL_QUOTE","This version is not a final treatment quote");
+        var terms=proposalVersions.findAcceptanceTerms(versionId).orElseThrow();
+        if(!"PENDING".equals(terms.getFxReapprovalStatus()))throw new ApiException(409,"FX_REAPPROVAL_NOT_PENDING","No exchange-rate re-approval is waiting on this quote");
+        Instant now=clock.instant();java.time.LocalDate today=java.time.LocalDate.now(clock);
+        BigDecimal rate=currency.effectiveRate(terms.getCurrency(),today);
+        proposalItems.priceAt(versionId,rate);
+        String html=renderProposal(proposal(versionId));
+        if(proposalVersions.repriceAtRate(versionId,rate,today,html,actor.subject(),micros(now))!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Final quote changed before it was re-released");
+        accessChallenges.revokeOpenForCase(caseId,micros(now));
+        ProposalView view=proposal(versionId);
+        mintShareAndNotify(caseId,versionId,view.language()==null?"en":view.language(),"final-quote-ready","FINAL_QUOTE_READY","final-quote-repriced:"+versionId+":"+now.toEpochMilli());
+        work.closeWorkItems(caseId,FX_REAPPROVAL_WORK,"Finance re-released the quote at today's rate");
+        audit("FINAL_QUOTE_REPRICED",actor,caseId,"ProposalVersion",versionId.toString(),"REPRICE","SUCCESS","fxRate="+terms.getFxRate()+" -> "+rate);return view;
     }
     /**
      * A re-issued secure link is a WhatsApp/email message to the patient from the business number, so it follows the

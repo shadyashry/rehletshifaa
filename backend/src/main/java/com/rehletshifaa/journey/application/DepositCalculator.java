@@ -13,7 +13,8 @@ import java.time.LocalDate;
  * The one calculation of the coordination deposit (review 2026-10-14 B-01, owner decision 2026-10-14), used for the
  * deposit itself, the amount the patient is told is due before it exists, and the proposal's "deposit due" line:
  * <ol>
- *   <li>the policy's share (15%) of the patient's medical total, the marked-up Consultant lines, travel excluded;</li>
+ *   <li>the policy's share (15%) of the patient's medical total: the provider lines at their own prices plus the coordination
+ *       and guarantee fee (P1-10, D-A; numerically the marked-up Consultant lines it replaced), travel excluded;</li>
  *   <li>at least the policy's minimum and at most its maximum, both set in US dollars and converted at the
  *       proposal's own exchange-rate date;</li>
  *   <li>never more than the medical total itself;</li>

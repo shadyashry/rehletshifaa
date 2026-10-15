@@ -622,8 +622,9 @@ class SecureJourneyCorrectionsTest {
         var proposal=journey.createProposal(ctx.caseId,draftRequest(approvedReview(ctx.caseId),null));
         assertThat(proposal.currency()).isEqualTo("USD");
         assertThat(proposal.items()).allSatisfy(item->assertThat(item.unitPrice()).isLessThan(new BigDecimal("100000")));
-        // 390000 EGP * 1.15 margin * 0.02 = 8970.00 — line and total agree in the same currency.
-        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("8970.00"));
+        // P1-10 (D-A): 390000 EGP * 0.02 = 7800.00 for the line and the 15% fee 58500 EGP * 0.02 = 1170.00, together the 8970.00 of the old markup.
+        assertThat(proposal.items()).extracting(ProposalItemView::unitPrice).usingElementComparator(BigDecimal::compareTo)
+            .containsExactly(new BigDecimal("7800.00"),new BigDecimal("1170.00"));
     }
 
     @Test void anotherSupportedCurrencyPropagatesJustTheSame() throws Exception {
@@ -698,7 +699,7 @@ class SecureJourneyCorrectionsTest {
 
         jdbc.update("UPDATE fx_rates SET rate=? WHERE quote_currency='USD'",new BigDecimal("0.0500"));
         // The released line is frozen against the snapshotted rate, so the patient price cannot drift.
-        assertThat(jdbc.queryForObject("SELECT unit_price FROM proposal_items WHERE proposal_version_id=?",BigDecimal.class,proposalVersion)).isEqualByComparingTo(frozen);
+        assertThat(jdbc.queryForObject("SELECT unit_price FROM proposal_items WHERE proposal_version_id=? AND category='MEDICAL'",BigDecimal.class,proposalVersion)).isEqualByComparingTo(frozen);
     }
 
     @Test void aCoordinatorCanStillChooseADifferentCurrencyExplicitly() throws Exception {
@@ -898,11 +899,13 @@ class SecureJourneyCorrectionsTest {
     private record ProposalCtx(UUID caseId,UUID versionId,String token,String grant,String statusToken){}
 
     // Fixture numbers (releasedProposal): provider net 390,000 EGP; 12% margin = 46,800 EGP; at 0.02 USD per EGP these
-    // are 7,800 and 936 USD. A margin rate of 0.12 is the policy rate.
+    // are 7,800 and 936 USD. A margin rate of 0.12 is the policy rate. Since P1-10 (D-A, owner 2026-10-15) the patient is shown
+    // the provider's own line price and the coordination and guarantee fee as its own line, so the display figures (7,800 and
+    // 936 USD) are disclosed by design; the EGP base, the rate and every internal commercial field stay forbidden.
     private static final java.util.regex.Pattern COMMERCIAL_KEY=java.util.regex.Pattern.compile(
         "(?i).*(margin|profit|providernet|netcost|net_?egp|financereason|commercialpolicy|policyrate).*");
     private static final List<BigDecimal> COMMERCIAL_VALUES=List.of(
-        new BigDecimal("390000"),new BigDecimal("46800"),new BigDecimal("7800"),new BigDecimal("936"),new BigDecimal("0.12"));
+        new BigDecimal("390000"),new BigDecimal("46800"),new BigDecimal("0.12"));
 
     private void collectCommercialLeaks(String path,com.fasterxml.jackson.databind.JsonNode node,List<String> leaks){
         if(node.isObject()) node.properties().forEach(e->{

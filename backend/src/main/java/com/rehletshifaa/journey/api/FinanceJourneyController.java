@@ -18,4 +18,7 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PostMapping("/cases/{caseId}/messages")public IdResponse message(@PathVariable UUID caseId,@Valid @RequestBody MessageRequest request){return service.message(caseId,request);}
  @PostMapping("/cases/{caseId}/messages/{messageId}/read")public IdResponse read(@PathVariable UUID caseId,@PathVariable UUID messageId){return service.markMessageRead(caseId,messageId);}
  @PostMapping("/cases/{caseId}/proposals/{versionId}/approve")public ProposalView approve(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.approveFinance(caseId,versionId);}
+ /** P1-10 (B-05): answer an exchange-rate re-approval on a final quote: keep the frozen rate, or re-release at today's rate. */
+ @PostMapping("/cases/{caseId}/final-quotes/{versionId}/fx-rate/confirm")public ProposalView confirmFxRate(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.confirmFinalQuoteFxRate(caseId,versionId);}
+ @PostMapping("/cases/{caseId}/final-quotes/{versionId}/fx-rate/reprice")public ProposalView repriceAtTodaysRate(@PathVariable UUID caseId,@PathVariable UUID versionId){return service.repriceFinalQuoteAtTodaysRate(caseId,versionId);}
 }

@@ -85,7 +85,7 @@ class JourneyServiceIntegrationTest {
 
         authenticate("coordinator-subject",Role.COORDINATOR);var proposal=journey.createProposal(created.caseId(),new ProposalDraftRequest(review.id(),"en","Hospital and travel plan","EGP","Clinical review and treatment","Complications and extra nights","Deposit before travel","Provider refund policy","Not procedure-specific consent",Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Treatment package",BigDecimal.ONE,new BigDecimal("1000.00"),false,0)),"Coordinator note"));
         UUID proposalVersionId=proposal.versionId();
-        assertThat(proposal.items()).singleElement().satisfies(item->assertThat(item.description()).isEqualTo("Consultant treatment package"));
+        assertThat(proposal.items()).extracting(ProposalItemView::description).containsExactly("Consultant treatment package","Coordination and guarantee fee"); // P1-10: the fee is its own last line
         var operationsAssignment=journey.assign(created.caseId(),new AssignmentRequest("operations-subject","OPERATIONS","PRIMARY","cardiac-pod","Travel and hospital planning"));
         var financeAssignment=journey.assign(created.caseId(),new AssignmentRequest("finance-subject","FINANCE","PRIMARY","cardiac-pod","Commercial approval"));
         authenticate("operations-subject",Role.OPERATIONS);journey.decideAssignment(created.caseId(),operationsAssignment.id(), new AssignmentDecisionRequest(true,null), com.rehletshifaa.authority.domain.Role.OPERATIONS);
@@ -326,10 +326,11 @@ class JourneyServiceIntegrationTest {
         authenticate("coordinator-subject",Role.COORDINATOR);
         var proposal=journey.createProposal(created.caseId(),new ProposalDraftRequest(review.id(),"en","Consultation only","USD","Consultation","None","Deposit","Refund","Consent",Instant.now().plusSeconds(86400),List.of(new ProposalItemRequest("MEDICAL","Consultation",BigDecimal.ONE,new BigDecimal("3500.00"),false,0)),null));
         assertThat(proposal.currency()).isEqualTo("USD");
-        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("80.50")); // 3500 EGP * 1.15 margin * 0.02 fx
+        // P1-10: 3500 EGP * 0.02 = 70.00 and the 15% fee 525 EGP * 0.02 = 10.50, together the 80.50 of the old markup.
+        assertThat(proposal.items()).extracting(ProposalItemView::unitPrice).usingElementComparator(BigDecimal::compareTo).containsExactly(new BigDecimal("70.00"),new BigDecimal("10.50"));
         proposal=journey.releaseProposal(created.caseId(),proposal.versionId());
         assertThat(proposal.status()).isEqualTo("RELEASED");
-        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("80.50")); // frozen: 3500 * 1.15 * 0.02
+        assertThat(proposal.items()).extracting(ProposalItemView::unitPrice).usingElementComparator(BigDecimal::compareTo).containsExactly(new BigDecimal("70.00"),new BigDecimal("10.50")); // frozen at 0.02
     }
 
     @Test void manualNoTravelRequiresFinanceFromClinicallyApprovedAndGatesReflectIt()throws Exception{
@@ -393,9 +394,10 @@ class JourneyServiceIntegrationTest {
         assertThat(new BigDecimal(pv.get("margin_amount_egp").toString())).isEqualByComparingTo("1500.00");
         assertThat(new BigDecimal(pv.get("patient_total_expected_egp").toString())).isEqualByComparingTo("11500.00");
         assertThat(pv.get("commercial_policy_id")).isNotNull();
-        // The patient-facing item price is the inclusive amount (margin baked in), not the provider price.
+        // P1-10 (D-A): the medical line carries the provider's own price and the margin is the disclosed coordination and guarantee fee.
         var proposal=journey.workspace(created.caseId()).proposal();
-        assertThat(proposal.items()).singleElement().satisfies(i->assertThat(i.unitPrice()).isEqualByComparingTo("11500.00"));
+        assertThat(proposal.items()).extracting(ProposalItemView::category).containsExactly("MEDICAL","PLATFORM_FEE");
+        assertThat(proposal.items()).extracting(ProposalItemView::unitPrice).usingElementComparator(BigDecimal::compareTo).containsExactly(new BigDecimal("10000.00"),new BigDecimal("1500.00"));
     }
 
     private UUID arriveWithDoctor(String name,String phone,String email)throws Exception{

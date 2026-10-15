@@ -2,7 +2,6 @@ package com.rehletshifaa.journey.infrastructure;
 
 import com.rehletshifaa.journey.domain.ProposalItem;
 import com.rehletshifaa.shared.persistence.BaseRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -34,8 +33,16 @@ public interface ProposalItemRepository extends BaseRepository<ProposalItem, UUI
 
     boolean existsByIdAndProposalVersionIdAndOptionalTrue(UUID id, UUID proposalVersionId);
 
-    /** Fixes the display unit prices at the release rate (EGP-priced lines only). */
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("update ProposalItem i set i.unitPrice = round(i.unitPriceEgp * :rate, 2) where i.proposalVersionId = :versionId and i.unitPriceEgp is not null")
-    int priceAt(@Param("versionId") UUID versionId, @Param("rate") BigDecimal rate);
+    java.util.List<ProposalItem> findByProposalVersionId(UUID proposalVersionId);
+
+    /**
+     * Fixes the display unit prices at the release rate (EGP-priced lines only). Computed in Java: a JPQL {@code round(unitPriceEgp * :rate, 2)}
+     * binds the rate as a scale-2 decimal on H2, so a rate such as 0.0204 priced the lines at 0.02 (found in P1-10).
+     */
+    default int priceAt(UUID versionId, BigDecimal rate) {
+        var lines = findByProposalVersionId(versionId);
+        lines.forEach(line -> line.priceAt(rate));
+        saveAllAndFlush(lines);
+        return lines.size();
+    }
 }

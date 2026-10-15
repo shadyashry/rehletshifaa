@@ -12,6 +12,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "proposal_items")
 public class ProposalItem extends AssignedIdEntity {
+    public static final String MEDICAL = "MEDICAL";
+    public static final String PLATFORM_FEE = "PLATFORM_FEE";
     @Column(name = "proposal_version_id", nullable = false) private UUID proposalVersionId;
     @Column(nullable = false, length = 40) private String category;
     @Column(nullable = false, length = 500) private String description;
@@ -44,11 +46,29 @@ public class ProposalItem extends AssignedIdEntity {
     public static ProposalItem medical(UUID proposalVersionId, String description, BigDecimal displayUnitPrice, int sortOrder, String source,
                                        Prices prices, UUID catalogServiceId, UUID facilityPackageId) {
         ProposalItem i = new ProposalItem(UUID.randomUUID());
-        i.proposalVersionId = proposalVersionId; i.category = "MEDICAL"; i.description = description; i.quantity = BigDecimal.ONE;
+        i.proposalVersionId = proposalVersionId; i.category = MEDICAL; i.description = description; i.quantity = BigDecimal.ONE;
         i.unitPrice = displayUnitPrice; i.sortOrder = sortOrder; i.source = source; i.unitPriceEgp = prices.unitPriceEgp();
         i.providerPriceEgp = prices.providerPriceEgp(); i.unitPriceMinEgp = prices.unitPriceMinEgp(); i.unitPriceMaxEgp = prices.unitPriceMaxEgp();
         i.catalogServiceId = catalogServiceId; i.facilityPackageId = facilityPackageId;
         return i;
+    }
+
+    /**
+     * P1-10 (D-A, owner 2026-10-15): the platform's disclosed coordination and guarantee fee, one mandatory line per version; the
+     * provider is paid nothing from it, so its provider price is zero.
+     */
+    public static ProposalItem platformFee(UUID proposalVersionId, String description, BigDecimal displayUnitPrice, int sortOrder,
+                                           BigDecimal feeEgp, BigDecimal feeMinEgp, BigDecimal feeMaxEgp) {
+        ProposalItem i = new ProposalItem(UUID.randomUUID());
+        i.proposalVersionId = proposalVersionId; i.category = PLATFORM_FEE; i.description = description; i.quantity = BigDecimal.ONE;
+        i.unitPrice = displayUnitPrice; i.sortOrder = sortOrder; i.source = "PLATFORM"; i.unitPriceEgp = feeEgp;
+        i.providerPriceEgp = BigDecimal.ZERO; i.unitPriceMinEgp = feeMinEgp; i.unitPriceMaxEgp = feeMaxEgp;
+        return i;
+    }
+
+    /** Fixes the display unit price at the release rate (units of the quote currency per EGP); a line without an EGP price keeps its own. */
+    public void priceAt(BigDecimal displayPerEgp) {
+        if (unitPriceEgp != null) unitPrice = unitPriceEgp.multiply(displayPerEgp).setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     private ProposalItem(UUID id) { super(id); }
