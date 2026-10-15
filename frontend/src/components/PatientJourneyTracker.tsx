@@ -2,7 +2,10 @@
 
 import { Check } from "lucide-react";
 
-import type { Locale } from "@/lib/i18n";
+import type { Dictionary } from "@/lib/dictionary";
+
+/** The status link's journey words, from messages/{en,ar}.json (`secureLink.journey`), passed by the server page. */
+export type JourneyCopy = Dictionary["secureLink"]["journey"];
 
 /**
  * The patient's view of their case journey, shared by the signed-in portal and the secure no-login
@@ -10,13 +13,7 @@ import type { Locale } from "@/lib/i18n";
  * are mapped to these on the server or in the portal, and never rendered directly.
  */
 export const PATIENT_PHASES = [
-  { key: "received", en: "Case received", ar: "استلمنا حالتك" },
-  { key: "coordinator", en: "Coordinator review", ar: "مراجعة المنسق" },
-  { key: "consultant", en: "Consultant review", ar: "مراجعة الاستشاري" },
-  { key: "proposal", en: "Your proposal", ar: "عرضك" },
-  { key: "deposit", en: "Coordination deposit", ar: "وديعة التنسيق" },
-  { key: "treatment", en: "Treatment", ar: "العلاج" },
-  { key: "followup", en: "Follow-up", ar: "المتابعة" },
+  { key: "received" }, { key: "coordinator" }, { key: "consultant" }, { key: "proposal" }, { key: "deposit" }, { key: "treatment" }, { key: "followup" },
 ] as const;
 
 export type PatientPhase = (typeof PATIENT_PHASES)[number]["key"];
@@ -26,15 +23,9 @@ export function phasePosition(phase?: string | null) {
   return index < 0 ? 0 : index;
 }
 
-export function phaseLabel(phase: string | null | undefined, locale: Locale) {
-  const entry = PATIENT_PHASES[phasePosition(phase)];
-  return locale === "ar" ? entry.ar : entry.en;
-}
-
-export function PatientJourneyTracker({ locale, phase, waitingOnPatient = false, label }: {
-  locale: Locale; phase?: string | null; waitingOnPatient?: boolean; label: string;
+export function PatientJourneyTracker({ copy, phase, waitingOnPatient = false, label }: {
+  copy: JourneyCopy; phase?: string | null; waitingOnPatient?: boolean; label: string;
 }) {
-  const ar = locale === "ar";
   const current = phasePosition(phase);
   return (
     <section aria-label={label} className="card p-4 sm:p-5">
@@ -43,7 +34,7 @@ export function PatientJourneyTracker({ locale, phase, waitingOnPatient = false,
           const done = index < current, now = index === current;
           const tone = done ? "text-ink-600" : now ? (waitingOnPatient ? "text-status-warning-fg" : "text-brand-900") : "text-ink-400";
           return (
-            <li key={entry.key} className="flex items-start gap-2.5 sm:flex-1 sm:flex-col sm:items-center sm:gap-2 sm:text-center">
+            <li key={entry.key} aria-current={now ? "step" : undefined} className="flex items-start gap-2.5 sm:flex-1 sm:flex-col sm:items-center sm:gap-2 sm:text-center">
               <span aria-hidden className="relative flex h-5 w-5 flex-none items-center justify-center sm:w-full">
                 <span className="absolute inset-x-0 top-1/2 hidden h-px -translate-y-1/2 bg-line sm:block"/>
                 <span className={`relative z-10 grid h-5 w-5 place-items-center rounded-full ${
@@ -54,7 +45,7 @@ export function PatientJourneyTracker({ locale, phase, waitingOnPatient = false,
                 </span>
               </span>
               <span className={`text-[0.8rem] leading-5 ${now ? "font-bold" : "font-medium"} ${tone}`}>
-                {ar ? entry.ar : entry.en}
+                {copy.phases[entry.key]}
               </span>
             </li>
           );
@@ -65,65 +56,21 @@ export function PatientJourneyTracker({ locale, phase, waitingOnPatient = false,
 }
 
 /**
+ * P1-6 (D-02): what the patient can usefully do while the team has the step, per phase; nothing while they owe the step
+ * themselves, or once the journey is in follow-up.
+ */
+export function phaseMeanwhile(phase: string | null | undefined, actionRequired: boolean, copy: JourneyCopy): string | null {
+  if (actionRequired || !phase) return null;
+  return (copy.meanwhile as Record<string, string>)[phase] ?? null;
+}
+
+/**
  * What is happening and what comes next, keyed by phase so the secure link can explain the case without
  * ever receiving an internal status. Deliberately says nothing about who is handling it: this page is
  * reached with a one-time code rather than a sign-in.
  */
-/**
- * P1-6 (D-02): what the patient can usefully do while the team has the step, per phase; nothing while they owe the step
- * themselves, or once the journey is in follow-up.
- */
-export function phaseMeanwhile(phase: string | null | undefined, actionRequired: boolean, locale: Locale): string | null {
-  if (actionRequired) return null;
-  const copy: Record<string, { en: string; ar: string }> = {
-    received: { en: "Gather any recent reports, scans or prescriptions you have, in case your coordinator asks for them.", ar: "اجمع ما لديك من تقارير أو صور أشعة أو وصفات حديثة، فقد يطلبها منسّقك." },
-    coordinator: { en: "Keep your recent reports to hand, and message your coordinator if anything about your condition changes.", ar: "احتفظ بتقاريرك الحديثة في متناول يدك، وراسل منسّقك إن تغيّر شيء في حالتك." },
-    consultant: { en: "Keep following your own doctor's advice, and tell your coordinator if your symptoms change.", ar: "واصل اتباع نصائح طبيبك، وأخبر منسّقك إن تغيّرت أعراضك." },
-    proposal: { en: "Check that your passport is valid and think about who would travel with you.", ar: "تأكّد من صلاحية جواز سفرك، وفكّر فيمن سيرافقك في السفر." },
-    treatment: { en: "Keep your passport and phone to hand; your coordinator will message you with dates.", ar: "احتفظ بجواز سفرك وهاتفك في متناول يدك؛ سيراسلك منسّقك بالمواعيد." },
-  };
-  const entry = phase ? copy[phase] : undefined;
-  return entry ? (locale === "ar" ? entry.ar : entry.en) : null;
-}
-
-export function phaseExplanation(phase: string | null | undefined, actionRequired: boolean, locale: Locale) {
-  const ar = locale === "ar";
-  if (actionRequired) return {
-    title: ar ? "نحتاج منك معلومة" : "We need something from you",
-    body: ar ? "طلب منسقك ما يلي لمتابعة حالتك." : "Your coordinator has asked for the following so your case can continue.",
-    next: ar ? "بعد إرسالها، يراجعها منسقك ويكمل الخطوة التالية." : "Once you send it, your coordinator reviews it and continues.",
-  };
-  const copy: Record<string, { en: [string, string, string?]; ar: [string, string, string?] }> = {
-    received: {
-      en: ["We have your case", "Your case has been received and is waiting for a coordinator to look at it.", "A coordinator will check what you sent and tell you if anything is missing."],
-      ar: ["استلمنا حالتك", "تم استلام حالتك وهي بانتظار مراجعة أحد المنسقين.", "سيتحقق المنسق مما أرسلته ويخبرك إن كان ينقص شيء."],
-    },
-    coordinator: {
-      en: ["Your coordinator is reviewing your case", "Your coordinator is going through what you sent and preparing it for a Consultant.", "Your case will be sent to a Consultant in the right specialty."],
-      ar: ["منسقك يراجع حالتك", "يطّلع منسقك على ما أرسلته ويجهّزه لعرضه على استشاري.", "ستُرسل حالتك إلى استشاري في التخصص المناسب."],
-    },
-    consultant: {
-      en: ["A Consultant is reviewing your case", "A Consultant is going through your reports and history now.", "You will receive a recommendation and an initial cost estimate."],
-      ar: ["استشاري يراجع حالتك", "يطّلع الاستشاري الآن على تقاريرك وتاريخك الطبي.", "ستصلك التوصية مع تقدير أولي للتكلفة."],
-    },
-    proposal: {
-      en: ["Your proposal", "Your treatment plan and its estimated cost are being prepared, or are ready for you to review.", "Take the time you need. Nothing happens until you decide."],
-      ar: ["عرضك", "يجري تجهيز خطة علاجك وتكلفتها التقديرية، أو أنها جاهزة لمراجعتك.", "خذ وقتك. لن يحدث شيء قبل أن تقرر."],
-    },
-    deposit: {
-      en: ["We are waiting for the coordination deposit", "Your coordinator will share the payment details and confirm it once received.", "Once confirmed, your coordinator starts arranging your treatment."],
-      ar: ["بانتظار وديعة التنسيق", "سيشارك منسقك تفاصيل الدفع ويؤكد الاستلام.", "بعد التأكيد، يبدأ منسقك ترتيب علاجك."],
-    },
-    treatment: {
-      en: ["We are arranging your treatment", "Your coordinator is organising your appointments and arrival.", "You will receive your dates and arrival details."],
-      ar: ["نرتّب علاجك", "ينظّم منسقك مواعيدك وترتيبات وصولك.", "ستصلك المواعيد وتفاصيل الوصول."],
-    },
-    followup: {
-      en: ["You are in follow-up", "We stay in contact while you recover.", undefined],
-      ar: ["أنت في مرحلة المتابعة", "نبقى على تواصل معك أثناء تعافيك.", undefined],
-    },
-  };
-  const entry = copy[phase ?? "received"] ?? copy.received;
-  const [title, body, next] = ar ? entry.ar : entry.en;
-  return { title, body, next };
+export function phaseExplanation(phase: string | null | undefined, actionRequired: boolean, copy: JourneyCopy): { title: string; body: string; next?: string } {
+  if (actionRequired) return copy.needed;
+  const explain = copy.explain as Record<string, { title: string; body: string; next?: string }>;
+  return explain[phase ?? "received"] ?? explain.received;
 }

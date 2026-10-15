@@ -505,3 +505,15 @@ Critique 23/40; plan `plans/patient-portal-file.md` (at the owner gate). In-area
 | Blocked (legal L-6) | `commercial-terms.ts` 41, 68, 81: "your coordinator sends you the payment instructions" contradicts DEP-3 (patient pays the platform account in My Care). Wording for legal. | area 1 critique | `lib/commercial-terms.ts` | legal |
 | Blocked (legal / native) | Arabic `ackShortFinal` ("I understand accepting this offer is a financial agreement") differs in meaning from the English acceptance statement. | area 1 critique | `ProposalSign.tsx` copy | legal, native review |
 | P2 | The portal proposal drawer (`PatientProposal.tsx`) and the proposal link (`ProposalSign.tsx`) are two implementations of one document; converge after area 1. | area 1 plan | both | /impeccable shape |
+
+## Area 1 — slice T, deferred review findings (2026-10-15)
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| LOW | `CONSENT_TEXT` (both languages) and `CaseStatusAccess`'s own `copy` object are still inline in the client bundle; move with slices D and B. | React review | `ProfileActivation.tsx`, `CaseStatusAccess.tsx` | slices B, D |
+| LOW | The status link's "Your proposal" note after acknowledgement still says the coordinator is "arranging the next steps" next to "pay your deposit"; align in slice B. | screenshot review | `CaseStatusAccess.tsx` `proposalAccepted` | slice B (clarify) |
+| LOW | The activation step counter's label is built by joining words ("Step n of m"); one template key with `Intl` numerals. | RTL/i18n | `ProfileActivation.tsx` `Steps` | slice D |
+| LOW | The journey tracker gives screen readers no "completed" text (now has `aria-current`); `PATIENT_PHASES` could be a key tuple. Both go with `CaseJourney`. | web guidelines, React review | `PatientJourneyTracker.tsx` | slice A |
+| LOW | `resolveAction` still separates `NONE` from `CONTINUE_IN_PORTAL` (both now land on the ready page); the local `Deposit` type keeps `amountPaid`. | React review | `ProfileActivation.tsx` | slice D |
+| LOW | Arabic: shadda in «منسّقك» is inconsistent across the moved strings; «وديعة التنسيق» vs "Your coordination deposit". | RTL/i18n | `messages/ar.json` `secureLink` | native review |
+| LOW | Staff fixture `portal-fixture.ts` (assisted path) and the env-gated `my-care-live.spec.ts` still use the retired `WAIT_DEPOSIT_ARRANGEMENT` / "Deposit arrangements"; the live spec needs a run against the tunnel stack to update. | slice T | `e2e/portal-fixture.ts`, `e2e/my-care-live.spec.ts` | area 2 / live run |

@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileUp, LockKeyhole, ShieldCheck, X } from "lucide-react";
 
-import { PatientJourneyTracker, phaseExplanation, phaseMeanwhile } from "@/components/PatientJourneyTracker";
+import { PatientJourneyTracker, phaseExplanation, phaseMeanwhile, type JourneyCopy } from "@/components/PatientJourneyTracker";
 import { plural } from "@/lib/portal-labels";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
+import { localeHref } from "@/lib/links";
 import { EmergencyGuidance } from "@/components/EmergencyGuidance";
 
 type Summary = { caseNumber: string; destinationHint: string };
@@ -89,9 +90,11 @@ const copy = {
  * is exchanged for a short-lived grant first. After that the page shows only what this case's coordinator
  * actually asked for — never the full case form, and never another case.
  */
-export function CaseStatusAccess({ locale, token, emergency }: { locale: Locale; token: string;
+export function CaseStatusAccess({ locale, token, emergency, journeyCopy }: { locale: Locale; token: string;
   /** A-02: the bilingual emergency instruction (common.emergencyNotice), passed by the page so the client bundle carries no dictionary. */
-  emergency?: { title: string; body: string } }) {
+  emergency?: { title: string; body: string };
+  /** The journey's words (secureLink.journey), passed by the page for the same reason. */
+  journeyCopy: JourneyCopy }) {
   const t = copy[locale];
   const notice = emergency ? <EmergencyGuidance title={emergency.title} body={emergency.body} className="mb-6"/> : null;
   const router = useRouter();
@@ -226,11 +229,14 @@ export function CaseStatusAccess({ locale, token, emergency }: { locale: Locale;
   const proposalState = status?.actionRequired ? null : status?.proposal?.state ?? null;
   const explain = proposalState === "READY" ? { title: t.proposalReadyTitle, body: t.proposalReady, next: t.proposalReadyNext }
     : proposalState === "PREPARING" ? { title: t.proposalPreparingTitle, body: t.proposalPreparing, next: t.proposalPreparingNext }
-    : phaseExplanation(status?.phase, !!status?.actionRequired, locale);
+    : phaseExplanation(status?.phase, !!status?.actionRequired, journeyCopy);
+  // DEP-3: in the deposit phase the payment is the patient's own step (paid in My Care), and this link cannot tell whether it
+  // was made: no "nothing needed", no team timing, and one way to My Care.
+  const depositStep = !!status && !status.actionRequired && status.phase === "deposit";
   // P1-6 (D-02): while the team has the step, how long it usually takes and what the patient can do meanwhile.
-  const teamStep = !!status && !status.actionRequired && proposalState !== "READY";
+  const teamStep = !!status && !status.actionRequired && proposalState !== "READY" && !depositStep;
   const usually = teamStep && status?.expectedWorkingDays ? t.usuallyWithin.replace("{duration}", plural(locale, status.expectedWorkingDays, t.workingDays)) : null;
-  const meanwhile = teamStep ? phaseMeanwhile(status?.phase, false, locale) : null;
+  const meanwhile = teamStep ? phaseMeanwhile(status?.phase, false, journeyCopy) : null;
   return (
     <Frame title={t.title} notice={notice}>
       {summary && <p className="mb-5 font-bold text-brand-800">{summary.caseNumber}</p>}
@@ -258,7 +264,8 @@ export function CaseStatusAccess({ locale, token, emergency }: { locale: Locale;
           <h2 id="status-now" className="mt-1 text-[1.05rem] font-bold leading-6 text-brand-900">{explain.title}</h2>
           <p className="mt-1.5 leading-6 text-ink-700">{explain.body}</p>
           {usually && <p className="mt-2 text-[0.9rem] text-ink-700">{usually}</p>}
-          {!status.actionRequired && proposalState !== "READY" && <p className="mt-2 text-[0.9rem] font-semibold text-brand-800">{t.noAction}</p>}
+          {depositStep && <a className="btn-primary mt-4 w-full sm:w-auto" href={`${localeHref(locale, "portal")}?signin=1`}>{journeyCopy.payInMyCare}</a>}
+          {teamStep && <p className="mt-2 text-[0.9rem] font-semibold text-brand-800">{t.noAction}</p>}
           {explain.next && (
             <p className="mt-3 border-t border-brand-200 pt-3 text-[0.88rem] leading-6 text-ink-600">
               <span className="font-bold text-ink-800">{t.next}:</span> {explain.next}
@@ -272,7 +279,7 @@ export function CaseStatusAccess({ locale, token, emergency }: { locale: Locale;
         </section>
 
         <div className="mt-5">
-          <PatientJourneyTracker locale={locale} phase={status.phase} waitingOnPatient={status.actionRequired} label={t.journey}/>
+          <PatientJourneyTracker copy={journeyCopy} phase={status.phase} waitingOnPatient={status.actionRequired || depositStep} label={t.journey}/>
         </div>
 
         <p className="mt-5 text-[0.82rem] text-ink-500">

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { ProfileActivation } from "./ProfileActivation";
+import en from "@/messages/en.json";
+import ar from "@/messages/ar.json";
 
 /**
  * Drives the activation journey through a stubbed API: verify -> prefilled form -> validation errors ->
@@ -26,7 +28,7 @@ const prefill = {
 
 const completed = (account: { status: string; emailHint: string | null; awaitingEmail: boolean; emailSent: boolean } = setupPending, extra: Record<string, unknown> = {}) => ({
   profileActive: true, accountLinked: false, account, caseNumber: "RS-2026-000123", caseStatus: "ACCEPTED", onboardingState: "COMPLETED",
-  currentAction: account.status === "ACTIVE" ? "NONE" : "SET_UP_ACCOUNT", journeyStage: account.status === "ACTIVE" ? "DEPOSIT" : "ACCOUNT_SETUP", waitingOn: "STAFF", deposit, ...extra,
+  currentAction: account.status === "ACTIVE" ? "CONTINUE_IN_PORTAL" : "SET_UP_ACCOUNT", journeyStage: account.status === "ACTIVE" ? "DEPOSIT" : "ACCOUNT_SETUP", waitingOn: "STAFF", deposit, ...extra,
 });
 
 function json(body: unknown, ok = true, status = 200) {
@@ -55,7 +57,7 @@ async function reachForm(overrides: Record<string, () => Promise<Response>> = {}
     "000": () => json(summary),
   });
   vi.stubGlobal("fetch", fetchMock);
-  render(<ProfileActivation locale="en" token="tok-000" />);
+  render(<ProfileActivation locale="en" token="tok-000" copy={en.secureLink.activation} />);
 
   fireEvent.click(await screen.findByRole("button", { name: /send code/i }));
   const code = await screen.findByLabelText(/6-digit code/i);
@@ -84,7 +86,7 @@ describe("ProfileActivation", () => {
 
   it("verifies with a one-time code before any profile data is shown", async () => {
     vi.stubGlobal("fetch", stub({ "000": () => json(summary) }));
-    render(<ProfileActivation locale="en" token="tok-000" />);
+    render(<ProfileActivation locale="en" token="tok-000" copy={en.secureLink.activation} />);
     expect(await screen.findByRole("heading", { name: /confirm it's you/i })).toBeTruthy();
     // Nothing about the patient is on screen until the code is verified.
     expect(screen.queryByDisplayValue("Link")).toBeNull();
@@ -139,7 +141,8 @@ describe("ProfileActivation", () => {
 
   it("explains a representative-submitted case and asks the patient for their own account email", async () => {
     await reachForm({}, { submittedBy: "REPRESENTATIVE", representativeName: "Omar Hassan", representativeRelationship: "PARENT", candidateEmail: null, knownMobile: "+254700000006", mobileOwner: "REPRESENTATIVE" });
-    expect(screen.getByText(/submitted by Omar Hassan \(parent\)/i)).toBeTruthy();
+    // The name is bidi-isolated inside the sentence.
+    expect(screen.getByText(/submitted by ⁨?Omar Hassan⁩? \(parent\)/i)).toBeTruthy();
     expect(screen.queryByRole("radio", { name: /use this email/i })).toBeNull();
     expect(screen.getByLabelText(/^email address/i)).toBeTruthy();
   });
@@ -172,18 +175,43 @@ describe("ProfileActivation", () => {
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/resend-setup"))).toHaveLength(1);
   });
 
-  it("skips account setup for an already-active account and finishes before mentioning any money", async () => {
-    await reachForm({ "/activate": () => json(completed(active)) });
+  it("skips account setup for an already-active account and names the unpaid deposit as the next step, paid in My Care", async () => {
+    const assign = vi.fn();
+    Object.defineProperty(window, "location", { configurable: true, value: { href: "/en/activate/tok-000", assign } });
+    await reachForm({ "/activate": () => json(completed(active)), "/portal-access": () => json({ alreadyLinked: true, account: active, caseId: "case-1" }) });
     await fillRequired();
     submit();
 
     expect(await screen.findByRole("heading", { name: /your profile is ready/i })).toBeTruthy();
-    expect(screen.getByText(/next step/i)).toBeTruthy();
-    expect(screen.queryByText(/3,000/)).toBeNull();
+    expect(screen.getByText("Next step")).toBeTruthy();
+    expect(screen.getByText(/you pay it in My Care, by bank transfer or through an agent/i)).toBeTruthy();
+    // Only what is true is ticked: the deposit is owed, so it is not on the finished list.
+    expect(screen.queryByText("Deposit received")).toBeNull();
+    expect(screen.getByText("Account secured")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Pay your coordination deposit" })).toBeTruthy();
+    expect(screen.getByText(/3,000/)).toBeTruthy();
+    const pay = screen.getByRole("button", { name: /sign in to pay/i });
+    expect(pay.className).toContain("btn-primary");
+    expect(screen.getAllByRole("button").filter(b => b.className.includes("btn-primary"))).toHaveLength(1);
+    fireEvent.click(pay);
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("/en/portal?case=case-1&signin=1"));
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: /view deposit details/i }));
-    expect(await screen.findByRole("heading", { name: /deposit arrangements/i })).toBeTruthy();
-    await waitFor(() => expect(screen.getByText(/3,000/)).toBeTruthy());
+  it("on a return visit after activation never claims a deposit that was not paid", async () => {
+    await reachForm({}, { profileActive: true, account: active, currentAction: "CONTINUE_IN_PORTAL", journeyStage: "DEPOSIT" }).catch(() => {});
+    expect(await screen.findByRole("heading", { name: /your profile is ready/i })).toBeTruthy();
+    expect(screen.queryByText("Deposit received")).toBeNull();
+    expect(screen.queryByText(/treatment journey is now active/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /sign in to pay/i })).toBeTruthy();
+  });
+
+  it("on a return visit with the deposit received says the coordination is underway", async () => {
+    await reachForm({}, { profileActive: true, account: active, currentAction: "CONTINUE_IN_PORTAL", journeyStage: "CARE_COORDINATION",
+      deposit: { ...deposit, status: "PAID", satisfied: true, amountPaid: 3000, balance: 0 } }).catch(() => {});
+    expect(await screen.findByRole("heading", { name: /your treatment journey is now active/i })).toBeTruthy();
+    expect(screen.getByText("Deposit received")).toBeTruthy();
+    expect(screen.queryByText(/shortly/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /sign in to my case/i })).toBeTruthy();
   });
 
   it("resumes on the account-setup screen when the profile is done but the password is not", async () => {
@@ -197,20 +225,6 @@ describe("ProfileActivation", () => {
     expect(screen.getByRole("button", { name: /^continue$/i })).toBeTruthy();
   });
 
-  it("gives the patient no action at all while staff arrange the offline deposit", async () => {
-    await reachForm({ "/activate": () => json(completed(active)) });
-    await fillRequired();
-    submit();
-    fireEvent.click(await screen.findByRole("button", { name: /view deposit details/i }));
-
-    expect(screen.getByRole("heading", { name: /deposit arrangements/i })).toBeTruthy();
-    expect(screen.getByText(/no action is required from you right now/i)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /check payment status/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^pay/i })).toBeNull();
-    for (const control of screen.getAllByRole("button")) expect(control.className).not.toContain("btn-primary");
-    expect(screen.getByRole("button", { name: /go to my case/i }).className).not.toContain("btn-primary");
-  });
-
   it("sends a patient with a set-up account to sign in on their own case", async () => {
     const assign = vi.fn();
     Object.defineProperty(window, "location", { configurable: true, value: { href: "/en/activate/tok-000", assign } });
@@ -220,7 +234,7 @@ describe("ProfileActivation", () => {
     });
     await fillRequired();
     submit();
-    fireEvent.click(await screen.findByRole("button", { name: /go to my case/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /sign in to my case/i }));
     // Straight to sign-in on the current case — never the public homepage, never a search for the case.
     await waitFor(() => expect(assign).toHaveBeenCalledWith("/en/portal?case=case-1&signin=1"));
   });
@@ -234,7 +248,7 @@ describe("ProfileActivation", () => {
     });
     await fillRequired();
     submit();
-    fireEvent.click(await screen.findByRole("button", { name: /go to my case/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /sign in to my case/i }));
     expect(await screen.findByRole("heading", { name: /profile information is complete/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /resend setup link/i })).toBeTruthy();
     expect(assign).not.toHaveBeenCalled();
@@ -242,7 +256,7 @@ describe("ProfileActivation", () => {
 
   it("reports an invalid or expired link without exposing anything else", async () => {
     vi.stubGlobal("fetch", stub({ "000": () => json({ code: "CASE_LINK_INVALID" }, false, 404) }));
-    render(<ProfileActivation locale="en" token="tok-000" />);
+    render(<ProfileActivation locale="en" token="tok-000" copy={en.secureLink.activation} />);
     expect(await screen.findByText(/invalid or has expired/i)).toBeTruthy();
   });
 
@@ -259,17 +273,9 @@ describe("ProfileActivation", () => {
     expect(document.body.textContent).not.toMatch(/within 14 days|provider.{0,20}charges|accepted care estimate|I have read and accept the coordination deposit, cancellation and refund terms/i);
   });
 
-  it("names the next step as the deposit for the acknowledged preliminary estimate", async () => {
-    await reachForm({ "/activate": () => json(completed(active)) });
-    await fillRequired();
-    submit();
-    expect(await screen.findByText("Deposit for your acknowledged preliminary estimate")).toBeTruthy();
-    expect(screen.queryByText(/accepted care estimate/i)).toBeNull();
-  });
-
   it("renders the Arabic journey for RTL locales", async () => {
     vi.stubGlobal("fetch", stub({ "000": () => json(summary) }));
-    render(<ProfileActivation locale="ar" token="tok-000" />);
+    render(<ProfileActivation locale="ar" token="tok-000" copy={ar.secureLink.activation} />);
     expect(await screen.findByRole("heading", { name: /لنتأكد أنه أنت/ })).toBeTruthy();
   });
 });

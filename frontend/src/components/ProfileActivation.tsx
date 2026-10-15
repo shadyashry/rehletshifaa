@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Check } from "lucide-react";
 
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
 import { DEPOSIT_TERMS_CONSENT } from "@/lib/commercial-terms";
+import type { Dictionary } from "@/lib/dictionary";
+import { fillTemplate } from "@/lib/portal-labels";
 
 type Summary = { caseNumber: string; purpose: string; channel: string; destinationHint: string };
 type Deposit = {
@@ -32,160 +35,8 @@ type Form = {
   dateOfBirth: string; nationality: string; countryOfResidence: string; preferredLanguage: string; sex: string;
 };
 
-const copy = {
-  en: {
-    eyebrow: "Continue your care",
-    verifyTitle: "Let's confirm it's you",
-    verifyIntro: "For your security we'll send a 6-digit code to",
-    sendCode: "Send code", sending: "Sending…", resend: "Send a new code",
-    codeLabel: "6-digit code", verify: "Continue", verifying: "Checking…",
-    useEmail: "Send to email instead", useWhatsapp: "Send to WhatsApp instead",
-    formTitle: "Complete your profile",
-    formIntro: "We've filled in what you already shared. Please review it and complete what's missing.",
-    prefilledNote: "Pre-filled from your case",
-    submittedByRep: (n: string, r: string) => `This case was submitted by ${n} (${r}). The details below are about the patient.`,
-    sectionAbout: "Personal details", sectionContact: "Contact", sectionAgreements: "Agreements",
-    givenName: "Given name(s)", familyName: "Family name / surname", singleName: "I have a single legal name (no family name)",
-    preferredName: "Preferred name", namesHelp: "As usually written — passport or ID details are not needed now.",
-    dateOfBirth: "Date of birth", sex: "Sex", sexHelp: "Recorded for medical care.",
-    nationality: "Nationality", residence: "Country of residence",
-    accountEmail: "Account email", accountEmailHelp: "You'll use this email to sign in. We'll verify it before it becomes your account.",
-    haveEmail: "We already have this email from your case.", useThisEmail: "Use this email", useAnotherEmail: "Use another email",
-    emailVerifiedNote: "Verified", emailOther: "Email address",
-    phone: "WhatsApp / mobile", phoneOptional: "optional", phoneHelp: "Include the country code, for example +971 50 123 4567.",
-    belongsTo: "This number belongs to", ownerMe: "Me", ownerRep: "A family member / representative",
-    ownerRepHelp: "We'll keep it as a contact for your case. Add your own number below if you have one.",
-    ownerRepKnown: (n: string) => `The number on file (${n}) belongs to your representative and stays theirs.`,
-    yourOwnPhone: "Your own WhatsApp / mobile",
-    language: "Preferred language",
-    required: "Required", optional: "optional",
-    selectCountry: "Search country…", noCountry: "No matching country", selectOption: "Select…",
-    male: "Male", female: "Female", other: "Other", undisclosed: "Prefer not to say",
-    english: "English", arabic: "العربية",
-    activate: "Continue", activating: "Saving…",
-    passportNote: "We don't need your passport or ID now. If your treatment needs a visa or travel booking, your coordinator will ask for it later.",
-    // account setup
-    accountTitle: "Your profile information is complete",
-    accountIntro: "One final step: create your password to securely access your RehletShifaa account.",
-    accountSent: "We sent a secure account setup link to",
-    accountNotSent: "We could not send the setup link just now. Press “Resend setup link” to receive it at",
-    accountSentHelp: "Open the link, create your password, and you'll come straight back to your case. This private link expires for your security.",
-    accountResend: "Resend setup link", accountResent: "A new setup link is on its way.", resending: "Sending…",
-    accountExpired: "This setup link has expired.", accountNewLink: "Send me a new link",
-    accountReady: "Your account is ready.", continueSignIn: "Continue to sign in",
-    accountCheckEmail: "Check your email to continue securely.",
-    amountDue: "Amount due", alreadyPaid: "Already received", balance: "Remaining",
-    depositPending: "You can safely close this page — nothing is lost, and your case continues automatically once the deposit is recorded.",
-    refreshStatus: "Refresh status",
-    readyTitle: "Your profile is ready",
-    readyIntro: "Your patient profile is active and your account is set up. Sign in to follow this case and any other case linked to your profile.",
-    nextStepLabel: "Next step",
-    nextDeposit: "Deposit for your acknowledged preliminary estimate",
-    viewDeposit: "View deposit details",
-    nextDepositWho: "Your coordinator will arrange this with you.",
-    depositStageTitle: "Deposit arrangements",
-    depositArrangements: "Your coordinator will provide or arrange the payment instructions for your region and record the payment once it arrives.",
-    noActionNeeded: "No action is required from you right now.",
-    backToCase: "Go to my case",
-    doneTitle: "Your treatment journey is now active",
-    doneIntro: "Your RehletShifaa coordinator is starting the next stage of your treatment coordination and will contact you shortly.",
-    stepProposal: "Preliminary estimate acknowledged", stepProfile: "Profile completed", stepAccount: "Account secured", stepDeposit: "Deposit received",
-    portalIntro: "Sign in with the password you created to follow this case — and every other case you have with us — in one place.",
-    viewJourney: "Sign in to my case", opening: "Opening…",
-    caseLabel: "Case",
-    stepOf: "Step", of: "of",
-    steps: ["Verify", "Your details", "Secure account"],
-    invalid: "This link is invalid or has expired. Please ask your coordinator for a new one.",
-    error: "Something went wrong. Please try again.",
-    tooMany: "Too many attempts. Please try again in a little while.",
-    fixFields: "Please check the highlighted fields.",
-    sessionExpired: "Your secure session timed out. Please confirm the code again — nothing you entered was lost.",
-    errGiven: "Enter the given name(s).", errFamily: "Enter the family name, or confirm a single legal name.",
-    errDob: "Enter the date of birth.", errDobFuture: "The date of birth cannot be in the future.",
-    errSelect: "Please choose an option.", errPhone: "Enter a valid international number, for example +971 50 123 4567.",
-    errEmail: "Enter the email address you will use to sign in.", errOwner: "Tell us whether this number is yours or a family member's.",
-    errConsents: "Please accept all required agreements to continue.",
-    loading: "Loading…",
-  },
-  ar: {
-    eyebrow: "تابع رحلتك العلاجية",
-    verifyTitle: "لنتأكد أنه أنت",
-    verifyIntro: "لحمايتك سنرسل رمزًا من 6 أرقام إلى",
-    sendCode: "إرسال الرمز", sending: "جارٍ الإرسال…", resend: "إرسال رمز جديد",
-    codeLabel: "الرمز المكوّن من 6 أرقام", verify: "متابعة", verifying: "جارٍ التحقق…",
-    useEmail: "أرسله إلى البريد بدلًا من ذلك", useWhatsapp: "أرسله إلى واتساب بدلًا من ذلك",
-    formTitle: "أكمل ملفك الشخصي",
-    formIntro: "أدخلنا مسبقًا ما شاركته معنا. يرجى مراجعته وإكمال الناقص فقط.",
-    prefilledNote: "معبأ مسبقًا من حالتك",
-    submittedByRep: (n: string, r: string) => `قُدّمت هذه الحالة بواسطة ${n} (${r}). البيانات أدناه تخص المريض.`,
-    sectionAbout: "البيانات الشخصية", sectionContact: "التواصل", sectionAgreements: "الموافقات",
-    givenName: "الاسم الأول (الأسماء الشخصية)", familyName: "اسم العائلة / اللقب", singleName: "لديّ اسم قانوني واحد فقط (بدون اسم عائلة)",
-    preferredName: "الاسم المفضّل", namesHelp: "كما يُكتب عادةً — لا نحتاج بيانات جواز السفر أو الهوية الآن.",
-    dateOfBirth: "تاريخ الميلاد", sex: "الجنس", sexHelp: "يُسجَّل لأغراض الرعاية الطبية.",
-    nationality: "الجنسية", residence: "بلد الإقامة",
-    accountEmail: "بريد الحساب", accountEmailHelp: "ستستخدم هذا البريد لتسجيل الدخول. سنتحقق منه قبل أن يصبح حسابك.",
-    haveEmail: "لدينا هذا البريد بالفعل من حالتك.", useThisEmail: "استخدم هذا البريد", useAnotherEmail: "استخدم بريدًا آخر",
-    emailVerifiedNote: "مُتحقَّق منه", emailOther: "البريد الإلكتروني",
-    phone: "واتساب / الجوال", phoneOptional: "اختياري", phoneHelp: "أدخل رمز الدولة، مثال ‎+971 50 123 4567.",
-    belongsTo: "هذا الرقم يخص", ownerMe: "أنا", ownerRep: "أحد أفراد العائلة / ممثّل",
-    ownerRepHelp: "سنبقيه وسيلة تواصل لحالتك. أضف رقمك الخاص أدناه إن وُجد.",
-    ownerRepKnown: (n: string) => `الرقم المسجّل (${n}) يخص ممثّلك ويبقى له.`,
-    yourOwnPhone: "رقم واتساب / الجوال الخاص بك",
-    language: "لغة التواصل",
-    required: "مطلوب", optional: "اختياري",
-    selectCountry: "ابحث عن الدولة…", noCountry: "لا توجد نتائج", selectOption: "اختر…",
-    male: "ذكر", female: "أنثى", other: "أخرى", undisclosed: "أفضّل عدم الإفصاح",
-    english: "English", arabic: "العربية",
-    activate: "متابعة", activating: "جارٍ الحفظ…",
-    passportNote: "لا نحتاج جواز سفرك أو هويتك الآن. إذا احتاج علاجك تأشيرة أو حجز سفر، سيطلبها منسقك لاحقًا.",
-    accountTitle: "اكتملت معلومات ملفك",
-    accountIntro: "خطوة أخيرة: أنشئ كلمة مرورك للوصول الآمن إلى حساب رحلة شفاء الخاص بك.",
-    accountSent: "أرسلنا رابط إعداد الحساب الآمن إلى",
-    accountNotSent: "تعذّر إرسال رابط الإعداد الآن. اضغط «إعادة إرسال رابط الإعداد» لاستلامه على",
-    accountSentHelp: "افتح الرابط، أنشئ كلمة مرورك، وستعود مباشرة إلى حالتك. تنتهي صلاحية هذا الرابط الخاص لحمايتك.",
-    accountResend: "إعادة إرسال رابط الإعداد", accountResent: "رابط إعداد جديد في طريقه إليك.", resending: "جارٍ الإرسال…",
-    accountExpired: "انتهت صلاحية رابط الإعداد هذا.", accountNewLink: "أرسل لي رابطًا جديدًا",
-    accountReady: "حسابك جاهز.", continueSignIn: "متابعة إلى تسجيل الدخول",
-    accountCheckEmail: "تحقق من بريدك الإلكتروني للمتابعة بأمان.",
-    amountDue: "المبلغ المستحق", alreadyPaid: "المستلم بالفعل", balance: "المتبقي",
-    depositPending: "يمكنك إغلاق هذه الصفحة بأمان — لن يضيع شيء، وتستكمل حالتك تلقائيًا فور تسجيل الوديعة.",
-    refreshStatus: "تحديث الحالة",
-    readyTitle: "ملفك جاهز",
-    readyIntro: "ملفك الطبي مُفعّل وحسابك جاهز. سجّل الدخول لمتابعة هذه الحالة وأي حالة أخرى مرتبطة بملفك.",
-    nextStepLabel: "الخطوة التالية",
-    nextDeposit: "وديعة التنسيق لتقديرك المبدئي الذي أقررت به",
-    viewDeposit: "عرض تفاصيل الوديعة",
-    nextDepositWho: "سيرتّب منسّقك ذلك معك.",
-    depositStageTitle: "ترتيبات الوديعة",
-    depositArrangements: "سيوفّر منسّقك تعليمات الدفع الخاصة بمنطقتك أو يرتّبها، ويسجّل الدفعة فور وصولها.",
-    noActionNeeded: "لا يلزمك أي إجراء الآن.",
-    backToCase: "الذهاب إلى حالتي",
-    doneTitle: "رحلتك العلاجية نشطة الآن",
-    doneIntro: "بدأ منسق رحلة شفاء المرحلة التالية من تنسيق علاجك وسيتواصل معك قريبًا.",
-    stepProposal: "تم الإقرار بالتقدير المبدئي", stepProfile: "اكتمل الملف", stepAccount: "تم تأمين الحساب", stepDeposit: "تم استلام الوديعة",
-    portalIntro: "سجّل الدخول بكلمة المرور التي أنشأتها لمتابعة هذه الحالة — وكل حالاتك معنا — في مكان واحد.",
-    viewJourney: "تسجيل الدخول إلى حالتي", opening: "جارٍ الفتح…",
-    caseLabel: "الحالة",
-    stepOf: "الخطوة", of: "من",
-    steps: ["التحقق", "بياناتك", "تأمين الحساب"],
-    invalid: "هذا الرابط غير صالح أو انتهت صلاحيته. يرجى طلب رابط جديد من منسقك.",
-    error: "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
-    tooMany: "محاولات كثيرة. يرجى المحاولة بعد قليل.",
-    fixFields: "يرجى مراجعة الحقول المحددة.",
-    sessionExpired: "انتهت جلستك الآمنة. يرجى تأكيد الرمز مرة أخرى — لم يضِع ما أدخلته.",
-    errGiven: "أدخل الاسم الأول.", errFamily: "أدخل اسم العائلة، أو أكّد أن اسمك القانوني مفرد.",
-    errDob: "أدخل تاريخ الميلاد.", errDobFuture: "لا يمكن أن يكون تاريخ الميلاد في المستقبل.",
-    errSelect: "يرجى اختيار أحد الخيارات.", errPhone: "أدخل رقمًا دوليًا صحيحًا، مثال ‎+971 50 123 4567.",
-    errEmail: "أدخل البريد الإلكتروني الذي ستستخدمه لتسجيل الدخول.", errOwner: "أخبرنا إن كان هذا الرقم لك أو لأحد أفراد العائلة.",
-    errConsents: "يرجى قبول جميع الموافقات المطلوبة للمتابعة.",
-    loading: "جارٍ التحميل…",
-  },
-};
-
-const RELATIONSHIP_LABEL: Record<string, { en: string; ar: string }> = {
-  PARENT: { en: "parent", ar: "أحد الوالدين" }, CHILD: { en: "child", ar: "ابن/ابنة" }, SPOUSE: { en: "spouse", ar: "زوج/زوجة" },
-  SIBLING: { en: "sibling", ar: "أخ/أخت" }, RELATIVE: { en: "relative", ar: "قريب" }, GUARDIAN: { en: "guardian", ar: "وصي" }, OTHER: { en: "representative", ar: "ممثّل" },
-};
+/** The page's words, from messages/{en,ar}.json (`secureLink.activation`), passed by the server page. */
+export type ActivationCopy = Dictionary["secureLink"]["activation"];
 
 const CONSENT_TEXT: Record<string, { en: string; ar: string }> = {
   PRIVACY_DATA_PROCESSING: {
@@ -216,8 +67,8 @@ const CONSENT_TEXT: Record<string, { en: string; ar: string }> = {
 
 type PatientAction = "COMPLETE_PROFILE" | "SET_UP_ACCOUNT" | "NONE" | "CONTINUE_IN_PORTAL";
 type JourneyStage = "PROFILE" | "ACCOUNT_SETUP" | "DEPOSIT" | "CARE_COORDINATION";
-/** "account" is the setup-pending screen; "activated" is the moment everything is ready — before any money. */
-type Stage = "loading" | "verify" | "form" | "account" | "activated" | "deposit" | "done" | "invalid";
+/** "account" is the setup-pending screen; "activated" is the moment the profile is finished, "done" a return visit after it. */
+type Stage = "loading" | "verify" | "form" | "account" | "activated" | "done" | "invalid";
 
 /**
  * Fall back to the profile step whenever the server has not named an action: stranding someone on a
@@ -234,12 +85,11 @@ function resolveAction(data: { currentAction?: PatientAction; profileActive: boo
 function stageFor(action: PatientAction): Stage {
   if (action === "COMPLETE_PROFILE") return "form";
   if (action === "SET_UP_ACCOUNT") return "account";
-  if (action === "CONTINUE_IN_PORTAL") return "done";
-  return "deposit"; // nothing for the patient to do, but the deposit stage is what they should see
+  // Everything else continues in My Care, the deposit included (DEP-3); the ready page says what is still owed.
+  return "done";
 }
 
-export function ProfileActivation({ locale, token }: { locale: Locale; token: string }) {
-  const t = copy[locale];
+export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; token: string; copy: ActivationCopy }) {
 
   const [stage, setStage] = useState<Stage>("loading");
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -250,7 +100,6 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [deposit, setDeposit] = useState<Deposit | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
-  const [action, setAction] = useState<PatientAction | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [consents, setConsents] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -332,9 +181,7 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
         sex: data.sex ?? "",
       });
       setConsents(previous => previous.length ? previous : data.completedConsents.filter(c => data.requiredConsents.includes(c)));
-      const resolved = resolveAction(data);
-      setAction(resolved);
-      setStage(stageFor(resolved));
+      setStage(stageFor(resolveAction(data)));
     } catch (e) { setNotice(describe(e)); } finally { setBusy(false); }
   }
 
@@ -377,7 +224,6 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
       setDeposit(result.deposit);
       setAccount(result.account);
       const resolved = resolveAction(result);
-      setAction(resolved);
       // Profile complete → account setup is the very next screen. Only an already-active account skips it.
       setStage(resolved === "SET_UP_ACCOUNT" ? "account" : "activated");
     } catch (e) {
@@ -398,19 +244,10 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
     try {
       const data: Account = await call("/resend-setup", { grant });
       setAccount(data);
-      if (data.status === "ACTIVE") { setAction("CONTINUE_IN_PORTAL"); setStage("activated"); }
+      if (data.status === "ACTIVE") setStage("activated");
       else setResent(true);
     } catch (e) { setNotice(describe(e)); } finally { setBusy(false); }
   }
-
-  const refreshDeposit = useCallback(async () => {
-    if (!grant) return;
-    try {
-      const data: Deposit = await call("/deposit", { grant });
-      setDeposit(data);
-      if (data.satisfied) { setAction("CONTINUE_IN_PORTAL"); setStage("done"); }
-    } catch { /* keep the current view; the patient can retry */ }
-  }, [call, grant]);
 
   /**
    * Continue into the authenticated portal using the account the patient set up, on this case.
@@ -439,11 +276,20 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
   );
 
   const repOwned = form?.mobileOwner === "REPRESENTATIVE";
-  const relationshipLabel = prefill?.representativeRelationship ? (RELATIONSHIP_LABEL[prefill.representativeRelationship]?.[locale] ?? prefill.representativeRelationship) : "";
+  const relationshipLabel = prefill?.representativeRelationship ? ((t.relationship as Record<string, string>)[prefill.representativeRelationship] ?? prefill.representativeRelationship) : "";
+  // The deposit is the patient's to pay in My Care (DEP-3); until it is, it is the next step, never a finished one.
+  const depositOwed = !!deposit?.required && !deposit.satisfied;
+  const depositLine = !deposit ? null : !deposit.required || deposit.status === "WAIVED" ? t.stepDepositWaived : deposit.satisfied ? t.stepDeposit : null;
+  const accountActive = account?.status === "ACTIVE";
+  const finished = [t.stepProposal, t.stepProfile, ...(accountActive ? [t.stepAccount] : []), ...(depositLine ? [depositLine] : [])];
+  // A return visit once the deposit is in: the coordination is underway. Otherwise the profile is ready, saying only what is.
+  const underway = stage === "done" && !depositOwed;
+  const ready = underway ? { title: t.doneTitle, intro: t.doneIntro } : { title: t.readyTitle, intro: accountActive ? t.readyIntro : t.readyIntroProfile };
+  const amountOwed = depositOwed && deposit ? deposit.balance ?? deposit.amountDue : null;
 
   return (
     <Shell locale={locale}>
-      {stage !== "done" && <Steps labels={t.steps} current={stepIndex} stepOf={t.stepOf} of={t.of} />}
+      {stage !== "done" && stage !== "activated" && <Steps labels={t.steps} current={stepIndex} stepOf={t.stepOf} of={t.of} />}
 
       {notice && (
         <p role="alert" className="mb-5 rounded-xl border border-alert-200 bg-alert-50 p-4 text-sm text-alert-800">{notice}</p>
@@ -493,7 +339,7 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
           <h1 ref={headingRef} tabIndex={-1} className="headline mt-2 outline-none">{t.formTitle}</h1>
           <p className="lead mt-3">{t.formIntro}</p>
           {prefill.submittedBy === "REPRESENTATIVE" && prefill.representativeName && (
-            <p className="mt-4 rounded-xl bg-mist p-4 text-sm leading-6 text-ink-700">{t.submittedByRep(prefill.representativeName, relationshipLabel)}</p>
+            <p className="mt-4 rounded-xl bg-mist p-4 text-sm leading-6 text-ink-700">{fillTemplate(t.submittedByRep, { name: `\u2068${prefill.representativeName}\u2069`, relationship: relationshipLabel })}</p>
           )}
 
           <Fieldset legend={t.sectionAbout}>
@@ -587,7 +433,7 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
                     ))}
                   </div>
                   {fieldErrors.mobileOwner && <p className="error-text mt-2">{fieldErrors.mobileOwner}</p>}
-                  {repOwned && <p className="mt-2 text-xs leading-5 text-ink-500">{t.ownerRepKnown(prefill.knownMobile)} {t.ownerRepHelp}</p>}
+                  {repOwned && <p className="mt-2 text-xs leading-5 text-ink-500">{fillTemplate(t.ownerRepKnown, { number: `\u2066${prefill.knownMobile}\u2069` })} {t.ownerRepHelp}</p>}
                 </>
               )}
               {(!prefill.knownMobile || repOwned) && (
@@ -661,82 +507,40 @@ export function ProfileActivation({ locale, token }: { locale: Locale; token: st
         </section>
       )}
 
-      {/* Profile + account complete: its own finish line. Money is named as the next task, never as part of it. */}
-      {stage === "activated" && (
+      {/* Profile + account complete: what is finished, in true steps only, then the one thing still owed or the way in. */}
+      {(stage === "activated" || stage === "done") && (
         <section className="card p-6 md:p-8">
-          <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-600 text-xl text-white">✓</span>
-          <h1 ref={headingRef} tabIndex={-1} className="headline mt-5 outline-none">{t.readyTitle}</h1>
-          <p className="lead mt-3">{t.readyIntro}</p>
-
-          {action === "CONTINUE_IN_PORTAL" || !deposit?.required ? (
-            <button type="button" className="btn-primary mt-7 w-full sm:w-auto" disabled={busy} onClick={() => void openPortal()}>
-              {busy ? t.opening : t.backToCase}
-            </button>
-          ) : (
-            <>
-              <div className="mt-7 border-t border-line pt-5">
-                <p className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.nextStepLabel}</p>
-                <p className="mt-1.5 font-semibold text-ink-900">{t.nextDeposit}</p>
-                <p className="mt-1 text-[0.88rem] leading-6 text-ink-600">{t.nextDepositWho}</p>
-              </div>
-              <button type="button" className="mt-5 text-[0.9rem] font-semibold text-brand-800 underline underline-offset-4"
-                      onClick={() => setStage("deposit")}>
-                {t.viewDeposit}
-              </button>
-            </>
-          )}
-        </section>
-      )}
-
-      {/* A status, not a task. Staff arrange the offline deposit, so this screen offers the patient no
-          action to take and no button that pretends otherwise — only a quiet way back to their case. */}
-      {stage === "deposit" && deposit && (
-        <section className="card p-6 md:p-8">
-          <p className="eyebrow">{t.caseLabel} {prefill?.caseNumber}</p>
-          <h1 ref={headingRef} tabIndex={-1} className="headline mt-2 outline-none">{t.depositStageTitle}</h1>
-          <p className="lead mt-3">{t.depositArrangements}</p>
-
-          <dl className="mt-7 overflow-hidden rounded-xl border border-line">
-            <Row label={t.amountDue} value={money(deposit.amountDue, deposit.currency, locale)} strong />
-            {(deposit.amountPaid ?? 0) > 0 && <Row label={t.alreadyPaid} value={money(deposit.amountPaid, deposit.currency, locale)} />}
-            {(deposit.balance ?? 0) > 0 && (deposit.amountPaid ?? 0) > 0 && (
-              <Row label={t.balance} value={money(deposit.balance, deposit.currency, locale)} />
-            )}
-          </dl>
-
-          <p className="mt-6 rounded-xl bg-mist p-4 text-[0.92rem] font-semibold leading-6 text-ink-700" role="status">
-            {t.noActionNeeded}
-          </p>
-          <p className="mt-3 text-sm leading-6 text-ink-500">{t.depositPending}</p>
-
-          <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-line pt-6">
-            <button type="button" className="text-[0.9rem] font-semibold text-brand-800 underline underline-offset-4 disabled:opacity-50"
-                    disabled={busy} onClick={() => void openPortal()}>
-              {busy ? t.opening : t.backToCase}
-            </button>
-            <button type="button" className="text-[0.88rem] font-semibold text-ink-500 underline underline-offset-4 disabled:opacity-50"
-                    disabled={busy} onClick={() => void refreshDeposit()}>{t.refreshStatus}</button>
-          </div>
-        </section>
-      )}
-
-      {stage === "done" && (
-        <section className="card p-6 md:p-8">
-          <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-2xl text-white">✓</span>
-          <h1 ref={headingRef} tabIndex={-1} className="headline mt-5 outline-none">{t.doneTitle}</h1>
-          <p className="lead mt-3">{t.doneIntro}</p>
+          <span aria-hidden className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-600 text-white"><Check size={22} strokeWidth={2.5}/></span>
+          <h1 ref={headingRef} tabIndex={-1} className="headline mt-5 outline-none">{ready.title}</h1>
+          <p className="lead mt-3">{ready.intro}</p>
           <ul className="mt-7 space-y-3">
-            {[t.stepProposal, t.stepProfile, t.stepAccount, t.stepDeposit].map(step => (
+            {finished.map(step => (
               <li key={step} className="flex items-center gap-3 text-ink-800">
-                <span aria-hidden className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700">✓</span>
+                <span aria-hidden className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-brand-100 text-brand-700"><Check size={14} strokeWidth={3}/></span>
                 {step}
               </li>
             ))}
           </ul>
-          <p className="mt-7 leading-7 text-ink-600">{t.portalIntro}</p>
-          <button type="button" className="btn-primary mt-6 w-full sm:w-auto" disabled={busy} onClick={() => void openPortal()}>
-            {busy ? t.opening : t.viewJourney}
-          </button>
+
+          {depositOwed ? (
+            <div className="mt-7 border-t border-line pt-5">
+              <p className="label-micro text-brand-700">{t.nextStepLabel}</p>
+              <h2 className="mt-1.5 font-semibold text-ink-900">{t.nextPay}</h2>
+              {amountOwed != null && deposit && (
+                <p className="mt-1 text-ink-800">{t.amountDue}: <bdi dir="ltr" className="font-semibold tabular-nums">{money(amountOwed, deposit.currency, locale)}</bdi></p>
+              )}
+              <p className="mt-1 max-w-[65ch] text-[0.9375rem] leading-6 text-ink-600">{t.nextPayHow}</p>
+              <button type="button" className="btn-primary mt-5 w-full sm:w-auto" disabled={busy} aria-busy={busy || undefined} onClick={() => void openPortal()}>
+                {busy ? t.opening : t.signInToPay}
+              </button>
+            </div>
+          ) : (<>
+            {underway && <p className="mt-7 leading-7 text-ink-600">{t.portalIntro}</p>}
+            {/* It opens sign-in on this case, so it says so. */}
+            <button type="button" className="btn-primary mt-6 w-full sm:w-auto" disabled={busy} aria-busy={busy || undefined} onClick={() => void openPortal()}>
+              {busy ? t.opening : t.viewJourney}
+            </button>
+          </>)}
         </section>
       )}
     </Shell>
@@ -805,15 +609,6 @@ function Field({ label, required, requiredLabel, help, hint, error, children }: 
       {error ? <span className="error-text mt-2 block">{error}</span>
              : help ? <span className="mt-2 block text-xs leading-5 text-ink-500">{help}</span> : null}
     </label>
-  );
-}
-
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-line px-4 py-3 last:border-b-0">
-      <dt className="text-sm text-ink-600">{label}</dt>
-      <dd className={strong ? "text-lg font-bold text-ink-900" : "text-ink-800"} dir="ltr">{value}</dd>
-    </div>
   );
 }
 

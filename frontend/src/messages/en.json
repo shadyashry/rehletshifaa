@@ -2022,5 +2022,186 @@
       "seeConsultants": "See Consultants for {area} in the Control Center",
       "askLead": "Ask your coordinator lead to add or approve a Consultant for {area}."
     }
+  },
+  "secureLink": {
+    "activation": {
+      "eyebrow": "Continue your care",
+      "verifyTitle": "Let's confirm it's you",
+      "verifyIntro": "For your security we'll send a 6-digit code to",
+      "sendCode": "Send code",
+      "sending": "Sending…",
+      "resend": "Send a new code",
+      "codeLabel": "6-digit code",
+      "verify": "Continue",
+      "verifying": "Checking…",
+      "useEmail": "Send to email instead",
+      "useWhatsapp": "Send to WhatsApp instead",
+      "formTitle": "Complete your profile",
+      "formIntro": "We've filled in what you already shared. Please review it and complete what's missing.",
+      "prefilledNote": "Pre-filled from your case",
+      "submittedByRep": "This case was submitted by {name} ({relationship}). The details below are about the patient.",
+      "sectionAbout": "Personal details",
+      "sectionContact": "Contact",
+      "sectionAgreements": "Agreements",
+      "givenName": "Given name(s)",
+      "familyName": "Family name / surname",
+      "singleName": "I have a single legal name (no family name)",
+      "preferredName": "Preferred name",
+      "namesHelp": "As usually written — passport or ID details are not needed now.",
+      "dateOfBirth": "Date of birth",
+      "sex": "Sex",
+      "sexHelp": "Recorded for medical care.",
+      "nationality": "Nationality",
+      "residence": "Country of residence",
+      "accountEmail": "Account email",
+      "accountEmailHelp": "You'll use this email to sign in. We'll verify it before it becomes your account.",
+      "haveEmail": "We already have this email from your case.",
+      "useThisEmail": "Use this email",
+      "useAnotherEmail": "Use another email",
+      "emailVerifiedNote": "Verified",
+      "emailOther": "Email address",
+      "phone": "WhatsApp / mobile",
+      "phoneOptional": "optional",
+      "phoneHelp": "Include the country code, for example +971 50 123 4567.",
+      "belongsTo": "This number belongs to",
+      "ownerMe": "Me",
+      "ownerRep": "A family member / representative",
+      "ownerRepHelp": "We'll keep it as a contact for your case. Add your own number below if you have one.",
+      "ownerRepKnown": "The number on file ({number}) belongs to your representative and stays theirs.",
+      "yourOwnPhone": "Your own WhatsApp / mobile",
+      "language": "Preferred language",
+      "required": "Required",
+      "optional": "optional",
+      "selectCountry": "Search country…",
+      "noCountry": "No matching country",
+      "selectOption": "Select…",
+      "male": "Male",
+      "female": "Female",
+      "other": "Other",
+      "undisclosed": "Prefer not to say",
+      "english": "English",
+      "arabic": "العربية",
+      "activate": "Continue",
+      "activating": "Saving…",
+      "passportNote": "We don't need your passport or ID now. If your treatment needs a visa or travel booking, your coordinator will ask for it later.",
+      "accountTitle": "Your profile information is complete",
+      "accountIntro": "One final step: create your password to securely access your RehletShifaa account.",
+      "accountSent": "We sent a secure account setup link to",
+      "accountNotSent": "We could not send the setup link just now. Press “Resend setup link” to receive it at",
+      "accountSentHelp": "Open the link, create your password, and you'll come straight back to your case. This private link expires for your security.",
+      "accountResend": "Resend setup link",
+      "accountResent": "A new setup link is on its way.",
+      "resending": "Sending…",
+      "readyTitle": "Your profile is ready",
+      "readyIntro": "Your patient profile is active and your account is set up. Sign in to follow this case and any other case linked to your profile.",
+      "readyIntroProfile": "Your patient profile is active.",
+      "nextStepLabel": "Next step",
+            "doneTitle": "Your treatment journey is now active",
+      "doneIntro": "Your RehletShifaa coordinator is starting the next stage of your treatment coordination.",
+      "stepProposal": "Preliminary estimate acknowledged",
+      "stepProfile": "Profile completed",
+      "stepAccount": "Account secured",
+      "stepDeposit": "Deposit received",
+      "portalIntro": "Sign in with the password you created to follow this case — and every other case you have with us — in one place.",
+      "viewJourney": "Sign in to my case",
+      "opening": "Opening…",
+      "caseLabel": "Case",
+      "stepOf": "Step",
+      "of": "of",
+      "steps": [
+        "Verify",
+        "Your details",
+        "Secure account"
+      ],
+      "invalid": "This link is invalid or has expired. Please ask your coordinator for a new one.",
+      "error": "Something went wrong. Please try again.",
+      "tooMany": "Too many attempts. Please try again in a little while.",
+      "fixFields": "Please check the highlighted fields.",
+      "sessionExpired": "Your secure session timed out. Please confirm the code again — nothing you entered was lost.",
+      "errGiven": "Enter the given name(s).",
+      "errFamily": "Enter the family name, or confirm a single legal name.",
+      "errDob": "Enter the date of birth.",
+      "errDobFuture": "The date of birth cannot be in the future.",
+      "errSelect": "Please choose an option.",
+      "errPhone": "Enter a valid international number, for example +971 50 123 4567.",
+      "errEmail": "Enter the email address you will use to sign in.",
+      "errOwner": "Tell us whether this number is yours or a family member's.",
+      "errConsents": "Please accept all required agreements to continue.",
+      "loading": "Loading…",
+      "nextPay": "Pay your coordination deposit",
+      "amountDue": "Amount due",
+      "nextPayHow": "You pay it in My Care, by bank transfer or through an agent, and then enter the reference your bank or agent gives you. Your coordinator starts arranging your care once our finance team confirms it.",
+      "signInToPay": "Sign in to pay",
+      "stepDepositWaived": "No deposit needed",
+      "relationship": {
+        "PARENT": "parent",
+        "CHILD": "child",
+        "SPOUSE": "spouse",
+        "SIBLING": "sibling",
+        "RELATIVE": "relative",
+        "GUARDIAN": "guardian",
+        "OTHER": "representative"
+      }
+    },
+    "journey": {
+      "payInMyCare": "Sign in to pay",
+      "phases": {
+        "received": "Case received",
+        "coordinator": "Coordinator review",
+        "consultant": "Consultant review",
+        "proposal": "Your proposal",
+        "deposit": "Coordination deposit",
+        "treatment": "Treatment",
+        "followup": "Follow-up"
+      },
+      "needed": {
+        "title": "We need something from you",
+        "body": "Your coordinator has asked for the following so your case can continue.",
+        "next": "Once you send it, your coordinator reviews it and continues."
+      },
+      "explain": {
+        "received": {
+          "title": "We have your case",
+          "body": "Your case has been received and is waiting for a coordinator to look at it.",
+          "next": "A coordinator will check what you sent and tell you if anything is missing."
+        },
+        "coordinator": {
+          "title": "Your coordinator is reviewing your case",
+          "body": "Your coordinator is going through what you sent and preparing it for a Consultant.",
+          "next": "Your case will be sent to a Consultant in the right specialty."
+        },
+        "consultant": {
+          "title": "A Consultant is reviewing your case",
+          "body": "A Consultant is going through your reports and history now.",
+          "next": "You will receive a recommendation and an initial cost estimate."
+        },
+        "proposal": {
+          "title": "Your proposal",
+          "body": "Your treatment plan and its estimated cost are being prepared, or are ready for you to review.",
+          "next": "Take the time you need. Nothing happens until you decide."
+        },
+        "deposit": {
+          "title": "Your coordination deposit",
+          "body": "If you have not paid it yet, sign in to My Care to pay it by bank transfer or through an agent, and enter the reference you are given. If you already sent the reference, our finance team is checking it.",
+          "next": "Once confirmed, your coordinator starts arranging your treatment."
+        },
+        "treatment": {
+          "title": "We are arranging your treatment",
+          "body": "Your coordinator is organising your appointments and arrival.",
+          "next": "You will receive your dates and arrival details."
+        },
+        "followup": {
+          "title": "You are in follow-up",
+          "body": "We stay in contact while you recover."
+        }
+      },
+      "meanwhile": {
+        "received": "Gather any recent reports, scans or prescriptions you have, in case your coordinator asks for them.",
+        "coordinator": "Keep your recent reports to hand, and message your coordinator if anything about your condition changes.",
+        "consultant": "Keep following your own doctor's advice, and tell your coordinator if your symptoms change.",
+        "proposal": "Check that your passport is valid and think about who would travel with you.",
+        "treatment": "Keep your passport and phone to hand; your coordinator will message you with dates."
+      }
+    }
   }
 }

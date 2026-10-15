@@ -13,7 +13,7 @@ const keys = (value: unknown, prefix = ""): string[] =>
 
 describe("portal copy parity", () => {
   it("has the same keys in English and Arabic (Arabic may add plural categories)", () => {
-    for (const namespace of ["portalWork", "portalProposal"] as const) {
+    for (const namespace of ["portalWork", "portalProposal", "secureLink"] as const) {
       const english = keys(en[namespace]).filter((key) => !key.startsWith("plural."));
       const arabic = keys(ar[namespace]).filter((key) => !key.startsWith("plural."));
       expect(arabic.sort()).toEqual(english.sort());

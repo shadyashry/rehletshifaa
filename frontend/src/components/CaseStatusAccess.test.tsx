@@ -47,7 +47,7 @@ async function reachAction(overrides: Record<string, () => Promise<Response>> = 
     "tok-1": () => json(summary),
   });
   vi.stubGlobal("fetch", fetchMock);
-  render(<CaseStatusAccess locale="en" token="tok-1"/>);
+  render(<CaseStatusAccess locale="en" token="tok-1" journeyCopy={en.secureLink.journey}/>);
   fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
   const code = await screen.findByLabelText(/verification code/i);
   fireEvent.change(code, { target: { value: "123456" } });
@@ -65,18 +65,18 @@ describe("CaseStatusAccess", () => {
   // A-02 (P0-3): the emergency instruction is on the page before and after verification, in the patient's language.
   it("tells the patient to seek local care in an emergency, in English and Arabic", async () => {
     vi.stubGlobal("fetch", stub({ "tok-1": () => json(summary) }));
-    const { unmount } = render(<CaseStatusAccess locale="en" token="tok-1" emergency={en.common.emergencyNotice}/>);
+    const { unmount } = render(<CaseStatusAccess locale="en" token="tok-1" emergency={en.common.emergencyNotice} journeyCopy={en.secureLink.journey}/>);
     await screen.findByRole("button", { name: /send verification code/i });
     const note = screen.getByRole("note", { name: en.common.emergencyNotice.title });
     expect(note.textContent).toContain(en.common.emergencyNotice.body);
     unmount();
-    render(<CaseStatusAccess locale="ar" token="tok-1" emergency={ar.common.emergencyNotice}/>);
+    render(<CaseStatusAccess locale="ar" token="tok-1" emergency={ar.common.emergencyNotice} journeyCopy={ar.secureLink.journey}/>);
     expect(await screen.findByRole("note", { name: ar.common.emergencyNotice.title })).toBeTruthy();
   });
 
   it("never shows case data before the one-time code is verified", async () => {
     vi.stubGlobal("fetch", stub({ "tok-1": () => json(summary) }));
-    render(<CaseStatusAccess locale="en" token="tok-1"/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" journeyCopy={en.secureLink.journey}/>);
     expect(await screen.findByRole("button", { name: /send verification code/i })).toBeTruthy();
     expect(screen.queryByText(/current medication/i)).toBeNull();
     // No sign-in or registration step exists on this page.
@@ -123,7 +123,7 @@ describe("CaseStatusAccess", () => {
 
   it("reports an invalid or expired link without revealing anything", async () => {
     vi.stubGlobal("fetch", stub({ "tok-1": () => json({ code: "CASE_LINK_INVALID" }, false, 404) }));
-    render(<CaseStatusAccess locale="en" token="tok-1"/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" journeyCopy={en.secureLink.journey}/>);
     expect(await screen.findByText(/invalid or has expired/i)).toBeTruthy();
   });
 });
@@ -142,7 +142,7 @@ describe("CaseStatusAccess journey", () => {
       "/view": () => json(view),
       "tok-1": () => json(summary),
     }));
-    render(<CaseStatusAccess locale="en" token="tok-1"/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" journeyCopy={en.secureLink.journey}/>);
     fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
     fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
@@ -203,7 +203,7 @@ describe("CaseStatusAccess journey", () => {
       "tok-1": () => json(summary),
     });
     vi.stubGlobal("fetch", fetchMock);
-    render(<CaseStatusAccess locale="en" token="tok-1"/>);
+    render(<CaseStatusAccess locale="en" token="tok-1" journeyCopy={en.secureLink.journey}/>);
     fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
     fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
@@ -228,5 +228,16 @@ describe("CaseStatusAccess journey", () => {
     await reachStatus({ ...consultantStatus, phase: "deposit", proposal: { state: "ACCEPTED", action: "VIEW_PROPOSAL", versionNumber: 1, validUntil: null, decidedAt: "2026-09-10T10:00:00Z" } });
     expect(await screen.findByText(/you acknowledged your estimate/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /review proposal/i })).toBeNull();
+  });
+
+  // DEP-3: the deposit is the patient's to pay in My Care, and this link cannot tell whether it was paid.
+  it("in the deposit phase says where and how to pay, and never that nothing is needed", async () => {
+    await reachStatus({ ...consultantStatus, phase: "deposit", expectedWorkingDays: 1 });
+    expect(await screen.findByRole("heading", { name: "Your coordination deposit" })).toBeTruthy();
+    expect(screen.getByText(/sign in to My Care to pay it by bank transfer or through an agent/i)).toBeTruthy();
+    expect(screen.queryByText(/no action is required/i)).toBeNull();
+    expect(screen.queryByText(/coordinator will share the payment details/i)).toBeNull();
+    expect(screen.queryByText(/usually takes/i)).toBeNull();
+    expect(screen.getByRole("link", { name: "Sign in to pay" }).getAttribute("href")).toBe("/en/portal?signin=1");
   });
 });

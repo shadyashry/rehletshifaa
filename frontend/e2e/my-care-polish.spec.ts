@@ -10,7 +10,7 @@ for (const locale of ["en", "ar"] as const) {
   for (const width of [390, 1440]) {
     test(`My Care names the patient and keeps one focal surface (${locale} ${width})`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
-      await setupPatient(page, "deposit-arranging");
+      await setupPatient(page, "deposit-checking");
       await page.goto(`/${locale}/portal`);
       await expect(page.locator("#case-heading")).toContainText("Maya Example");
       // One white card per subject on paper; only the current step carries the file's petrol tab edge.

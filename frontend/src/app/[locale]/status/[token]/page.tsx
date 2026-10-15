@@ -5,5 +5,6 @@ import { getDictionary } from "@/lib/dictionary";
 
 export default async function StatusPage({params}:{params:Promise<{locale:string;token:string}>}){
  const {locale,token}=await params;if(!isLocale(locale)||!token)notFound();
- return <CaseStatusAccess locale={locale} token={token} emergency={getDictionary(locale).common.emergencyNotice}/>;
+ const d=getDictionary(locale);
+ return <CaseStatusAccess locale={locale} token={token} emergency={d.common.emergencyNotice} journeyCopy={d.secureLink.journey}/>;
 }

@@ -412,6 +412,7 @@ Update at the end of every phase.
 | 2026-10-09 | Owner: "go with your recommendations for D1–D4" (finish plan). **D1** journey-bound cases: a known limitation, because no admission policy is current and no case was ever admitted (dev DB); the fix is a precondition for turning journey admission on. **D2** B1 status tokens approved as proposed (`token-proposals.md`). **D3** price first stays; the recommendation-first suggestion is closed. **D4** the public site uses the four stages as on How it works, and a generic team introduction until real coordinator content exists. | Owner |
 | 2026-10-09 | Batch 3 (owner): **B3-1** the travel-package question leaves the intake (the coordinator sets it in the portal); **B3-2** coordinator introduction = role, Arabic and English, WhatsApp (no name, photo or hours); **B3-3** the routers are unnumbered and link to How it works. | Owner |
 | 2026-10-09 | Close (owner): fix the re-critique P1s as part of the close; accept the Teams/People/governance e2e coverage gap as post-launch. Fees: the site states nothing about whether sending a case or the review costs anything. | Owner |
+| 2026-10-15 | Area 1 plan `plans/patient-portal-file.md` **approved** with the recommendations: **D-1** stamp dates from backend milestones; **D-2** Copy controls on the payment slip; **D-3** no fourth (Acknowledged) stamp; **D-4** quiet emergency notice on the patient pages; **D-5** no only-account line until the business confirms. Slice T first. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -438,10 +439,10 @@ Update at the end of every phase.
 ## Next exact action
 
 **UX area 1 — patient portal as the file** (`plans/patient-portal-file.md`, branch `feat/ux-area-1-portal-file`, worktree
-`zealous-kapitsa-ee74d4`): critique **23/40** and shape plan written, **at the owner gate — not approved, no code**. Next: the
+`zealous-kapitsa-ee74d4`): critique **23/40** and shape plan **approved by the owner (2026-10-15)** with D-1 backend milestones, D-2 Copy yes, D-3 no fourth stamp, D-4 quiet notice, D-5 not yet. Was: the
 owner approves the plan and decides D-1 (stamp dates: backend milestones, recommended), D-2 (Copy on the payment slip), D-3
 (no fourth stamp, recommended), D-4 (quiet emergency notice on the patient pages) and D-5 (only-account assurance, business);
-then slices T → A → F → B → C → D → E in about three sessions. Correction: "My Care + multiple cases" below **is committed**
+then slices T → A → F → B → C → D → E in about three sessions. **Slice T is built and committed; next is slice A (foundations).** Correction: "My Care + multiple cases" below **is committed**
 (`0d743b2`, 2026-10-13) and is an ancestor of this branch; it is reused, not rebuilt.
 
 **My Care + multiple cases** (`plans/patient-my-care.md`, owner-approved 2026-10-13) built by `/redesign-area` on
@@ -519,4 +520,5 @@ case sent / specialist reviewing / estimate ready from backend event dates only;
 journey) unchanged. Owner decisions D-1…D-5 open; legal L-6 (payment-instruction lines in `commercial-terms.ts`) added to the
 legal list. Found out of scope: the patient workspace returns the staff timeline (actor names, reasons) and open assignments
 (staff subjects) — backend data-minimisation follow-up.
-**Status: at the owner gate.**
+**Status: plan approved 2026-10-15 (decisions D-1 milestones, D-2 Copy yes, D-3 no, D-4 quiet notice, D-5 not yet).**
+**Slice T built (truth first):** activation's ready page lists only true steps (account only when active; deposit received / not needed only when so) and names an unpaid deposit as the next step — heading, amount owed, how it is paid in My Care, one "Sign in to pay"; the unreachable deposit stage and its "no action / coordinator arranges" copy are gone; "will contact you shortly" removed. The status link's deposit phase says how and where to pay (true whether or not it was paid), shows no "nothing needed" and no team timing, offers one "Sign in to pay" link, and marks the step as the patient's on the tracker. ProfileActivation's and the journey tracker's copy moved to `messages/{en,ar}.json` (`secureLink.activation`, `secureLink.journey`, passed from the server pages; parity test extended); names and numbers bidi-isolated. The My Care fixture's retired `WAIT_DEPOSIT_ARRANGEMENT` became `WAIT_PAYMENT_CHECK` with a submitted reference (scenario `deposit-checking`), which fixes 6 My Care specs that failed on the base branch. Reviews (React/composition, web guidelines, RTL/i18n, Pro Max): 1 HIGH (deposit phase gave no way to pay) and 6 MEDIUM fixed; LOWs to backlog "Area 1 — slice T". Verify: typecheck ok; eslint 0 errors on touched files (1 pre-existing warning); vitest 66 files / 471; Playwright my-care, my-care-new-case, my-care-polish, activation-flow, status-access, status-proposal and a11y (en + ar) 72/72. Screenshots: `screenshots/area-1/after/t-*`. Next: slice A (foundations).

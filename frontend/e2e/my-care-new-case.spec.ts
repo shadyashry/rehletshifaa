@@ -15,7 +15,7 @@ async function consentAndSend(page: Page) {
 }
 
 test("a signed-in patient sends a case for someone else: who, relationship, and their own saved contact", async ({ page }) => {
-  const { writes } = await setupPatient(page, "deposit-arranging");
+  const { writes } = await setupPatient(page, "deposit-checking");
   await page.goto("/en/send-my-case");
   await expect(page.getByText("Signed in as")).toBeVisible();
   await page.getByText("Someone else", { exact: true }).click();
@@ -35,7 +35,7 @@ test("a signed-in patient sends a case for someone else: who, relationship, and 
 });
 
 test("someone else without a name or relationship is not sent", async ({ page }) => {
-  const { writes } = await setupPatient(page, "deposit-arranging");
+  const { writes } = await setupPatient(page, "deposit-checking");
   await page.goto("/en/send-my-case");
   await page.getByText("Someone else", { exact: true }).click();
   await consentAndSend(page);
@@ -44,7 +44,7 @@ test("someone else without a name or relationship is not sent", async ({ page })
 });
 
 test("a limit on cases for others is explained, not a generic failure", async ({ page }) => {
-  await setupPatient(page, "deposit-arranging", { newCaseRefusal: { status: 429, code: "TOO_MANY_CASES_FOR_OTHERS" } });
+  await setupPatient(page, "deposit-checking", { newCaseRefusal: { status: 429, code: "TOO_MANY_CASES_FOR_OTHERS" } });
   await page.goto("/en/send-my-case");
   await page.getByText("Someone else", { exact: true }).click();
   await page.getByLabel("Given name(s)").fill("Omar");
@@ -57,7 +57,7 @@ test("a limit on cases for others is explained, not a generic failure", async ({
 });
 
 test("the default is still the patient's own next case, with nothing about another person", async ({ page }) => {
-  const { writes } = await setupPatient(page, "deposit-arranging");
+  const { writes } = await setupPatient(page, "deposit-checking");
   await page.goto("/en/send-my-case");
   await expect(page.getByLabel("Given name(s)")).toHaveCount(0);
   await consentAndSend(page);
@@ -67,7 +67,7 @@ test("the default is still the patient's own next case, with nothing about anoth
 
 test("in Arabic, the same choice reads right-to-left on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await setupPatient(page, "deposit-arranging");
+  await setupPatient(page, "deposit-checking");
   await page.goto("/ar/send-my-case");
   await page.getByText("لشخص آخر", { exact: true }).click();
   await expect(page.getByText(/بصفتك ممثلًا عنه/)).toBeVisible();
@@ -77,7 +77,7 @@ test("in Arabic, the same choice reads right-to-left on a phone", async ({ page 
 
 test("signed in, the header leads back to My Care instead of offering Sign in", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await setupPatient(page, "deposit-arranging");
+  await setupPatient(page, "deposit-checking");
   await page.goto("/en");
   const header = page.locator("header.site-header");
   await expect(header.getByRole("link", { name: "My Care" })).toHaveAttribute("href", "/en/portal");
