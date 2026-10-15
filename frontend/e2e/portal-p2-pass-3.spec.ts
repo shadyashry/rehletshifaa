@@ -91,10 +91,19 @@ test("picking a view from inside a case moves focus to that view's visible headi
   await expect(heading).toBeFocused();
 });
 
-test("leaving a case by Back to My work hands the focus to the view's heading", async ({ page }) => {
+// UX 2-2: Back returns to the row the case was opened from (staff-keyboard.spec.ts); with no row, to the view's heading.
+test("leaving a case by Back hands the focus back to the row it was opened from", async ({ page }) => {
   await setupPortal(page, "COORDINATOR_LEAD");
   await page.goto("/en/portal?view=mine");
   await openFirstCase(page);
+  await page.getByRole("button", { name: /^Back to / }).click();
+  await expect(page.locator("#staff-view [data-roving-list] [data-roving-primary]").first()).toBeFocused();
+});
+
+test("leaving a case opened from elsewhere (its URL) by Back hands the focus to the view's heading", async ({ page }) => {
+  await setupPortal(page, "COORDINATOR_LEAD");
+  await page.goto("/en/portal?view=mine&case=owned");
+  await page.locator("#case-heading").waitFor();
   await page.getByRole("button", { name: /^Back to / }).click();
   await expect(page.getByRole("heading", { level: 2, name: "My cases" })).toBeFocused();
 });

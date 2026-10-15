@@ -880,11 +880,12 @@
   }
   :is(.portal-shell, .account-dialog, .portal-account) button:disabled:not(:root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline)) { opacity: var(--button-disabled-opacity); cursor: not-allowed; }
   /* Filled and edged buttons go inert by colour, so the label stays legible; after the hover rules so hover cannot wake them. */
-  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):disabled, :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):disabled:hover {
+  /* `aria-disabled` is the same state on a control that must stay focusable (a list's roving Open while the portal is busy). */
+  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):is(:disabled, [aria-disabled="true"]), :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):is(:disabled, [aria-disabled="true"]):hover {
     opacity: 1; cursor: not-allowed; transform: none; box-shadow: none;
     background: var(--button-disabled-bg); color: var(--button-disabled-fg); border-color: var(--button-disabled-border);
   }
-  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):disabled::after { display: none; }
+  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):is(:disabled, [aria-disabled="true"])::after { display: none; }
   .portal-shell .card { box-shadow: var(--shadow-card); }
   .portal-shell fieldset:disabled { opacity: .65; }
   .portal-shell h2, .portal-shell h3 { scroll-margin-top: 7rem; }

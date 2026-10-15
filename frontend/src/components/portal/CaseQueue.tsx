@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
+import { useRovingList, useShortcutsEnabled } from "@/components/portal/StaffShortcuts";
 import { StatusBadge, caseStatusTone } from "@/components/portal/StatusBadge";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { matchesKpi, type KpiFilter } from "@/components/portal/RoleDashboardSummary";
@@ -69,6 +70,9 @@ function attentionChip(item: QueueCase, copy: WorkCopy["attention"], now = Date.
  * <p>One list, because staff scan and act rather than browse (the Cards view was removed at GATE P2-2). The toolbar
  * carries only search, filters and sort — everything else lives in the filter panel and surfaces as removable chips,
  * so the page shows work rather than controls. Row selection appears only where a bulk action exists for it.
+ *
+ * <p>The rows are one tab stop (UX 2-2): Tab lands on the current row's Open, ↑/↓, Home/End and `j`/`k` move between
+ * rows, Enter opens; Shift+Tab from Open reaches that row's other controls.
  */
 export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,busy,state,scope="all",title,onChange,onOpen,onMutate,onTransfer,statusLabel,categoryLabel}: {
   locale:Locale; role:string; cases:T[]; subject?:string; lead:boolean; busy:boolean; state:QueueState; scope?:"mine"|"team"|"all";
@@ -107,6 +111,8 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   const selectedCases=list.filter(item=>selectedIds.has(item.id));
   const pages=Math.max(1,Math.ceil(list.length/12)), page=Math.min(current.page,pages);
   const pageItems=list.slice((page-1)*12,page*12);
+  const roving=useRovingList(pageItems.map(item=>item.id),{rowActions:true});
+  const shortcuts=useShortcutsEnabled();
   const pageSelected=pageItems.length>0&&pageItems.every(item=>selectedIds.has(item.id));
   const canBulkClaim=coordinator&&selectedCases.length>0&&selectedCases.every(item=>!item.coordinatorSubject&&item.status==="RECEIVED");
   // Bulk work exists only for unowned requests (take ownership) and my own cases (request information).
@@ -157,7 +163,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
       <label className="relative min-w-0 flex-1 basis-56">
         <span className="sr-only">{text.search}</span>
         <Search aria-hidden size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-ink-400"/>
-        <input type="search" className="field ps-9" placeholder={text.search} value={state.search} onChange={event=>change({search:event.target.value})}/>
+        <input type="search" aria-keyshortcuts={shortcuts?"/":undefined} className="field ps-9" placeholder={text.search} value={state.search} onChange={event=>change({search:event.target.value})}/>
       </label>
 
       <div className="relative">
@@ -238,7 +244,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
 
       {!busy&&!list.length
         ?<div className="card px-6 py-10 text-center"><FolderOpen className="mx-auto mb-3 text-brand-600" size={26} aria-hidden/><h3 className="font-bold text-ink-900">{chips.length||state.search?text.noMatch:text.empty}</h3><p className="mt-1.5 text-[0.85rem] text-ink-500">{text.emptyHint}</p>{(chips.length>0||state.search)&&<button type="button" className="link-cta mt-4 text-[0.85rem]" onClick={()=>{clearAll();change({search:""});}}>{text.clearAll}</button>}</div>
-        :<ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-white">
+        :<>{roving.hint}<ul {...roving.listProps} className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-white">
           {pageItems.map(item=>{
             const pending=item.assignmentStatus==="PENDING"&&item.assignmentId;
             const claimable=coordinator&&!item.coordinatorSubject&&item.status==="RECEIVED";
@@ -248,6 +254,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             // Every row repeats the same action words, so each button is also named by its case ("Open RS-…"); the
             // visible word comes first, so the name still contains what is on screen.
             const named=(action:string)=>`${action} ${item.caseNumber}`;
+            const tab=roving.secondary(item.id);
             // Only the number is isolated left-to-right, so "الحالة RS-…" still reads right-to-left in Arabic.
             const [titleBefore,titleAfter=""]=text.caseTitle.split("{number}");
             const title=item.patientName?<bdi>{item.patientName}</bdi>:<>{titleBefore}<bdi dir="ltr">{item.caseNumber}</bdi>{titleAfter}</>;
@@ -263,22 +270,22 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
               {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><Files size={13} aria-hidden/>{plural(work.locale,item.documentCount??0,work.plural.documents)}</span>}
             </>;
             const actions=<>
-              {claimable&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-label={named(text.claim)} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
-              {pending&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-label={named(text.accept)} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
-              {transferable&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-haspopup="dialog" aria-label={named(text.transfer)} onClick={()=>onTransfer?.(item)}>{text.transfer}</button>}
+              {claimable&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} tabIndex={tab} aria-label={named(text.claim)} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
+              {pending&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} tabIndex={tab} aria-label={named(text.accept)} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
+              {transferable&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-haspopup="dialog" tabIndex={tab} aria-label={named(text.transfer)} onClick={()=>onTransfer?.(item)}>{text.transfer}</button>}
               {/* Opening is the row's quiet default; only a business action (take ownership, accept) is filled. */}
-              <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-label={named(text.open)} onClick={()=>onOpen(item)}>{text.open}<ArrowRight size={14} aria-hidden className="rtl:rotate-180"/></button>
+              <button type="button" {...roving.primary(item.id)} className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" aria-disabled={busy||undefined} aria-label={named(text.open)} onClick={()=>{if(!busy)onOpen(item);}}>{text.open}<ArrowRight size={14} aria-hidden className="rtl:rotate-180"/></button>
             </>;
 
 
-            return <li key={item.id} className="flex flex-col gap-3 p-3.5 transition hover:bg-brand-50/40 sm:flex-row sm:items-center sm:gap-4">
-              {selectable&&<label className="-m-3.5 inline-grid h-11 w-11 flex-none cursor-pointer place-items-center"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={selectedIds.has(item.id)} onChange={()=>toggle(item.id)} aria-label={fillTemplate(text.selectCase,{number:item.caseNumber})}/></label>}
+            return <li key={item.id} data-row={item.id} data-case={item.id} className="flex flex-col gap-3 p-3.5 transition hover:bg-brand-50/40 has-[[data-roving-primary]:focus-visible]:bg-brand-50 sm:flex-row sm:items-center sm:gap-4">
+              {selectable&&<label className="-m-3.5 inline-grid h-11 w-11 flex-none cursor-pointer place-items-center"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={selectedIds.has(item.id)} tabIndex={tab} onChange={()=>toggle(item.id)} aria-label={fillTemplate(text.selectCase,{number:item.caseNumber})}/></label>}
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                   <p className="truncate font-bold text-ink-900">{title}</p>
                   {item.patientName&&<span className="text-[0.8125rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>}
                   {item.careCategory&&<span className="text-[0.8125rem] text-ink-500">{categoryLabel(item.careCategory)}</span>}
-                  <button type="button" className="-my-3.5 inline-grid h-11 w-11 place-items-center text-ink-400 transition hover:text-brand-700" title={copied===item.id?text.copied:fillTemplate(text.copy,{number:item.caseNumber})} aria-label={fillTemplate(text.copy,{number:item.caseNumber})}
+                  <button type="button" tabIndex={tab} className="-my-3.5 inline-grid h-11 w-11 place-items-center text-ink-400 transition hover:text-brand-700" title={copied===item.id?text.copied:fillTemplate(text.copy,{number:item.caseNumber})} aria-label={fillTemplate(text.copy,{number:item.caseNumber})}
                           onClick={()=>{void navigator.clipboard?.writeText(item.caseNumber).then(()=>{setCopied(item.id);setTimeout(()=>setCopied(null),1500);}).catch(()=>{});}}>
                     {copied===item.id?<Check size={13}/>:<Copy size={13}/>}
                   </button>
@@ -291,7 +298,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
               <div className="flex flex-none flex-wrap gap-2 sm:justify-end">{actions}</div>
             </li>;
           })}
-        </ul>}
+        </ul></>}
 
       {pages>1&&<nav className="mt-4 flex items-center justify-between gap-3" aria-label={text.pages}>
         <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={page===1} onClick={()=>change({page:page-1})}>{text.previous}</button>

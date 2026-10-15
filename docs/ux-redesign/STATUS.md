@@ -729,3 +729,66 @@ casts in Portal/StaffQueue); Back/Next are buttons, not links (no open-in-new-ta
 
 **Next:** slice 2-2 — keyboard flow (roving lists in My work and the queue, return to the row, shortcut layer with `?` help
 and an off switch, `n` = Next in My work on a case).
+
+## UX area 2 — slice 2-2: the keyboard flow (2026-10-16, worktree `serene-poincare-31f0bc`, branch `claude/serene-poincare-31f0bc` fast-forwarded to 2-1 @ `680b2ed`)
+
+**Built (enhances the accepted views; Petrol & Paper unchanged, no new token).**
+- **Roving-focus lists** (`portal/StaffShortcuts.tsx` `useRovingList`, used by `MyWork.tsx` and `CaseQueue.tsx`): each list is one
+  tab stop — the current row's Open; ↑/↓ and Home/End move between rows (vertical, so nothing to mirror in RTL), Enter opens
+  (the native button). In the queue the row's other controls (select, copy, take ownership, accept, transfer) join the tab
+  order only while the focus is in the list, so Tab enters on Open and Shift+Tab reaches the rest of that row. The current row
+  is kept by id; when it leaves the list (work done) the row that took its place is current. A petrol-50 wash marks the row
+  whose Open has keyboard focus (`has-[…:focus-visible]`). A screen-reader hint (`aria-describedby`) says how the list moves.
+  The queue's Open uses `aria-disabled` while the portal is busy (styled as the Inert button in `globals.css`), so the roving
+  target never drops the focus.
+- **Back returns to the row** (`Portal.tsx`): opening a case records the row it was opened from; Back (and browser Back)
+  focuses the row of the case being closed if it is in the visible list (after `n` that is a later row), else the row first
+  opened, else the list's current row — keeping the scroll position. A case opened from elsewhere (URL, notification) still
+  hands the focus to the view's heading; switching views from a case does too.
+- **Shortcuts** (`StaffShortcuts`, rendered once by Portal for staff; `useStaffShortcut` for a component's own key): `?` help;
+  `j`/`k` next/previous row (from anywhere on a list view); `g` then `w`/`c`/`t`/`m` for My work / My cases / Team queue /
+  Conversations (only the views the person has); `/` search (My work and Conversations have none, so `/` goes to My cases and
+  its search); `n` on a case = 2-1's `nextItem`/`openNext` (same leave guard). Bound by `event.code`, so an Arabic layout works;
+  ignored in text fields and non-modal popups, with Ctrl/Alt/Meta (Shift only for `?`), while any modal `<dialog>` is open, and
+  for the key after `g` (consumed). **On by default (O-2)**, with an off switch in the help dialog (WCAG 2.1.4), stored per
+  browser in localStorage (`portal-shortcuts`, try/catch, synced across tabs); arrow keys and Enter are widget keys and stay on.
+- **Help dialog**: a native modal `<dialog>` (the CaseDrawer header pattern; focus returns to the opener), groups *Anywhere*
+  (`?`, `g` + view), *In a list* (arrows · `j` `k`, Home/End, Enter, Shift+Tab, `/`), *On a case* (`n`); flat Latin keycaps
+  (`<kbd dir="ltr" lang="en">`, page font, hairline), arrows named for screen readers; the off switch with its note. A quiet
+  "Keyboard shortcuts ?" text button at the foot of the staff portal opens it (and reopens it when shortcuts are off).
+- **Back/Next stay buttons (2-1 follow-up, decided):** both are in-place transitions with the leave-with-draft guard, focus and
+  scroll rules (and now `n`); as links they would invite a second tab of the same workspace, whose drafts the guard cannot
+  see. Every case keeps its shareable URL (`?case=`) for anyone who needs a new tab.
+- **Copy:** `portalWork.shortcuts` in en + ar (Arabic per the RTL review: "اختصارات بمفتاح واحد", "فتح الحالة في الصف المحدد",
+  verbal nouns for the moves, "في صفحة الحالة", an intro that tells an Arabic-layout user to press the key bearing the Latin letter).
+
+**Reviews** (Impeccable + Vercel skills loaded before code; four read-only reviews; HIGH/MEDIUM fixed): React/composition (no
+HIGH; stale in-list state when focus leaves without a blur → document focusin/focusout; disabled Open as roving target →
+`aria-disabled`; Back after `n` → row of the closing case; one storage listener; listener-order test), web guidelines
+(return by row id, list hint for screen readers, Shift+Tab row in help, switch labelled once, `aria-keyshortcuts` on the
+trigger and the queue search, off note), RTL/i18n (wording above, `lang` on keycaps), Pro Max (regrouped into three groups by
+where keys work, merged ↑↓/j k row, one-sentence intro, label-micro group headings, flat keycaps, wash meets the hairlines,
+no extra hairline at the foot; its HIGH — rows under the header — is already met by the root `scroll-padding-top: 6.5rem`).
+Visual pass on the EN/AR 390/1440 shots. Impeccable detector: 0 findings (after the keycap's 2px edge went).
+
+**Verify.** `pnpm typecheck` ok; eslint 0 on touched files; vitest 70 files / 548 (new `StaffShortcuts.test.tsx`: one tab stop,
+arrows/Home/End, physical keys with an Arabic `key`, fields/modifiers/modal ignored, `g` prefix, help + off switch kept,
+listener order both ways, list hint); Playwright on :3114 (staff-keyboard [new], staff-home, portal-ux, portal-p2-pass-3,
+portal-reliability, care-coordination, workspace-case-switch, ux8-commercial-journeys, case-cover, a11y en + ar): 106/109 in
+the full run, the 3 failures (a `newPage` timeout and two case-heading focus checks under load) green on rerun. Spec changed:
+portal-p2-pass-3 "Back hands the focus to the heading" now expects the row (and a URL-opened case keeps the heading).
+Overwritten pass-2/pass-3 and 2-1 shots restored.
+
+**Screenshots:** `screenshots/area-2/2-2/` — `help-{en,ar}-{390,1440}`, `my-work-row-{en,ar}-{390,1440}` (keyboard-focused row),
+`my-cases-row-{en,ar}-1440`.
+
+**Follow-ups (not in 2-2):** opening a case focuses `#case-heading` in one rAF, which misses when the lazy case chunk arrives
+late under load (seen in e2e, pre-existing from 2-1; focus once the case view mounts — 2-4, Portal); claim/accept disable the
+row's own buttons and drop the focus to the body (return it to the row); a polite cue while `g` waits for its second key;
+`aria-keyshortcuts="n"` on Next in My work (StaffCaseView, 2-4); the queue re-renders whole on each arrow (split the rows into
+their own component if the list grows); `useEffectEvent` once `@types/react` ≥ 19.2; Conversations becomes a roving list in 2-3;
+the hover and focus washes in the queue are close (hover could move to paper); the pre-existing inline finance link copy in
+Portal (2-4).
+
+**Next:** slice 2-3 — messages + conversations (thread tabs with unread counts, Consultant naming, reply from the strip,
+conversation list states, underline scope tabs, focus/live region, bidi; both components' copy to messages).

@@ -30,6 +30,7 @@ import { scrollIntoView } from "@/lib/scroll";
 import { countryName } from "@/lib/countries";
 import { PROPOSAL_PAYMENT_TERMS_RECORD } from "@/lib/commercial-terms";
 import { type CaseView, type CatalogService, type DirectoryFacility, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
+import { useStaffShortcut } from "@/components/portal/StaffShortcuts";
 import { copy, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, UnreadCount, LockedSection } from "@/components/portal/portal-ui";
 
 const ClinicalReviewPanel=dynamic(()=>import("@/components/portal/ClinicalReview").then(m=>m.ClinicalReviewPanel));
@@ -172,6 +173,8 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   const at=workItems.findIndex(item=>item.caseId===c.id);
   const nextItem=(at<0?workItems:[...workItems.slice(at+1),...workItems.slice(0,at)]).find(item=>item.caseId!==c.id)??null;
   const openNext=nextItem&&openCaseById?()=>openCaseById(nextItem.caseId):null;
+  // `n` (UX 2-2) is the same Next in My work, through the same leave guard.
+  useStaffShortcut("KeyN",openNext);
   const alsoOpen=workItems.filter(item=>item.caseId===c.id&&item.id!==current.workItemId);
   const coverRef=useRef<HTMLElement>(null);
   const line=useCoverGone(coverRef);

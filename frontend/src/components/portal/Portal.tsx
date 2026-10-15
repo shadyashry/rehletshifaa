@@ -14,6 +14,7 @@ import { matchesKpi } from "@/components/portal/RoleDashboardSummary";
 import { initialQueue, ownershipTab, type QueueState } from "@/components/portal/CaseQueue";
 import { StaffNav, isStaffViewId, type StaffViewId, type StaffViewItem } from "@/components/portal/StaffNav";
 import { LeaveCaseDialog, useDraftWatch } from "@/components/portal/LeaveCaseGuard";
+import { StaffShortcuts, focusReturnRow } from "@/components/portal/StaffShortcuts";
 import type { CareView } from "@/components/portal/MyCare";
 import { PatientNav } from "@/components/portal/PatientNav";
 import { WorkCopyProvider, useWorkCopy } from "@/components/portal/portal-copy";
@@ -109,7 +110,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const[chosenRole,setActive]=useState<RoleKey|undefined>();const[cases,setCases]=useState<CaseView[]>([]);const[myTasks,setMyTasks]=useState<Task[]>([]);const[workspace,setWorkspace]=useState<Workspace|null>(null);const[documents,setDocuments]=useState<CaseDocument[]>([]);const[facilities,setFacilities]=useState<DirectoryFacility[]>([]);const[doctors,setDoctors]=useState<VerifiedDoctor[]>([]);const[categories,setCategories]=useState<CareCategory[]>([]);const[staff,setStaff]=useState<StaffMember[]|null>([]);const[doctorProfile,setDoctorProfile]=useState<DoctorProfile|null>(null);const[coordinatorProfile,setCoordinatorProfile]=useState<StaffProfile|null>(null);const[catalog,setCatalog]=useState<CatalogService[]>([]);const[fxRates,setFxRates]=useState<FxRate[]>([]);const[busyCount,setBusyCount]=useState(0);const busy=busyCount>0;const[notice,setNotice]=useState("");const[error,setError]=useState("");
   const [preferences,setPreferences]=useState<Preferences>({displayName:null,locale:null});
   const [queueState,setQueueState]=useState<QueueState>(initialQueue);
-  const queuePosition=useRef(0);const opening=useRef(0);const mutationPending=useRef(false);
+  const queuePosition=useRef(0);const returnToRow=useRef<string|null>(null);const opening=useRef(0);const mutationPending=useRef(false);
   const [documentError,setDocumentError]=useState(false);const [queueLoading,setQueueLoading]=useState(true);const [queueFor,setQueueFor]=useState<string|null>(null);const [landedRole,setLandedRole]=useState<string|null>(null);
   // A role named in the URL (a deep link, or a switch kept there) holds until the person switches; read once, not synced.
   const [roleParam]=useState(()=>typeof window==="undefined"?null:new URLSearchParams(window.location.search).get("role") as RoleKey|null);
@@ -175,7 +176,8 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     // While /me reloads there is no role yet; a role-scoped URL would read /undefined/cases/….
     if(!currentRole)return;
     const request=++opening.current;if(!managedBusy)setBusyCount(n=>n+1);setError("");setDocumentError(false);
-    if(!workspace)queuePosition.current=window.scrollY;
+    // Leaving the list for a case: keep where the page was, and whether a row of a list opened it (UX 2-2: Back returns there).
+    if(!workspace){queuePosition.current=window.scrollY;returnToRow.current=document.activeElement?.closest<HTMLElement>("#staff-view [data-roving-list] [data-row]")?.dataset.row??null;}
     try{
       if(currentRole==="coordinator"&&!item.coordinatorSubject){
         const preview=await api<{caseSummary:CaseView;intakeSummary?:string}>(`/coordinator/cases/${item.id}/intake-preview`);
@@ -204,9 +206,10 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     try{const ws=await api<Workspace>(`/${currentRole}/cases/${caseId}`);await openCase(ws.caseSummary,ws);}
     catch(e){setError(e instanceof Error?e.message:t.error);}
   }
-  function backToQueue(){opening.current++;setWorkspace(null);setError("");setNotice("");const url=new URL(window.location.href);url.searchParams.delete("case");window.history.replaceState({},"",url);
-    // The control that closed the case is gone with it: hand the focus to the view's heading, keeping the scroll position.
-    requestAnimationFrame(()=>{window.scrollTo({top:queuePosition.current,behavior:"instant"});focusViewHeading({preventScroll:true});});}
+  function backToQueue(toRow=true){const closing=workspace?.caseSummary.id??"";opening.current++;setWorkspace(null);setError("");setNotice("");const url=new URL(window.location.href);url.searchParams.delete("case");window.history.replaceState({},"",url);
+    // The control that closed the case is gone with it: the focus goes back to the row the case was opened from, else to the
+    // view's heading, keeping the scroll position either way.
+    requestAnimationFrame(()=>{window.scrollTo({top:queuePosition.current,behavior:"instant"});if(!(toRow&&returnToRow.current!==null&&focusReturnRow(returnToRow.current,closing)))focusViewHeading({preventScroll:true});});}
   // Keep only navigation preferences in this browser session, scoped to the signed-in account.
   // Keyed by the subject, not the User object: a silent token renew hands over a new User and must not reset the view.
   const userSubject=user?.profile.sub;
@@ -269,7 +272,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   useEffect(()=>{if(!caseOpen)return;const onUnload=(event:BeforeUnloadEvent)=>{if(hasDraft()){event.preventDefault();event.returnValue="";}};window.addEventListener("beforeunload",onUnload);return()=>window.removeEventListener("beforeunload",onUnload);},[caseOpen,hasDraft]);
   /** Staff views live in the URL (`?view=`), so Back/Forward, deep links and new tabs reach them. */
   function showStaffView(id:StaffViewId,fromCase:boolean,push=true){
-    if(fromCase)backToQueue();
+    if(fromCase)backToQueue(false);
     changeQueue(withView(queueState,id));
     const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("view",id);
     if(push&&staffView&&!new URLSearchParams(window.location.search).has("view")){const here=new URL(window.location.href);here.searchParams.delete("case");here.searchParams.set("view",staffView);window.history.replaceState({},"",here);}
@@ -350,6 +353,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div id="staff-view" hidden={!!workspace}><Queue viewHref={viewHref} views={staffViews?.items??[]} view={staffView??"work"} onSelectView={selectStaffView} clinic={clinicLink} loading={queueLoading||queueFor!==currentRole} queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff??[]} replyCovers={replyCovers} openCase={openCase} mutate={mutate} fetchJson={api}/></div>}
 
     {currentRole==="finance"&&!workspace&&holds(me,"COMMERCIAL_POLICY_READ")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{locale==="ar"?"سياسات الهامش والدفعة المقدمة":"Margin & deposit policies"}</a>{locale==="ar"?" — في مركز التحكم":" — in the Control Center"}</p>}
+    {staffViews&&<StaffShortcuts views={staffViews.items} caseOpen={!!workspace} onView={selectStaffView}/>}
   </PortalFrame></FeedbackContext.Provider>;
 }
 

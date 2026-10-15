@@ -4,6 +4,7 @@ import { ArrowRight, CalendarClock, Clock3, FileText } from "lucide-react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge } from "@/components/portal/StatusBadge";
+import { useRovingList } from "@/components/portal/StaffShortcuts";
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { careAreaLabel, coordinatorLabel, plural, priorityLabel, waitingLabel, workItemText, type WorkItemCopy } from "@/lib/portal-labels";
 
@@ -24,6 +25,8 @@ export type WorkItem = {
  *
  * <p>Rows are a hairline list with one quiet action each. Only an overdue or urgent first item earns the filled
  * button, so the page never shows a column of identical primaries. An empty list points to the next useful place.
+ *
+ * <p>The list is one tab stop (UX 2-2): ↑/↓, Home/End and `j`/`k` move between rows, Enter opens the row's case.
  */
 export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting = 0, onTeamQueue }: {
   locale: Locale; role?: string; items: WorkItem[]; busy: boolean; onOpen: (caseId: string) => void;
@@ -34,6 +37,7 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
 }) {
   const work = useWorkCopy();
   const t = work.myWork;
+  const roving = useRovingList(items.map(item => item.id));
 
   return (
     <section aria-labelledby="my-work-title" aria-busy={busy} className="mb-8">
@@ -56,14 +60,14 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
             : <p className="mt-1 text-ink-600">{t.emptyHint}</p>}
         </div>
       ) : (
-        <ul className="mt-4 divide-y divide-line border-y border-line">
+        <>{roving.hint}<ul {...roving.listProps} className="mt-4 divide-y divide-line border-y border-line">
           {items.map((item, index) => {
             const lead = index === 0 && (item.overdue || item.priority === "URGENT");
             const titleId = `work-item-${item.id}`;
             const text = workItemText(item, locale, work);
             return (
-            <li key={item.id}>
-              <article aria-labelledby={titleId} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:gap-6">
+            <li key={item.id} data-row={item.id} data-case={item.caseId}>
+              <article aria-labelledby={titleId} className="flex flex-col gap-3 py-4 transition-colors has-[[data-roving-primary]:focus-visible]:bg-brand-50 sm:flex-row sm:items-center sm:gap-6">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <PriorityChip priority={item.priority} label={priorityLabel(item.priority, work.priority)}/>
@@ -91,7 +95,7 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
                     {item.waitingOn && item.waitingOn !== "NONE" && <span>{work.waiting.label}: {waitingLabel(item.waitingOn, work.waiting, { role, holdsWork: true })}</span>}
                   </p>
                 </div>
-                <button type="button"
+                <button type="button" {...roving.primary(item.id)}
                         className={lead ? "btn-primary w-full justify-center sm:w-auto" : "inline-flex min-h-11 items-center gap-1.5 self-start font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current sm:self-center"}
                         onClick={() => onOpen(item.caseId)}>
                   {item.type==="CONSULTANT_ASSIGNMENT"?t.reviewAssignment:t.open}
@@ -102,7 +106,7 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
             </li>
             );
           })}
-        </ul>
+        </ul></>
       )}
     </section>
   );

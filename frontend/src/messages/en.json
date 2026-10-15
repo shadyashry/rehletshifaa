@@ -1866,6 +1866,38 @@
       "overdueSince": "Overdue since {date}",
       "separator": ", "
     },
+    "shortcuts": {
+      "open": "Keyboard shortcuts",
+      "offState": "off",
+      "title": "Keyboard shortcuts",
+      "close": "Close",
+      "intro": "Press the key marked with the Latin letter shown, whatever your keyboard language. Shortcuts pause while you type in a field or while a dialog is open.",
+      "inList": "In a list",
+      "move": "Next or previous row",
+      "firstLast": "First or last row",
+      "openRow": "Open the row's case",
+      "then": "then",
+      "anywhere": "Anywhere",
+      "search": "Search cases",
+      "help": "Show these shortcuts",
+      "onCase": "On a case",
+      "listHint": "Up and down arrows move between rows.",
+      "listHintActions": "Up and down arrows move between rows; Shift+Tab reaches this row's other actions.",
+      "rowActions": "This row's other actions",
+      "offNote": "Single-key shortcuts are off. Arrow keys and Enter in lists still work.",
+      "next": "Open the next item in My work",
+      "switch": "Single-key shortcuts",
+      "switchHint": "Turn them off if they get in the way of voice control or a screen reader. Arrow keys and Enter in lists keep working. Saved in this browser.",
+      "keys": {
+        "up": "Up arrow",
+        "down": "Down arrow",
+        "home": "Home",
+        "end": "End",
+        "enter": "Enter",
+        "shift": "Shift",
+        "tab": "Tab"
+      }
+    },
     "leaveCase": {
       "title": "Leave this case?",
       "body": "Text you typed in this case hasn’t been sent. If you leave now, it will be lost.",
