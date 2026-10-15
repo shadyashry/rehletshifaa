@@ -1044,6 +1044,10 @@
       "patientResponded": "Patient responded"
     },
     "plural": {
+      "filePages": {
+        "one": "Your file · {count} page",
+        "other": "Your file · {count} pages"
+      },
       "workingDays": {
         "one": "{count} working day",
         "other": "{count} working days"
@@ -1327,7 +1331,11 @@
       "stamp": {
         "received": "Received",
         "inReview": "In review",
-        "estimateReady": "Estimate ready"
+        "estimateReady": "Estimate ready",
+        "sent": "Sent"
+      },
+      "file": {
+        "earlier": "Earlier in your file"
       },
       "nav": {
         "label": "My Care",
@@ -1521,8 +1529,6 @@
         "copied": "Copied",
         "copiedAnnounce": "{label} copied.",
         "copyFailed": "Could not copy {label}. Select it and copy it yourself.",
-        "total": "Coordination deposit",
-        "received": "Already received",
         "estimateNote": "This deposit is based on your preliminary estimate. Your treatment and its final price may change after your doctor examines you in person; the deposit is deducted from your final treatment plan and quote.",
         "method": "How would you like to pay?",
         "online": "Online payment",
@@ -1560,6 +1566,18 @@
         "title": "Coordination deposit",
         "received": "Received",
         "sentReference": "Reference you sent",
+        "track": {
+          "label": "Payment steps",
+          "steps": [
+            "You pay and send the reference",
+            "Finance checks it",
+            "Received"
+          ]
+        },
+        "receipt": "Your payment",
+        "receivedOf": "{paid} of {total} received",
+        "remaining": "{amount} remaining",
+        "paidChart": "{paid} of the {total} deposit received.",
         "status": {
           "REQUESTED": "Due",
           "CHECKING": "Being checked",

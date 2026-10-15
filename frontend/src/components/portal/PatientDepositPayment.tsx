@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Check, CircleAlert, Copy, Info } from "lucide-react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
+import { PaidBar, PaymentTrack } from "@/components/portal/DepositVisuals";
 import type { Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
@@ -33,7 +34,8 @@ export function PatientDepositPayment({ locale, caseId, currency, amountDue, tot
   locale: Locale; caseId: string; currency: string; amountDue: number | null; totalDue: number | null; received: number | null;
   bank: BankTransferData; transfer?: TransferReportData | null; busy: boolean; mutate: Mutate;
 }) {
-  const t = useWorkCopy().myCare.payment;
+  const myCare = useWorkCopy().myCare;
+  const t = myCare.payment;
   const [method, setMethod] = useState<Method>(transfer?.method === "AGENT_CASH" ? "AGENT_CASH" : "BANK_TRANSFER");
   const [reference, setReference] = useState("");
   // A rejected agent payment keeps the agent the patient named; only the receipt number is entered again.
@@ -86,16 +88,16 @@ export function PatientDepositPayment({ locale, caseId, currency, amountDue, tot
       <section aria-labelledby={`${fieldId}-due`}>
         <h3 id={`${fieldId}-due`} className="label-micro text-ink-500">{t.amountDue}</h3>
         <p className="statement mt-1 text-brand-900 tabular-nums"><bdi dir="ltr">{money(amountDue)}</bdi></p>
-        {received != null && received > 0 && (
-          <p className="mt-1 text-[0.875rem] text-ink-600">
-            {t.total} <bdi dir="ltr" className="tabular-nums">{money(totalDue)}</bdi> · {t.received} <bdi dir="ltr" className="tabular-nums">{money(received)}</bdi>
-          </p>
-        )}
+        {/* Part already received: how much of the deposit, as a bar with its figures (the amount above is what remains). */}
+        {received != null && received > 0 && totalDue ? <PaidBar paid={received} total={totalDue} currency={currency} locale={locale} copy={myCare.deposit} className="mt-3"/> : null}
         {/* The estimate caveat as a quiet note: an icon and a hairline, no tinted panel. */}
         <p className="mt-3 flex gap-2.5 border-t border-line pt-3 text-[0.875rem] leading-6 text-ink-700">
           <Info size={18} aria-hidden className="mt-0.5 flex-none text-brand-600"/>
           <span>{t.estimateNote}</span>
         </p>
+        {/* Where the payment is: always the patient's turn on this step (a rejected reference included). */}
+        <PaymentTrack steps={myCare.deposit.track.steps} current={0} label={myCare.deposit.track.label}
+                      completedLabel={myCare.journey.done} currentLabel={myCare.journey.current} className="mt-5"/>
       </section>
 
       <fieldset className="min-w-0">

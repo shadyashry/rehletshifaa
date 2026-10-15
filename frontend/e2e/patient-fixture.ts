@@ -18,6 +18,8 @@ const deposit = { id: "dep-1", status: "REQUESTED", currency: "USD", totalEgp: 2
 const transfer = { id: "tr-1", method: "BANK_TRANSFER", reference: "FT26091200481", status: "SUBMITTED", submittedAt: "2026-09-12T08:30:00Z" };
 /** `pay-deposit`: the deposit is the patient's step (PAY_DEPOSIT) with the platform account (dummy details); `pay-deposit-rejected`: part was received and the last reference was not confirmed. */
 const bankTransfer = { accountName: "RehletShifaa Test Account", bankName: "Test Bank (dummy details)", accountNumber: "0000000000000", iban: "EG000000000000000000000000000", swift: "TESTEGCXXXX", paymentReference: "RS-2026-000081" };
+/** `deposit-paid`: Finance confirmed the reference the patient sent (UX 1c-1: the receipt is stamped Received on that date). */
+const confirmed = { ...transfer, status: "CONFIRMED", decidedAt: "2026-09-13T11:00:00Z" };
 const rejected = { id: "tr-2", method: "BANK_TRANSFER", reference: "FT0000", status: "REJECTED", submittedAt: "2026-09-12T08:30:00Z", reason: "No transfer with this reference reached the account." };
 
 /** `proposal-recorded`: the coordinator recorded the patient's acknowledgement after an Arabic call (assisted path). */
@@ -62,7 +64,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     proposal: early ? null : { ...proposal, status: ready ? "RELEASED" : "ACCEPTED", assistance: scenario === "proposal-recorded"
       ? { requestedAt: "2026-09-10T09:00:00Z", decisionSource: "RECORDED_ON_BEHALF", recordedByName: "Sara Ahmed", channel: "WHATSAPP_CALL", confirmedBy: "PATIENT", conversationAt: "2026-09-11T09:00:00Z", decidedAt: "2026-09-11T09:05:00Z" }
       : null as null | Record<string, string> },
-    deposit: ready || early ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0 }
+    deposit: ready || early ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0, transfer: confirmed }
       : scenario === "pay-deposit" ? { ...deposit, bankTransfer, transfer: null }
       : scenario === "pay-deposit-rejected" ? { ...deposit, status: "PARTIALLY_PAID", paidDisplay: 200, balanceDisplay: 300, bankTransfer, transfer: rejected }
       : { ...deposit, transfer },

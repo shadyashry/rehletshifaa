@@ -273,7 +273,8 @@ test("a step that is not one of the three moments carries no stamp", async ({ pa
   await setupPatient(page, "deposit-checking");
   await page.goto("/en/portal");
   await expect(page.getByRole("heading", { name: "We're checking your payment" })).toBeVisible();
-  await expect(page.locator(".case-stamp")).toHaveCount(0);
+  // The page itself is unstamped; the earlier pages of the file and the payment receipt carry their own (UX 1c-1).
+  await expect(page.locator(".dossier-page-stamp .case-stamp")).toHaveCount(0);
 });
 
 test("Back returns to the previous case and view instead of leaving My Care", async ({ page }) => {

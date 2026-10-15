@@ -7,8 +7,10 @@ import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { EmergencyGuidance } from "@/components/EmergencyGuidance";
 import { CaseJourney } from "@/components/CaseJourney";
-import { CaseStamp } from "@/components/brand/CaseStamp";
+import { CaseStamp, stampDate } from "@/components/brand/CaseStamp";
 import { DossierPage } from "@/components/brand/DossierPage";
+import { CaseFileStack, type FileSheet } from "@/components/portal/CaseFileStack";
+import { PaidBar, PaymentReceipt, PaymentTrack, paymentStep } from "@/components/portal/DepositVisuals";
 import { careViewHref, isPlainClick } from "@/components/portal/care-view";
 import { careAreaLabel, fillTemplate, plural } from "@/lib/portal-labels";
 import { ConfirmDialog, UnreadCount } from "@/components/portal/portal-ui";
@@ -95,7 +97,21 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
   const focus = actions.currentAction.kind === "FOCUS";
   const expectedDays = actions.currentAction.expectedWorkingDays ?? null;
   const showSwitcher = cases.length > 1;
-  const stamp = code === "REVIEW_PROPOSAL" && finalQuote ? null : stampFor(code, { ...milestones, estimateReadyAt: milestones?.estimateReadyAt ?? patientProposal?.releasedAt }, t.stamp);
+  // A final quote's release is not the estimate's: only an estimate's release stands in for the estimate-ready date.
+  const dated: CaseMilestones = { ...milestones, estimateReadyAt: milestones?.estimateReadyAt ?? (finalQuote ? null : patientProposal?.releasedAt) };
+  const stamp = code === "REVIEW_PROPOSAL" && finalQuote ? null : stampFor(code, dated, t.stamp);
+  // UX 1c-1: each dated moment the journey has reached is an earlier page of the file behind the current one (except
+  // the moment the current page itself is stamped with), and its date sits under its journey step. No date, no sheet.
+  const sheets: FileSheet[] = MOMENTS.flatMap(m => {
+    const at = dated[m.key];
+    return at && m.phase <= phase && m.key !== stamp?.key ? [{ key: m.key, title: t.journey.phases[m.phase], label: t.stamp[m.stamp], date: at }] : [];
+  });
+  const journeyDates = t.journey.phases.map((_, index) => {
+    const moment = MOMENTS.find(m => m.phase === index);
+    const at = moment ? dated[moment.key] : null;
+    const text = at ? stampDate(at, locale) : null;
+    return at && text ? { dateTime: at, text } : null;
+  });
 
   // Arriving from the case switcher: the card that was pressed is gone, so the new case's heading takes focus.
   useEffect(() => { if (takeArrivalFocus(c.id)) document.getElementById("case-heading")?.focus(); }, [c.id]);
@@ -160,7 +176,8 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
         <div className="mt-5 flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,8fr)_minmax(0,4fr)] lg:items-start lg:gap-6">
           {/* CURRENT STEP — the page of the file that matters now: the petrol tab edge, one primary action or a clear "nothing
               needed", and the stamp when this step is one of the three moments and the backend recorded its date. */}
-          <DossierPage edge="tab" aria-labelledby="current-step-title" className="my-care-step lg:col-start-1 lg:row-start-1"
+          <CaseFileStack sheets={sheets} locale={locale} label={t.file.earlier} pages={plural(locale, sheets.length + 1, work.plural.filePages)} className="lg:col-start-1 lg:row-start-1">
+          <DossierPage edge="tab" aria-labelledby="current-step-title" className="my-care-step"
                        stamp={stamp ? <CaseStamp label={stamp.label} date={stamp.date} locale={locale}/> : null}>
             <p className="eyebrow">{t.step.eyebrow}</p>
             <h2 id="current-step-title" className="statement mt-2.5 text-brand-900">{step.title}</h2>
@@ -193,7 +210,7 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
             )}
 
             {/* The money this step is about, inside the step: one place for the amount, on the facts panel. */}
-            {depositInStep && deposit && !(code === "PAY_DEPOSIT" && paymentStep) && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 border-t border-line pt-4"/>}
+            {depositInStep && deposit && !(code === "PAY_DEPOSIT" && paymentStep) && <DepositFacts deposit={deposit} locale={locale} level={3} className="mt-5 border-t border-line pt-4"/>}
             {code === "PAY_DEPOSIT" && focus && paymentStep}
 
             {/* Exactly one primary action, and only when the backend says the patient owes something. */}
@@ -224,6 +241,7 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
               </div>
             )}
           </DossierPage>
+          </CaseFileStack>
 
           {/* COORDINATOR — the relationship that is the product: near the top, a person, one way to reach them. */}
           <section aria-labelledby="coordinator-title" className="card p-5 sm:p-6 lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-start">
@@ -257,7 +275,7 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
           </section>
 
           {/* JOURNEY — orientation only; nothing here is a control. The markers fill as the case moves. */}
-          <CaseJourney id="journey-title" title={t.journey.title} steps={t.journey.phases} current={phase}
+          <CaseJourney id="journey-title" title={t.journey.title} steps={t.journey.phases} current={phase} dates={journeyDates}
                        completedLabel={t.journey.done} currentLabel={t.journey.current} className="card p-5 sm:p-6 lg:col-start-1 lg:row-start-2"/>
 
           {/* ESTIMATE — the document's summary and, once settled, one way to open it. */}
@@ -271,7 +289,7 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
               {proposal.versionNumber > 1 && <p className="mt-1 text-[0.875rem] text-ink-500">{t.estimate.updated}</p>}
               {/* While the deposit is being paid, the payment step already says this; it is said once. */}
               {proposal.documentType === "PRELIMINARY_ESTIMATE" && code !== "PAY_DEPOSIT" && <p className="mt-2 max-w-[65ch] text-[0.875rem] leading-6 text-ink-600">{t.estimate.basis}</p>}
-              {showDeposit && !depositInStep && deposit && <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={3} className="mt-5 border-t border-line pt-4"/>}
+              {showDeposit && !depositInStep && deposit && <DepositFacts deposit={deposit} locale={locale} level={3} className="mt-5 border-t border-line pt-4"/>}
               {/* One control for one outcome: reviewing is already the current step's action, so only the settled document gets a link here. */}
               {patientProposal.action === "VIEW_PROPOSAL" && (
                 <button type="button" className="link-cta mt-4 inline-flex min-h-11 items-center gap-1.5 text-[0.9375rem]" onClick={onOpenProposal}>
@@ -281,7 +299,7 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
             </section>
           )}
           {showDeposit && !depositInStep && !showProposal && deposit && (
-            <DepositFacts deposit={deposit} locale={locale} copy={t.deposit} level={2} className="card p-5 sm:p-6 lg:col-start-1 lg:row-start-3"/>
+            <DepositFacts deposit={deposit} locale={locale} level={2} className="card p-5 sm:p-6 lg:col-start-1 lg:row-start-3"/>
           )}
 
           {!showSwitcher && newCaseHref && (
@@ -309,9 +327,16 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
 }
 
 /** The deposit as authoritative money in a truthful, offline state: amount, status in words, and what happens next. */
-function DepositFacts({ deposit, locale, copy, level, className }: { deposit: DepositSummaryData; locale: Locale; copy: LocalizedWorkCopy["myCare"]["deposit"]; level: 2 | 3; className: string }) {
+function DepositFacts({ deposit, locale, level, className }: { deposit: DepositSummaryData; locale: Locale; level: 2 | 3; className: string }) {
+  const { deposit: copy, stamp: stampCopy, journey } = useWorkCopy().myCare;
   const Heading = level === 2 ? "h2" : "h3";
   const status = copy.status as Record<string, string>, note = copy.note as Record<string, string>;
+  const transfer = deposit.transfer;
+  const checking = transfer?.status === "SUBMITTED", confirmed = transfer?.status === "CONFIRMED";
+  // Partly received: the bar shows only what Finance confirmed; a reference being checked adds nothing to it.
+  const paid = deposit.status === "PARTIALLY_PAID" && deposit.totalDisplay ? deposit.paidDisplay ?? null : null;
+  // The track once the money is moving or done; a deposit merely due is the payment step's to draw.
+  const tracked = deposit.status === "PAID" || checking || confirmed;
   return (
     <section aria-labelledby="deposit-title" className={className}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -319,12 +344,15 @@ function DepositFacts({ deposit, locale, copy, level, className }: { deposit: De
         <StatusBadge tone={depositTone(deposit.status)}>{(deposit.transfer?.status === "SUBMITTED" ? status.CHECKING : status[deposit.status]) ?? deposit.status}</StatusBadge>
       </div>
       <p className="statement mt-2 text-brand-900 tabular-nums"><bdi dir="ltr">{deposit.totalDisplay != null ? formatMoney(deposit.totalDisplay, deposit.currency, locale) : "—"}</bdi></p>
-      {deposit.status === "PARTIALLY_PAID" && deposit.paidDisplay != null && (
-        <p className="mt-1 text-[0.875rem] text-ink-600">{copy.received} <bdi dir="ltr" className="tabular-nums">{formatMoney(deposit.paidDisplay, deposit.currency, locale)}</bdi></p>
+      {paid != null && deposit.totalDisplay ? <PaidBar paid={paid} total={deposit.totalDisplay} remaining={deposit.balanceDisplay} currency={deposit.currency} locale={locale} copy={copy} className="mt-3"/> : null}
+      {tracked && <PaymentTrack steps={copy.track.steps} current={paymentStep(deposit.status, transfer?.status)} label={copy.track.label}
+                                completedLabel={journey.done} currentLabel={journey.current} className="mt-5"/>}
+      {transfer && (checking || confirmed) && (
+        <PaymentReceipt title={copy.receipt} className="mt-4"
+                        rows={[{ label: copy.sentReference, value: <bdi dir="ltr" translate="no">{transfer.reference}</bdi> }]}
+                        stamp={checking ? { label: stampCopy.sent, date: transfer.submittedAt, locale } : { label: stampCopy.received, date: transfer.decidedAt, locale }}/>
       )}
-      {deposit.transfer?.status === "SUBMITTED"
-        ? <p className="mt-1.5 text-[0.875rem] leading-6 text-ink-600">{copy.sentReference}: <bdi dir="ltr" className="font-semibold text-ink-900">{deposit.transfer.reference}</bdi></p>
-        : note[deposit.status] && <p className="mt-1.5 text-[0.875rem] leading-6 text-ink-600">{note[deposit.status]}</p>}
+      {!checking && note[deposit.status] && <p className="mt-3 text-[0.875rem] leading-6 text-ink-600">{note[deposit.status]}</p>}
     </section>
   );
 }
@@ -359,17 +387,25 @@ function depositTone(status: string): StatusTone {
   return status === "PAID" || status === "WAIVED" ? "success" : status === "REFUNDED" || status === "CANCELLED" ? "neutral" : "info";
 }
 
+/** The three moments the file dates (D-1): the journey step each belongs to and the word its stamp carries. */
+const MOMENTS = [
+  { key: "receivedAt", phase: 0, stamp: "received" },
+  { key: "consultantReviewAt", phase: 2, stamp: "inReview" },
+  { key: "estimateReadyAt", phase: 3, stamp: "estimateReady" },
+] as const satisfies readonly { key: keyof CaseMilestones; phase: number; stamp: keyof LocalizedWorkCopy["myCare"]["stamp"] }[];
+
+/** The step whose page carries a moment's stamp: case received (while it waits for the coordinator), in review, estimate ready. */
+const STAMPED_BY: Record<string, keyof CaseMilestones> = { WAIT_COORDINATOR_REVIEW: "receivedAt", WAIT_CONSULTANT_REVIEW: "consultantReviewAt", REVIEW_PROPOSAL: "estimateReadyAt" };
+
 /**
  * D-1: the stamp for the three moments the file records — case received (while it waits for the coordinator), specialist
  * reviewing, estimate ready — keyed by the backend's action code and printed only with the date the backend recorded.
  * No date, no stamp; every other step carries none.
  */
-function stampFor(code: string, milestones: CaseMilestones | null | undefined, labels: LocalizedWorkCopy["myCare"]["stamp"]): { label: string; date: string } | null {
-  const moment = code === "WAIT_COORDINATOR_REVIEW" ? { label: labels.received, date: milestones?.receivedAt }
-    : code === "WAIT_CONSULTANT_REVIEW" ? { label: labels.inReview, date: milestones?.consultantReviewAt }
-    : code === "REVIEW_PROPOSAL" ? { label: labels.estimateReady, date: milestones?.estimateReadyAt }
-    : null;
-  return moment?.date ? { label: moment.label, date: moment.date } : null;
+function stampFor(code: string, milestones: CaseMilestones | null | undefined, labels: LocalizedWorkCopy["myCare"]["stamp"]): { key: keyof CaseMilestones; label: string; date: string } | null {
+  const moment = MOMENTS.find(m => m.key === STAMPED_BY[code]);
+  const date = moment ? milestones?.[moment.key] : null;
+  return moment && date ? { key: moment.key, label: labels[moment.stamp], date } : null;
 }
 
 /**
