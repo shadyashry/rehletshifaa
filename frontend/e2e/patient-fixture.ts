@@ -46,9 +46,12 @@ export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: strin
   /** P1-16: with "deposit-paid", the case is in treatment at this step; the patient treatment API answers `view`, and a decision answers `decided` (then read back). */
   treatment?: { code: "IN_TREATMENT" | "REVIEW_CHANGE_ORDER"; view: Record<string, unknown>; decided?: Record<string, unknown> };
   /** P1-17: with "deposit-paid", the case is discharged (GOING_HOME) or in follow-up; the patient discharge and statements APIs answer these. */
-  discharge?: { code: "GOING_HOME" | "FOLLOW_UP"; view: Record<string, unknown>; statements: Record<string, unknown>[] } };
+  discharge?: { code: "GOING_HOME" | "FOLLOW_UP"; view: Record<string, unknown>; statements: Record<string, unknown>[] };
+  /** P1-18: with "deposit-paid", the case is in follow-up (FOLLOW_UP, REPORT_OUTCOME) or closed and completed (COMPLETED); the patient
+   *  follow-up API answers `view`, the statements API `statements`, and sending the answers answers `reported` (then read back). */
+  followUp?: { code: "FOLLOW_UP" | "REPORT_OUTCOME" | "COMPLETED"; view: Record<string, unknown>; statements?: Record<string, unknown>[]; reported?: Record<string, unknown> } };
 
-export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, finalQuote, guardian, concerns = [], admission, treatment, discharge,
+export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, finalQuote, guardian, concerns = [], admission, treatment, discharge, followUp,
   documents = [{ documentId: "d1", fileName: "Echo_Report.pdf", status: "CLEAN", createdAt: "2026-09-01T09:00:00Z" }] }: PatientOptions = {}) {
   await page.addInitScript(({ authority }) => {
     sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({ access_token: "synthetic", token_type: "Bearer", scope: "openid",
@@ -60,7 +63,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
   // Before an estimate exists: no proposal, no deposit, and only the milestones reached so far.
   const early = scenario === "case-received" ? "RECEIVED" : scenario === "consultant-review" ? "CONSULTANT_REVIEW" : null;
   const caseSummary = early ? { ...summary, status: early, doctorName: early === "RECEIVED" ? null : summary.doctorName }
-    : ready ? { ...summary, status: "PATIENT_DECISION", waitingOn: "PATIENT" } : paid ? { ...summary, status: discharge ? (discharge.code === "GOING_HOME" ? "DISCHARGED" : "FOLLOW_UP") : treatment ? "TREATMENT_IN_PROGRESS" : admissionStage(admission?.code) } : summary;
+    : ready ? { ...summary, status: "PATIENT_DECISION", waitingOn: "PATIENT" } : paid ? { ...summary, status: followUp ? (followUp.code === "COMPLETED" ? "CLOSED" : "FOLLOW_UP") : discharge ? (discharge.code === "GOING_HOME" ? "DISCHARGED" : "FOLLOW_UP") : treatment ? "TREATMENT_IN_PROGRESS" : admissionStage(admission?.code) } : summary;
   const milestones = { receivedAt: received, consultantReviewAt: early === "RECEIVED" ? null : consultantReview, estimateReadyAt: early ? null : stamp };
   const states = early
     ? { journeyStage: early, waitingOn: "STAFF", blockers: [], currentAction: { code: early === "RECEIVED" ? "WAIT_COORDINATOR_REVIEW" : "WAIT_CONSULTANT_REVIEW", kind: "WAIT", expectedWorkingDays: 2 }, availableActions: ["MESSAGE_COORDINATOR"] }
@@ -74,7 +77,10 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
       blockers: [{ code: guardian, labelEn: "Guardian details required", labelAr: "مطلوب إدخال بيانات الوصي", owner: "PATIENT", gating: true }] } : {}),
     ...(admission ? { journeyStage: caseSummary.status, waitingOn: "PATIENT", currentAction: { code: admission.code, kind: ["CONFIRM_ARRIVAL", "PAY_BALANCE"].includes(admission.code) ? "FOCUS" : "WAIT" } } : {}),
     ...(treatment ? { journeyStage: caseSummary.status, waitingOn: treatment.code === "REVIEW_CHANGE_ORDER" ? "PATIENT" : "STAFF", currentAction: { code: treatment.code, kind: treatment.code === "REVIEW_CHANGE_ORDER" ? "FOCUS" : "WAIT" } } : {}),
-    ...(discharge ? { journeyStage: caseSummary.status, waitingOn: "STAFF", currentAction: { code: discharge.code, kind: "WAIT" } } : {}) };
+    ...(discharge ? { journeyStage: caseSummary.status, waitingOn: "STAFF", currentAction: { code: discharge.code, kind: "WAIT" } } : {}),
+    ...(followUp ? { journeyStage: caseSummary.status, waitingOn: followUp.code === "REPORT_OUTCOME" ? "PATIENT" : "STAFF",
+      currentAction: followUp.code === "COMPLETED" ? { code: "NONE", kind: "NONE", exit: "COMPLETED" } : { code: followUp.code, kind: followUp.code === "REPORT_OUTCOME" ? "FOCUS" : "WAIT" },
+      availableActions: followUp.code === "COMPLETED" ? [] : ["MESSAGE_COORDINATOR"] } : {}) };
   const workspace = {
     caseSummary, timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: "2026-09-01T09:00:00Z" }, { type: "STATUS", label: caseSummary.status, status: caseSummary.status, occurredAt: stamp }],
     tasks: [], messages: [{ id: "m1", threadType: "PATIENT_COORDINATOR", senderRole: "COORDINATOR", senderName: "Sara Ahmed", direction: "INBOUND", body: "Welcome — I will send the deposit details shortly.", createdAt: stamp, internalOnly: false, read: false }],
@@ -154,6 +160,9 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (api === "/patient/cases/case-1/treatment" && treatment) return reply(treatment.view);
     if (api === "/patient/cases/case-1/discharge" && discharge) return reply(discharge.view);
     if (api === "/patient/cases/case-1/statements" && discharge) return reply(discharge.statements);
+    if (api === "/patient/cases/case-1/statements" && followUp) return reply(followUp.statements ?? []);
+    if (api === "/patient/cases/case-1/follow-up" && followUp) return reply(followUp.view);
+    if (/^\/patient\/cases\/case-1\/follow-up\/outcomes\/D(30|90)$/.test(api) && followUp) { if (followUp.reported) followUp.view = followUp.reported; return reply(followUp.view); }
     if (/^\/patient\/cases\/case-1\/change-orders\/[^/]+\/decision$/.test(api) && treatment) { if (treatment.decided) treatment.view = treatment.decided; return reply(treatment.view); }
     return reply({ message: `unstubbed ${api}` }, 404);
   });

@@ -170,7 +170,10 @@ export function StatementSheet({ locale, copy: t, statement: s, headingLevel = 3
       <Heading id={`${id}-title`} className="text-[0.9375rem] font-bold text-ink-800">
         {fillTemplate(t.number, { number: `⁨${s.statementNumber}⁩` })}
       </Heading>
-      <p className="text-[0.8125rem] text-ink-600">{fillTemplate(t.issued, { date: issued.format(new Date(s.issuedAt)) })}</p>
+      <p className="text-[0.8125rem] text-ink-600">
+        {/* P1-18: which statement this is (discharge or closing), then when it was issued. */}
+        {Object.hasOwn(t.kinds, s.kind) && <>{t.kinds[s.kind as keyof typeof t.kinds]} · </>}{fillTemplate(t.issued, { date: issued.format(new Date(s.issuedAt)) })}
+      </p>
       <div className="mt-2 overflow-x-auto">
         <table className="w-full min-w-[18rem] text-[0.875rem] tabular-nums">
           <thead className="text-ink-500">

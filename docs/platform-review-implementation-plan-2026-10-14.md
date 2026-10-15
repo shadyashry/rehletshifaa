@@ -1539,6 +1539,71 @@ phases.
     `change-order-applied`, `discharge-pack-ready`, `statement-ready`) are still not bound in `application.yml` (pre-existing).
   - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `7d2e78c`) and rebuilds the dev backend for
     V102; then P1-18 session 2 (UI and copy, started in a new session; contract in the shared notes folder, `p1-18-session-1-handover.md`).
+- **Status (2026-10-16, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/trusting-lamarr-b82819`, cut from `a879cd7`):** delivered,
+  frontend only (no wire gap blocked a screen); Flyway still at V102. Scores and dates are shown as the API returns them; nothing is
+  computed in the browser. The P1-15 money rule (deposit covers the platform fee first) is untouched and still awaits the owner.
+  - **Staff "Follow-up" panel** (`FollowUpPanel`, after Discharge / Reconciliation on the case page, for the case's Consultant and
+    coordinator only — never Finance or Operations — while the case is `DISCHARGED`, `FOLLOW_UP` or `CLOSED`, or for an open follow-up item
+    (`FOLLOW_UP_WORK`); reads `GET /{doctor|coordinator}/cases/{id}/follow-up`; renders nothing for a case closed before discharge): the
+    window (discharged, free follow-up N days, ends / ended), what holds the case open in words (the five closure blockers) with "the case
+    closes on its own … there is no close button", the plan (mode, due, tests, instructions), the contacts (mode and time, booked / held /
+    missed / cancelled, from the plan / added, reminded / recorded, the Consultant's note), the D3/D14/D30 check-ins (not yet / due / done,
+    reached or not, note), the outcomes (asked, awaiting / not answered, answered in My Care or by secure link, "answered by someone for the
+    patient", pain / daily activities / satisfaction "N out of 10", complication badge, its text for the Consultant or "the details are in
+    the Consultant's record" for the coordinator, awaiting review / reviewed + review note). On a closed case with `reopenAvailable`: "a
+    complication was reported after the case closed" with an in-page link to the existing P1-13 "Reopen case" (`#reopen-case`, added to
+    `ReopenCase`). Every command answers with the view. One primary action, the viewer's current work (`#follow-up-next`): **Consultant** —
+    record a booked contact held / missed with a required note (leads on `FOLLOW_UP_CONTACT`), review a reported complication with what was
+    done or advised (leads on `REVIEW_COMPLICATION`; also on a closed case), book another contact (when, video / phone / in person), cancel
+    a booked contact with a reason; recording forms only in `DISCHARGED` / `FOLLOW_UP`. **Coordinator** — read-only except the due
+    check-ins (reached / not reached + optional note with "no clinical detail here"; leads on `CHECK_IN_D3|D14|D30`); on `REBOOK_FOLLOW_UP`
+    the line "agree a new time with the patient and ask the Consultant to book it" (booking is the Consultant's endpoint). "Do it" from the
+    current-action panel lands on the panel's next form. This closes the P0-2 Consultant follow-up gap.
+  - **My Care**: a new `followUpStep` slot (`FOLLOW_UP_STEPS` = `FOLLOW_UP`, `REPORT_OUTCOME`, plus exit `COMPLETED`) renders
+    `PatientFollowUp` (reads `GET /patient/cases/{id}/follow-up`, and `/statements` once closed). `REPORT_OUTCOME` (new step text "How are
+    you doing?"): the purpose notice above the questions (who reads the answers — Consultant and coordinator, and for a reported problem a
+    care manager and Compliance; quality use without the name; kept with the case record; ask the coordinator to stop or delete), then pain,
+    daily activities and satisfaction as 0-10 choice cards (44px, 6 per row on a phone, 11 on wider screens, the ends named), "has anything
+    gone wrong since you left hospital" yes / no, a yes asks what happened and says not to wait in an emergency; inline errors, focus on the
+    first unanswered question; sends `noticeVersion` = `OUTCOME_NOTICE_VERSION` (`outcome-notice-2026-10`, in `admission-steps.ts`; change it
+    with the notice's words and the backend constant). Thanks after sending (complication-aware), and "we received your answers on …"
+    afterwards. `FOLLOW_UP`: the next contact ("By phone on …", "we remind you the day before") or "your Consultant books your next contact
+    if one is needed", "your free follow-up lasts until …" / "ended on …", earlier contacts, and "If something goes wrong" in order
+    (coordinator → Consultant → local emergency). Going home no longer repeats the plan's first date in follow-up. Completed (`NONE` + exit
+    `COMPLETED`, step text reworded for both completion kinds): the closing statement (`StatementSheet`, now naming its kind: "Closing
+    statement · Issued …") or "being prepared", and "How was your journey?" pointing at the review message the backend sent.
+  - **Status link**: the summary's `purpose`; on an OUTCOME link the page opens on the open question (step text "How are you doing?",
+    the page's one action) with "Who is answering? I am the patient / I am answering for the patient" first → `answeredBy`
+    PATIENT / REPRESENTATIVE on `POST /public/cases/{token}/outcomes/{point}`; failures in the patient's words (already sent, closed,
+    notice changed, session ended, link invalid). On any link in the `followup` phase (and on an OUTCOME link once answered), the follow-up
+    block via `POST /public/cases/{token}/follow-up`. The page passes `followUpCopy`.
+  - **Control Center**: "Free follow-up (days)" (7-90, prefilled from the active version, 30 when none) on the margin-policy form, sent as
+    `followUpFreeDays`, listed on the version and stated in the confirmation (inline en/ar, as the rest of that screen).
+  - **Copy** (en + ar; **Arabic is a draft** pending native review; **the purpose notice needs counsel's review** before go-live, with
+    P1-7's retention class): `portalWork.followUp` (panel), `myCare.followUp` (block, questions, notice, route, closed),
+    `myCare.steps.REPORT_OUTCOME`, `myCare.steps.COMPLETED` reworded; the six work types in `workTitles`, `workCopy.items` and
+    `currentAction.work`; `workCopy.items.COMPLICATION_REPORTED`; the three evidence kinds on the trail; `statement.kinds` (DISCHARGE,
+    CLOSURE); 16 error codes (`NOT_DISCHARGED` existed; `COMPLICATION_DETAILS_REQUIRED` now covers the patient's and the Consultant's case).
+  - Tests: new `FollowUpPanel.test.tsx` (7: window, blockers instead of a close button, contacts, check-ins and answers; review as the one
+    primary on `REVIEW_COMPLICATION`; record missed + book on `FOLLOW_UP_CONTACT`; coordinator without clinical text records `CHECK_IN_D14`;
+    `REBOOK_FOLLOW_UP` line; closed + reopen link in Arabic; nothing for a case closed before discharge), `PatientFollowUp.test.tsx` (4,
+    through `MyCare`: follow-up with the route in order; the questions with the notice, required answers, complication text and the notice
+    version; completed with the closing statement and the review; Arabic), +2 `CaseStatusAccess` (OUTCOME link with "answering for the
+    patient" → `REPRESENTATIVE`; follow-up block on a status link), `PageHeaders` (free follow-up prefilled, listed and sent; four bodies
+    updated). Playwright `e2e/my-care-follow-up.spec.ts` (8: en/ar × 390/1440 outcome questions with 44px targets, one primary, no page
+    scroll and the body sent; en/ar follow-up; en/ar completed) via the new `followUp` option of `patient-fixture.ts`, green on a dev server
+    together with `my-care-going-home.spec.ts` (6). `pnpm typecheck` clean, eslint clean on touched files, vitest 86 files / 666 tests
+    green. Reviewed with react-best-practices, composition-patterns (the link's "who is answering" is a child slot with its own check, not a
+    flag), web-design-guidelines and Impeccable (detector: no findings); the e2e run caught a duplicate React key between the follow-up and
+    going-home blocks, fixed.
+  - Not done (later or owner): the final UX design of these screens (UX plan); no reminder for an unanswered question (backend); where
+    reviews are published (owner); paid teleconsultation after the window (P2-25); the coordinator cannot book a contact (by design, the
+    Consultant's endpoint); not walked live — needs the dev stack rebuilt at V102 with this frontend; Meta approval of
+    `rs_follow_up_reminder`, `rs_outcome_request`, `rs_closure_review`.
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/trusting-lamarr-b82819` (it contains `a879cd7`), rebuilds backend and
+    frontend, and walks one case live (discharge → follow-up window → Consultant records the plan's contact → coordinator D3 check-in → day-30
+    question answered in My Care with a complication → Consultant review → window ends → CLOSED with the closing statement); then P1-19
+    (hospital-agreement audit), started in a new session.
 
 ### P1-19  Hospital-agreement audit  (design §7; architecture §5.7)
 - `consultant_affiliations` (yearly declaration, Compliance review, eligibility condition D-H, `UNDECLARED_FACILITY`

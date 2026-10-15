@@ -41,7 +41,8 @@ export function PatientGoingHome({ locale, caseId, code, documents, onOpenDocume
   if (!view?.discharged) return null;
   return (
     <div className="mt-5 border-t border-line pt-4">
-      <GoingHomeStory locale={locale} copy={t} view={view} documentNames={names}
+      {/* P1-18: in follow-up the follow-up block above names the next contact, so the plan's first date is not repeated here. */}
+      <GoingHomeStory locale={locale} copy={t} view={code === "FOLLOW_UP" ? { ...view, followUpDueAt: null } : view} documentNames={names}
         documentsAction={onOpenDocuments && <button type="button" className="mt-1 inline-flex min-h-11 items-center text-sm font-bold text-brand-700 underline underline-offset-4"
                                                      onClick={onOpenDocuments}>{t.openDocuments}</button>}/>
       <section aria-labelledby={`${id}-statement`} className="mt-5 border-t border-line pt-4">

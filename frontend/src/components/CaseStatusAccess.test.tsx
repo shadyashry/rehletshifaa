@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, configure, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, configure, fireEvent, render, screen, within } from "@testing-library/react";
 
 import { CaseStatusAccess } from "./CaseStatusAccess";
 import en from "@/messages/en.json";
@@ -566,5 +566,59 @@ describe("CaseStatusAccess going home", () => {
     expect(screen.getByText("Balance due")).toBeTruthy();
     expect(screen.getByText(/5,500\.50/)).toBeTruthy();
     expect(screen.getByText("$112.21")).toBeTruthy();
+  });
+});
+
+// P1-18: an OUTCOME link opens on its open question (the page's one action) and asks who is answering; in follow-up any link
+// shows the next contact and who to turn to.
+describe("CaseStatusAccess follow-up", () => {
+  beforeEach(() => vi.resetAllMocks());
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  const outcomeSummary = { ...summary, purpose: "OUTCOME" };
+  const inFollowUp = { caseNumber: "RS-10281", statusEn: "Follow-up", statusAr: "المتابعة", phase: "followup", actionRequired: false, action: null };
+  const followUp = { active: true, contacts: [{ dueAt: "2026-11-25T09:00:00Z", mode: "VIDEO", status: "SCHEDULED" }], windowEndsAt: "2026-11-24T09:00:00Z",
+    windowClosed: false, outcomes: [{ point: "D30", requestedAt: "2026-11-24T09:00:00Z", open: true, reportedAt: null }], openOutcome: "D30", closed: false };
+  const followUpCopy = { followUp: en.portalWork.myCare.followUp, step: en.portalWork.myCare.steps.REPORT_OUTCOME };
+
+  async function open(routes: Record<string, () => Promise<Response>>, linkSummary: typeof summary & { purpose?: string } = outcomeSummary) {
+    const fetchMock = stub({ "/request-access": () => json(linkSummary), "/verify": () => json({ grant: "grant-1" }), "/view": () => json(inFollowUp),
+      "tok-1": () => json(linkSummary), ...routes });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey} followUpCopy={followUpCopy}/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+    return fetchMock;
+  }
+
+  it("on an OUTCOME link opens on the questions, under the purpose notice, and sends who is answering with the notice version", async () => {
+    const fetchMock = await open({ "/follow-up": () => json(followUp), "/outcomes/D30": () => json({ ...followUp, openOutcome: null, outcomes: [{ ...followUp.outcomes[0], open: false, reportedAt: "2026-11-25T10:00:00Z" }] }) });
+    expect(await screen.findByRole("heading", { name: "How are you doing?" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Before you answer" })).toBeTruthy();
+    expect(screen.getByText(/a care manager and our compliance team read it too/)).toBeTruthy();
+    // Nothing answered yet: who is answering is asked first, then every question.
+    fireEvent.click(screen.getByRole("button", { name: "Send my answers" }));
+    expect(await screen.findByText("Say who is answering.")).toBeTruthy();
+    expect(screen.getAllByText("Answer this question.")).toHaveLength(4);
+    fireEvent.click(screen.getByLabelText("I am answering for the patient"));
+    for (const [legend, n] of [["How much pain do you have now?", "2"], ["How well can you manage your daily activities?", "7"], ["How satisfied are you with your care?", "9"]] as const) {
+      fireEvent.click(within(screen.getByRole("group", { name: legend })).getByLabelText(n));
+    }
+    fireEvent.click(within(screen.getByRole("group", { name: "Has anything gone wrong since you left hospital?" })).getByLabelText("No"));
+    fireEvent.click(screen.getByRole("button", { name: "Send my answers" }));
+    expect(await screen.findByText("Thank you. Your answers reached your care team.")).toBeTruthy();
+    const sent = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/outcomes/D30"))!;
+    expect(JSON.parse(String(sent[1]!.body))).toEqual({ grant: "grant-1", answeredBy: "REPRESENTATIVE", pain: 2, function: 7, satisfaction: 9, complication: false,
+      complicationNote: null, noticeVersion: "outcome-notice-2026-10" });
+  });
+
+  it("in follow-up on a status link shows the next contact, the free follow-up's end and who to turn to, with no questions", async () => {
+    await open({ "/follow-up": () => json({ ...followUp, openOutcome: null }) }, summary);
+    expect(await screen.findByRole("heading", { name: "Your follow-up" })).toBeTruthy();
+    expect(screen.getByText(/^By video on /)).toBeTruthy();
+    expect(screen.getByText(/Your free follow-up lasts until/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "If something goes wrong" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send my answers" })).toBeNull();
   });
 });

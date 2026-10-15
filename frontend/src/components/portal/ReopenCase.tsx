@@ -22,7 +22,7 @@ export function ReopenCase({ locale, caseId, side, busy, mutate, load }: {
   const t = useWorkCopy().safety.reopen;
   const [open, setOpen] = useState(false);
   return (
-    <section className="card mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-4" aria-label={t.closed}>
+    <section id="reopen-case" className="card mt-4 flex scroll-mt-28 flex-wrap items-center justify-between gap-x-4 gap-y-2 p-4" aria-label={t.closed}>
       <p className="text-[0.9375rem] text-ink-700">{t.closed}</p>
       <button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={() => setOpen(true)}>{t.action}</button>
       {open && <ReopenDialog locale={locale} caseId={caseId} side={side} busy={busy} mutate={mutate} load={load} onClose={() => setOpen(false)}/>}

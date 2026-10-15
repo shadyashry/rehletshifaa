@@ -10,7 +10,7 @@ import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 import type { Mutate } from "@/components/portal/portal-model";
 import { isGuardianStep } from "@/lib/guardian";
-import { ADMISSION_STEPS, DISCHARGE_STEPS, TREATMENT_STEPS } from "@/components/portal/admission-steps";
+import { ADMISSION_STEPS, DISCHARGE_STEPS, FOLLOW_UP_STEPS, TREATMENT_STEPS } from "@/components/portal/admission-steps";
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
 // Role-specific panels, loaded on demand: a coordinator never downloads My Care, a patient never the clinical review.
@@ -22,6 +22,7 @@ const PatientIdentityStep=dynamic(()=>import("@/components/portal/PatientIdentit
 const PatientAdmission=dynamic(()=>import("@/components/portal/PatientAdmission").then(m=>m.PatientAdmission));
 const PatientTreatment=dynamic(()=>import("@/components/portal/PatientTreatment").then(m=>m.PatientTreatment));
 const PatientGoingHome=dynamic(()=>import("@/components/portal/PatientGoingHome").then(m=>m.PatientGoingHome));
+const PatientFollowUp=dynamic(()=>import("@/components/portal/PatientFollowUp").then(m=>m.PatientFollowUp));
 const PatientDepositPayment=dynamic(()=>import("@/components/portal/PatientDepositPayment").then(m=>m.PatientDepositPayment));
 const PatientProposal=dynamic(()=>import("@/components/portal/PatientProposal").then(m=>m.PatientProposal));
 const PatientProposalDecision=dynamic(()=>import("@/components/portal/PatientProposal").then(m=>m.PatientProposalDecision));
@@ -55,6 +56,7 @@ export function PatientCaseView({locale,proposalCopy,role,value,documents,busy,m
       amountDue={value.deposit.balanceDisplay??value.deposit.totalDisplay??null} totalDue={value.deposit.totalDisplay??null} received={value.deposit.paidDisplay??null}
       bank={value.deposit.bankTransfer} transfer={value.deposit.transfer} busy={busy} mutate={mutate}/>:undefined}
      treatmentStep={TREATMENT_STEPS.has(actions.currentAction.code)?<PatientTreatment key={`${c.id}:${actions.currentAction.code}`} locale={locale} caseId={c.id} code={actions.currentAction.code} busy={busy} mutate={mutate} load={load}/>:undefined}
+     followUpStep={FOLLOW_UP_STEPS.has(actions.currentAction.code)||actions.currentAction.exit==="COMPLETED"?<PatientFollowUp key={`follow-up:${c.id}:${actions.currentAction.code}`} locale={locale} caseId={c.id} code={actions.currentAction.code} busy={busy} mutate={mutate} load={load}/>:undefined}
      dischargeStep={DISCHARGE_STEPS.has(actions.currentAction.code)?<PatientGoingHome key={`${c.id}:${actions.currentAction.code}`} locale={locale} caseId={c.id} code={actions.currentAction.code} documents={documents} onOpenDocuments={onCareView?()=>onCareView("documents"):undefined} load={load}/>:undefined}
      admissionStep={ADMISSION_STEPS.has(actions.currentAction.code)?<PatientAdmission key={`${c.id}:${actions.currentAction.code}`} locale={locale} caseId={c.id} code={actions.currentAction.code} busy={busy} mutate={mutate} load={load}/>:undefined}
      messagesPanel={<div aria-busy={busy||undefined} className="min-w-0"><CaseMessages key={c.id} locale={locale} role={role} caseId={c.id} messages={value.messages} canSend={true} busy={busy} mutate={mutate}/></div>}/>

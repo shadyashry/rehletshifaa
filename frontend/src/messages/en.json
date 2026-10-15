@@ -1375,7 +1375,13 @@
         "RECONCILE_INVOICE": "Reconcile the invoice",
         "COUNTERSIGN_RECONCILIATION": "Check the reconciliation",
         "FACILITY_DISPUTE": "Settle the dispute",
-        "REFUND_CREDIT": "Open the reconciliation"
+        "REFUND_CREDIT": "Open the reconciliation",
+        "FOLLOW_UP_CONTACT": "Record the contact",
+        "REBOOK_FOLLOW_UP": "Arrange a new contact",
+        "REVIEW_COMPLICATION": "Review the complication",
+        "CHECK_IN_D3": "Record the check-in",
+        "CHECK_IN_D14": "Record the check-in",
+        "CHECK_IN_D30": "Record the check-in"
       },
       "actions": {
         "ASSIGN_CONSULTANT": "Assign Consultant",
@@ -1817,7 +1823,7 @@
         },
         "COMPLETED": {
           "title": "Your care with us is complete",
-          "body": "Your Consultant confirmed that no follow-up is needed. Your coordinator remains available if anything changes."
+          "body": "Your treatment and its follow-up are complete. If anything changes, contact your coordinator."
         },
         "CLOSED": {
           "title": "This case is closed",
@@ -1858,6 +1864,10 @@
           "title": "You are going home",
           "body": "You have been discharged. Below are the warning signs to watch for, your medicines, your follow-up and your documents.",
           "next": "Your coordinator stays in touch while you recover."
+        },
+        "REPORT_OUTCOME": {
+          "title": "How are you doing?",
+          "body": "Your care team asks a few short questions about your recovery. It takes about a minute."
         }
       },
       "payment": {
@@ -2110,6 +2120,95 @@
         "print": "Print",
         "statement": "Your statement",
         "statementPending": "Your statement is ready once the hospital's final invoice has been checked. We will tell you when it is."
+      },
+      "followUp": {
+        "title": "Your follow-up",
+        "next": "Your next contact",
+        "nextLine": "{mode} on {date}",
+        "noneBooked": "Your Consultant books your next contact if one is needed.",
+        "reminder": "We remind you the day before.",
+        "modes": {
+          "VIDEO": "By video",
+          "PHONE": "By phone",
+          "IN_PERSON": "In person"
+        },
+        "earlier": "Earlier contacts",
+        "status": {
+          "SCHEDULED": "Booked",
+          "DONE": "Held",
+          "MISSED": "Missed"
+        },
+        "window": "Your free follow-up lasts until {date}.",
+        "windowEnded": "Your free follow-up ended on {date}.",
+        "route": {
+          "title": "If something goes wrong",
+          "coordinator": "Tell your coordinator first.",
+          "consultant": "Your coordinator brings in your Consultant.",
+          "emergency": "In an emergency, do not wait: call your local emergency number or go to the nearest emergency department."
+        },
+        "outcome": {
+          "points": {
+            "D30": "One month after you left hospital",
+            "D90": "Three months after you left hospital"
+          },
+          "notice": {
+            "title": "Before you answer",
+            "who": "Your Consultant and your coordinator read your answers. If you report a problem, a care manager and our compliance team read it too.",
+            "use": "We also use the answers, without your name, to check and improve the quality of care.",
+            "keep": "We keep them with your case record for as long as that record is kept.",
+            "withdraw": "You can ask your coordinator at any time to stop using your answers or to delete them."
+          },
+          "answeredBy": {
+            "legend": "Who is answering?",
+            "PATIENT": "I am the patient",
+            "REPRESENTATIVE": "I am answering for the patient"
+          },
+          "scaleHint": "Choose a number from 0 to 10.",
+          "pain": {
+            "label": "How much pain do you have now?",
+            "low": "0 = no pain",
+            "high": "10 = the worst pain you can imagine"
+          },
+          "function": {
+            "label": "How well can you manage your daily activities?",
+            "low": "0 = not at all",
+            "high": "10 = as well as before"
+          },
+          "satisfaction": {
+            "label": "How satisfied are you with your care?",
+            "low": "0 = not at all",
+            "high": "10 = completely"
+          },
+          "complication": {
+            "legend": "Has anything gone wrong since you left hospital?",
+            "yes": "Yes",
+            "no": "No",
+            "what": "What happened?",
+            "whatHint": "For example a fever, bleeding, a wound that opens or a new pain. Your Consultant reviews it.",
+            "emergency": "If it is an emergency, do not wait for a reply: call your local emergency number."
+          },
+          "send": "Send my answers",
+          "sending": "Sending…",
+          "sent": "Thank you. Your answers reached your care team.",
+          "sentComplication": "Thank you. Your Consultant is asked to review what you reported, and your coordinator is told.",
+          "errors": {
+            "missing": "Answer this question.",
+            "who": "Say who is answering.",
+            "details": "Say what happened.",
+            "failed": "Your answers could not be sent. Try again.",
+            "closed": "This question is closed.",
+            "already": "These answers were already sent.",
+            "outdated": "This page has changed. Reload it and answer again.",
+            "session": "Your session ended. Ask for a new code and try again."
+          },
+          "received": "Thank you. We received your answers on {date}."
+        },
+        "closed": {
+          "statement": "Your closing statement",
+          "statementPending": "Your closing statement is being prepared. We will tell you when it is ready.",
+          "reviewTitle": "How was your journey?",
+          "reviewBody": "We sent you a message asking about your experience. If you would like to share it, reply to that message."
+        }
       }
     },
     "nav": {
@@ -2275,7 +2374,13 @@
       "RECONCILE_INVOICE": "Reconcile the final invoice",
       "COUNTERSIGN_RECONCILIATION": "Countersign a reconciliation above the band",
       "FACILITY_DISPUTE": "Settle a disputed hospital charge",
-      "REFUND_CREDIT": "Refund the patient's credit"
+      "REFUND_CREDIT": "Refund the patient's credit",
+      "FOLLOW_UP_CONTACT": "Follow-up contact",
+      "REBOOK_FOLLOW_UP": "Rebook a missed follow-up contact",
+      "REVIEW_COMPLICATION": "Review a reported complication",
+      "CHECK_IN_D3": "Day-3 check-in",
+      "CHECK_IN_D14": "Day-14 check-in",
+      "CHECK_IN_D30": "Day-30 check-in"
     },
     "proposalVersion": "v{number}",
     "waitingReason": {
@@ -2672,6 +2777,34 @@
         "PATIENT_DEPARTED": {
           "title": "The patient on {caseNumber} has left",
           "context": "Operations confirmed the departure. Follow-up continues as planned."
+        },
+        "FOLLOW_UP_CONTACT": {
+          "title": "Follow-up contact with {caseNumber}",
+          "context": "A follow-up contact is booked. Hold it, then record it under Follow-up as held or missed, with a note."
+        },
+        "REBOOK_FOLLOW_UP": {
+          "title": "Rebook the missed contact for {caseNumber}",
+          "context": "The patient missed a follow-up contact. Agree a new time with them and ask the Consultant to book it, within one working day."
+        },
+        "REVIEW_COMPLICATION": {
+          "title": "Review the complication reported on {caseNumber}",
+          "context": "The patient reported a problem in their follow-up answers and an incident is open. Review it within 4 working hours and record what you did or advised."
+        },
+        "CHECK_IN_D3": {
+          "title": "Day-3 check-in with {caseNumber}",
+          "context": "Call the patient to ask how they are. Record whether you reached them by 18:00 Cairo time on the day."
+        },
+        "CHECK_IN_D14": {
+          "title": "Day-14 check-in with {caseNumber}",
+          "context": "Call the patient to ask how they are. Record whether you reached them by 18:00 Cairo time on the day."
+        },
+        "CHECK_IN_D30": {
+          "title": "Day-30 check-in with {caseNumber}",
+          "context": "Call the patient to ask how they are. Record whether you reached them by 18:00 Cairo time on the day."
+        },
+        "COMPLICATION_REPORTED": {
+          "title": "A complication was reported on {caseNumber}",
+          "context": "The patient reported a problem in their follow-up answers. An incident is open and the Consultant is asked to review it."
         }
       }
     },
@@ -2842,7 +2975,10 @@
           "FINAL_INVOICE": "Final invoice",
           "RECONCILIATION": "Reconciliation",
           "RETURN_CONFIRMED": "Return confirmed",
-          "DEPARTURE_CONFIRMED": "Departure confirmed"
+          "DEPARTURE_CONFIRMED": "Departure confirmed",
+          "FOLLOW_UP_CONTACT": "Follow-up contact",
+          "CHECK_IN": "Check-in",
+          "FOLLOW_UP_WINDOW_CLOSED": "Free follow-up ended"
         }
       },
       "cancel": "Cancel"
@@ -2851,7 +2987,7 @@
       "NOT_IN_TREATMENT": "This can only be recorded while the patient is in treatment.",
       "MILESTONE_IN_FUTURE": "A milestone cannot be in the future. Check the time it happened.",
       "OPERATIVE_NOTE_REQUIRED": "A completed procedure needs the operative note: give its reference or choose its document.",
-      "COMPLICATION_DETAILS_REQUIRED": "A complication needs what happened and its severity.",
+      "COMPLICATION_DETAILS_REQUIRED": "Say what happened. A complication the Consultant records also needs its severity.",
       "DISCHARGE_DATE_REQUIRED": "A planned discharge needs its date.",
       "DISCHARGE_DATE_IN_PAST": "The planned discharge date cannot be in the past.",
       "EVIDENCE_NOT_COUNTERSIGNABLE": "This entry cannot be countersigned here.",
@@ -2896,7 +3032,22 @@
       "STATEMENT_NOT_FOUND": "That statement was not found.",
       "E_INVOICE_ALREADY_RECORDED": "The e-invoice reference is already recorded.",
       "FIT_TO_FLY_WINDOW_INVALID": "The fit-to-fly window must be between 24 and 168 hours.",
-      "INVALID_EVIDENCE_DOCUMENT": "Choose a checked document of this case."
+      "INVALID_EVIDENCE_DOCUMENT": "Choose a checked document of this case.",
+      "FOLLOW_UP_NOT_ACTIVE": "This can only be done while the patient is discharged or in follow-up.",
+      "FOLLOW_UP_PLAN_MISSING": "Record the follow-up plan first.",
+      "FOLLOW_UP_CONTACT_NOT_FOUND": "That contact was not found. Reload the page.",
+      "FOLLOW_UP_CONTACT_RECORDED": "That contact is already recorded or cancelled.",
+      "COMPLICATION_NOT_AWAITING_REVIEW": "That complication is not awaiting a review.",
+      "CHECK_IN_UNKNOWN": "That check-in is not part of this case's follow-up.",
+      "CHECK_IN_ALREADY_RECORDED": "That check-in is already recorded.",
+      "CHECK_IN_NOT_DUE": "A check-in can be recorded from the day before its day.",
+      "OUTCOME_NOT_REQUESTED": "That question has not been asked yet.",
+      "OUTCOME_ALREADY_REPORTED": "These answers were already sent.",
+      "OUTCOME_CLOSED": "That question is closed.",
+      "OUTCOME_NOTICE_OUTDATED": "The notice above the questions has changed. Reload the page and answer again.",
+      "FOLLOW_UP_NOT_COMPLETE": "The case cannot close until the follow-up is complete.",
+      "FOLLOW_UP_WINDOW_INVALID": "The free follow-up must be between 7 and 90 days.",
+      "LINK_PURPOSE_MISMATCH": "This link cannot be used for that."
     },
     "treatment": {
       "title": "Treatment",
@@ -3363,7 +3514,146 @@
       "balanceDue": "Balance due",
       "creditDue": "Credit due",
       "settled": "Nothing is owed either way.",
-      "rate": "The second column is at the exchange rate fixed on the quote."
+      "rate": "The second column is at the exchange rate fixed on the quote.",
+      "kinds": {
+        "DISCHARGE": "Discharge statement",
+        "CLOSURE": "Closing statement"
+      }
+    },
+    "followUp": {
+      "title": "Follow-up",
+      "loadFailed": "The follow-up could not be loaded. Reload the page to try again.",
+      "window": {
+        "discharged": "Discharged",
+        "freeDays": "Free follow-up",
+        "days": "{days} days",
+        "ends": "Ends",
+        "ended": "Ended",
+        "none": "The free follow-up starts at discharge."
+      },
+      "state": {
+        "open": "In follow-up",
+        "closed": "Case closed"
+      },
+      "plan": {
+        "title": "Plan",
+        "tests": "Tests before the contact",
+        "instructions": "Instructions"
+      },
+      "modes": {
+        "VIDEO": "Video",
+        "PHONE": "Phone",
+        "IN_PERSON": "In person"
+      },
+      "contacts": {
+        "title": "Contacts",
+        "none": "No contact is booked.",
+        "status": {
+          "SCHEDULED": "Booked",
+          "DONE": "Held",
+          "MISSED": "Missed",
+          "CANCELLED": "Cancelled"
+        },
+        "origin": {
+          "PLAN": "From the plan",
+          "ADDED": "Added"
+        },
+        "reminded": "Patient reminded {when}",
+        "recorded": "Recorded {when}"
+      },
+      "book": {
+        "title": "Book another contact",
+        "dueAt": "When",
+        "mode": "How",
+        "save": "Book the contact"
+      },
+      "record": {
+        "title": "Record the contact of {when}",
+        "outcome": "What happened",
+        "outcomes": {
+          "DONE": "Held",
+          "MISSED": "The patient missed it"
+        },
+        "note": "Note",
+        "noteHint": "What was discussed or advised; for a missed contact, how you tried to reach the patient.",
+        "save": "Record the contact"
+      },
+      "cancel": {
+        "title": "Cancel a booked contact",
+        "contact": "Contact",
+        "choose": "Choose a contact",
+        "reason": "Why it is cancelled",
+        "save": "Cancel the contact"
+      },
+      "rebook": "A contact was missed. Agree a new time with the patient and ask the Consultant to book it; your work item closes once a contact is booked.",
+      "checkIns": {
+        "title": "Check-ins",
+        "points": {
+          "D3": "Day 3",
+          "D14": "Day 14",
+          "D30": "Day 30"
+        },
+        "status": {
+          "NOT_YET": "Not yet",
+          "DUE": "Due",
+          "DONE": "Done"
+        },
+        "outcomes": {
+          "REACHED": "Patient reached",
+          "NOT_REACHED": "Not reached"
+        },
+        "due": "due {when}",
+        "form": "Record the {point} check-in",
+        "outcome": "Did you reach the patient?",
+        "note": "Note (optional)",
+        "noteHint": "No clinical detail here: anything clinical goes to the Consultant.",
+        "save": "Record the check-in"
+      },
+      "outcomes": {
+        "title": "Outcomes",
+        "none": "No outcome question has been asked yet. They go to the patient at day 30 and day 90.",
+        "points": {
+          "D30": "Day 30",
+          "D90": "Day 90"
+        },
+        "asked": "Asked {when}",
+        "awaiting": "Awaiting the answer",
+        "unanswered": "Not answered",
+        "answered": "Answered {when}",
+        "channels": {
+          "MY_CARE": "in My Care",
+          "SECURE_LINK": "by secure link"
+        },
+        "byRepresentative": "Answered by someone for the patient",
+        "pain": "Pain",
+        "function": "Daily activities",
+        "satisfaction": "Satisfaction",
+        "score": "{score} out of 10",
+        "complication": "Complication reported",
+        "noComplication": "No complication reported",
+        "detailsWithConsultant": "The details are in the Consultant's record.",
+        "awaitingReview": "Awaiting the Consultant's review",
+        "reviewed": "Reviewed {when}",
+        "review": "Review",
+        "reviewForm": "Review the reported complication ({point})",
+        "reviewNote": "What you did or advised",
+        "reviewHint": "Recorded in the clinical record. It releases the hold on closing the case.",
+        "saveReview": "Record the review"
+      },
+      "closure": {
+        "title": "Closing the case",
+        "automatic": "The case closes on its own once nothing below holds it, so there is no close button.",
+        "ready": "Nothing holds the case: it closes at the next check.",
+        "blockers": {
+          "FOLLOW_UP_WINDOW_OPEN": "The free follow-up has not ended",
+          "FOLLOW_UP_CONTACT_OPEN": "A booked contact is not recorded yet",
+          "CHECK_IN_OPEN": "A check-in is not recorded yet",
+          "COMPLICATION_UNDER_REVIEW": "A reported complication awaits the Consultant's review",
+          "FOLLOW_UP_REVIEW_OPEN": "A reopened-case review or a rebooking is still open"
+        }
+      },
+      "reopen": "A complication was reported after the case closed. Reopen the case to follow it up.",
+      "reopenLink": "Go to Reopen case"
     }
   },
   "secureLink": {

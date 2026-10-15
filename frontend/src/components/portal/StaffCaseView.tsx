@@ -9,6 +9,7 @@ import { AdmissionPanel, ADMISSION_STAGES, ADMISSION_WORK, type AdmissionRole } 
 import { TreatmentPanel, TREATMENT_WORK } from "@/components/portal/TreatmentPanel";
 import { DischargePanel, DISCHARGE_STAGES, DISCHARGE_WORK, type DischargeRole } from "@/components/portal/DischargePanel";
 import { ReconciliationPanel, SETTLEMENT_STAGES, SETTLEMENT_WORK, type SettlementRole } from "@/components/portal/ReconciliationPanel";
+import { FollowUpPanel, FOLLOW_UP_STAGES, FOLLOW_UP_WORK } from "@/components/portal/FollowUpPanel";
 import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageEstimate } from "@/components/portal/FacilityPackagePicker";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
@@ -116,6 +117,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  // invoice in the reconciliation instead); and the reconciliation and statements once discharged, or for an open Finance item.
  const dischargePanel=admissionRole&&admissionRole!=="finance"&&!value.preview&&(DISCHARGE_STAGES.has(c.status)||DISCHARGE_WORK.has(current.workType??""))?<DischargePanel key={c.id} locale={locale} role={admissionRole as DischargeRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/>:null;
  const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/>:null;
+ // P1-18: the follow-up window, contacts, check-ins, outcomes and what holds the case open, for the case's Consultant and coordinator
+ // (never Finance or Operations), from discharge to a closed case, or for an open follow-up item (a review outlives the exit).
+ const followUpPanel=(isDoctor||isCoordinator)&&!value.preview&&(FOLLOW_UP_STAGES.has(c.status)||FOLLOW_UP_WORK.has(current.workType??""))?<FollowUpPanel key={c.id} locale={locale} role={isDoctor?"doctor":"coordinator"} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/>:null;
  // P0-5: the destination and the treatment episodes read back with their facility named, for every staff role on the case.
  const when=(v?:string|null)=>v?new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
  const episodes=value.treatmentEpisodes??[];
@@ -160,7 +164,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   const newestDocument=documents.length?documents[documents.length-1]:undefined;
   // The clinical review form lives in the Clinical tab, so send a consultant there rather than to an
   // overview panel that does not exist for them.
-  const focusAction=()=>{setTab(isDoctor&&!workflowBlock?"clinical":"overview");requestAnimationFrame(()=>{const target=(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel");scrollIntoView(target,{behavior:"smooth",block:"center"});(target?.querySelector("button,select,input,textarea") as HTMLElement|null)?.focus();});};
+  const focusAction=()=>{setTab(isDoctor&&!workflowBlock?"clinical":"overview");requestAnimationFrame(()=>{const target=(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(current.workType??current.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel");scrollIntoView(target,{behavior:"smooth",block:"center"});(target?.querySelector("button,select,input,textarea") as HTMLElement|null)?.focus();});};
   const completeWork=(evidence:string)=>{if(current.workItemId!=null)void mutate(`/tasks/${current.workItemId}/cases/${c.id}/complete`,{evidence,expectedVersion:current.workItemVersion??0});};
   const openMessages=()=>setOverlay("messages");
   const caseTabs=[{id:"overview" as const,label:locale==="ar"?"نظرة عامة":"Overview",count:0},{id:"clinical" as const,label:locale==="ar"?"الملف السريري":"Clinical",count:0},{id:"documents" as const,label:locale==="ar"?"المستندات":"Documents",count:documents.length},{id:"activity" as const,label:locale==="ar"?"السجل":"Activity",count:0}].filter(item=>!value.paymentOnly||item.id==="overview"); // the payment view has no record behind the other tabs
@@ -271,6 +275,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
        {treatmentPanel}
        {dischargePanel}
        {reconciliationPanel}
+       {followUpPanel}
        {/* The proposal is the work while it is being prepared or released; afterwards it is reference. */}
        {isCoordinator&&(proposalIsWork?<div id={current.kind==="FOCUS"&&!formAction?"case-actions":undefined}>{proposalPanel}</div>
          :(value.proposal||value.deposit)?<ProposalSummary proposal={value.proposal} deposit={value.deposit} delivery={value.delivery} available={available} onView={()=>setOverlay("proposal")}/>:null)}
