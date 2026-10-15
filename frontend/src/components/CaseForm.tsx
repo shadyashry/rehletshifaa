@@ -283,8 +283,8 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   // ---- Returning, signed-in patient: saved details reused, only the new case is entered ----
   if (isPatient && session?.linked) {
-    return <div className="grid min-w-0 gap-5">{emergency}<form className="card overflow-hidden" onSubmit={submitReturning} noValidate>
-      <div className="border-b border-line bg-brand-50/70 px-6 py-5 md:px-9">
+    return <div className="grid min-w-0 gap-5">{emergency}<form className="card intake-card overflow-hidden" onSubmit={submitReturning} noValidate>
+      <div className="border-b border-line px-6 py-5 md:px-9">
         <p className="text-sm text-ink-500">{t.signedInAs}</p>
         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1"><strong className="text-lg text-brand-900">{session.displayName}</strong><a className="text-sm font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/portal`}>{t.goToPortal}</a></p>
         <p className="mt-2 text-sm leading-6 text-ink-600">{t.savedDetails}</p>
@@ -316,9 +316,9 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
           <div className="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t.whoTitle}>
             {([["MYSELF", t.myself, t.myselfHelp, UserRound], ["SOMEONE_ELSE", t.someoneElse, t.someoneElseHelp, Users]] as const).map(([key, label, help, Icon]) => {
               const selected = values.caseFor === key;
-              return <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${selected ? "border-brand-600 bg-brand-50 shadow-[0_0_0_3px_var(--color-brand-100)]" : "border-line bg-white hover:border-brand-300"}`}>
+              return <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition ${selected ? "border-brand-600 bg-brand-50 shadow-[0_0_0_3px_var(--color-brand-100)]" : "border-line bg-white hover:border-brand-300"}`}>
                 <input type="radio" name="caseFor" className="sr-only" value={key} checked={selected} onChange={() => update("caseFor", key)} />
-                <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-lg ${selected ? "bg-brand-600 text-white" : "bg-mist text-brand-700"}`} aria-hidden><Icon size={20} /></span>
+                <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-md ${selected ? "bg-brand-700 text-white" : "bg-mist-deep text-brand-700"}`} aria-hidden><Icon size={20} /></span>
                 <span className="min-w-0"><strong className="block text-ink-900">{label}</strong><span className="mt-0.5 block text-sm leading-5 text-ink-500">{help}</span></span>
                 {selected && <Check size={18} className="ms-auto flex-none text-brand-600" aria-hidden />}
               </label>;
@@ -377,11 +377,11 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   return <div className="grid min-w-0 gap-5">
     {emergency}
     {siteKey && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" />}
-    <form className="card overflow-hidden" onSubmit={submit} noValidate>
-      <div className="border-b border-line bg-brand-50/70 px-6 py-5 md:px-9">
-        <p id="case-form-heading" tabIndex={-1} className="text-sm font-bold text-brand-900">{t.steps[step-1]}</p>
-        <ol className="mt-4 grid grid-cols-3 gap-2" aria-label={t.progress}>
-          {t.steps.map((label,index) => <li key={label} className="min-w-0"><div className="flex items-center gap-2"><span className="step-dot" data-active={index+1<=step}>{index+1<step?<Check size={15}/>:index+1}</span><span className="hidden truncate text-xs font-semibold text-ink-600 sm:block">{label}</span></div><div className="mt-2 h-1 overflow-hidden rounded-full bg-white"><div className={`h-full bg-brand-600 transition-all ${index+1<=step?"w-full":"w-0"}`}/></div></li>)}
+    <form className="card intake-card overflow-hidden" onSubmit={submit} noValidate>
+      <div className="border-b border-line px-6 py-5 md:px-9">
+        <p id="case-form-heading" tabIndex={-1} className="text-[1.0625rem] font-semibold leading-6 text-brand-900">{t.steps[step-1]}</p>
+        <ol className="intake-steps mt-4 grid list-none grid-cols-3 p-0" aria-label={t.progress}>
+          {t.steps.map((label,index) => { const n = index + 1; const state = n < step ? "reached" : n === step ? "current" : "upcoming"; return <li key={label} className="intake-step relative min-w-0" data-state={state} aria-current={n === step ? "step" : undefined}><span className="journey-marker" data-state={state} aria-hidden>{n < step ? <Check size={15} strokeWidth={2.4}/> : n}</span><span className="mt-2 block pe-2 text-[0.8125rem] font-semibold leading-5 text-ink-500">{label}</span></li>; })}
         </ol>
       </div>
       <div className="p-6 md:p-9">
@@ -391,7 +391,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
         {patientFields()}
 
-        {someoneElse && <fieldset className="mt-8 min-w-0 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
+        {someoneElse && <fieldset className="mt-8 min-w-0 rounded-lg border border-line bg-surface-pearl p-5">
           <legend className="px-1 text-sm font-bold uppercase tracking-wide text-accent-700">{t.repSection}</legend>
           <div className="mt-2 grid gap-6 sm:grid-cols-2">
             <Field label={t.repName} required requiredMark={t.requiredMark} valid={valid.representativeName && !!values.representativeName} error={fieldError("representativeName")}>
@@ -411,7 +411,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
                 {/* The visible prefix is drawn; a transparent native select over it does the choosing, so keyboards,
                     screen readers and phone pickers all get the platform control. It comes after the number in the DOM
                     (shown first with `order-first`) so the field label still targets the number input. */}
-                <span className="relative order-first flex flex-none items-center gap-1.5 border-e border-line bg-brand-50 ps-3 pe-2 text-sm font-bold text-ink-800 hover:bg-brand-100">
+                <span className="relative order-first flex flex-none items-center gap-1.5 border-e border-line bg-surface-pearl ps-3 pe-2 text-sm font-bold text-ink-800 hover:bg-brand-50">
                   <span aria-hidden className="flex items-center gap-1.5">
                     {dialCountry ? <><span className="text-base leading-none">{flagEmoji(dialCountry.iso2)}</span><span>{dialCountry.dial}</span></> : <span className="text-ink-500">+—</span>}
                     <ChevronDown size={14} className="text-ink-500" />
@@ -440,7 +440,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       </fieldset>}
 
       {/* Section 3 — review, options & consent */}
-      {step===3&&<><div className="rounded-2xl border border-brand-200 bg-brand-50 p-5"><h2 className="title">{t.review}</h2><p className="mt-2 text-sm leading-6 text-ink-600">{t.reviewHelp}</p><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-ink-500">{t.forName}</dt><dd className="font-bold text-ink-900">{[values.givenName.trim(), values.familyName.trim()].filter(Boolean).join(" ")}</dd></div>{someoneElse && <div><dt className="text-ink-500">{t.submittedBy}</dt><dd className="font-bold text-ink-900">{values.representativeName.trim()} <span className="font-normal text-ink-500">({values.representativeRelationship ? t.relationships[values.representativeRelationship] : ""})</span></dd></div>}<div><dt className="text-ink-500">{t.countryLabel}</dt><dd className="font-bold text-ink-900">{country?.name}</dd></div><div><dt className="text-ink-500">{d.form.phone}</dt><dd dir="ltr" className="font-bold text-ink-900">{fullPhone}</dd></div><div><dt className="text-ink-500">{d.form.files}</dt><dd className="font-bold text-ink-900">{files.length}</dd></div></dl></div>
+      {step===3&&<><div className="rounded-lg border border-line bg-surface-pearl p-5"><h2 className="title">{t.review}</h2><p className="mt-2 text-sm leading-6 text-ink-600">{t.reviewHelp}</p><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-ink-500">{t.forName}</dt><dd className="font-bold text-ink-900">{[values.givenName.trim(), values.familyName.trim()].filter(Boolean).join(" ")}</dd></div>{someoneElse && <div><dt className="text-ink-500">{t.submittedBy}</dt><dd className="font-bold text-ink-900">{values.representativeName.trim()} <span className="font-normal text-ink-500">({values.representativeRelationship ? t.relationships[values.representativeRelationship] : ""})</span></dd></div>}<div><dt className="text-ink-500">{t.countryLabel}</dt><dd className="font-bold text-ink-900">{country?.name}</dd></div><div><dt className="text-ink-500">{d.form.phone}</dt><dd dir="ltr" className="font-bold text-ink-900">{fullPhone}</dd></div><div><dt className="text-ink-500">{d.form.files}</dt><dd className="font-bold text-ink-900">{files.length}</dd></div></dl></div>
       {consentField()}
 
       {siteKey && <div className="cf-turnstile mt-6" data-sitekey={siteKey} data-callback="onRehletShifaaTurnstile" />}
@@ -533,7 +533,7 @@ function CountrySelect({ value, placeholder, emptyLabel, clearLabel, invalid, on
       {value && <button type="button" aria-label={clearLabel} className="flex-none px-2 text-ink-400 hover:text-ink-700" onClick={() => { onChange(null); setQuery(""); inputRef.current?.focus(); }}><X size={16} /></button>}
       <ChevronDown size={18} aria-hidden className={`me-2 flex-none text-ink-400 transition ${open ? "rotate-180" : ""}`} />
     </div>
-    {open && <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-line bg-white py-1 shadow-lg">
+    {open && <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-line bg-white py-1 shadow-[var(--shadow-raised)]">
       {results.length === 0 ? <li className="px-4 py-3 text-sm text-ink-500">{emptyLabel}</li> : results.map((c, i) => {
         const selected = value?.iso2 === c.iso2;
         return <li key={c.iso2} role="option" aria-selected={selected}
