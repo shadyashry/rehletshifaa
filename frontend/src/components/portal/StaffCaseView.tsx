@@ -1,7 +1,7 @@
 "use client";
 
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
-import { createContext, use, useMemo, useState, type ReactNode } from "react";
+import { createContext, use, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Check, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
@@ -16,6 +16,9 @@ import type { ProposalCopy } from "@/components/portal/PatientProposal";
 import { JourneyPulse, FullJourneyDialog } from "@/components/portal/JourneySnapshot";
 import { CurrentActionPanel, type CaseActions } from "@/components/portal/CurrentAction";
 import { FinanceApproval } from "@/components/portal/FinanceApproval";
+import { FxReapproval } from "@/components/portal/FxReapproval";
+import type { PriceCopy } from "@/components/PriceTransparency";
+import { isPlatformFee, QUOTE_VALIDITY_TOO_LONG, SCOPE_CHANGE_REASON_REQUIRED } from "@/lib/price-transparency";
 import type { CareView } from "@/components/portal/MyCare";
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
 import { useWorkCopy } from "@/components/portal/portal-copy";
@@ -28,7 +31,7 @@ import { scrollIntoView } from "@/lib/scroll";
 import { countryName } from "@/lib/countries";
 import { PROPOSAL_PAYMENT_TERMS_RECORD } from "@/lib/commercial-terms";
 import { type CaseView, type CatalogService, type DirectoryFacility, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
-import { copy, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, UnreadCount, LockedSection } from "@/components/portal/portal-ui";
+import { copy, FeedbackContext, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, UnreadCount, LockedSection } from "@/components/portal/portal-ui";
 
 const ClinicalReviewPanel=dynamic(()=>import("@/components/portal/ClinicalReview").then(m=>m.ClinicalReviewPanel));
 const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAssignmentDialog").then(m=>m.DeclineAssignmentDialog));
@@ -41,7 +44,7 @@ export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalC
  * What every part of the staff case page shares — the viewer, the case and the one way to change it — provided once by
  * `StaffCaseView` so the proposal, deposit, delivery and assessment pieces stop taking the same props one by one.
  */
-type CaseWorkspace={locale:Locale;t:typeof copy.en;role:RoleKey;c:CaseView;busy:boolean;mutate:Mutate;fxRates:FxRate[];catalog:CatalogService[];/** P0-5: active facilities with Finance-approved packages, for the final assessment's package lines. */facilities:DirectoryFacility[];mySubject?:string};
+type CaseWorkspace={locale:Locale;t:typeof copy.en;role:RoleKey;c:CaseView;busy:boolean;mutate:Mutate;/** The price wording (fee line, quote hold, final-quote form, rate re-approval). */price:PriceCopy;fxRates:FxRate[];catalog:CatalogService[];/** P0-5: active facilities with Finance-approved packages, for the final assessment's package lines. */facilities:DirectoryFacility[];mySubject?:string};
 const CaseWorkspaceContext=createContext<CaseWorkspace|null>(null);
 
 export function CaseWorkspaceProvider({value,children}:{value:CaseWorkspace;children:ReactNode}){
@@ -67,10 +70,10 @@ type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
  * Patients never load this module (`PatientCaseView` renders My Care instead).
  */
-export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
+export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
  const work=useWorkCopy();
  const c=value.caseSummary;
- const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,fxRates,catalog,facilities,mySubject}),[locale,t,role,c,busy,mutate,fxRates,catalog,facilities,mySubject]);
+ const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,price:proposalCopy.price,fxRates,catalog,facilities,mySubject}),[locale,t,role,c,busy,mutate,proposalCopy.price,fxRates,catalog,facilities,mySubject]);
  const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
  const isCoordinator=role==="coordinator";const owned=!!mySubject&&c.coordinatorSubject===mySubject;
  const doctorPhase=["CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW"].includes(c.status);
@@ -205,7 +208,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
    respondBy={myPending?.offerExpiresAt??null}
    onAcceptAssignment={()=>{if(!myPending)return;void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:true}).then(result=>{if(result&&isDoctor)setTab("clinical");});}}
    onDeclineAssignment={()=>setOverlay("decline")}
-   form={financeApproval&&value.proposal&&value.commercial?<FinanceApproval locale={locale} commercial={value.commercial} busy={busy} approveLabel={t.financeApprove}
+   form={financeApproval&&value.proposal&&value.commercial?<FinanceApproval locale={locale} commercial={value.commercial} busy={busy} approveLabel={t.financeApprove} feeLabel={proposalCopy.price.feeLabel}
      onApprove={()=>void mutate(`/finance/cases/${c.id}/proposals/${value.proposal!.versionId}/approve`)}/>
     :formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref} proposal={value.proposal} representatives={value.representatives}/>:undefined}/>
 
@@ -248,6 +251,8 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
        {/* The proposal is the work while it is being prepared or released; afterwards it is reference. */}
        {isCoordinator&&(proposalIsWork?<div id={current.kind==="FOCUS"&&!formAction?"case-actions":undefined}>{proposalPanel}</div>
          :(value.proposal||value.deposit)?<ProposalSummary proposal={value.proposal} deposit={value.deposit} delivery={value.delivery} available={available} onView={()=>setOverlay("proposal")}/>:null)}
+       {role==="finance"&&value.proposal?.fxReapprovalStatus==="PENDING"&&<FxReapproval locale={locale} copy={proposalCopy.price.fxReapproval} caseId={c.id} versionId={value.proposal.versionId} currency={value.proposal.currency} commercial={value.commercial}
+         total={value.proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0)} busy={busy} mutate={mutate}/>}
        {!isCoordinator&&!isDoctor&&(value.proposal||value.deposit)&&proposalPanel}
        {/* The case brief: the facts a coordinator decides ownership on, and the operational context once they own it. */}
        {isCoordinator&&<CoordinatorBrief actions={actions} documents={documents} preview={!!value.preview} intakeSummary={value.intakeSummary} consultantName={consultantOnCase} onClinical={()=>setTab("clinical")} onDocuments={()=>setTab("documents")}/>}
@@ -471,15 +476,21 @@ export function FinalAssessment(){
  </div>;
 }
 
-function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;proposal?:Proposal;gates?:ProposalGates|null}){
- const {locale,c:{id:caseId},busy,mutate,fxRates}=useCaseWorkspace();
- const[currency,setCurrency]=useState("EGP");const[scope,setScope]=useState("");
+export function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;proposal?:Proposal;gates?:ProposalGates|null}){
+ const {locale,c:{id:caseId},busy,mutate,fxRates,price}=useCaseWorkspace();
+ const[currency,setCurrency]=useState("EGP");const[scope,setScope]=useState("");const[validUntil,setValidUntil]=useState("");
+ // The server's answers to this form, shown next to the field they are about (the page banner stays quiet for them).
+ const feedback=use(FeedbackContext);const mine=feedback.errorPath===`/coordinator/cases/${caseId}/final-quotes`;
+ const scopeError=mine&&feedback.errorCode===SCOPE_CHANGE_REASON_REQUIRED;const dateError=mine&&feedback.errorCode===QUOTE_VALIDITY_TOO_LONG;
+ const scopeRef=useRef<HTMLTextAreaElement>(null);const dateRef=useRef<HTMLInputElement>(null);
+ useEffect(()=>{if(scopeError)scopeRef.current?.focus();else if(dateError)dateRef.current?.focus();},[scopeError,dateError]);
+ const today=new Date().toLocaleDateString("en-CA");
  const g=locale==="ar"?{title:"العرض النهائي",createIntro:"أنشئ العرض النهائي من التقييم النهائي المعتمد. لا يتغيّر وضع الحالة.",currency:"عملة عرض المريض",scope:"سبب تغيّر النطاق مقارنةً بالتقدير المبدئي",create:"إنشاء العرض النهائي",release:"إرسال العرض النهائي للمريض",releaseHint:"يُرسل رابطًا آمنًا. تبقى الحالة عند «تأكيد الوصول».",needReview:"يجب أن يسجّل الطبيب تقييمًا نهائيًا معتمدًا أولًا.",financeWait:"بانتظار الموافقة المالية على الخدمات المُدخلة يدويًا."}:{title:"Final treatment quote",createIntro:"Create the final quote from the approved final assessment. The case status does not change.",currency:"Patient's quote currency",scope:"Why the scope changed vs the preliminary estimate",create:"Create final quote",release:"Send final quote to patient",releaseHint:"Sends a secure link. The case stays at arrival confirmed.",needReview:"The doctor must record an approved final assessment first.",financeWait:"Waiting for finance approval of the manually-priced services."};
  const currencyOptions=["EGP",...fxRates.filter(f=>f.currency!=="EGP").map(f=>f.currency)];
  const isFinalDraft=proposal?.documentType==="FINAL_TREATMENT_QUOTE"&&["CLINICALLY_APPROVED","FINANCE_APPROVED"].includes(proposal.status);
  if(isFinalDraft&&proposal)return <div className="mt-4 rounded-lg border border-brand-200 p-4"><h4 className="font-bold text-brand-800">{g.title}</h4>{gates?.financeRequired&&!gates.financeCompleted?<p className="mt-2 text-sm text-alert-700">{g.financeWait}</p>:null}<button className="btn-primary mt-3" disabled={busy||!gates?.readyForRelease} onClick={()=>void mutate(`/coordinator/cases/${caseId}/final-quotes/${proposal.versionId}/release`)}>{g.release}</button><p className="mt-2 text-[0.8125rem] text-ink-500">{g.releaseHint}</p></div>;
  if(proposal?.documentType==="FINAL_TREATMENT_QUOTE")return null;
- return <div className="mt-4 rounded-lg border border-brand-200 p-4"><h4 className="font-bold text-brand-800">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.createIntro}</p>{!reviewId?<p className="mt-2 text-sm text-ink-500">{g.needReview}</p>:<><label className="mt-3 block text-sm font-bold">{g.currency}<select className="field mt-1 w-auto" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></label><label className="mt-3 block text-sm font-bold">{g.scope}<textarea className="field mt-1" rows={2} value={scope} onChange={e=>setScope(e.target.value)}/></label><button className="btn-primary mt-3" disabled={busy} onClick={()=>{const validUntil=validUntilInDays(14);void mutate(`/coordinator/cases/${caseId}/final-quotes`,{clinicalReviewId:reviewId,currency,scopeChangeReason:scope||undefined,validUntil});}}>{g.create}</button></>}</div>;
+ return <div className="mt-4 rounded-lg border border-brand-200 p-4"><h4 className="font-bold text-brand-800">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.createIntro}</p>{!reviewId?<p className="mt-2 text-sm text-ink-500">{g.needReview}</p>:<><label className="mt-3 block text-sm font-bold">{g.currency}<select className="field mt-1 w-auto" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></label><label className="mt-3 block text-sm font-bold">{g.scope}<textarea ref={scopeRef} className={`field mt-1 ${scopeError?"field-error":""}`} rows={2} value={scope} aria-invalid={scopeError||undefined} aria-describedby={scopeError?"final-quote-scope-error":undefined} onChange={e=>setScope(e.target.value)}/></label>{scopeError&&<p id="final-quote-scope-error" role="alert" className="error-text mt-1">{price.coordinator.scopeRequired}</p>}<label className="mt-3 block text-sm font-bold">{price.coordinator.validUntil}<input ref={dateRef} type="date" className={`field mt-1 w-auto ${dateError?"field-error":""}`} min={today} value={validUntil} aria-invalid={dateError||undefined} aria-describedby={dateError?"final-quote-validity-hint final-quote-validity-error":"final-quote-validity-hint"} onChange={e=>setValidUntil(e.target.value)}/></label><p id="final-quote-validity-hint" className="mt-1 text-[0.8125rem] text-ink-500">{price.coordinator.validUntilHint}</p>{dateError&&<p id="final-quote-validity-error" role="alert" className="error-text mt-1">{price.coordinator.validityTooLong}</p>}<button className="btn-primary mt-3" disabled={busy} onClick={()=>{void mutate(`/coordinator/cases/${caseId}/final-quotes`,{clinicalReviewId:reviewId,currency,scopeChangeReason:scope.trim()||undefined,validUntil:validUntil?new Date(`${validUntil}T23:59:59`).toISOString():undefined});}}>{g.create}</button></>}</div>;
 }
 
 /**
@@ -564,7 +575,7 @@ export function RoleActions({role,t,c,proposal,gates,availableActions,locale,mut
  return null;
 }
 
-function ProposalCard({proposal}:{proposal:Proposal}){const work=useWorkCopy();const {locale,t}=useCaseWorkspace();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="rounded-lg bg-brand-50 p-5"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong><bdi dir="ltr">{money(total,proposal.currency,locale)}</bdi></strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${item.quantity}`:""}{item.optional?(locale==="ar"?" (اختياري)":" (optional)"):""}</span><strong className="whitespace-nowrap"><bdi dir="ltr">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</bdi></strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 rounded-lg bg-white/70 p-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{locale==="ar"?"صالح حتى":"Valid until"} {new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))}</p>}</div>}
+function ProposalCard({proposal}:{proposal:Proposal}){const work=useWorkCopy();const {locale,t,price}=useCaseWorkspace();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="rounded-lg bg-brand-50 p-5"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong><bdi dir="ltr">{money(total,proposal.currency,locale)}</bdi></strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{isPlatformFee(item)?price.feeLabel:item.description}{item.quantity>1?` × ${item.quantity}`:""}{item.optional?(locale==="ar"?" (اختياري)":" (optional)"):""}</span><strong className="whitespace-nowrap"><bdi dir="ltr">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</bdi></strong></li>)}</ul>{proposal.fxReapprovalStatus==="PENDING"&&<p role="status" className="mt-3 text-sm font-semibold text-status-warning-fg">{price.staff.fxPending}</p>}{proposal.acceptableFrom&&<p className="mt-3 text-sm text-ink-700">{fillTemplate(price.staff.cooling,{time:new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(proposal.acceptableFrom))})}</p>}{proposal.coordinatorNotes&&<div className="mt-3 rounded-lg bg-white/70 p-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{locale==="ar"?"صالح حتى":"Valid until"} {new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))}</p>}</div>}
 
 // P0-5: business labels for the travel plan and treatment episode states shown on the case page.
 const TRAVEL_STATUS:Record<string,[string,string]>={PLANNING:["Planning","قيد التخطيط"],CONFIRMED:["Confirmed booking","حجز مؤكد"],ARRIVED:["Arrived","تم الوصول"]};

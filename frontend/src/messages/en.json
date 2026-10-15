@@ -914,6 +914,56 @@
     "statFocus": "focus areas"
   },
   "portalProposal": {
+    "price": {
+      "feeLabel": "Coordination and guarantee fee",
+      "feeNote": "Your coordinator, the arrangement of your care and our no-surprise promise.",
+      "guarantee": "Our no-surprise promise: your final quote will not be higher than the maximum shown here unless your Consultant finds, when they examine you, that your treatment needs to change. If it does, they will tell you why in writing, and you will have at least 24 hours to decide.",
+      "how": {
+        "title": "How your price works",
+        "steps": [
+          {
+            "title": "A specialist reviews your records",
+            "body": "You receive a preliminary estimate as a range, not a single number, because no one can price your care before an examination."
+          },
+          {
+            "title": "Your Consultant examines you",
+            "body": "Your final quote comes only after your Consultant has examined you in person. Until then, the estimate can change."
+          }
+        ],
+        "protectTitle": "Your protection"
+      },
+      "scopeChange": {
+        "title": "Why your plan changed"
+      },
+      "cooling": {
+        "text": "Because your plan changed, you have time to decide. You can accept this quote from {time}. Until then you can read it, message your coordinator or ask for changes.",
+        "unknown": "Because your plan changed, you have at least 24 hours to decide. Your coordinator can tell you exactly when you can accept."
+      },
+      "staff": {
+        "fxPending": "Finance is checking the exchange rate. The patient cannot accept this quote yet.",
+        "cooling": "The patient can accept this quote from {time}."
+      },
+      "fxPending": "Our Finance team is checking today's exchange rate for this quote. You do not need to do anything. Your coordinator will let you know as soon as you can accept.",
+      "coordinator": {
+        "validUntil": "Valid until (optional)",
+        "validUntilHint": "Leave empty for 14 days from sending; you can only shorten it.",
+        "scopeRequired": "This quote is above the estimate's maximum, so the patient must be told why. Add the reason your Consultant found that the plan needs to change.",
+        "validityTooLong": "That date is later than the quote validity the commercial policy allows. Choose an earlier date or leave it empty."
+      },
+      "fxReapproval": {
+        "title": "Exchange rate needs your decision",
+        "body": "The exchange rate has moved by more than the allowed band since this quote was prepared. The patient cannot accept until you decide.",
+        "frozen": "Quote total at the frozen rate",
+        "frozenRate": "Frozen rate",
+        "keep": "Keep the frozen rate",
+        "reprice": "Re-release at today's rate",
+        "keepTitle": "Keep the frozen rate?",
+        "keepBody": "The patient can accept the quote as it stands, at the rate it was prepared with. The EGP amounts do not change.",
+        "repriceTitle": "Re-release at today's rate?",
+        "repriceBody": "The quote is recalculated at today's rate, the old link stops working and the patient is sent the new quote. The EGP amounts, the no-surprise cap and the validity do not change.",
+        "cancel": "Cancel"
+      }
+    },
     "title": "Your proposal",
     "documentType": {
       "estimate": "Preliminary care estimate",
@@ -1739,7 +1789,9 @@
       "SECOND_OPINION": "Give your second opinion",
       "REVIEW": "Review",
       "INFORMATION_REQUEST": "Follow up the information request",
-      "DOCUMENT_REVIEW": "Review the documents"
+      "DOCUMENT_REVIEW": "Review the documents",
+      "FX_REAPPROVAL": "Check the exchange rate on a final quote",
+      "FINAL_QUOTE_EXPIRED": "Final quote expired: contact the patient"
     },
     "proposalVersion": "v{number}",
     "waitingReason": {

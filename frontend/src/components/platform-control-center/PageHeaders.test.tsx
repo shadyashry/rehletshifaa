@@ -43,7 +43,7 @@ describe("Commercial › Margin & Deposit", () => {
     expect(within(dialog).getByText(/used for preliminary estimates created from now on/)).toBeVisible();
     expect(apiFetchAs).not.toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
-    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ marginRate: 0.15, manualBandEgp: null }) })));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ marginRate: 0.15, manualBandEgp: null, finalQuoteValidityDays: 14, fxToleranceRate: 0.03 }) })));
   });
 
   it("states the pre-approved manual band with every margin revision (P0-5)", async () => {
@@ -57,7 +57,26 @@ describe("Commercial › Margin & Deposit", () => {
     const dialog = screen.getByRole("dialog", { name: "Confirm new version" });
     expect(dialog).toHaveTextContent("Manual lines up to EGP 25000 release without Finance");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
-    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ body: JSON.stringify({ marginRate: 0.15, manualBandEgp: 25000 }) })));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ body: JSON.stringify({ marginRate: 0.15, manualBandEgp: 25000, finalQuoteValidityDays: 14, fxToleranceRate: 0.03 }) })));
+  });
+
+  it("shows and sends the final-quote validity and the exchange-rate tolerance with every margin revision (P1-10)", async () => {
+    auth.me = meWith(["COMMERCIAL_POLICY_READ", "COMMERCIAL_POLICY_MANAGE", "REFERENCE_DATA_READ"]);
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...policies, "/finance/commercial-policies": [{ id: "m0", marginRate: 0.15, manualBandEgp: null, finalQuoteValidityDays: 7, fxToleranceRate: 0.05, active: true, version: 2 }] }));
+    render(<MarginDeposit locale="en" />);
+    expect(await screen.findByText("Final quote valid 7 days · Finance re-approves a rate move beyond 5.00%")).toBeVisible();
+    // Prefilled from the active version, so a revision never resets them silently.
+    expect(screen.getByLabelText(/Final quote validity/)).toHaveValue(7);
+    expect(screen.getByLabelText(/Exchange-rate tolerance/)).toHaveValue(5);
+    fireEvent.change(screen.getByLabelText("Margin %"), { target: { value: "15" } });
+    fireEvent.change(screen.getByLabelText(/Final quote validity/), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText(/Exchange-rate tolerance/), { target: { value: "2.5" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Review new version" })[0]);
+    const dialog = screen.getByRole("dialog", { name: "Confirm new version" });
+    expect(dialog).toHaveTextContent("final quote valid 10 days");
+    expect(dialog).toHaveTextContent("rate tolerance 2.5%");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ marginRate: 0.15, manualBandEgp: null, finalQuoteValidityDays: 10, fxToleranceRate: 0.025 }) })));
   });
 
   it("sets the deposit as a share of the estimate (W-1: 15%)", async () => {

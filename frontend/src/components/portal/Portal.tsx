@@ -30,6 +30,7 @@ import type { ReplyCover } from "@/components/portal/ReplyCoverPanel";
 import type { ConversationDetail } from "@/components/portal/ConversationsView";
 import { type CaseView, type StaffCaseResponse, type CatalogService, type DirectoryFacility, type FxRate, type CaseDocument, type VerifiedDoctor, type DoctorProfile, type StaffProfile, type CareCategory, type StaffMember, type Task, type Workspace, type MutationResult, refreshAfterRejectedAction, normalizeCases, STAFF_ROLES, terminalStatuses, roleLabel } from "@/components/portal/portal-model";
 import { copy, FeedbackContext } from "@/components/portal/portal-ui";
+import { FIELD_HANDLED_CODES } from "@/lib/price-transparency";
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
 // Role-specific panels, loaded on demand: a coordinator never downloads My Care, a patient never the clinical review.
@@ -120,7 +121,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const CaseViewFor=useCaseView(!caseRole?null:caseRole==="patient"?"patient":"staff");
   const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{const token=accessToken.current;if(!signedInSubject||!token)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));// A2b: a privileged change wants the passkey — explain and offer it (or its setup) instead of re-signing-in blindly.
       if(body.code===PASSKEY_REQUIRED){const method=(init?.method??"GET").toUpperCase();throw Object.assign(new Error(reauthenticationCopy[locale].passkeyRequired),{passkeyPending:method==="GET"?null:{path,method,body:typeof init?.body==="string"?init.body:undefined}});}
-      if(body.code===REAUTHENTICATION_REQUIRED){const method=(init?.method??"GET").toUpperCase();await requestReauthentication(signIn,method==="GET"?undefined:{path,method,body:typeof init?.body==="string"?init.body:undefined});throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn,locale]);
+      if(body.code===REAUTHENTICATION_REQUIRED){const method=(init?.method??"GET").toUpperCase();await requestReauthentication(signIn,method==="GET"?undefined:{path,method,body:typeof init?.body==="string"?init.body:undefined});throw new Error(reauthenticationCopy[locale].required);}throw Object.assign(new Error(body.message??t.error),{code:typeof body.code==="string"?body.code:undefined});}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn,locale]);
   // Busy counts the operations in flight, so one finishing cannot clear it while another still runs. A refresh answers
   // only if it is still the latest one for this role: an older one, or one from before a role switch, is dropped.
   const refreshing=useRef(0);
@@ -232,9 +233,12 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     if(back)setReauthReturn({pending:back==="completed"?pending:null,abandoned:back==="abandoned"});},[]); // eslint-disable-line react-hooks/exhaustive-deps
   // A2b: a privileged change the backend refused for want of a passkey (with the change, to send again after confirming).
   const[passkeyNeeded,setPasskeyNeeded]=useState<{pending:PendingChange|null}|null>(null);
+  // A refusal the proposal pages explain themselves (cooling period, rate check, quote validity): its code and where it came
+  // from, kept apart from the page banner so they can answer next to the field or in the proposal's own note.
+  const[refusal,setRefusal]=useState<{code:string;path:string}|null>(null);
   async function mutate(path:string,body?:unknown,method="POST"):Promise<MutationResult|null|undefined>{
     // Another action is still running: nothing was sent, which is not a failure (null, not undefined).
-    if(mutationPending.current)return null;mutationPending.current=true;setBusyCount(n=>n+1);setError("");setNotice("");
+    if(mutationPending.current)return null;mutationPending.current=true;setBusyCount(n=>n+1);setError("");setNotice("");setRefusal(null);
     const origin=document.activeElement instanceof HTMLElement&&document.activeElement!==document.body?document.activeElement:null;
     try{const result=await api<MutationResult>(path,{method,body:body===undefined?undefined:JSON.stringify(body)});setNotice(t.success);setReauthReturn(null);
       await Promise.all([refresh(true),workspace?openCase(path.endsWith("/claim")?{...workspace.caseSummary,coordinatorSubject:user?.profile.sub}:workspace.caseSummary,undefined,true):undefined]);
@@ -242,7 +246,9 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
       requestAnimationFrame(()=>rebaseline(origin));
       return result??{status:"SAVED"};
     }catch(e){const message=e instanceof Error?e.message:t.error;if(path.endsWith("/claim"))setWorkspace(null);
-      if(e instanceof Error&&"passkeyPending" in e){setPasskeyNeeded({pending:(e as Error&{passkeyPending:PendingChange|null}).passkeyPending});return undefined;}await refreshAfterRejectedAction(path,workspace,refresh,openCase);setError(message);return undefined;}
+      if(e instanceof Error&&"passkeyPending" in e){setPasskeyNeeded({pending:(e as Error&{passkeyPending:PendingChange|null}).passkeyPending});return undefined;}await refreshAfterRejectedAction(path,workspace,refresh,openCase);
+      const code=e instanceof Error&&"code" in e?String((e as Error&{code?:string}).code??""):"";
+      if(code&&FIELD_HANDLED_CODES.includes(code))setRefusal({code,path});else setError(message);return undefined;}
     finally{mutationPending.current=false;setBusyCount(n=>n-1);}
   }
   // Staff views (My work, My cases, Team queue) in one place: the header navigation, the inline phone navigation and
@@ -303,7 +309,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   function changeRole(role:RoleKey){setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.delete("view");url.searchParams.set("role",role);window.history.replaceState({},"",url);}
   function switchRole(role:RoleKey){guardLeave(()=>changeRole(role));}
   const clinicLink=hasClinic?{href:virtualClinicHref(locale),label:work.nav.clinic}:null;
-  const clearFeedback=useCallback(()=>{setNotice("");setError("");},[]);const clearNotice=useCallback(()=>setNotice(""),[]);
+  const clearFeedback=useCallback(()=>{setNotice("");setError("");setRefusal(null);},[]);const clearNotice=useCallback(()=>setNotice(""),[]);
   if(loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
   if(controlCenterOnly)return <PortalFrame title={t.title} subtitle={locale==="ar"?"جارٍ فتح مركز التحكم…":"Opening the Control Center…"}/>;
   if(user&&!workforce&&!careEntry&&clinicAccess.loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
@@ -317,7 +323,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const descriptions:Record<RoleKey,string>=locale==="ar"?{coordinator:"راجع الحالات ونسّق الخطوة التالية للرعاية.",doctor:"راجع الحالات المسندة إليك وسجّل قراراتك السريرية.",operations:"تابع الترتيبات والإجراءات المطلوبة منك.",finance:"راجع المدفوعات والموافقات المطلوبة.",patient:"تابع رعايتك وتعرّف على الخطوة التالية."}:{coordinator:"Review cases and coordinate the next step in care.",doctor:"Review assigned cases and record your clinical decisions.",operations:"Manage your assigned care and travel arrangements.",finance:"Review payments and commercial approvals that need your attention.",patient:"Follow your care and see what happens next."};
   const inWorkspace=!!workspace&&!!caseRole;
   const isPatientRole=currentRole==="patient";
-  return <FeedbackContext.Provider value={{notice,error,clear:clearFeedback,clearNotice}}><PortalFrame paper={isPatientRole} title={isPatientRole?work.myCare.nav.care:currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
+  return <FeedbackContext.Provider value={{notice,error,errorCode:refusal?.code,errorPath:refusal?.path,clear:clearFeedback,clearNotice}}><PortalFrame paper={isPatientRole} title={isPatientRole?work.myCare.nav.care:currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>workspace&&workspace.caseSummary.id!==caseId?guardLeave(()=>void openCaseById(caseId)):void openCaseById(caseId)}/>}
     {staffViews&&<StaffNav locale={locale} label={work.nav.label} items={staffViews.items} current={workspace?null:staffView} clinic={clinicLink} onSelect={selectStaffView} hrefFor={viewHref}/>}
     {isPatientRole&&workspace&&<PatientNav view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}

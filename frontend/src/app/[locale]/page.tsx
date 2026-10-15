@@ -5,6 +5,7 @@ import { CtaPanel } from "@/components/CtaPanel";
 import { CarePathways } from "@/components/home/CarePathways";
 import { Hero } from "@/components/home/Hero";
 import { JourneyFilm } from "@/components/home/JourneyFilm";
+import { PriceSection } from "@/components/home/PriceSection";
 import { PromiseSection } from "@/components/home/PromiseSection";
 import { TravelServices } from "@/components/home/TravelServices";
 import { TrustSection } from "@/components/home/TrustSection";
@@ -34,6 +35,7 @@ export default async function Home({ params }: Props) {
       <PromiseSection d={d} locale={locale} />
       {/* How the file is handled comes before the travel offer: trust first, logistics after (review 2026-10-14). */}
       <TrustSection d={d} />
+      <PriceSection d={d} />
       <TravelServices d={d} />
       <div className="home-final-cta">
         <CtaPanel

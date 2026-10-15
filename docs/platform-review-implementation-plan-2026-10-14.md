@@ -777,6 +777,51 @@ phases.
     session (Sonnet 5.5 for copy/UI, per the UX plan): the three-step "How your price works" panel and the guarantee placeholder on
     `ProposalSign.tsx` and the homepage (EN/AR, one key each, logical CSS, WCAG 2.2 AA), the fee line's patient wording, the
     cooling-period and FX-pause states, and the minimum Finance UI for the FX re-approval item. V97 is the next free Flyway version.
+- **Status (2026-10-15, session 2 of 2, Sonnet 5.5 as the plan names it; committed on `claude/p1-10-s2-ui-bf8b61`, cut from `feat/review-p0` at
+  b4ab584, so the owner fast-forwards `feat/review-p0` to this commit):** the patient-facing and Finance UI and the copy are delivered, no backend
+  change, no migration (V97 is still the next free Flyway version). The frontend needs a rebuild of the dev stack
+  (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`, frontend only is enough).
+  - Delivered: **Fee line wording.** A `PLATFORM_FEE` item (`lib/price-transparency.ts` `isPlatformFee`) is worded from `portalProposal.price.feeLabel` /
+    `feeNote` ("Coordination and guarantee fee", what it covers) on the public proposal (`ProposalSign.tsx`: after the medical lines, not grouped under a raw
+    category, not counted as a service), the signed-in proposal (`PatientProposal.tsx`), the staff proposal card, and Finance's approval table (tagged "Platform
+    fee"). **"How your price works"** (`components/PriceTransparency.tsx` `HowYourPriceWorks`): three numbered steps (specialist reviews and gives a range;
+    Consultant examines you, final quote only then; your protection = the guarantee), on the estimate in `ProposalSign.tsx` and on the home page
+    (`home/PriceSection.tsx`, between Trust and Travel, no action of its own); My Care's proposal drawer shows the guarantee paragraph under the items instead
+    of the panel (narrow surface). **Guarantee:** one key per language, `portalProposal.price.guarantee` (EN = the binding placeholder from this entry; AR
+    is a draft, **pending native review and counsel**); no refund promise. **Final-quote states:** the Consultant's reason in a prominent block before the
+    recommendation (`ScopeChangeNotice`); the cooling period as a calm note with the opening time in the viewer's locale and timezone, accept disabled
+    (`aria-describedby` the note) and re-enabled by a timer when the time passes, request changes and decline never held; Finance checking the rate as
+    "you do not need to do anything" with accept disabled. Both 409 codes (`COOLING_PERIOD`, `FX_REAPPROVAL_REQUIRED`) are explained in place on the
+    **secure-link** path (`ProposalSign.decide`; any other 409 stays "newer version") and on the **signed-in** path: `Portal.api` now carries the
+    backend `code` on its error, `mutate` keeps the four proposal codes out of the page banner and exposes them as `FeedbackContext.errorCode` +
+    `errorPath`, and `PatientProposal`/`PatientProposalDecision` answer with the same notes (never "your decision was not sent"). **Finance UI:**
+    `portal/FxReapproval.tsx` on Finance's case page when the version's `fxReapprovalStatus` is PENDING: the frozen total and rate, "Keep the frozen rate"
+    and "Re-release at today's rate", each behind a `ConfirmDialog`, POSTing to the two Finance endpoints; the coordinator's proposal card says Finance is
+    checking and, in the cooling period, when the patient can accept. Work titles `FX_REAPPROVAL` and `FINAL_QUOTE_EXPIRED` added to `portalWork.workTitles`
+    (en, ar). **Coordinator final-quote form:** optional "Valid until" date (hint "Leave empty for 14 days from sending; you can only shorten it."), no
+    `validUntil` sent when empty (end of the chosen day otherwise), `SCOPE_CHANGE_REASON_REQUIRED` shown under the reason field and `QUOTE_VALIDITY_TOO_LONG`
+    under the date (focus moves there). **Control Center › Margin & Deposit:** "Final quote validity (days)" and "Exchange-rate tolerance (%)" shown on the
+    active version, prefilled in the revision form, in the confirmation, and sent with every margin revision (`finalQuoteValidityDays`, `fxToleranceRate`).
+  - Tests and numbers: new `PriceTransparency.test.tsx` (21: fee label en and ar on the public and signed-in pages, the three steps and guarantee from the
+    keys in en and ar and on the home page, no refund wording, scope-change block before the recommendation, cooling hides accept and shows the time,
+    passed cooling re-enables accept, FX pending, both 409 codes on the secure link, any other 409 still "newer version", the signed-in cooling/FX
+    notes and the refusal contract) and `portal/FinalQuotePricing.test.tsx` (8: both Finance confirmations call exactly their endpoint, cancelling sends
+    nothing, Arabic, the coordinator form sends no `validUntil` when empty and the chosen date otherwise, both field errors). `PageHeaders.test.tsx` updated
+    (the margin body now carries the two fields) plus one new test (prefilled, confirmed, sent). Verification: `pnpm typecheck` clean; eslint clean on every
+    touched file; `vitest run` 68 files / 500 tests green; Playwright (production build) on a11y, home-quality, home-visual, pre8c-commercial-copy,
+    proposal-responsive, arabic-proposal-decision, proposal-otp, my-care: 98 of 106 pass; the 8 failures are 6 in `my-care.spec.ts` that look for a "Deposit arrangements" heading which My Care never rendered at b4ab584 (stale since the deposit step moved, pre-existing and unrelated) and the 2 Arabic-decision specs my home/price panel broke by being the first `ol li` on the page, fixed by scoping the locator to the "What happens next" section (then 10/10). Checked in the browser pane with a throwaway harness (not committed): the
+    estimate in en and ar (RTL: step numbers at the start, amounts at the end, fee row), the cooling note with its time and the disabled accept, the
+    Arabic rate-check note, and the Arabic home section.
+  - Open gaps: the Arabic guarantee and every new Arabic string are drafts, pending native review (UX plan area X) and counsel (the English is the
+    owner's placeholder). Finance's panel shows the **frozen** figure and rate only; today's figure is not on any view, so Finance chooses without
+    seeing the new number (a `fxReapprovalTodayTotal` on `ProposalView` is the small backend change if wanted). The signed-in refusal wiring is covered
+    at the component contract (`FeedbackContext`), not through the whole `Portal` (no existing harness for it). Not built: the Finance-side
+    notification copy codes beyond the two work titles, a coordinator-facing control for `FINAL_QUOTE_EXPIRED` (it opens a normal item), the
+    scope-change reason on the Consultant's final assessment (still entered by the coordinator, as session 1 noted), the guarantee on the final quote
+    (a final quote is past the promise; it shows the reason and the hold instead). Final look is the UX plan's (areas 1 and 4), this is the faithful minimum.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the frontend of the dev stack; walk it once live (release a final
+    quote above the estimate's maximum, confirm the cooling note and disabled accept in My Care and on the secure link, move the rate beyond 3% and
+    decide as Finance); counsel and a native reviewer read the guarantee and the new Arabic. Then P1-13.
 
 ### P1-11  Split `JourneyService`  (E-06)
 - Extract `ConsultantAssignmentService`, `ClinicalReviewService`, `ProposalService` (create / release / decide /
@@ -904,8 +949,8 @@ export on demand (C-07); region-per-market deployment (E-10); video consultation
 Delivered on `feat/review-p0` (pushed at `e68dbc5`, local beyond that; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped),
 P0-5, P1-6, and P1-8 sessions 1 and 2 (meters, internal metrics port, alert rules; `5919bf1`; scheduler lease V95, Prometheus
 registry, Prometheus + Grafana, rules file, dashboard on `claude/p1-8-lease-5e9409`) and its verification (`df40908`). P1-10 session 1
-(fee line, no-surprise cap, cooling period, validity, FX band; V96) is committed on `claude/p1-10-fee-fb4348` for the owner to
-fast-forward. Everything below is still to do.
+(fee line, no-surprise cap, cooling period, validity, FX band; V96, `b4ab584`) and session 2 (patient and Finance UI, copy; `claude/p1-10-s2-ui-bf8b61`)
+are done. Everything below is still to do.
 
 **Why the order changed.** The owner's two priorities are (1) a complete, auditable journey after the deposit —
 today nothing collects, proves or reconciles money after the 15%, and the Consultant's hospital deal is invisible —
@@ -919,7 +964,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
 | 1 | P1-8 Metrics, alerts, scheduler leadership | done: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
-| 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2: session 1 done (2026-10-15, V96), session 2 next | Fable 5.1 high, then Sonnet 5.5 | Session 2 (panel, guarantee placeholder, fee wording, cooling/FX states, Finance UI) after the owner fast-forwards `feat/review-p0` and rebuilds the dev stack (V96). Counsel on the fee's VAT rate does not block it |
+| 2 | ~~P1-10 Commercial truth + fee restructuring~~ (D-A) | **done**: sessions 1 and 2 (2026-10-15) | Fable 5.1 high, then Sonnet 5.5 | Owner fast-forwards `feat/review-p0` to the session-2 commit, rebuilds the frontend and walks the flow; counsel on the guarantee wording and the fee's VAT rate; native Arabic review |
 | — | UI/UX (all areas) | own plan | see `docs/ux-redesign/PLAN.md` | Runs in parallel in its own worktree; Finance and Operations areas wait for P1-15 / P1-17 |
 | 3 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
 | 5 | **P1-15 Admission, voucher, balance, `ADMISSION_READY`** | 2 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |

@@ -9,7 +9,7 @@ const facilities: DirectoryFacility[] = [{ id: "f1", name: "Nile Heart Hospital"
 
 function setup(mutate = vi.fn().mockResolvedValue({ id: "r1" })) {
   render(<CaseWorkspaceProvider value={{ locale: "en", t: {} as never, role: "doctor", c: { id: "c1", status: "ARRIVAL_CONFIRMED", version: 1 } as never,
-      busy: false, mutate, fxRates: [], catalog: [], facilities, mySubject: "doctor-subject" }}><FinalAssessment/></CaseWorkspaceProvider>);
+      busy: false, mutate, price: {} as never, fxRates: [], catalog: [], facilities, mySubject: "doctor-subject" }}><FinalAssessment/></CaseWorkspaceProvider>);
   return mutate;
 }
 

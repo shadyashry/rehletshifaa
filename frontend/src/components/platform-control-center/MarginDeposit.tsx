@@ -10,11 +10,13 @@ import { careAreaLabel } from "./admin-labels";
 import { EmptyState, ErrorNotice, Field, Section, SuccessNotice } from "./cc-ui";
 import { FocusTrapDialog } from "./FocusTrapDialog";
 
-type CommercialPolicy = { id: string; careCategory?: string; marginRate: number; /** P0-5 (A-07): a manual line at or below this EGP figure needs no Finance; null for none. */ manualBandEgp?: number | null; active: boolean; version: number; validFrom?: string };
+type CommercialPolicy = { id: string; careCategory?: string; marginRate: number; /** P0-5 (A-07): a manual line at or below this EGP figure needs no Finance; null for none. */ manualBandEgp?: number | null;
+  /** P1-10 (B-05): days a released final quote stays acceptable, and the exchange-rate move (0–1) beyond which Finance re-approves. */
+  finalQuoteValidityDays?: number; fxToleranceRate?: number; active: boolean; version: number; validFrom?: string };
 type DepositPolicy = { id: string; careCategory?: string; /** Share of the estimate, 0–1 (W-1). */ depositRate: number;
   /** P0-4: bounds in US dollars, null for none. */ minimumUsd?: number | null; maximumUsd?: number | null; active: boolean; version: number; validFrom?: string };
 type CareArea = { slug: string; nameEn: string; nameAr: string };
-type Pending = { kind: "margin" | "deposit"; area: string; value: number; minimumUsd?: number | null; maximumUsd?: number | null; manualBandEgp?: number | null; form: HTMLFormElement };
+type Pending = { kind: "margin" | "deposit"; area: string; value: number; minimumUsd?: number | null; maximumUsd?: number | null; manualBandEgp?: number | null; finalQuoteValidityDays?: number; fxTolerancePercent?: number; form: HTMLFormElement };
 
 /**
  * Commercial › Margin & Deposit — internal commercial configuration: the central margin and coordination-deposit policies.
@@ -56,7 +58,9 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
     const careCategory = pending.area || undefined;
     try {
       // P0-5: every margin revision states its pre-approved manual band too; an empty field means no band (every manual line needs Finance).
-      if (pending.kind === "margin") await api("/finance/commercial-policies", { method: "PUT", body: { careCategory, marginRate: pending.value / 100, manualBandEgp: pending.manualBandEgp ?? null } });
+      if (pending.kind === "margin") await api("/finance/commercial-policies", { method: "PUT", body: { careCategory, marginRate: pending.value / 100, manualBandEgp: pending.manualBandEgp ?? null,
+        // P1-10: every revision also states how long a final quote stands and how far the rate may move; both are prefilled, never silently reset.
+        finalQuoteValidityDays: pending.finalQuoteValidityDays, fxToleranceRate: pending.fxTolerancePercent == null ? undefined : pending.fxTolerancePercent / 100 } });
       // P0-4: every revision states its bounds; an empty field is no bound, never "keep the old one".
       else await api("/finance/deposit-policies", { method: "PUT", body: { careCategory, depositRate: pending.value / 100, minimumUsd: pending.minimumUsd ?? null, maximumUsd: pending.maximumUsd ?? null } });
       pending.form.reset(); setPending(null); setNotice(ar ? "حُفظ إصدار جديد." : "New version saved."); await load();
@@ -75,11 +79,13 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   if (loadError) return shell(<ErrorNotice error={loadError} locale={locale} action="load" onRetry={() => void load()} />);
   const areaSelect = <Field label={ar ? "مجال الرعاية" : "Care area"}><select name="area"><option value="">{area()}</option>{careAreas.map((a) => <option key={a.slug} value={a.slug}>{ar ? a.nameAr : a.nameEn}</option>)}</select></Field>;
   const usd = (raw: FormDataEntryValue | null) => { const text = String(raw ?? "").trim(); return text === "" ? null : Number(text); };
-  const stage = (kind: Pending["kind"]) => (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const d = new FormData(e.currentTarget); setPending({ kind, area: String(d.get("area") || ""), value: Number(d.get("rate")) || 0, form: e.currentTarget, ...(kind === "deposit" ? { minimumUsd: usd(d.get("minimumUsd")), maximumUsd: usd(d.get("maximumUsd")) } : { manualBandEgp: usd(d.get("manualBandEgp")) }) }); };
+  const stage = (kind: Pending["kind"]) => (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const d = new FormData(e.currentTarget); setPending({ kind, area: String(d.get("area") || ""), value: Number(d.get("rate")) || 0, form: e.currentTarget, ...(kind === "deposit" ? { minimumUsd: usd(d.get("minimumUsd")), maximumUsd: usd(d.get("maximumUsd")) } : { manualBandEgp: usd(d.get("manualBandEgp")), finalQuoteValidityDays: Number(d.get("finalQuoteValidityDays")) || undefined, fxTolerancePercent: usd(d.get("fxTolerancePercent")) ?? undefined }) }); };
   const bounds = (min?: number | null, max?: number | null) => min == null && max == null ? (ar ? "بلا حد أدنى أو أقصى" : "No minimum or maximum")
     : `${min != null ? `${ar ? "الحد الأدنى" : "Minimum"} ${min} USD` : ""}${min != null && max != null ? " · " : ""}${max != null ? `${ar ? "الحد الأقصى" : "Maximum"} ${max} USD` : ""}`;
   const currentDefault = deposits.find((p) => p.active && !p.careCategory);
   const currentMargin = margins.find((p) => p.active && !p.careCategory);
+  const validity = (days?: number, tolerance?: number) => days == null || tolerance == null ? ""
+    : ar ? `العرض النهائي صالح ${days} يومًا · يراجع الفريق المالي سعر الصرف عند تغيّره بأكثر من ${(tolerance * 100).toFixed(2)}%` : `Final quote valid ${days} days · Finance re-approves a rate move beyond ${(tolerance * 100).toFixed(2)}%`;
   const band = (b?: number | null) => b == null ? (ar ? "كل بند يدوي يحتاج الفريق المالي" : "Every manual line needs Finance")
     : (ar ? `البنود اليدوية حتى ${b} ج.م تُطلق بلا الفريق المالي` : `Manual lines up to EGP ${b} release without Finance`);
   return shell(<>
@@ -87,11 +93,13 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
     <SuccessNotice>{notice || null}</SuccessNotice>
     <ErrorNotice error={saveError} locale={locale} />
     <Section id="margin" title={ar ? "سياسة الهامش" : "Margin policy"} description={ar ? "يُدمج في سعر الباقة عند إنشاء التقدير المبدئي. يستخدم العرض النهائي الهامش نفسه المثبّت في التقدير المبدئي للحالة." : "Built into the package price when a preliminary estimate is created. The final quote reuses the margin locked in the case's preliminary estimate."}>
-      <ul className="cc-list">{margins.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.marginRate * 100).toFixed(2)}%</bdi> <span className="cc-meta">{band(p.manualBandEgp)}</span></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
+      <ul className="cc-list">{margins.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.marginRate * 100).toFixed(2)}%</bdi> <span className="cc-meta">{band(p.manualBandEgp)}</span> <span className="cc-meta">{validity(p.finalQuoteValidityDays, p.fxToleranceRate)}</span></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
       {canEdit && <form className="cc-filterbar" onSubmit={stage("margin")} aria-label={ar ? "إصدار جديد من سياسة الهامش" : "New margin policy version"}>
         {areaSelect}
         <Field label={ar ? "الهامش %" : "Margin %"}><input name="rate" type="number" min="0" max="50" step="0.1" required dir="ltr" /></Field>
         <Field label={ar ? "النطاق اليدوي المعتمد مسبقًا (ج.م)" : "Pre-approved manual band (EGP)"} hint={ar ? "بند يدوي بهذا السعر أو أقل لا يحتاج الفريق المالي؛ اتركه فارغًا ليحتاجه كل بند." : "A manual line at or below this price needs no Finance; leave empty so every manual line does."}><input name="manualBandEgp" type="number" min="0" step="100" dir="ltr" defaultValue={currentMargin?.manualBandEgp ?? ""} /></Field>
+        <Field label={ar ? "صلاحية العرض النهائي (أيام)" : "Final quote validity (days)"} hint={ar ? "المدة التي يبقى فيها العرض النهائي قابلًا للقبول بعد إرساله؛ يستطيع المنسّق تقصيرها فقط." : "How long a released final quote can be accepted; the coordinator can shorten it, never lengthen it."}><input name="finalQuoteValidityDays" type="number" min="1" max="90" step="1" required dir="ltr" defaultValue={currentMargin?.finalQuoteValidityDays ?? 14} /></Field>
+        <Field label={ar ? "هامش تغيّر سعر الصرف (%)" : "Exchange-rate tolerance (%)"} hint={ar ? "إذا تحرّك سعر الصرف بأكثر من هذه النسبة عند قبول العرض النهائي، يوافق الفريق المالي من جديد قبل أن يقبل المريض." : "If the rate has moved by more than this when a final quote is accepted, Finance re-approves before the patient can accept."}><input name="fxTolerancePercent" type="number" min="0" max="50" step="0.1" required dir="ltr" defaultValue={currentMargin?.fxToleranceRate == null ? 3 : +(currentMargin.fxToleranceRate * 100).toFixed(2)} /></Field>
         <button disabled={busy}>{ar ? "مراجعة الإصدار الجديد" : "Review new version"}</button>
       </form>}
     </Section>
@@ -107,7 +115,7 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
     </Section>
     {pending && <FocusTrapDialog label={ar ? "تأكيد الإصدار الجديد" : "Confirm new version"} onClose={busy ? () => undefined : () => setPending(null)}>
       <h2>{pending.kind === "margin" ? (ar ? "حفظ إصدار جديد من الهامش؟" : "Save a new margin version?") : (ar ? "حفظ إصدار جديد من دفعة التنسيق؟" : "Save a new coordination deposit version?")}</h2>
-      <p><strong>{area(pending.area || undefined)}</strong> · <bdi dir="ltr">{pending.value.toFixed(2)}%</bdi>{pending.kind === "deposit" ? (ar ? " من التقدير" : " of the estimate") : null}{pending.kind === "deposit" && <> · <bdi dir="ltr">{bounds(pending.minimumUsd, pending.maximumUsd)}</bdi></>}{pending.kind === "margin" && <> · {band(pending.manualBandEgp)}</>}</p>
+      <p><strong>{area(pending.area || undefined)}</strong> · <bdi dir="ltr">{pending.value.toFixed(2)}%</bdi>{pending.kind === "deposit" ? (ar ? " من التقدير" : " of the estimate") : null}{pending.kind === "deposit" && <> · <bdi dir="ltr">{bounds(pending.minimumUsd, pending.maximumUsd)}</bdi></>}{pending.kind === "margin" && <> · {band(pending.manualBandEgp)} · {ar ? `صلاحية العرض النهائي ${pending.finalQuoteValidityDays} يومًا` : `final quote valid ${pending.finalQuoteValidityDays} days`} · {ar ? `هامش سعر الصرف ${pending.fxTolerancePercent}%` : `rate tolerance ${pending.fxTolerancePercent}%`}</>}</p>
       <ul className="cc-consequences">
         <li>{ar ? "يحل محل الإصدار الحالي لمجال الرعاية هذا فورًا." : "It replaces the current version for this care area immediately."}</li>
         <li>{pending.kind === "margin"

@@ -11,6 +11,8 @@ import { getDictionary } from "@/lib/dictionary";
 import { fillTemplate, plural } from "@/lib/portal-labels";
 import { formatMoney } from "@/lib/money";
 import { scrollIntoView } from "@/lib/scroll";
+import { ACCEPTANCE_HOLD_ID, AcceptanceHold, HowYourPriceWorks, ScopeChangeNotice } from "@/components/PriceTransparency";
+import { COOLING_PERIOD, FX_REAPPROVAL_REQUIRED, finalQuoteState, isPlatformFee, useNow } from "@/lib/price-transparency";
 
 type Item = { id: string; category: string; description: string; quantity: number; unitPrice: number; optional: boolean };
 type Summary = { caseNumber: string; channel: string; destinationHint: string; whatsappHint?: string | null; emailHint?: string | null };
@@ -26,6 +28,10 @@ type Proposal = {
   fxRateDate?: string | null;
   /** When the patient asked their coordinator to go through the terms in Arabic (assisted path); absent until then. */
   assistance?: { requestedAt?: string | null } | null;
+  /** When a final quote above the estimate's maximum can be accepted (end of its cooling period); null otherwise. */
+  acceptableFrom?: string | null;
+  /** Finance is checking the exchange rate before this final quote can be accepted: null | PENDING | CONFIRMED. */
+  fxReapprovalStatus?: string | null;
 };
 type Decision = "ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED";
 /** Terminal states the patient cannot act out of; each gets its own honest explanation, never a raw error. */
@@ -196,6 +202,8 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const decisionRef = useRef<HTMLDivElement>(null);
   const [decisionVisible, setDecisionVisible] = useState(true);
   const [requestFailed, setRequestFailed] = useState(false);
+  // The code the server last refused an acceptance with, for a hold this page did not know about yet.
+  const [refusedWith, setRefusedWith] = useState<string | null>(null);
   const requestedRef = useRef<HTMLParagraphElement>(null);
   // Until the terms have approved Arabic wording, an Arabic page asks the coordinator to go through them with the
   // patient in Arabic and record the decision (owner decision, GATE P2-1) instead of asking for an acknowledgement.
@@ -298,8 +306,15 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
       if (!r.ok) {
         // A stale document must not look like a transient failure: say what happened and stop offering actions.
         if (r.status === 410) { setBlocked("EXPIRED"); return; }
+        const body = (await r.json().catch(() => ({}))) as { code?: string; message?: string };
+        // A hold on accepting is not a replaced document: explain it in place and keep the other choices open.
+        if (r.status === 409 && (body.code === COOLING_PERIOD || body.code === FX_REAPPROVAL_REQUIRED)) {
+          setRefusedWith(body.code);
+          requestAnimationFrame(() => scrollIntoView(document.getElementById(ACCEPTANCE_HOLD_ID), { behavior: "smooth", block: "center" }));
+          return;
+        }
         if (r.status === 409) { setBlocked("SUPERSEDED"); return; }
-        throw new Error(((await r.json().catch(() => ({}))) as { message?: string }).message ?? t.error);
+        throw new Error(body.message ?? t.error);
       }
       setOutcome(decision); setPhase("done");
     } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
@@ -319,6 +334,10 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
     return formatMoney(n, currency, locale);
   };
   const items = useMemo(() => proposal?.items.filter((i) => !i.optional) ?? [], [proposal]);
+  // The platform's one disclosed line is worded here (the stored text is English) and sits after the medical lines.
+  const medicalItems = useMemo(() => items.filter((i) => !isPlatformFee(i)), [items]);
+  const feeItem = items.find(isPlatformFee);
+  const price = getDictionary(locale).portalProposal.price;
   const itemsTotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
   const expected = proposal?.totalExpected ?? itemsTotal;
   const hasRange = proposal?.totalMin != null && proposal?.totalMax != null && proposal.totalMin !== proposal.totalMax;
@@ -338,10 +357,14 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
   const basisPoints = [...estimateTerms.basis.filter((_, i) => i !== 2 || !!proposal?.assumptions?.trim()), ...(showRate ? [estimateTerms.basisRate] : [])];
   // Only group when the data genuinely carries more than one category — never invent clinical sections.
   const groups = useMemo(() => {
-    const distinct = new Set(items.map((i) => i.category).filter(Boolean));
-    if (distinct.size < 2) return [{ category: null as string | null, rows: items }];
-    return [...distinct].map((category) => ({ category, rows: items.filter((i) => i.category === category) }));
-  }, [items]);
+    const distinct = new Set(medicalItems.map((i) => i.category).filter(Boolean));
+    if (distinct.size < 2) return [{ category: null as string | null, rows: medicalItems }];
+    return [...distinct].map((category) => ({ category, rows: medicalItems.filter((i) => i.category === category) }));
+  }, [medicalItems]);
+  // Cooling period or Finance's rate check: accepting waits, declining and asking for changes never do.
+  const now = useNow(proposal?.acceptableFrom);
+  const hold = finalQuoteState(proposal ?? {}, now, refusedWith);
+  const acceptBlocked = isFinal && hold.acceptBlocked;
 
   const primaryLabel = isFinal ? t.acceptFinal : t.acknowledge;
   const ackShort = isFinal ? t.ackShortFinal : t.ackShort;
@@ -433,13 +456,15 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
               </p>
             )}
 
+            {isFinal && !blocked && hold.acceptBlocked && <div className="mt-4"><AcceptanceHold copy={price} locale={locale} state={hold} /></div>}
+
             <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
               <div className="min-w-0 rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(28,51,58,0.05)] sm:p-7">
+                {isFinal && <ScopeChangeNotice copy={price} reason={proposal.scopeChangeReason} id="scope-heading" className="mb-1" />}
                 <Prose id="recommendation-heading" label={isFinal ? t.assessmentLabel : t.treatmentLabel} text={proposal.recommendedTreatment} />
                 {proposal.consultantName && (
                   <p className="mt-2 text-[0.88rem] font-semibold text-brand-800">{t.reviewedBy} <span dir="auto">{proposal.consultantName}</span></p>
                 )}
-                {isFinal && <Prose id="scope-heading" label={t.scopeLabel} text={proposal.scopeChangeReason} />}
                 {!isFinal && <Prose id="assumptions-heading" label={t.assumptionsLabel} text={proposal.assumptions} />}
                 <Prose id="risks-heading" label={isFinal ? t.risksLabel : t.changeLabel} text={proposal.risksAndLimitations} />
 
@@ -461,6 +486,17 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                       </ul>
                     </div>
                   ))}
+                  {feeItem && (
+                    <ul className="mt-1">
+                      <li className="flex items-baseline justify-between gap-6 border-t border-line py-3">
+                        <span className="min-w-0">
+                          <span className="block text-[0.95rem] leading-6 text-ink-800">{price.feeLabel}</span>
+                          <span className="block text-[0.85rem] leading-5 text-ink-600">{price.feeNote}</span>
+                        </span>
+                        <span className="flex-none whitespace-nowrap text-[0.95rem] font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(feeItem.quantity * feeItem.unitPrice)}</bdi></span>
+                      </li>
+                    </ul>
+                  )}
                   {/* A stored range is always shown as a range, with the expected figure beside it — never "expected" alone. */}
                   <div className="mt-3 border-t-2 border-brand-200 pt-3">
                     <p className="flex items-baseline justify-between gap-6">
@@ -476,11 +512,13 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                   </div>
                 </section>
 
+                {!isFinal && <div className="mt-8"><HowYourPriceWorks copy={price} headingId="how-price-works" /></div>}
+
                 <section aria-labelledby="scope-of-cover" className="mt-8 grid gap-5 sm:grid-cols-2">
                   <h2 id="scope-of-cover" className="sr-only">{t.scopeHeading}</h2>
                   <div>
                     <p className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.includedLabel}</p>
-                    <p dir="auto" className="mt-2 text-[0.92rem] leading-6 text-ink-700">{proposal.includedServices || items.map((i) => i.description).join(" · ")}</p>
+                    <p dir="auto" className="mt-2 text-[0.92rem] leading-6 text-ink-700">{proposal.includedServices || medicalItems.map((i) => i.description).join(" · ")}</p>
                     <p className="mt-2 text-[0.85rem] leading-6 text-ink-600">{t.coordinationNote}</p>
                   </div>
                   <div>
@@ -583,7 +621,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                     {error && <p role="alert" className="mt-3 rounded-xl bg-alert-50 p-3 text-[0.9rem] text-alert-800">{error}</p>}
 
                     <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
-                      {!assisted && <button className="btn-primary min-h-11 px-6" disabled={busy} onClick={submitPrimary}>{busy ? t.deciding : primaryLabel}</button>}
+                      {!assisted && <button className="btn-primary min-h-11 px-6" disabled={busy || acceptBlocked} aria-describedby={acceptBlocked ? ACCEPTANCE_HOLD_ID : undefined} onClick={submitPrimary}>{busy ? t.deciding : primaryLabel}</button>}
                       <button type="button" className="min-h-11 text-[0.92rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
                               disabled={busy} onClick={() => setDialog("REVISION_REQUESTED")}>{t.requestRevision}</button>
                     </div>
@@ -620,7 +658,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                   <dl className="mt-3 space-y-1.5 text-[0.85rem]">
                     <div className="flex justify-between gap-4">
                       <dt className="text-ink-600">{t.servicesLabel}</dt>
-                      <dd className="font-semibold text-ink-800">{plural(locale, items.length, getDictionary(locale).portalWork.plural.services)}</dd>
+                      <dd className="font-semibold text-ink-800">{plural(locale, medicalItems.length, getDictionary(locale).portalWork.plural.services)}</dd>
                     </div>
                     {proposal.validUntil && (
                       <div className="flex justify-between gap-4">
@@ -657,7 +695,7 @@ export function ProposalSign({ locale, token }: { locale: Locale; token: string 
                   <div className="flex items-center justify-end gap-3 min-[480px]:flex-none">
                     <button type="button" className="min-h-11 text-[0.9rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
                             disabled={busy} onClick={() => setDialog("REVISION_REQUESTED")}>{t.requestRevision}</button>
-                    <button className="btn-primary min-h-11 flex-1 justify-center px-5 sm:flex-none" disabled={busy} onClick={assisted ? () => void requestAssistance() : submitPrimary}>
+                    <button className="btn-primary min-h-11 flex-1 justify-center px-5 sm:flex-none" disabled={busy || (acceptBlocked && !assisted)} aria-describedby={acceptBlocked && !assisted ? ACCEPTANCE_HOLD_ID : undefined} onClick={assisted ? () => void requestAssistance() : submitPrimary}>
                       {busy ? (assisted ? assistedCopy.sending : t.deciding) : assisted ? assistedCopy.askShort : primaryLabel}
                     </button>
                   </div>
