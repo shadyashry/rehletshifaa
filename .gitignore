@@ -33,3 +33,6 @@ output/
 /eslint.json
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+
+# P1-9 backup sets and realm exports (patient data in production; never committed)
+/backups/

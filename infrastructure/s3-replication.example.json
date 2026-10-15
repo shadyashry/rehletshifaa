@@ -1,0 +1,20 @@
+{
+  "Role": "REPLACE_WITH_REPLICATION_ROLE_ARN",
+  "Rules": [
+    {
+      "ID": "medical-documents-to-dr-region",
+      "Status": "Enabled",
+      "Priority": 1,
+      "Filter": {},
+      "DeleteMarkerReplication": { "Status": "Disabled" },
+      "SourceSelectionCriteria": { "SseKmsEncryptedObjects": { "Status": "Enabled" } },
+      "Destination": {
+        "Bucket": "arn:aws:s3:::REPLACE_WITH_DR_BUCKET",
+        "StorageClass": "STANDARD_IA",
+        "EncryptionConfiguration": { "ReplicaKmsKeyID": "REPLACE_WITH_DR_KMS_KEY_ARN" },
+        "ReplicationTime": { "Status": "Enabled", "Time": { "Minutes": 15 } },
+        "Metrics": { "Status": "Enabled", "EventThreshold": { "Minutes": 15 } }
+      }
+    }
+  ]
+}

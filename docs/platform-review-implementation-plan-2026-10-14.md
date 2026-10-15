@@ -673,6 +673,46 @@ phases.
   nightly Keycloak realm export; a `scripts/restore-drill.sh` that restores to a scratch stack and runs the smoke
   suite; RTO/RPO written into `docs/deployment.md`.
 - Sessions: 1–2. Model: Opus 5.5 fast, medium.
+- **Status (2026-10-15, session 1 of 1, Opus 5.5; committed on `claude/amazing-jepsen-cb80d9`, cut from `claude/guardian-upload` at
+  `9d0309b`):** delivered, scripts and docs only (no Java, no migration; V98 stays the newest, V99 the next free). The production host is
+  not decided in the docs, so the settings are written host-neutral with **AWS RDS/S3 as the worked example**; the runbook is the new
+  `docs/disaster-recovery.md`, the targets and the drill table are in `docs/deployment.md` ("Recovery objectives").
+  - Delivered: **PITR** `scripts/dr/aws-rds-pitr.sh` (`configure`: 35-day automated backups, the log shipped every 5 min, backup window
+    00:30–01:30 UTC, deletion protection, automated backups + logs replicated to a second region for 14 days with its own KMS key;
+    `status`: latest restorable time; `restore`: always to a new private instance) and the same settings for self-managed PostgreSQL
+    (pgBackRest/WAL-G, `archive_timeout = 300`). **Object storage** `scripts/dr/aws-s3-versioning-replication.sh` +
+    `infrastructure/s3-replication.example.json` (new; RTC 15 min, delete markers not replicated, SSE-KMS replica key) +
+    `infrastructure/s3-lifecycle.example.json` (noncurrent versions kept 35 days = the PITR window, expired delete markers removed):
+    `configure`, `versions KEY`, `recover KEY` (deleted: remove the delete marker; overwritten: copy `--version-id` over as a new version),
+    each step with its `mc` equivalent; the app role still has no `s3:DeleteObjectVersion`. **Realm export**
+    `infrastructure/keycloak/export-realm.sh` (admin partial export: realm, clients, roles, groups, flows; secrets and key material masked by
+    Keycloak; refuses a file with a person's account, a stored credential or an unmasked secret; only client service accounts pass) and
+    the opt-in overlay `docker-compose.backup.yml` (`keycloak-realm-export`, extends `keycloak-sync` so no credential is repeated; nightly
+    02:00 UTC, 30 kept in `backups/keycloak-realm/`, `EXPORT_ONCE=true` for one run). Users and second factors are recovered with Keycloak's
+    database (PITR), never from a file. **Backup set** `scripts/backup-set.sh` (read-only on the source: pg_dump, the realm export, a bucket
+    copy, row counts per table via `scripts/restore-drill/table-counts.sql`, `MANIFEST`, `SHA256SUMS`; containers found by Compose labels,
+    credentials only from the containers' own environment). **Drill** `scripts/restore-drill.sh <set>` into `scripts/restore-drill/compose.yml`
+    (project `rehletshifaa-restore-drill`, loopback ports 15432/18180/19000/18080, own volumes, a scratch Mailpit for the mail health check,
+    every credential generated per run, default Spring profile so no demo seeder, notifications off; `down -v` of that project only):
+    checksums → infrastructure → `pg_restore` with every table's row count compared → realm import, `staff-identity-admin` re-keyed, a
+    scratch-only `restore-drill` client (client credentials, API audience; the scratch backend allows it as a presenter) → objects restored
+    into a versioned bucket, every checksum compared → backend from this checkout → smoke: readiness and health UP, Flyway at the
+    checkout's newest (V98) with 0 failed, `/api/v1/me` 401 without a token and 200 with a restored-realm token → overwrite-then-delete
+    recovery of a canary object from its versions; a timed Markdown report in `backups/drill-reports/`. `/backups/` is git-ignored.
+  - Drill, run for real (2026-10-15, Docker Desktop on Windows 11, set taken from the running dev stack, which was only read): **PASS,
+    restore time 135 s** (realm import 71 s, mostly Keycloak start; backend start 40 s; image build 3 s cached, reported apart): 136 tables
+    / 798 rows equal, 7 bound + 3 custom flows and every client back, Flyway V96 → V98, `/api/v1/me` 401/200, canary recovered (4 versions).
+    The dev bucket held **0 objects**, so the object path was also run with a synthetic copy of the set (3 added files, labelled in its
+    `MANIFEST`): PASS, 122 s, 3 checksums equal. `keycloak-realm-export` ran once in the dev project (`run --rm --no-deps`): export written,
+    checksum OK; no dev service was recreated. Keycloak 26 does not recreate the unused built-in `saml ecp` flow on import, so the drill
+    compares bound and custom flows, not the total. The `scripts/dr/` scripts were dry-run only (no AWS account here).
+  - Tests and numbers: backend `mvn -o -q test` (JVM in UTC) 887 tests, 0 failures, 3 skips (unchanged: no Java in this phase); `bash -n` on every new script.
+  - Open gaps: the **production drill** (managed-host PITR restore time, region failover, the PII keys from the secret store) must add its
+    row to `docs/deployment.md` before real patient data; a host decision (then fill the settings table for it); the Oracle option's
+    `backup.sh` is a 24 h RPO and does not meet the target alone; sealed-evidence Object Lock waits for the evidence ledger (P1-15/16);
+    an alert on backup age / replication lag (Alertmanager route is a P1-8 follow-up); the drill as a scheduled quarterly job.
+  - Next exact action: owner fast-forwards `feat/review-p0` (after `claude/guardian-upload`) to this commit; optionally starts the nightly
+    export (`... -f docker-compose.backup.yml up -d --no-deps keycloak-realm-export`). Then P1-15 once D-B, D-C, D-D are decided.
 
 ### P1-10  Commercial truth on the proposal  (B-03, A-08, B-05, D-01)
 - "How your price works" three-step panel and the no-surprise guarantee text (counsel-approved) on the proposal and
@@ -1113,7 +1153,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | 10 | **P1-19 Hospital-agreement audit** | 1–2 | Opus 5.5; eligibility change by Fable | D-H |
 | 11 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide retention of plaintext WhatsApp sender digits; evidence and statements as `LEGAL_RECORD` class |
 | 12 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-18, so the extracted code is final |
-| 13 | P1-9 Backups and restore drill | 1–2 | Opus 5.5, medium | — |
+| 13 | ~~P1-9 Backups and restore drill~~ | **done**: 1 session (2026-10-15); local drill PASS in 135 s | Opus 5.5 | Production drill on the chosen host (managed PITR restore time, region failover) adds its row to `docs/deployment.md` before real patient data |
 | 14 | P1-14 Consultant public profiles (data and endpoint) | 1 | Opus 5.5 | The page is UX plan area 1b; photographs with consent |
 | 15 | P2-24 Refund rules enforced | 1 | Fable high | Moves up from P2: the point of no return (P1-15) and the 10-day rule need enforcement before the first paying patient |
 | 16 | P2-15 … P2-26 (rest) | about 19 | per the P2 table | P2-15 needs the second-destination timing decision |
@@ -1143,6 +1183,7 @@ the licence now; the credential type is a one-line addition in P1-19.
 - [ ] Submit the new WhatsApp templates to Meta for approval: `rs_patient_action_reminder`, `rs_information_request_closed` (P1-6), and the deposit templates if not yet approved (P0-4).
 - [ ] Set the real bank-transfer details (`PAYMENT_BANK_*`); the defaults are dummy values (DEP-3).
 - [ ] Start every environment with `PII_INDEX_KEY` set before V86 runs (P0-1).
+- [ ] Apply PITR and bucket versioning/replication on the chosen host (`scripts/dr/`), start the nightly realm export, and run the production restore drill; record its time in `docs/deployment.md` (P1-9).
 - [ ] Native Arabic review of all new copy (P0-3, P0-5, P1-6 and earlier), as part of P2-21.
 
 ### Follow-ups carried from delivered phases

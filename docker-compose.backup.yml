@@ -1,0 +1,34 @@
+# P1-9: nightly Keycloak realm export (configuration only: realm settings, clients, roles, groups, authentication
+# flows; no user accounts, credentials or unmasked secrets; see infrastructure/keycloak/export-realm.sh and
+# docs/disaster-recovery.md). Opt-in overlay; starting it leaves every other service as it is:
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.backup.yml up -d --no-deps keycloak-realm-export
+# One export now, without the schedule (a one-off container; the running services are not recreated):
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml -f docker-compose.backup.yml run --rm --no-deps -e EXPORT_ONCE=true keycloak-realm-export
+# Exports land in ${BACKUP_DIR:-./backups}/keycloak-realm (git-ignored), one per night at EXPORT_AT_UTC, 30 kept.
+services:
+  keycloak-realm-export:
+    # Same image and the same dev-only bootstrap admin environment as keycloak-sync, so no credential is repeated here.
+    # Production: set KC_ADMIN_USER / KC_ADMIN_PASSWORD from the secret store (an export account with manage-realm).
+    extends: { file: docker-compose.yml, service: keycloak-sync }
+    restart: unless-stopped
+    environment:
+      KC_SERVER: http://keycloak:8080
+      EXPORT_DIR: /exports
+      EXPORT_KEEP: "30"
+      EXPORT_AT_UTC: "02:00"
+    volumes:
+      - ./infrastructure/keycloak/export-realm.sh:/opt/export/export-realm.sh:ro
+      # Linux hosts: the directory must be writable by uid 1000 (the Keycloak image's user).
+      - ${BACKUP_DIR:-./backups}/keycloak-realm:/exports
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        run() { for attempt in $$(seq 1 30); do bash /opt/export/export-realm.sh && return 0; sleep 20; done;
+        echo "keycloak-realm-export: export failed after 30 attempts" >&2; return 1; };
+        run || [ "$${EXPORT_ONCE:-false}" != true ] || exit 1;
+        [ "$${EXPORT_ONCE:-false}" = true ] && exit 0;
+        while true; do
+        now=$$(date -u +%s); next=$$(date -u -d "today $$EXPORT_AT_UTC" +%s);
+        [ "$$next" -le "$$now" ] && next=$$(date -u -d "tomorrow $$EXPORT_AT_UTC" +%s);
+        sleep $$((next - now)); run;
+        done

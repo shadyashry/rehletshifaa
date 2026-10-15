@@ -11,6 +11,13 @@
       },
       "Expiration": { "Days": 1 },
       "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+    },
+    {
+      "ID": "keep-replaced-versions-for-the-pitr-window",
+      "Status": "Enabled",
+      "Filter": {},
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 35 },
+      "Expiration": { "ExpiredObjectDeleteMarker": true }
     }
   ]
 }
