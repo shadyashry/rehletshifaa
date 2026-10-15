@@ -469,3 +469,20 @@ stack runs it (schema 77). A Docker engine restart stopped the stack right after
 with the standard tunnel-overlay command (only cloudflared restarts on its own). Owner decisions
 still open: journey-bound cases (backlog P1 decision); legal L1–L5; native Arabic review; status tokens (B1) for the
 amber tones; proposal drawer order (price first approved, recommendation-first suggestion kept in the backlog).
+
+## Trust pass — public site (2026-10-15, branch `feat/ux-trust-pass` from `feat/review-p0` @ `adcab1b`)
+
+Source: `patient-site-review-2026-10-14.md` (24/32). Plan: `plans/public-site-trust.md` (owner approval in chat).
+Built: the hero shows the case file (`DossierPreview` + `CaseStamp`, photo removed; entrance uses `backwards` fill);
+Send my case opens with the promise line (5 minutes · reply within 2 working hours Sat–Thu · no commitment), a quiet
+emergency note with a disclosure, the account line moved beside the contact fields, a "What happens next" rail beside
+the form and camera guidance on uploads; the confirmation is the first stamped dossier page; the privacy section moved
+above travel. Copy in en + ar (`home.dossier`, `form.promise`, `form.nextSteps`, `form.uploadCamera`, `form.success`,
+`common.emergencyNotice.more`). DESIGN.md gained "Case stamp and dossier pages".
+Verify: typecheck ok; eslint clean on touched files; vitest 66 files / 470; Playwright `a11y.spec.ts` + `home-quality`
+37/38 on the first run (stamp text contrast) → stamp words moved to `alert-700`, re-run green (home + send-my-case,
+en + ar); `home-media.spec.ts` updated for the hero (intended change; needs the Chrome channel to run).
+Deferred (backlog "Public site — trust pass"): photographs and the coordinators strip (consent, P1-14), continue-later
+resume link (backend), care-area row distill, Arabic numerals/country names (B1).
+Theme decision: Petrol & Paper stays (reasoning in `PLAN.md`).
+Next: owner review on dev after merge + rebuild; then UX plan area 1 (`PLAN.md`), in its own worktree, in parallel with the backend plan.

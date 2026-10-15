@@ -393,6 +393,16 @@ fills as it crosses the middle of the screen; step one is always filled ("you ar
 ### Eyebrow (signature)
 Petrol label text, opened by a 1rem × 2px coral rule. It is the most repeated brand signal on every page.
 
+### Case stamp and dossier pages (signature)
+
+The product is a case file, so the public site shows it as one: `DossierPreview` stacks three paper pages (heading
+only on the back pages, the top page fully readable) and `CaseStamp` presses a date stamp on the page where something
+real happened — received, reviewed, estimated. The stamp's frame is Logo Coral; its words are `alert-700`, the
+stamp-ink red that reaches AA on paper (coral never carries text). Tilt ±8° (mirrored in RTL), a double rule, no
+fill. The stamp appears only on real events, never as decoration: the confirmation page after sending a case is the
+same page type, stamped "Received", and later journey artefacts (reviewed, estimate ready, discharge) take the same
+mark. Entrances use `animation-fill-mode: backwards`, so every page and stamp is visible even when no animation runs.
+
 ### Drawer (portal)
 A native modal `<dialog>` sized to 36rem (full width minus 2rem on phones; a portal case drawer becomes a full-height sheet below 640px), 8px radius, Raised shadow. Its header — the
 title as `<h2>` naming the dialog, and a 44px Close icon button — stays pinned while the content scrolls, edged by a

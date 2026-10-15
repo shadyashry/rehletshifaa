@@ -32,8 +32,9 @@ export default async function Home({ params }: Props) {
       <JourneyFilm d={d} locale={locale} />
       <CarePathways locale={locale} d={d} />
       <PromiseSection d={d} locale={locale} />
-      <TravelServices d={d} />
+      {/* How the file is handled comes before the travel offer: trust first, logistics after (review 2026-10-14). */}
       <TrustSection d={d} />
+      <TravelServices d={d} />
       <div className="home-final-cta">
         <CtaPanel
           locale={locale}

@@ -1,28 +1,22 @@
 import { ArrowRight, Check, HandHeart, HeartPulse, Languages, Stethoscope, UserRoundCheck } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 
+import { DossierPreview } from "@/components/home/DossierPreview";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 import { TrackedLink } from "@/components/TrackedLink";
 
 /**
- * The opening screen carries one claim, one action and the page's one photograph: the guidance scene —
- * a patient listening while a Consultant walks him through his RehletShifaa report, the coordinator
- * present behind them. Patient and guidance, not doctor and treatment. The still is a native 7:5 frame,
- * shown whole on desktop; the tighter tablet/phone crops are anchored just below centre so both faces and
- * the report stay in view. The "start with what you have" note docks onto the photograph's lower edge so
- * the two read as one composed visual unit.
+ * The opening screen carries one claim, one action and the product itself: the case file the patient will receive,
+ * shown as three stamped pages placed on the desk (DossierPreview), instead of a photograph that could belong to any
+ * clinic. The "start with what you have" note docks onto the file's lower edge so the two read as one composed unit:
+ * what you send, what you get back.
  * Below, the reassurance rail runs as one quiet line on the clinical mist — the hero's closing thought,
  * not a separate section.
  */
 export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
   const arabic = locale === "ar";
-  const still = "/media/rehletshifaa-hero-consultation.jpg";
-  const stillAlt = arabic
-    ? "مريض يستمع إلى استشاري يشرح له تقريره الطبي بهدوء، ومنسّقة الرعاية حاضرة خلفهما"
-    : "A patient listening as a Consultant calmly explains his medical report, with the care coordinator present";
 
   const trust = arabic
     ? [[Stethoscope, "مراجعة بقيادة استشاري"], [UserRoundCheck, "منسّق واحد طوال الرحلة"], [HeartPulse, "متابعة بعد عودتك"], [Languages, "بالعربية والإنجليزية"], [HandHeart, "لا التزام عند البدء"]] as const
@@ -56,20 +50,9 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
           </div>
         </div>
 
-        {/* One composed visual unit: the photograph, and the note docked onto its lower edge. */}
-        <figure className="m-0 w-full">
-          <div className="relative aspect-[16/10] overflow-hidden rounded-[16px] border border-border-subtle bg-surface-clinical sm:aspect-[16/9] lg:aspect-[7/5]">
-            <Image
-              src={still}
-              alt={stillAlt}
-              fill
-              priority
-              unoptimized
-              sizes="(min-width: 1024px) 560px, (min-width: 640px) 728px, 100vw"
-              className="object-cover object-[50%_58%]"
-            />
-          </div>
-          <figcaption className="home-hero-card relative z-[1] -mt-5 mx-4 rounded-[12px] border border-border-subtle bg-surface-elevated px-4 py-3.5 shadow-[0_10px_30px_-24px_rgba(28,51,58,0.35)] sm:mx-8 sm:px-5 sm:py-4 lg:mx-6">
+        {/* One composed visual unit: the case file, and the note docked onto its lower edge. */}
+        <DossierPreview locale={locale} d={d}>
+          <figcaption className="home-hero-card relative z-[5] -mt-4 mx-4 rounded-[12px] border border-border-subtle bg-surface-elevated px-4 py-3.5 shadow-[0_10px_30px_-24px_rgba(28,51,58,0.35)] sm:mx-8 sm:px-5 sm:py-4 lg:mx-6">
             <p className="text-[0.875rem] font-semibold text-brand-900">{d.home.heroCardTitle}</p>
             <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
               {d.home.prepareItems.map((item) => (
@@ -81,7 +64,7 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
             </ul>
             <p className="mt-1 text-[0.875rem] leading-5 text-ink-500">{d.home.reassurance}</p>
           </figcaption>
-        </figure>
+        </DossierPreview>
       </div>
 
       {/* The reassurance rail: one line of five, separated by hairlines, on the clinical mist. On phones the fifth

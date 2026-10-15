@@ -704,10 +704,11 @@ phases.
   complaint intake from My Care routed to the Care Coordination Manager; `REOPEN` from `CLOSED` into `FOLLOW_UP`.
 - Sessions: 2. Model: Opus 5.5 fast, medium (guardian consent reviewed by Fable).
 
-### P1-14  Consultant public profiles  (D-03, §16.2 item 5)
-- Render the published public profile: "Credentials reviewed · current", years, sub-specialties, languages,
-  platform case volume, optional intro video (S3, scanned); no ratings.
-- Sessions: 1. Model: Sonnet 5.5 fast, medium (Impeccable pass by Fable at the end).
+### P1-14  Consultant public profiles — data and endpoint  (D-03, §16.2 item 5)
+- Backend only: a public read of the published profile ("Credentials reviewed · current" derived from the credential
+  state, years, sub-specialties, languages, practice locations from the facility registry, optional intro video on
+  S3, scanned); no ratings; ethics regulation Article 10 (no promotional fields). The page itself is UX plan area 1b.
+- Sessions: 1. Model: Opus 5.5 fast, medium.
 
 ### P1-15  Admission, voucher and balance  (post-deposit design §5 stages 1–3, §6; architecture §5.1)
 - Source: `docs/post-deposit-journey-design.md` (decisions D-B, D-C, D-D) and `docs/post-deposit-solution-architecture.md`.
@@ -768,17 +769,12 @@ phases.
   Compliance screens; `V100__affiliations_and_audit_samples.sql`.
 - Sessions: 1–2. Model: Opus 5.5 fast, medium; eligibility change reviewed by Fable.
 
-### P1-20  Public site trust pass  (UX review 2026-10-14)
-- Source: `docs/ux-redesign/patient-site-review-2026-10-14.md` (critique 24/32 and the "dossier" direction). Runs
-  through `/redesign-area` with shape plans and gates, in parallel with the backend phases (frontend only).
-- Slices: (a) hero as the product artifact (dossier preview strip) with the photograph demoted, entrance animation
-  robustness; (b) Consultant cards and profiles with photographs, "Credentials reviewed · current", where they
-  practise, languages (joins P1-14); (c) Send my case opening: calm promise header with the reply window, emergency
-  notice as a quiet disclosure, "what happens next" rail, resume by WhatsApp, camera-capture guidance on uploads;
-  (d) home order and length (privacy before travel; care-area grid distilled); (e) confirmation page as the first
-  stamped dossier page (joins P2-20); (f) Arabic-first typography and numerals (joins P2-21).
-- Sessions: 3 (shape 0.5, build 2, polish 0.5). Model: Fable 5.1 high for shape and the hero; Opus 5.5 for the form
-  and cards; Sonnet 5.5 for copy sweeps.
+### UI/UX work is planned separately (decided 2026-10-15)
+- Every user-interface slice (the public-site trust pass, Consultant public profile rendering, signature moments,
+  Arabic typography and copy, the staff keyboard flow, Finance and Control Center redesigns) lives in the UX plan:
+  `docs/ux-redesign/PLAN.md`, tracked in `docs/ux-redesign/STATUS.md`, run through `/redesign-area` in its own
+  worktree and branch, in parallel with this plan. This plan keeps backend, workflow and data work only; where a
+  backend phase delivers a screen, it delivers the minimum working UI and the UX plan designs the final one.
 
 ---
 
@@ -791,9 +787,9 @@ phases.
 | P2-17 | Care-area change reason and "Reviewed by" (A-12); second-opinion visibility (A-11) | 1 | Opus fast |
 | P2-18 | R1 travel items with companions and per-traveller documents (A-13, §2.7) | 3 | Fable high |
 | P2-19 | Stage-weighted capacity; full-cover mode for leave (A-14) | 1 | Opus fast |
-| P2-20 | Signature moments: case sent, specialist reviewing, estimate ready, welcome, discharge summary (D-04) | 3 | Fable high (Impeccable), Sonnet for copy |
-| P2-21 | Arabic-first copy pass, Arabic type scale and numeral rule in `DESIGN.md` (D-05) | 2 | Sonnet fast, then native reviewer |
-| P2-22 | Staff "My work" keyboard flow, one-next-action strip, bilingual templates (D-06) | 2 | Opus fast |
+| P2-20 | Signature moments (D-04) — **moved to the UX plan** (areas 1 and 2); only the events they need stay here (P1-15…P1-18) | — | — |
+| P2-21 | Arabic-first copy pass and type scale (D-05) — **moved to the UX plan** (cross-cutting); the native review stays a launch gate | — | — |
+| P2-22 | Staff keyboard flow and one-next-action strip (D-06) — **moved to the UX plan** (area 2); bilingual reply templates stay here (backend data) | 0.5 | Opus fast |
 | P2-23 | Per-link rate limits and Turnstile-backed upload exemption (E-11) | 1 | Opus fast |
 | P2-24 | Refund rules enforced per §2.6 (B-06); minimum coordination fee (B-07) | 1 | Fable high |
 | P2-25 | Paid specialist opinion product (F-02) on the review flow + payment adapter (§2.5 decided) | 3 | Fable high |
@@ -817,9 +813,9 @@ registry, Prometheus + Grafana, rules file, dashboard on `claude/p1-8-lease-5e94
 **Why the order changed.** The owner's two priorities are (1) a complete, auditable journey after the deposit —
 today nothing collects, proves or reconciles money after the 15%, and the Consultant's hospital deal is invisible —
 and (2) a patient site that earns trust at the first visit. The post-deposit phases (P1-15…P1-19) need the fee
-restructuring (P1-10, legal) and the incidents model (P1-13) first; the UX pass (P1-20) is frontend-only and runs in
-parallel. `JourneyService` is split (P1-11) only after the journey code is final, and retention (P1-7) and the DR
-drill (P1-9) stay launch blockers that do not shape the product.
+restructuring (P1-10, legal) and the incidents model (P1-13) first; all user-interface work is planned separately in
+`docs/ux-redesign/PLAN.md` and runs in parallel in its own worktree. `JourneyService` is split (P1-11) only after the
+journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch blockers that do not shape the product.
 
 ### Phases still to run (recommended order)
 
@@ -827,8 +823,8 @@ drill (P1-9) stay launch blockers that do not shape the product.
 |---|---|---|---|---|
 | 1 | P1-8 Metrics, alerts, scheduler leadership | done: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
 | 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2 | Fable 5.1 high, then Sonnet 5.5 | Owner: D-A (platform fee line), guarantee wording, final-quote validity; counsel on the VAT rate of the fee |
-| 3 | **P1-20 Public site trust pass** (parallel track) | 3 | Fable (shape, hero), Opus (form, cards), Sonnet (copy) | Owner reads the UX review; shape-plan gate |
-| 4 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
+| — | UI/UX (all areas) | own plan | see `docs/ux-redesign/PLAN.md` | Runs in parallel in its own worktree; Finance and Operations areas wait for P1-15 / P1-17 |
+| 3 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
 | 5 | **P1-15 Admission, voucher, balance, `ADMISSION_READY`** | 2 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |
 | 6 | **P1-16 Treatment evidence: milestones, change orders** | 2 | Fable 5.1 high; forms by Opus | D-E band; P1-13 |
 | 7 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths by Fable | Owner: payer terms, partner commission |
@@ -838,7 +834,7 @@ drill (P1-9) stay launch blockers that do not shape the product.
 | 11 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide retention of plaintext WhatsApp sender digits; evidence and statements as `LEGAL_RECORD` class |
 | 12 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-18, so the extracted code is final |
 | 13 | P1-9 Backups and restore drill | 1–2 | Opus 5.5, medium | — |
-| 14 | P1-14 Consultant public profiles | 1 | Sonnet 5.5; Impeccable pass by Fable | Photographs with consent (P1-20 b) |
+| 14 | P1-14 Consultant public profiles (data and endpoint) | 1 | Opus 5.5 | The page is UX plan area 1b; photographs with consent |
 | 15 | P2-24 Refund rules enforced | 1 | Fable high | Moves up from P2: the point of no return (P1-15) and the 10-day rule need enforcement before the first paying patient |
 | 16 | P2-15 … P2-26 (rest) | about 19 | per the P2 table | P2-15 needs the second-destination timing decision |
 | 17 | P3 backlog | one each | Sonnet or Opus | — |
@@ -853,7 +849,7 @@ the licence now; the credential type is a one-line addition in P1-19.
 - [ ] D-I: start the PDPL licence application and the Law 13/2025 liability-fund subscription (owner action).
 - [ ] P1-10: guarantee wording on the proposal and final-quote validity; counsel: VAT rate on the platform fee.
 - [ ] P1-12: payer terms and partner commission.
-- [ ] P1-20: approve the "dossier" direction in the UX review before the shape plan; consent for Consultant photographs.
+- [ ] Consent for Consultant and coordinator photographs (UX plan area 1b; P1-14).
 - [ ] P2-15: when a second destination is added.
 - [ ] Legal review of the patient refund copy (F2); the refund rule itself is decided (P0-4).
 - [ ] Whether a case cancelled for an unanswered information request gets a reopen path (P1-6; today the patient sends it again).
@@ -880,14 +876,14 @@ the licence now; the credential type is a one-line addition in P1-19.
 
 Done: 1. P0-1 → 2. P0-2 → 3. P0-3 → 4. P0-4 → 5. P0-5 → 6. P1-6.
 
-Next: 7. P1-8 (metrics + ShedLock) → 8. P1-10 (commercial truth + fee restructuring) → 9. P1-20 (public site trust
-pass; parallel frontend track from here on) → 10. P1-13 (guardian/incidents) → 11. P1-15 (admission, voucher,
-balance) → 12. P1-16 (milestones, change orders) → 13. P1-12 (payouts/payer/partner) → 14. P1-17 (discharge,
-reconciliation, statements) → 15. P1-18 (follow-up, outcomes) → 16. P1-19 (hospital-agreement audit) → 17. P1-7
-(retention) → 18. P1-11 (split) → 19. P1-9 (DR drill) → 20. P1-14 (profiles) → 21. P2-24 (refund enforcement) →
-P2 in table order.
+Next: 7. P1-8 (metrics + ShedLock) → 8. P1-10 (commercial truth + fee restructuring) → 9. P1-13
+(guardian/incidents) → 10. P1-15 (admission, voucher, balance) → 11. P1-16 (milestones, change orders) → 12. P1-12
+(payouts/payer/partner) → 13. P1-17 (discharge, reconciliation, statements) → 14. P1-18 (follow-up, outcomes) →
+15. P1-19 (hospital-agreement audit) → 16. P1-7 (retention) → 17. P1-11 (split) → 18. P1-9 (DR drill) → 19. P1-14
+(profile data) → 20. P2-24 (refund enforcement) → P2 in table order. The UX plan runs beside this sequence in its
+own worktree (`docs/ux-redesign/PLAN.md`); its Finance and Operations areas start after P1-15 and P1-17.
 
 Owner decisions that gate a slice: D-A (P1-10), D-B/D-C/D-D (P1-15), D-E (P1-16), D-F (P1-17), D-G (P1-18), D-H
-(P1-19), the UX direction (P1-20), P1-12 (payer terms, partner commission), P2-15 (second destination timing).
+(P1-19), P1-12 (payer terms, partner commission), P2-15 (second destination timing).
 
 Roughly 25 sessions for the rest of P1 (including the six new phases), 19 for P2.

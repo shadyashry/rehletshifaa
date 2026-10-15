@@ -41,7 +41,8 @@
     "emergencyLabel": "Emergency",
     "emergencyNotice": {
       "title": "If this is an emergency, seek local care now",
-      "body": "RehletShifaa is not an emergency service. Call your local emergency number or go to the nearest emergency department."
+      "body": "RehletShifaa is not an emergency service. Call your local emergency number or go to the nearest emergency department.",
+      "more": "Read more"
     },
     "medicalNotice": "RehletShifaa coordinates access to medical review and care. Information provided through the platform does not replace emergency care or a complete clinical assessment. Final medical decisions are made by the treating Consultant following appropriate evaluation.",
     "privacy": "Privacy Policy",
@@ -74,6 +75,20 @@
       "A short note about your concern"
     ],
     "heroCardNote": "If anything else is needed, your coordinator will tell you before the review.",
+    "dossier": {
+      "label": "What you receive: the three pages of your case file",
+      "example": "Example",
+      "stamp": "Received",
+      "page1Kicker": "Case received",
+      "page1Title": "RS-2026-000421",
+      "page1Body": "Your file is with the coordination team. Replies Saturday to Thursday, 10:00–20:00 Cairo time.",
+      "page2Kicker": "Reviewed by",
+      "page2Title": "A Consultant in the right specialty",
+      "page2Body": "The recommendation, the risks, and what is still unknown.",
+      "page3Kicker": "Preliminary estimate",
+      "page3Title": "A price range in your currency",
+      "page3Body": "What it includes, what it does not, and what you pay now."
+    },
     "video": {
       "eyebrow": "Your journey, explained",
       "title": "See what happens after you start",
@@ -568,6 +583,30 @@
     "caseNumber": "Case number",
     "continue": "Continue on WhatsApp",
     "secureNote": "Secure transmission. Medical decisions remain consultant-led.",
+    "promise": {
+      "label": "What sending your case involves",
+      "time": "About 5 minutes",
+      "reply": "A coordinator replies within 2 working hours, Saturday to Thursday",
+      "commitment": "No commitment to start"
+    },
+    "nextSteps": {
+      "title": "What happens next",
+      "items": [
+        ["Your case is received", "A case number and a private link, within minutes."],
+        ["A coordinator prepares it", "One named person, in Arabic or English, reachable on WhatsApp."],
+        ["A Consultant reviews it", "Usually within a few working days once the file is complete."],
+        ["You receive an estimate", "A recommendation and a price range before you decide anything."]
+      ],
+      "whatsapp": "Prefer to talk first?"
+    },
+    "uploadCamera": "No scanner? Photograph each page with your phone. Photos and scans are both fine.",
+    "success": {
+      "stampReceived": "Received",
+      "withTeam": "Your file is with the coordination team.",
+      "hours": "We reply Saturday to Thursday, 10:00–20:00 Cairo time, usually within 2 working hours.",
+      "track": "Track your case",
+      "keepNumber": "Keep this number. It identifies your case on WhatsApp and in Track case."
+    },
     "errors": {
       "required": "This field is required.",
       "name": "Please enter the given name(s).",
