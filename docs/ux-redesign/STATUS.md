@@ -413,6 +413,7 @@ Update at the end of every phase.
 | 2026-10-09 | Batch 3 (owner): **B3-1** the travel-package question leaves the intake (the coordinator sets it in the portal); **B3-2** coordinator introduction = role, Arabic and English, WhatsApp (no name, photo or hours); **B3-3** the routers are unnumbered and link to How it works. | Owner |
 | 2026-10-09 | Close (owner): fix the re-critique P1s as part of the close; accept the Teams/People/governance e2e coverage gap as post-launch. Fees: the site states nothing about whether sending a case or the review costs anything. | Owner |
 | 2026-10-15 | Area 1 plan `plans/patient-portal-file.md` **approved** with the recommendations: **D-1** stamp dates from backend milestones; **D-2** Copy controls on the payment slip; **D-3** no fourth (Acknowledged) stamp; **D-4** quiet emergency notice on the patient pages; **D-5** no only-account line until the business confirms. Slice T first. | Owner |
+| 2026-10-15 | Area 1 slices **A** (`8f8dfc2`) and **F** (`31d60df`) **approved** after review; fast-forwarded into `feat/ux-area-1-portal-file`. Next: slice B. | Owner |
 | 2026-10-07 | The P0 loop exists only on `codex/platform-control-plane` (introduced in `19a970c`; `main` has `signIn` deps `[]` and no `refreshMe()` call), so `fix/my-care-reload-loop` branches from `codex/platform-control-plane` and its PR targets that branch, not `main`. | Owner |
 
 ## Accessibility baseline
@@ -442,7 +443,7 @@ Update at the end of every phase.
 `zealous-kapitsa-ee74d4`): critique **23/40** and shape plan **approved by the owner (2026-10-15)** with D-1 backend milestones, D-2 Copy yes, D-3 no fourth stamp, D-4 quiet notice, D-5 not yet. Was: the
 owner approves the plan and decides D-1 (stamp dates: backend milestones, recommended), D-2 (Copy on the payment slip), D-3
 (no fourth stamp, recommended), D-4 (quiet emergency notice on the patient pages) and D-5 (only-account assurance, business);
-then slices T → A → F → B → C → D → E in about three sessions. **Slice T is built and committed; next is slice A (foundations).** Correction: "My Care + multiple cases" below **is committed**
+then slices T → A → F → B → C → D → E in about three sessions. **Slices T, A (`8f8dfc2`) and F (`31d60df`) are built, committed and approved by the owner (2026-10-15); A and F fast-forwarded into `feat/ux-area-1-portal-file`. Next: slice B (status link = the file, unsealed)** — it uses `OneTimeCodeStep`, `DossierPage`, `CaseJourney` and the status-link `milestones` already typed; merge `feat/review-p0` (D-1 backend, `668e24c`) before or with it so the Received / In review stamps render live. Correction: "My Care + multiple cases" below **is committed**
 (`0d743b2`, 2026-10-13) and is an ancestor of this branch; it is reused, not rebuilt.
 
 **My Care + multiple cases** (`plans/patient-my-care.md`, owner-approved 2026-10-13) built by `/redesign-area` on
