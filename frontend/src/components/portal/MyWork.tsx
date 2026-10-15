@@ -5,7 +5,7 @@ import { ArrowRight, CalendarClock, Clock3, FileText } from "lucide-react";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge } from "@/components/portal/StatusBadge";
 import { intlLocale, type Locale } from "@/lib/i18n";
-import { careAreaLabel, coordinatorLabel, plural, priorityLabel, waitingLabel, workCopyText, type WorkItemCopy } from "@/lib/portal-labels";
+import { careAreaLabel, coordinatorLabel, plural, priorityLabel, waitingLabel, workItemText, type WorkItemCopy } from "@/lib/portal-labels";
 
 export type WorkItem = {
   id: string; caseId: string; caseNumber: string; patientName: string | null; caseStatus: string;
@@ -60,7 +60,7 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
           {items.map((item, index) => {
             const lead = index === 0 && (item.overdue || item.priority === "URGENT");
             const titleId = `work-item-${item.id}`;
-            const text = worded(item, locale, work);
+            const text = workItemText(item, locale, work);
             return (
             <li key={item.id}>
               <article aria-labelledby={titleId} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:gap-6">
@@ -120,13 +120,6 @@ function PriorityChip({ priority, label }: { priority: string; label: string }) 
   return <span className="text-[0.8125rem] font-semibold text-ink-600">{label}</span>;
 }
 
-/** From the wording code when this page knows it; otherwise the backend's English, titled by type in Arabic. */
-function worded(item: WorkItem, locale: Locale, work: ReturnType<typeof useWorkCopy>) {
-  const known = workCopyText(item.copy, work.workCopy);
-  if (known) return known;
-  const localized = Object.hasOwn(work.workTitles, item.type) ? work.workTitles[item.type as keyof typeof work.workTitles] : undefined;
-  return { title: (locale === "ar" ? localized : undefined) ?? (item.title || localized || ""), context: item.context };
-}
 
 function age(iso: string, locale: Locale) {
   const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);

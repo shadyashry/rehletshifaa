@@ -1,9 +1,9 @@
 "use client";
 
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
-import { createContext, use, useMemo, useState, type ReactNode } from "react";
+import { createContext, use, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Check, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageEstimate } from "@/components/portal/FacilityPackagePicker";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
@@ -14,12 +14,14 @@ import { IntakeHistory } from "@/components/portal/IntakeHistory";
 import type { ConversationDetail } from "@/components/portal/ConversationsView";
 import type { ProposalCopy } from "@/components/portal/PatientProposal";
 import { JourneyPulse, FullJourneyDialog } from "@/components/portal/JourneySnapshot";
-import { CurrentActionPanel, type CaseActions } from "@/components/portal/CurrentAction";
+import { CurrentActionPanel, actionTitle, focusCurrentAction, isOwnStep, stepLabel, type CaseActions, type CurrentActionView } from "@/components/portal/CurrentAction";
+import type { WorkItem } from "@/components/portal/MyWork";
+import { patientStepText } from "@/components/portal/patient-step";
 import { FinanceApproval } from "@/components/portal/FinanceApproval";
-import type { CareView } from "@/components/portal/MyCare";
+import type { CareView, PatientProposalState } from "@/components/portal/MyCare";
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
 import { useWorkCopy } from "@/components/portal/portal-copy";
-import { careAreaLabel, coordinatorLabel, fillTemplate, plural, tabKeyTarget, waitingLabel, waitingReasonText } from "@/lib/portal-labels";
+import { careAreaLabel, coordinatorLabel, fillTemplate, plural, tabKeyTarget, waitingLabel, waitingReasonText, workItemText } from "@/lib/portal-labels";
 import { AssignmentHistory, type AssignmentHistoryEntry } from "@/components/portal/AssignmentHistory";
 import { StatusBadge } from "@/components/portal/StatusBadge";
 import { intlLocale, type Locale } from "@/lib/i18n";
@@ -35,7 +37,11 @@ const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAss
 const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnership").then(m=>m.TransferOwnership));
 const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatientResponse").then(m=>m.RecordPatientResponse));
 
-export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];/** P0-5: active facilities with their approved packages, for the travel/treatment pickers and the consultant's package lines. */facilities?:DirectoryFacility[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null};
+export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];/** P0-5: active facilities with their approved packages, for the travel/treatment pickers and the consultant's package lines. */facilities?:DirectoryFacility[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null;
+ /** UX area 2: the viewer's open My work items in My work's own order (the backend's), for "Next in My work" and "Also open on this case". */
+ workItems?:WorkItem[];
+ /** The back control's name: the view this case was opened from ("Back to My work"). */
+ backLabel?:string};
 
 /**
  * What every part of the staff case page shares — the viewer, the case and the one way to change it — provided once by
@@ -67,8 +73,8 @@ type CaseOverlay="journey"|"messages"|"more"|"transfer"|"requestInfo"|"proposal"
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
  * Patients never load this module (`PatientCaseView` renders My Care instead).
  */
-export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref}:CaseViewProps){
- const work=useWorkCopy();
+export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref,workItems=[],backLabel,openCaseById}:CaseViewProps){
+ const work=useWorkCopy();const cover=work.caseCover;
  const c=value.caseSummary;
  const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,fxRates,catalog,facilities,mySubject}),[locale,t,role,c,busy,mutate,fxRates,catalog,facilities,mySubject]);
  const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
@@ -156,6 +162,20 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
    {value.preview&&<p className="text-sm text-ink-500">{locale==="ar"?"هذه معاينة للاستقبال. تتاح المستندات والرسائل بعد تولّي مسؤولية الحالة.":"This intake preview supports your ownership decision. Documents and messages become available after you take responsibility for the case."}</p>}
   </>;
 
+  // The cover's strip (UX area 2): who the case waits on, said once on the page, and — for the coordinator — what the
+  // patient's own page says now (the backend's patient step; never inferred here). No field, no line.
+  const waitingText=actions.waitingOn&&actions.waitingOn!=="NONE"?waitingLabel(actions.waitingOn,work.waiting,{role,ownsCase:owned,action:value.actions?current:null}):null;
+  const patientStep=!value.preview?actions.patientStep??null:null;
+  const facts=waitingText||patientStep?<CoverFacts waiting={waitingText} actions={actions} step={patientStep} proposal={value.patientProposal}/>:undefined;
+  // My work's order is the backend's; the next item is the first one after this case's items that belongs to another case,
+  // wrapping round to the top of the list.
+  const at=workItems.findIndex(item=>item.caseId===c.id);
+  const nextItem=(at<0?workItems:[...workItems.slice(at+1),...workItems.slice(0,at)]).find(item=>item.caseId!==c.id)??null;
+  const openNext=nextItem&&openCaseById?()=>openCaseById(nextItem.caseId):null;
+  const alsoOpen=workItems.filter(item=>item.caseId===c.id&&item.id!==current.workItemId);
+  const coverRef=useRef<HTMLElement>(null);
+  const line=useCoverGone(coverRef);
+
   // Who is on the case: the owner first, then the clinical and operational people actually assigned.
   const team=[
    {label:t.coordinatorLabel,name:coordinatorLabel(c,mySubject,work.queue),pending:false,until:null as string|null},
@@ -164,42 +184,40 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   ];
 
   return <CaseWorkspaceProvider value={workspace}><div>
-  <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm" aria-label={t.caseWorkspaceLabel}>
-   <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-ink-350 bg-white px-3 text-[0.85rem] font-semibold text-brand-800 transition hover:border-brand-600 hover:bg-brand-50 hover:text-brand-700" onClick={back}><ArrowLeft size={16} aria-hidden className="rtl:-scale-x-100"/>{t.myDashboard}</button>
-   <span className="text-ink-300" aria-hidden>/</span>
-   <span className="font-semibold text-ink-700" dir="ltr">{c.caseNumber}</span>
+  <nav className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2" aria-label={t.caseWorkspaceLabel}>
+   <button type="button" className="btn-secondary" onClick={back}><ArrowLeft size={16} aria-hidden className="rtl:-scale-x-100"/>{backLabel??fillTemplate(cover.backTo,{view:work.nav.work})}</button>
+   {nextItem&&openNext&&<NextInMyWork item={nextItem} onOpen={openNext}/>}
   </nav>
 
-  <header className="card p-4 sm:p-5">
+  {/* The cover of the file: the petrol tab edge, who this is, then the strip — your step, who it waits on, the patient's page. */}
+  <section ref={coverRef} aria-labelledby="case-heading" className="card file-tab p-4 sm:p-6">
    <div className="flex flex-wrap items-start justify-between gap-3">
     <div className="min-w-0">
-     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-      <span className="text-[0.8125rem] font-bold text-brand-700" dir="ltr">{c.caseNumber}</span>
-      {c.careCategory&&<span className="text-[0.8125rem] text-ink-500">{careAreaLabel(c.careCategory,work.careAreas)}</span>}
-      <span className="text-[0.8125rem] text-ink-500">{countryName(c.country,locale)}</span>
-      <span className="text-[0.8125rem] text-ink-500">{c.preferredLanguage==="ar"?(locale==="ar"?"العربية":"Arabic"):(locale==="ar"?"الإنجليزية":"English")}</span>
-     </div>
-     <h2 id="case-heading" tabIndex={-1} className="mt-0.5 text-[1.35rem] font-bold leading-7 text-brand-900 outline-none">{c.patientName||(locale==="ar"?"مراجعة طلب الرعاية":"Review care request")}</h2>
-     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.8rem]">
+     {/* Spaced by the gap; a screen reader hears a separator between the facts. */}
+     <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.8125rem] text-ink-500">
+      <bdi dir="ltr" className="font-bold text-brand-700">{c.caseNumber}</bdi>
+      {[c.careCategory?careAreaLabel(c.careCategory,work.careAreas):null,countryName(c.country,locale),c.preferredLanguage==="ar"?cover.languages.ar:cover.languages.en].filter(Boolean).map(fact=><span key={fact}><span className="sr-only">{cover.separator}</span>{fact}</span>)}
+     </p>
+     <h2 id="case-heading" tabIndex={-1} className="mt-1 text-[1.125rem] font-bold leading-7 text-brand-900 outline-none">{c.patientName?<bdi>{c.patientName}</bdi>:cover.untitled}</h2>
+     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.8125rem]">
       <Status value={c.status} locale={locale}/>
       {/* P0-3: the coordinator's urgency, for staff only; routine says nothing. */}
       {c.urgency&&c.urgency!=="ROUTINE"&&<span className={`inline-flex items-center gap-1 font-semibold ${c.urgency==="URGENT"?"text-alert-700":"text-ink-800"}`}><Gauge size={13} aria-hidden/><span className="font-normal text-ink-500">{work.urgency.label}:</span>{work.urgency.levels[c.urgency as Urgency]?.label??c.urgency}</span>}
-      {actions.waitingOn&&actions.waitingOn!=="NONE"&&<HeaderFact label={work.waiting.label} value={waitingLabel(actions.waitingOn,work.waiting,{role,ownsCase:!!mySubject&&c.coordinatorSubject===mySubject,action:value.actions?current:null})}/>}
       <HeaderFact label={t.coordinatorLabel} value={coordinatorLabel(c,mySubject,work.queue)}/>
-      {consultantOnCase&&<HeaderFact label={locale==="ar"?"الاستشاري":"Consultant"} value={consultantOnCase}/>}
+      {consultantOnCase&&<HeaderFact label={cover.consultant} value={consultantOnCase}/>}
      </div>
     </div>
-    <div className="flex flex-none items-center gap-2">
-     {!value.preview&&<button type="button" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-line-strong bg-white px-3 text-[0.85rem] font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-800" onClick={openMessages}>
-      <MessageSquare size={16} aria-hidden/>{locale==="ar"?"الرسائل":"Messages"}{unreadMessages>0&&<UnreadCount count={unreadMessages}/>}
+    <div className="flex flex-none flex-wrap items-center gap-2">
+     {!value.preview&&<button type="button" className="btn-secondary" onClick={openMessages}>
+      <MessageSquare size={16} aria-hidden/>{cover.messages}{unreadMessages>0&&<UnreadCount count={unreadMessages}/>}
      </button>}
-     {showMore&&<button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-line-strong bg-white px-3 text-[0.85rem] font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-800" aria-haspopup="dialog" onClick={()=>setOverlay("more")}><MoreHorizontal size={16} aria-hidden/>{locale==="ar"?"المزيد":"More"}</button>}
-     {isCoordinator&&!owned&&canRebalance&&!value.preview&&<button type="button" className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-line-strong bg-white px-3 text-[0.85rem] font-semibold text-ink-700 transition hover:border-brand-300 hover:text-brand-800" aria-haspopup="dialog" onClick={()=>setOverlay("transfer")}>{locale==="ar"?"نقل الملكية":"Transfer ownership"}</button>}
+     {showMore&&<button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={()=>setOverlay("more")}><MoreHorizontal size={16} aria-hidden/>{cover.more}</button>}
+     {isCoordinator&&!owned&&canRebalance&&!value.preview&&<button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={()=>setOverlay("transfer")}>{cover.transfer}</button>}
     </div>
    </div>
-  </header>
 
-  <CurrentActionPanel locale={locale} role={role} action={current}
+   <div className="mt-5 border-t border-line pt-5">
+  <CurrentActionPanel locale={locale} role={role} action={current} facts={facts}
    response={current.workType==="REVIEW_PATIENT_RESPONSE"?{message:latestPatientMessage?.body,documentName:newestDocument?.fileName}:null}
    busy={busy} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
    respondBy={myPending?.offerExpiresAt??null}
@@ -208,6 +226,11 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
    form={financeApproval&&value.proposal&&value.commercial?<FinanceApproval locale={locale} commercial={value.commercial} busy={busy} approveLabel={t.financeApprove}
      onApprove={()=>void mutate(`/finance/cases/${c.id}/proposals/${value.proposal!.versionId}/approve`)}/>
     :formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref} proposal={value.proposal} representatives={value.representatives}/>:undefined}/>
+   </div>
+   {alsoOpen.length>0&&<AlsoOpen items={alsoOpen}/>}
+  </section>
+  {/* Once the cover has scrolled away, the case and its step stay in one slim line under the site header. */}
+  {line.gone&&<CaseLine top={line.top} action={current} title={actionTitle(current,role,work)} next={nextItem&&openNext?{item:nextItem,onOpen:openNext}:null}/>}
 
   {isCoordinator&&<CaseBlockers locale={locale} blockers={actions.blockers} deposit={value.deposit}/>}
 
@@ -250,7 +273,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
          :(value.proposal||value.deposit)?<ProposalSummary proposal={value.proposal} deposit={value.deposit} delivery={value.delivery} available={available} onView={()=>setOverlay("proposal")}/>:null)}
        {!isCoordinator&&!isDoctor&&(value.proposal||value.deposit)&&proposalPanel}
        {/* The case brief: the facts a coordinator decides ownership on, and the operational context once they own it. */}
-       {isCoordinator&&<CoordinatorBrief actions={actions} documents={documents} preview={!!value.preview} intakeSummary={value.intakeSummary} consultantName={consultantOnCase} onClinical={()=>setTab("clinical")} onDocuments={()=>setTab("documents")}/>}
+       {isCoordinator&&<CoordinatorBrief documents={documents} preview={!!value.preview} intakeSummary={value.intakeSummary} onClinical={()=>setTab("clinical")} onDocuments={()=>setTab("documents")}/>}
       </div>
 
       {/* Kept mounted for the same reason: the clinical review and final assessment drafts. */}
@@ -270,8 +293,9 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
      </div>
     </div>
 
-    <aside className="min-w-0 space-y-4 lg:sticky lg:top-20">
-     <JourneyPulse locale={locale} stage={c.status} waitingOn={actions.waitingOn} viewerRole={role} ownsCase={!!mySubject&&c.coordinatorSubject===mySubject} action={value.actions?current:null} onViewJourney={()=>setOverlay("journey")}/>
+    {/* Sticks below the site header (--case-header-bottom), and below the case line once that shows (--case-line-bottom). */}
+    <aside className="min-w-0 space-y-4 lg:sticky lg:top-[calc(var(--case-line-bottom,var(--case-header-bottom,4rem))+1rem)]">
+     <JourneyPulse stage={c.status} onViewJourney={()=>setOverlay("journey")}/>
      {!value.preview&&<section aria-labelledby="case-team-title" className="card p-4">
       <h2 id="case-team-title" className="label-micro text-ink-500">{locale==="ar"?"فريق الحالة":"Case team"}</h2>
       <dl className="mt-2 space-y-1.5 text-[0.82rem]">{team.map((member,i)=><div key={`${member.label}-${i}`} className="flex items-baseline justify-between gap-3"><dt className="text-ink-500">{member.label}</dt><dd className="text-end font-semibold text-ink-800">{member.name}{member.pending&&<span className="ms-1 text-[0.8125rem] font-semibold text-status-warning-fg">{locale==="ar"?"· بانتظار القبول":"· pending"}</span>}{member.until&&<span className="block text-[0.8125rem] font-normal text-ink-500">{locale==="ar"?"العرض قائم حتى ":"Offer until "}<time dateTime={member.until}>{new Intl.DateTimeFormat(intlLocale(locale),{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(member.until))}</time></span>}</dd></div>)}</dl>
@@ -306,6 +330,125 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   {overlay==="decline"&&myPending&&<DeclineAssignmentDialog locale={locale} caseNumber={c.caseNumber} busy={busy} onClose={()=>closeOverlay("decline")}
    onConfirm={reason=>void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:false,reason})}/>}
  </div></CaseWorkspaceProvider>;
+}
+
+/** A due date in words: "Due 14 Oct", or "Overdue since 14 Oct" in the alert ink (the word carries it, not the colour). */
+function DueLine({dueAt,overdue}:{dueAt:string;overdue?:boolean}){
+ const work=useWorkCopy();const cover=work.caseCover;
+ const date=new Intl.DateTimeFormat(intlLocale(work.locale),{day:"numeric",month:"short"}).format(new Date(dueAt));
+ return <span className={`text-[0.8125rem] ${overdue?"font-bold text-alert-700":"text-ink-500"}`}>{fillTemplate(overdue?cover.overdueSince:cover.dueOn,{date})}</span>;
+}
+
+/** Reasons that only restate who the case waits on (or the patient's page beside it); every other reason adds why. */
+const RESTATING_REASONS=new Set(["DEFAULT_PATIENT","DEFAULT_CONSULTANT","DEFAULT_STAFF","PATIENT_JOURNEY_ACTION"]);
+
+/**
+ * The strip's other two lines, beside the step: who the case waits on (with why, when the backend's reason adds anything),
+ * and the patient's own page now — the patient's step in My Care's words, worded from the same proposal answer My Care
+ * reads (`patientProposal`), with its usual window while the team has it or its due date while the patient does.
+ * Rendered from the backend's fields only.
+ */
+function CoverFacts({waiting,actions,step,proposal}:{waiting:string|null;actions:CaseActions;step:CurrentActionView|null;proposal?:PatientProposalState|null}){
+ const work=useWorkCopy();const {locale,c}=useCaseWorkspace();
+ const words=step?patientStepText(step.code,work.myCare.steps,{proposalState:proposal?.state??null,status:c.status,exit:step.exit??null,documentType:proposal?.documentType}):null;
+ const waits=step?.kind==="WAIT"||step?.kind==="NONE";
+ const reason=actions.waitingReasonCode&&RESTATING_REASONS.has(actions.waitingReasonCode)?null:waitingReasonText(actions,work,locale);
+ return <dl className="grid gap-x-6 gap-y-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-1 lg:border-s lg:border-t-0 lg:ps-6 lg:pt-0">
+  {waiting&&<div>
+   <dt className="label-micro text-ink-500">{work.waiting.label}</dt>
+   <dd className="mt-0.5 text-[0.9375rem] leading-6 text-ink-800">{waiting}</dd>
+   {reason&&<dd dir="auto" className="text-[0.8125rem] leading-5 text-ink-500">{reason}</dd>}
+  </div>}
+  {step&&words&&<div>
+   <dt className="label-micro text-ink-500">{work.caseCover.patientPage}</dt>
+   <dd dir="auto" className="mt-0.5 text-[0.9375rem] leading-6 text-ink-800">{words.title}</dd>
+   {waits&&step.expectedWorkingDays?<dd className="text-[0.8125rem] text-ink-500">{fillTemplate(work.currentAction.usuallyWithin,{duration:plural(locale,step.expectedWorkingDays,work.plural.workingDays)})}</dd>
+    :!waits&&step.dueAt?<dd><DueLine dueAt={step.dueAt} overdue={step.overdue}/></dd>:null}
+  </div>}
+ </dl>;
+}
+
+/** The case's other open My work items (the step above is one of them): a quiet hairline list, words and dates only. */
+function AlsoOpen({items}:{items:WorkItem[]}){
+ const work=useWorkCopy();const {locale}=useCaseWorkspace();
+ return <section aria-labelledby="also-open-title" className="mt-5 border-t border-line pt-4">
+  <h3 id="also-open-title" className="label-micro text-ink-500">{work.caseCover.alsoOpen}</h3>
+  <ul className="mt-1 divide-y divide-line">{items.map(item=><li key={item.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2.5">
+   <span dir="auto" className="min-w-0 text-[0.9375rem] font-semibold text-ink-800">{workItemText(item,locale,work).title}</span>
+   {item.dueAt&&<DueLine dueAt={item.dueAt} overdue={item.overdue}/>}
+  </li>)}</ul>
+ </section>;
+}
+
+/** A quiet link to the next item in My work's order: never a second filled action. The case it opens is named for everyone. */
+function NextInMyWork({item,onOpen}:{item:WorkItem;onOpen:()=>void}){
+ const work=useWorkCopy();const sep=work.caseCover.separator;
+ return <button type="button" className="link-cta text-[0.875rem]" onClick={onOpen}>
+  {work.caseCover.nextInMyWork}
+  <span className="inline-flex min-w-0 items-baseline max-sm:sr-only"><span className="sr-only">{sep}</span><span aria-hidden className="text-ink-300">·&nbsp;</span><bdi dir="ltr" className="font-semibold">{item.caseNumber}</bdi>
+   {item.patientName&&<><span className="sr-only">{sep}</span><span aria-hidden className="text-ink-300">&nbsp;·&nbsp;</span><bdi className="max-w-[16ch] truncate font-semibold">{item.patientName}</bdi></>}</span>
+  <ArrowRight size={16} aria-hidden className="flex-none rtl:rotate-180"/>
+ </button>;
+}
+
+/**
+ * The slim line that keeps the case and its step on screen once the cover has scrolled away: case number, name, the step,
+ * a quiet control that takes the focus to the step itself (only when the step is the viewer's to take), and — from 640px,
+ * since phones have it at the top of the page — the next item in My work. While it shows, the page's scroll padding
+ * follows its measured height, so a focused control is never hidden under it (WCAG 2.4.11); if it goes while holding the
+ * focus, the focus moves to the case's heading rather than to nowhere.
+ */
+function CaseLine({top,action,title,next}:{top:number;action:CurrentActionView;title:string;next:{item:WorkItem;onOpen:()=>void}|null}){
+ const work=useWorkCopy();const {c}=useCaseWorkspace();
+ const cover=work.caseCover;
+ const bar=useRef<HTMLDivElement>(null);
+ useLayoutEffect(()=>{
+  const element=bar.current;if(!element)return;
+  const root=document.documentElement;const before=root.style.scrollPaddingTop;
+  const publish=()=>{const bottom=top+element.offsetHeight;root.style.scrollPaddingTop=`${bottom+16}px`;root.style.setProperty("--case-line-bottom",`${bottom}px`);};
+  publish();
+  const resize=typeof ResizeObserver==="undefined"?null:new ResizeObserver(publish);resize?.observe(element);
+  return()=>{
+   resize?.disconnect();root.style.scrollPaddingTop=before;root.style.removeProperty("--case-line-bottom");
+   if(element.contains(document.activeElement))document.getElementById("case-heading")?.focus({preventScroll:true});
+  };
+ },[top]);
+ return <div ref={bar} role="region" aria-label={fillTemplate(cover.lineLabel,{caseNumber:c.caseNumber})} style={{top}} className="fixed start-0 end-0 z-40 border-b border-line bg-white">
+  <div className="container-site flex items-center gap-x-5">
+   <p className="min-w-0 flex-1 py-1.5 text-[0.875rem] leading-5">
+    <span className="block truncate"><bdi dir="ltr" className="font-bold text-brand-700">{c.caseNumber}</bdi><span className="sr-only">{cover.separator}</span><span aria-hidden className="text-ink-300"> · </span><bdi className="font-semibold text-ink-900">{c.patientName||cover.untitled}</bdi></span>
+    <span dir="auto" className="block truncate text-ink-600">{fillTemplate(cover.stepLine,{label:stepLabel(action,work),title})}</span>
+   </p>
+   {isOwnStep(action)&&<button type="button" className="link-cta flex-none text-[0.875rem]" onClick={focusCurrentAction}>{cover.goToStep}</button>}
+   {next&&<span className="flex-none max-sm:hidden"><NextInMyWork item={next.item} onOpen={next.onOpen}/></span>}
+  </div>
+ </div>;
+}
+
+/**
+ * Whether the whole cover has scrolled up under the site header, and where that header ends (the line's top, published
+ * as --case-header-bottom for the sticky rail). Measured again whenever the header's size changes.
+ */
+function useCoverGone(cover:RefObject<HTMLElement|null>){
+ const [state,setState]=useState({gone:false,top:0});
+ useEffect(()=>{
+  const element=cover.current;if(!element||typeof IntersectionObserver==="undefined")return;
+  const header=document.querySelector<HTMLElement>(".site-header");const root=document.documentElement;
+  let observer:IntersectionObserver|null=null;let measured=-1;
+  const watch=()=>{
+   const top=Math.max(0,Math.round(header?.getBoundingClientRect().bottom??0));
+   if(top===measured)return;measured=top;
+   root.style.setProperty("--case-header-bottom",`${top}px`);
+   observer?.disconnect();
+   observer=new IntersectionObserver(([entry])=>{const gone=!entry.isIntersecting&&entry.boundingClientRect.top<top;setState(prev=>prev.gone===gone&&prev.top===top?prev:{gone,top});},{rootMargin:`${-top}px 0px 0px 0px`});
+   observer.observe(element);
+  };
+  watch();
+  const resize=header&&typeof ResizeObserver!=="undefined"?new ResizeObserver(watch):null;
+  if(header)resize?.observe(header);
+  return()=>{observer?.disconnect();resize?.disconnect();root.style.removeProperty("--case-header-bottom");};
+ },[cover]);
+ return state;
 }
 
 /**
@@ -356,19 +499,16 @@ function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?
  * never the files or messages themselves); after ownership it is the compact operational summary the current
  * action sits above. It renders only real data: a fact with nothing behind it is left out, not filled in.
  */
-function CoordinatorBrief({actions,documents,preview,intakeSummary,consultantName,onClinical,onDocuments}:{actions:CaseActions;documents:CaseDocument[];preview:boolean;intakeSummary?:string;consultantName?:string|null;onClinical:()=>void;onDocuments:()=>void}){
- const work=useWorkCopy();const {locale,t,mySubject,c}=useCaseWorkspace();
+function CoordinatorBrief({documents,preview,intakeSummary,onClinical,onDocuments}:{documents:CaseDocument[];preview:boolean;intakeSummary?:string;onClinical:()=>void;onDocuments:()=>void}){
+ const {locale,t,c}=useCaseWorkspace();
  const ar=locale==="ar";
  const when=(iso:string)=>new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(iso));
  const facts:{label:string;value:string}[]=[
   {label:ar?"تاريخ الاستلام":"Received",value:when(c.createdAt)},
-  ...(c.careCategory?[{label:t.careArea,value:careAreaLabel(c.careCategory,work.careAreas)}]:[{label:t.careArea,value:ar?"لم يُحدَّد بعد":"Not classified yet"}]),
-  {label:t.countryLabel,value:countryName(c.country,locale)},
-  {label:t.languageLabel,value:c.preferredLanguage==="ar"?(ar?"العربية":"Arabic"):(ar?"الإنجليزية":"English")},
+  // Care area, country, language, coordinator, Consultant, stage and "waiting on" are on the case cover above, said once.
+  // An unclassified care area is the one gap the cover cannot show (it leaves the area out), so the brief names it.
+  ...(c.careCategory?[]:[{label:t.careArea,value:ar?"لم يُحدَّد بعد":"Not classified yet"}]),
   {label:t.documents,value:documents.length===0?(ar?"لا توجد":"None"):String(documents.length)},
-  // Stage and "waiting on" are stated once, in the case header above — not repeated here.
-  {label:t.coordinatorLabel,value:c.coordinatorSubject?coordinatorLabel(c,mySubject,work.queue):work.queue.unownedInQueue},
-  ...(consultantName?[{label:t.consultantLabel,value:consultantName}]:[]),
   ...(c.travelPackageRequested?[{label:ar?"باقة السفر":"Travel package",value:ar?"مطلوبة":"Requested"}]:[]),
   {label:t.updatedLabel,value:when(c.updatedAt)},
  ];
@@ -378,7 +518,6 @@ function CoordinatorBrief({actions,documents,preview,intakeSummary,consultantNam
   <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-2 lg:grid-cols-3">
    {facts.map(fact=><div key={fact.label} className="min-w-0"><dt className="label-micro text-ink-500">{fact.label}</dt><dd className="mt-0.5 truncate font-semibold text-ink-800">{fact.value}</dd></div>)}
   </dl>
-  {waitingReasonText(actions,work,locale)&&<p className="mt-3 text-[0.82rem] text-ink-600">{waitingReasonText(actions,work,locale)}</p>}
   <div className="mt-4 border-t border-line pt-3">
    <p className="label-micro text-ink-500">{ar?"ملخص الحالة عند الاستقبال":"Intake summary"}</p>
    {summary?<p className="mt-1 line-clamp-4 whitespace-pre-wrap break-words text-[0.88rem] leading-6 text-ink-700">{summary}</p>:<p className="mt-1 text-[0.85rem] text-ink-500">{ar?"لم يكتب المريض وصفًا للحالة.":"The patient did not describe their condition."}</p>}

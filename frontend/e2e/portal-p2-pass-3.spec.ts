@@ -28,7 +28,7 @@ for (const locale of ["en", "ar"] as const) {
     await page.goto(`/${locale}/portal`);
     await openClinicalReview(page, ar);
     await draftField(page).fill("Synthetic note that has not been sent");
-    await page.getByRole("button", { name: ar ? /لوحة التحكم/ : /My dashboard/ }).click();
+    await page.getByRole("button", { name: ar ? /^العودة إلى / : /^Back to / }).click();
     const dialog = page.getByRole("alertdialog", { name: ar ? "مغادرة هذه الحالة؟" : "Leave this case?" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: ar ? "متابعة التحرير" : "Keep editing" })).toBeFocused();
@@ -38,7 +38,7 @@ for (const locale of ["en", "ar"] as const) {
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await expect(draftField(page)).toHaveValue("Synthetic note that has not been sent");
-    await page.getByRole("button", { name: ar ? /لوحة التحكم/ : /My dashboard/ }).click();
+    await page.getByRole("button", { name: ar ? /^العودة إلى / : /^Back to / }).click();
     await dialog.getByRole("button", { name: ar ? "المغادرة وتجاهل النص" : "Leave and discard the text" }).click();
     await expect(page.locator("#case-heading")).toHaveCount(0);
   });
@@ -53,7 +53,9 @@ test("notifications and the waiting reason are worded from their codes in Arabic
   await expect(page.getByText("A case has been transferred to you")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await openFirstCase(page, true);
-  await expect(page.getByText("بانتظار فريقنا")).toBeVisible();
+  // UX 2-1: who the case waits on is said once, on the cover's strip, in Arabic; a default reason that only restates it is not repeated.
+  await expect(page.locator("#current-action").getByText("بانتظار", { exact: true })).toBeVisible();
+  await expect(page.getByText("بانتظار فريقنا")).toHaveCount(0);
   await expect(page.getByText("Waiting for our team")).toHaveCount(0);
 });
 
@@ -61,7 +63,7 @@ test("leaving a case without typed text never asks", async ({ page }) => {
   await setupPortal(page, "COORDINATOR");
   await page.goto("/en/portal");
   await openFirstCase(page);
-  await page.getByRole("button", { name: /My dashboard/ }).click();
+  await page.getByRole("button", { name: /^Back to / }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await expect(page.locator("#case-heading")).toHaveCount(0);
 });
@@ -89,11 +91,11 @@ test("picking a view from inside a case moves focus to that view's visible headi
   await expect(heading).toBeFocused();
 });
 
-test("leaving a case from My dashboard hands the focus to the view's heading", async ({ page }) => {
+test("leaving a case by Back to My work hands the focus to the view's heading", async ({ page }) => {
   await setupPortal(page, "COORDINATOR_LEAD");
   await page.goto("/en/portal?view=mine");
   await openFirstCase(page);
-  await page.getByRole("button", { name: /My dashboard/ }).click();
+  await page.getByRole("button", { name: /^Back to / }).click();
   await expect(page.getByRole("heading", { level: 2, name: "My cases" })).toBeFocused();
 });
 
@@ -136,7 +138,7 @@ test("a saved draft is not unsent text", async ({ page }) => {
   await draftField(page).fill("Synthetic recommendation saved as a draft");
   await page.getByRole("button", { name: "Save draft" }).click();
   await expect(page.getByRole("status").filter({ hasText: /saved/i }).first()).toBeVisible();
-  await page.getByRole("button", { name: /My dashboard/ }).click();
+  await page.getByRole("button", { name: /^Back to / }).click();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await expect(page.locator("#case-heading")).toHaveCount(0);
 });

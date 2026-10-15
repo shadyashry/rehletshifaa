@@ -662,3 +662,70 @@ suite: 859 tests, 0 failures, 3 skipped (113 classes); frontend typecheck ok; es
 Maven ran in parallel, green on rerun).
 
 **Next:** slice 2-1 — the file cover and the one-next-action strip (`StaffCaseView`, `CurrentAction`, `JourneySnapshot`, `Portal`).
+
+## UX area 2 — slice 2-1: the file cover and the one-next-action strip (2026-10-15, worktree `youthful-gagarin-e257b1`, branch `claude/youthful-gagarin-e257b1` fast-forwarded to 2-0 @ `baab2fb`)
+
+**Built (enhances the accepted case page; Petrol & Paper unchanged, no new token).**
+- **The cover of the file** (`StaffCaseView.tsx`): the case header and the current-action panel are one `card file-tab` (the
+  patient pages' 2px petrol tab edge): identity on top (case number, care area, country, language — screen-reader separators
+  between them — name at 18px, status, urgency, coordinator, Consultant), then the strip under a hairline. Header buttons are
+  `btn-secondary` (44px, Field Edge). The back control names the view the case was opened from ("Back to My work", from
+  Portal's resolved staff view); the breadcrumb's second case number is gone.
+- **The strip** (`CurrentAction.tsx`, no card of its own; a `facts` slot): *Your step* — the backend's current action as
+  today, title now an h3 at 20px, the strongest line — and beside it (under it on phones) *Waiting on*, said once on the page,
+  with the backend's waiting reason only when it adds why (`DEFAULT_*` and `PATIENT_JOURNEY_ACTION` restate and are left out),
+  and *The patient's page* (coordinators only: `actions.patientStep` from 2-0), worded by `portalWork.myCare.steps` through the
+  new shared `patient-step.ts` (My Care's own rule, moved out of `MyCare.tsx` so the staff chunk does not load My Care),
+  reading `patientProposal` state and document type exactly as My Care does (REVIEW_PROPOSAL → REVIEW_FINAL_QUOTE), with
+  "Usually within {n working days}" on WAIT steps or "Due / Overdue since {date}" otherwise. No field, no line. A WAIT or
+  NONE step is labelled "This case now", never "Your step".
+- **Duplicates removed:** the brief's patient-voice waiting line, the rail's waiting chip, the second case number; the case
+  brief also drops care area, country, language, coordinator and Consultant (now on the cover; an unclassified care area
+  stays in the brief, the one fact the cover cannot show).
+- **The sticky line** (`CaseLine`): once the whole cover has scrolled under the site header (IntersectionObserver, header
+  measured by ResizeObserver), a slim white line under the header keeps case number, name and "Your step: …", a quiet
+  "Go to your step" (only on a step that is the viewer's; moves focus to the primary, else the form's first field, else the
+  step title, with an instant centred scroll — the page's smooth scrolling was cut short as the line left) and, from 640px,
+  "Next in My work". While shown it sets `scroll-padding-top` from its measured height (ResizeObserver; WCAG 2.4.11) and
+  publishes `--case-line-bottom` / `--case-header-bottom` for the sticky rail; if it leaves holding the focus, the focus goes
+  to the case heading.
+- **Next in My work**: the first item after this case's items in My work's own (backend) order, wrapping round, from the
+  tasks Portal already loads; a quiet `link-cta` in the case nav and in the line (never a second filled action). Opening
+  a case from a case now starts at its top with its heading focused (`Portal.openCase`).
+- **Also open on this case**: the case's other open My work items (excluding the current action's `workItemId`), a
+  hairline list with "Due / Overdue since" dates; `workItemText` moved to `lib/portal-labels.ts` (My work and the cover).
+- **Journey rail** (`JourneySnapshot.tsx`): DESIGN.md journey markers (`care-journey journey-rail`: numbered 32px, reached
+  filled Deep Petrol, current in the coral ring, a petrol connector; always vertical), "View full journey" as a text action.
+- **Copy:** everything touched is in `portalWork.caseCover` (en + ar; Arabic per the RTL review: "مهام أخرى مفتوحة في هذه
+  الحالة", "نقل المسؤولية", "ما تعرضه صفحة المريض", "مرحلة مكتملة / المرحلة الحالية", "مستحق في / متأخر منذ {date}");
+  unused `currentAction.label` removed. Type on the ladder and no tinted panels in what was touched (the inline patient
+  response is a hairline block now; the raw rgba shadow is gone).
+
+**Reviews** (Impeccable + Vercel skills loaded before code; four read-only reviews on the diff; all HIGH/MEDIUM fixed):
+React/composition (patient wording from `patientProposal` not the staff proposal; line height re-measured by
+ResizeObserver; waiting reason kept where it adds why; header observed by ResizeObserver; focus priority; `workItemText` out
+of the MyWork component module; wrap-round next; phase key/length test), web guidelines (sr separators, h3 step under the h2
+cover, visible focus ring on the programmatically focused step title, neutral label on waiting steps, focus rescue when the
+line leaves, phone layout of the line), RTL/i18n (Arabic wording above, date templates, locale separator), Pro Max (focus and
+scroll after Next, neutral label and no "Go to your step" on waiting steps, phone line, aside offset from the measured
+header, hierarchy: step 20px over name 18px, Waiting on in regular ink, cover facts de-duplicated from the brief). Visual
+pass on the EN/AR 390/1440 shots. Impeccable detector: 0 findings.
+
+**Verify.** `pnpm typecheck` ok; eslint 0 on touched files; vitest 69 files / 540 tests; Playwright (built on :3113):
+staff-home, portal-ux, portal-p2-pass-3, portal-reliability, care-coordination, workspace-case-switch,
+ux8-commercial-journeys, a11y (en + ar) and the new `e2e/case-cover.spec.ts` (cover, strip, once-only rules, rail markers,
+44px Field Edge buttons, sticky line, focus not obscured, Next opens the next case at its top) — 102/102. Specs adjusted:
+back control by its new name, "Your step" label, the Arabic waiting line now on the strip. The coordinator fixture's current
+action now carries its `workItemId` (`w2`), as the backend's does. Overwritten pass-2/pass-3 shots restored.
+
+**Screenshots:** `screenshots/area-2/2-1/` — `case-{en,ar}-{390,1440}` (full page) and `case-line-{en,ar}-{390,1440}`
+(scrolled, the sticky line).
+
+**Follow-ups (not in 2-1):** the dim "handoff to Consultant" banner and Case team still repeat the Consultant (2-4); the
+case brief, Case team, FullJourneyDialog (`PHASES`/`STAGES`/`ROLES` en/ar tables) and the rest of `StaffCaseView` keep inline
+copy (2-4); "Also open" has no cap (rare; cap at 3 with "+n in My work" if it grows); `Task` vs `WorkItem` typing (two
+casts in Portal/StaffQueue); Back/Next are buttons, not links (no open-in-new-tab) — consider in 2-2; portal buttons are
+44px on phones where DESIGN.md says 46px (portal convention, unchanged).
+
+**Next:** slice 2-2 — keyboard flow (roving lists in My work and the queue, return to the row, shortcut layer with `?` help
+and an off switch, `n` = Next in My work on a case).

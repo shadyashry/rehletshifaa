@@ -17,7 +17,8 @@ import { LeaveCaseDialog, useDraftWatch } from "@/components/portal/LeaveCaseGua
 import type { CareView } from "@/components/portal/MyCare";
 import { PatientNav } from "@/components/portal/PatientNav";
 import { WorkCopyProvider, useWorkCopy } from "@/components/portal/portal-copy";
-import type { WorkCopy } from "@/lib/portal-labels";
+import { fillTemplate, type WorkCopy } from "@/lib/portal-labels";
+import type { WorkItem } from "@/components/portal/MyWork";
 import type { AssignmentHistoryEntry } from "@/components/portal/AssignmentHistory";
 import { NotificationBell } from "@/components/portal/NotificationBell";
 import { ccHref } from "@/components/platform-control-center/control-center-nav";
@@ -185,7 +186,10 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
         if(request!==opening.current)return;setWorkspace(ws);setDocuments([]);
         const docs=await pending;if(request===opening.current){setDocuments(docs.rows);if(docs.failed&&!ws.paymentOnly)setDocumentError(true);}
       }
-      if(request===opening.current){const url=new URL(window.location.href);url.searchParams.set("case",item.id);if(url.search!==window.location.search)window.history.pushState({},"",url);if(!workspace)requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());}
+      if(request===opening.current){const url=new URL(window.location.href);url.searchParams.set("case",item.id);if(url.search!==window.location.search)window.history.pushState({},"",url);
+        // Arriving on a case — from a list, or from another case (Next in My work, a notification) — starts at its top, on its heading.
+        const switched=!!workspace&&workspace.caseSummary.id!==item.id;
+        if(!workspace||switched)requestAnimationFrame(()=>{if(switched)window.scrollTo({top:0,behavior:"instant"});document.getElementById("case-heading")?.focus();});}
     }catch(e){if(request===opening.current){setWorkspace(null);setError(e instanceof Error?e.message:t.error);void refresh();}}
     finally{if(!managedBusy)setBusyCount(n=>n-1);}
   }
@@ -338,7 +342,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     {workspace
         // Keyed by case: opening another case straight from a notification or My Work must not carry this case's
         // drafts, tab or open dialogs into it (or let them be submitted against the wrong patient's case).
-        ? !caseRole||!CaseViewFor ? (meFailed?null:<p role="status" className="text-sm text-ink-500">{t.loading}</p>) : <div ref={workspaceRoot}><RoleCaseView view={CaseViewFor} key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={caseRole} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} facilities={facilities} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} loadIntakeHistory={loadIntakeHistory} load={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} sendProposal={sendProposal} busy={busy} back={()=>guardLeave(backToQueue)} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={id=>id!==workspace.caseSummary.id?guardLeave(()=>void openCaseById(id)):undefined} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null}/></div>
+        ? !caseRole||!CaseViewFor ? (meFailed?null:<p role="status" className="text-sm text-ink-500">{t.loading}</p>) : <div ref={workspaceRoot}><RoleCaseView view={CaseViewFor} key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={caseRole} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} facilities={facilities} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} loadIntakeHistory={loadIntakeHistory} load={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} sendProposal={sendProposal} busy={busy} back={()=>guardLeave(backToQueue)} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={id=>id!==workspace.caseSummary.id?guardLeave(()=>void openCaseById(id)):undefined} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null} workItems={myTasks as unknown as WorkItem[]} backLabel={fillTemplate(work.caseCover.backTo,{view:staffViews?.items.find(item=>item.id===staffView)?.label??work.nav.work})}/></div>
         : isPatientRole ? (queueLoading||(!landed&&patientView)||(cases.length>0&&!error)
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)

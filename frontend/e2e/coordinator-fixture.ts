@@ -51,7 +51,7 @@ export async function setupCoordinatorDay(page: Page, role: "COORDINATOR" | "COO
         id: "owned", caseNumber: "RS-2026-000002", patientName: "Maya Example", status: "INTAKE_REVIEW", coordinatorSubject: subject, coordinatorName: "Layla Hassan" };
       return reply({ caseSummary, intakeSummary: "Adult patient with a known mitral valve condition; recent echo shows worsening regurgitation. Asking for a surgical opinion in Egypt.",
         actions: { journeyStage: "INTAKE_REVIEW", waitingOn: "STAFF", blockers: [], waitingReason: "Waiting for our team", waitingReasonCode: "DEFAULT_STAFF",
-          currentAction: { code: "ASSIGN_CONSULTANT", kind: "FOCUS" },
+          currentAction: { code: "ASSIGN_CONSULTANT", kind: "FOCUS", workItemId: "w2", workItemVersion: 0 },
           patientStep: { code: "WAIT_COORDINATOR_REVIEW", kind: "WAIT", expectedWorkingDays: 2, overdue: false }, availableActions: ["REQUEST_INFORMATION", "ASSIGN_CONSULTANT", "SET_TRAVEL_PACKAGE", "CANCEL_CASE"] },
         tasks: [], assignments: [], clinicalReviews: [], messages,
         timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: at(80) }, { type: "STATUS", label: "Intake review", status: "INTAKE_REVIEW", occurredAt: at(50) }],

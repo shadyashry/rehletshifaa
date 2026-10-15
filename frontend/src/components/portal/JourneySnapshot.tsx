@@ -5,8 +5,6 @@ import { Check, X } from "lucide-react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy } from "@/components/portal/portal-copy";
-import { StatusBadge } from "@/components/portal/StatusBadge";
-import { waitingLabel, type ActionHint } from "@/lib/portal-labels";
 
 export type TimelineEvent = {
   type: string; label: string; occurredAt: string; status: string;
@@ -15,55 +13,36 @@ export type TimelineEvent = {
 
 /**
  * Orientation in about a second: where this case sits across the seven phases people actually talk
- * about. Deliberately holds no owner, assignee, next action or history — those live where they belong,
- * so the pulse never competes with the current action or repeats it.
+ * about, drawn with the file's journey markers (DESIGN.md) — reached phases filled, the current one ringed. Deliberately
+ * holds no owner, assignee, next action, waiting party or history — those live on the case cover, said once — so the
+ * rail never competes with the current action or repeats it.
  */
-export function JourneyPulse({ locale, stage, waitingOn, viewerRole, ownsCase, action, onViewJourney }: {
-  locale: Locale; stage: string; waitingOn?: string | null; viewerRole?: string; ownsCase?: boolean; action?: ActionHint | null; onViewJourney: () => void;
-}) {
-  const work = useWorkCopy();
-  const ar = locale === "ar";
+export function JourneyPulse({ stage, onViewJourney }: { stage: string; onViewJourney: () => void }) {
+  const t = useWorkCopy().caseCover.journey;
   const currentIndex = phaseIndex(stage);
-  const blocked = !!waitingOn && ["PATIENT", "HOSPITAL", "EXTERNAL", "PAYMENT"].includes(waitingOn);
 
   return (
     <section aria-labelledby="journey-pulse-title" className="card p-4">
-      <h2 id="journey-pulse-title" className="label-micro text-ink-500">
-        {ar ? "الرحلة" : "Journey"}
-      </h2>
+      <h2 id="journey-pulse-title" className="label-micro text-ink-500">{t.title}</h2>
 
-      <ol className="mt-3 space-y-0.5">
-        {PHASES.map((phase, index) => {
-          const done = index < currentIndex;
-          const current = index === currentIndex;
-          const tone = done ? "text-ink-600" : current ? (blocked ? "text-status-warning-fg" : "text-brand-900") : "text-ink-400";
+      <ol className="care-journey journey-rail mt-3">
+        {t.phases.map((label, index) => {
+          const state = index < currentIndex ? "reached" : index === currentIndex ? "current" : "upcoming";
           return (
-            <li key={phase.key} className="flex items-center gap-2.5">
-              <span aria-hidden className="flex h-4 w-4 flex-none items-center justify-center">
-                {done
-                  ? <span className="grid h-4 w-4 place-items-center rounded-full bg-brand-100 text-brand-700"><Check size={10} strokeWidth={3}/></span>
-                  : current
-                    ? <span className={`h-3 w-3 rounded-full ring-4 ${blocked ? "bg-status-warning-fg ring-status-warning-surface" : "bg-brand-600 ring-brand-100"}`}/>
-                    : <span className="h-2.5 w-2.5 rounded-full border border-line-strong bg-white"/>}
-              </span>
-              <span className={`text-[0.82rem] leading-6 ${current ? "font-bold" : "font-medium"} ${tone}`}>
-                {ar ? phase.ar : phase.en}
+            <li key={PHASES[index]?.key ?? index} className="journey-step" aria-current={state === "current" ? "step" : undefined}>
+              {index < t.phases.length - 1 && <span aria-hidden className="journey-link" data-reached={index < currentIndex || undefined}/>}
+              <span aria-hidden className="journey-marker relative z-10 flex-none" data-state={state}>{index + 1}</span>
+              <span className={`text-[0.875rem] leading-5 ${state === "current" ? "font-semibold text-brand-900" : "text-ink-600"}`}>
+                {label}
+                {state === "reached" && <span className="sr-only"> ({t.done})</span>}
+                {state === "current" && <span className="sr-only"> ({t.current})</span>}
               </span>
             </li>
           );
         })}
       </ol>
 
-      {waitingOn && waitingOn !== "NONE" && (
-        <p className="mt-3">
-          <StatusBadge tone={blocked ? "warning" : "info"}>{work.waiting.label}: {waitingLabel(waitingOn, work.waiting, { role: viewerRole, ownsCase, action })}</StatusBadge>
-        </p>
-      )}
-
-      <button type="button" className="mt-3 block min-h-11 w-full rounded-lg border border-line px-3 text-[0.8rem] font-semibold text-brand-800 transition hover:border-brand-300 hover:bg-brand-50"
-              onClick={onViewJourney}>
-        {ar ? "عرض الرحلة كاملة" : "View full journey"}
-      </button>
+      <button type="button" className="link-cta mt-3 text-[0.875rem]" onClick={onViewJourney}>{t.viewFull}</button>
     </section>
   );
 }

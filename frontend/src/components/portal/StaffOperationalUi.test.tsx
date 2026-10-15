@@ -38,22 +38,35 @@ const timeline: TimelineEvent[] = [
 describe("JourneyPulse", () => {
   afterEach(cleanup);
 
-  it("gives orientation only: phases, current position and who has the ball", () => {
-    renderWithWork(<JourneyPulse locale="en" stage="PROPOSAL_PREPARATION" waitingOn="STAFF" onViewJourney={vi.fn()}/>);
+  it("gives orientation only: phases and the current position, drawn with the journey markers", () => {
+    const { container } = renderWithWork(<JourneyPulse stage="PROPOSAL_PREPARATION" onViewJourney={vi.fn()}/>);
     ["Intake", "Consultant", "Proposal", "Patient decision", "Coordination deposit", "Treatment", "Follow-up"]
       .forEach(phase => expect(screen.getByText(phase)).toBeTruthy());
-    expect(screen.getByText(/Waiting on: our team/i)).toBeTruthy();
+    expect([...container.querySelectorAll(".journey-marker")].map(marker => marker.getAttribute("data-state")))
+      .toEqual(["reached", "reached", "current", "upcoming", "upcoming", "upcoming", "upcoming"]);
+    // Who the case waits on is said once, on the case cover: the rail never repeats it.
+    expect(screen.queryByText(/Waiting on/i)).toBeNull();
     // It never repeats the current action or the people already shown in the header.
     expect(screen.queryByText(/next action/i)).toBeNull();
     expect(screen.queryByText(/assignee/i)).toBeNull();
     expect(screen.queryByRole("button", { name: /open current task/i })).toBeNull();
   });
 
+  it("names exactly as many phases as the rail maps stages to, in both languages", () => {
+    for (const locale of ["en", "ar"] as const) {
+      const { container } = renderWithWork(<JourneyPulse stage="FOLLOW_UP" onViewJourney={vi.fn()}/>, locale);
+      expect(workCopyFor(locale).caseCover.journey.phases).toHaveLength(container.querySelectorAll(".journey-marker").length);
+      expect(container.querySelector('.journey-marker[data-state="current"]')?.textContent).toBe("7");
+      cleanup();
+    }
+  });
+
   it("marks the current phase and opens the full journey on demand", () => {
     const onViewJourney = vi.fn();
-    renderWithWork(<JourneyPulse locale="en" stage="CONSULTANT_REVIEW" waitingOn="CONSULTANT" onViewJourney={onViewJourney}/>);
-    expect(screen.getByText("Consultant").className).toContain("font-bold");
-    expect(screen.getByText("Proposal").className).not.toContain("font-bold");
+    renderWithWork(<JourneyPulse stage="CONSULTANT_REVIEW" onViewJourney={onViewJourney}/>);
+    expect(screen.getByText("Consultant").closest("li")?.getAttribute("aria-current")).toBe("step");
+    expect(screen.getByText("Consultant").textContent).toContain("(current)");
+    expect(screen.getByText("Proposal").closest("li")?.hasAttribute("aria-current")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: /view full journey/i }));
     expect(onViewJourney).toHaveBeenCalled();
   });
@@ -151,8 +164,17 @@ describe("CurrentActionPanel", () => {
 
   it("reads right-to-left with Arabic copy for the same contract", () => {
     renderWithWork(<CurrentActionPanel locale="ar" role="coordinator" action={{ code: "WAIT_PATIENT_READINESS", kind: "WAIT", blockerCode: "PROFILE_NOT_ACTIVATED" }}/>, "ar");
-    expect(screen.getByText("الإجراء الحالي")).toBeTruthy();
+    // A waiting step is not the viewer's to take: it reads "This case now", never "Your step".
+    expect(screen.getByText("الحالة الآن")).toBeTruthy();
+    expect(screen.queryByText("خطوتك")).toBeNull();
     expect(screen.getByRole("heading", { name: /بانتظار تفعيل المريض لملفه/ })).toBeTruthy();
+  });
+
+  it("labels a step the viewer takes as their step, and lays the strip's facts beside it", () => {
+    renderWithWork(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "ASSIGN_CONSULTANT", kind: "FOCUS" }} facts={<dl><dt>Waiting on</dt><dd>you</dd></dl>}/>);
+    expect(screen.getByText("Your step")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 3, name: "Prepare the case for a Consultant" })).toBeTruthy();
+    expect(screen.getByText("you")).toBeTruthy();
   });
 
   it("shows nothing to patients", () => {

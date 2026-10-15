@@ -929,6 +929,11 @@
     .care-journey .journey-step > span:last-child { padding-block-start: 0; }
     .care-journey .journey-link { inset-block: calc(1rem - 1px) auto; inset-inline: calc(50% + 1.375rem) calc(-50% + 1.375rem); width: auto; height: 2px; }
   }
+  /* The staff case rail: the same markers, always down a narrow column and set tighter for working use. */
+  .care-journey.journey-rail .journey-step { flex-direction: row; align-items: center; gap: .75rem; padding-block-end: .625rem; padding-inline: 0; text-align: start; }
+  .care-journey.journey-rail .journey-step:last-child { padding-block-end: 0; }
+  .care-journey.journey-rail .journey-step > span:last-child { padding-block-start: 0; }
+  .care-journey.journey-rail .journey-link { inset-block: 2rem 0; inset-inline: calc(1rem - 1px) auto; width: 2px; height: auto; }
 }
 @media (max-width: 640px) {
   .portal-shell { padding-top: 1.5rem; }

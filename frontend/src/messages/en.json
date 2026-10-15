@@ -1085,7 +1085,6 @@
     },
     "unread": "Unread",
     "currentAction": {
-      "label": "Current action",
       "overdue": "Overdue",
       "due": "Due",
       "note": "Note for the record (optional)",
@@ -1828,6 +1827,44 @@
         "DEPOSIT_TRANSFER_REJECTED": "Transfer not confirmed — the patient to check and resend the reference",
         "PATIENT_INFO_UNANSWERED": "The patient did not answer the information request"
       }
+    },
+    "caseCover": {
+      "backTo": "Back to {view}",
+      "yourStep": "Your step",
+      "patientPage": "The patient's page",
+      "goToStep": "Go to your step",
+      "nextInMyWork": "Next in My work",
+      "alsoOpen": "Also open on this case",
+      "lineLabel": "Case {caseNumber}",
+      "messages": "Messages",
+      "more": "More",
+      "transfer": "Transfer ownership",
+      "untitled": "Review care request",
+      "consultant": "Consultant",
+      "languages": {
+        "ar": "Arabic",
+        "en": "English"
+      },
+      "journey": {
+        "title": "Journey",
+        "done": "completed",
+        "current": "current",
+        "viewFull": "View full journey",
+        "phases": [
+          "Intake",
+          "Consultant",
+          "Proposal",
+          "Patient decision",
+          "Coordination deposit",
+          "Treatment",
+          "Follow-up"
+        ]
+      },
+      "now": "This case now",
+      "stepLine": "{label}: {title}",
+      "dueOn": "Due {date}",
+      "overdueSince": "Overdue since {date}",
+      "separator": ", "
     },
     "leaveCase": {
       "title": "Leave this case?",
