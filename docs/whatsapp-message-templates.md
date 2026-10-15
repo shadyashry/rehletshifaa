@@ -42,6 +42,9 @@ created under the same template name.
 | `rs_change_order_applied` | `change-order-applied` | My treatment / علاجي → portal (as above). **New (P1-16), to be created and approved in WhatsApp Manager** |
 | `rs_discharge_pack_ready` | `discharge-pack-ready` | Going home / العودة إلى البلد → portal (as above). **New (P1-17), to be created and approved in WhatsApp Manager** |
 | `rs_statement_ready` | `statement-ready` | My statement / كشف حسابي → portal (as above). **New (P1-17), to be created and approved in WhatsApp Manager** |
+| `rs_follow_up_reminder` | `follow-up-reminder` | My follow-up / متابعتي → portal (as above). **New (P1-18), bound in `application.yml`; to be created and approved in WhatsApp Manager** |
+| `rs_outcome_request` | `outcome-request` | Answer securely / الإجابة بأمان → `status` (the OUTCOME secure link). **New (P1-18), bound; to be created and approved** |
+| `rs_closure_review` | `closure-review` | My journey / رحلتي → portal (as above). **New (P1-18), bound; to be created and approved** |
 | `rs_decision_recorded` | `proposal-decision-recorded` | none (3 body variables) |
 | `rs_followup_window_closed` | `intake-followup` | none |
 | `rs_coordinator_intro` | `coordinator-intro` | none (1 body variable: the coordinator's name) |
@@ -127,6 +130,18 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 **`rs_statement_ready`** (P1-17: the hospital's final invoice is reconciled and the DISCHARGE statement is issued; no amount in the message)
 - en: Your statement is ready: what you were charged, what you paid and any balance or credit. See it on your case page, using the button below.
 - ar: كشف حسابك جاهز: ما احتُسب عليك وما دفعته وأي رصيد مستحق أو مبلغ مسترد. اطّلع عليه في صفحة حالتك عبر الزر أدناه.
+
+**`rs_follow_up_reminder`** (P1-18: the day before a follow-up contact; no time or doctor in the message)
+- en: Your follow-up with your doctor is tomorrow. The time and how it will happen are on your case page, using the button below.
+- ar: موعد متابعتك مع طبيبك غدًا. الوقت وطريقة المتابعة في صفحة حالتك عبر الزر أدناه.
+
+**`rs_outcome_request`** (P1-18: day 30 and day 90 after discharge; the answers are given on the secure page, never in WhatsApp)
+- en: Your care team would like to know how you are since your treatment: four short questions about pain, daily activities, satisfaction and any problem since you went home. Answer securely using the button below; you will confirm a one-time code first.
+- ar: يودّ فريق رعايتك أن يعرف كيف حالك بعد العلاج: أربعة أسئلة قصيرة عن الألم والأنشطة اليومية والرضا وأي مشكلة منذ عودتك. أجب بأمان عبر الزر أدناه؛ ستؤكّد رمزًا لمرة واحدة أولًا.
+
+**`rs_closure_review`** (P1-18: the case closed; the review request and the final statement)
+- en: Your follow-up with RehletShifaa is complete and your case is closed. We would value a few words on your journey; your final statement is on your case page, using the button below.
+- ar: اكتملت متابعتك مع رحلة شفاء وأُغلقت حالتك. يسعدنا أن تشاركنا كلمات قليلة عن رحلتك؛ كشف حسابك الختامي في صفحة حالتك عبر الزر أدناه.
 
 **`rs_followup_window_closed`** (S3: sent once after WhatsApp's 24-hour window has closed)
 - en: Your RehletShifaa coordinator has an update for you. Reply to this message to continue the conversation.

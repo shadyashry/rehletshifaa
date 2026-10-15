@@ -486,6 +486,16 @@ rate and in EGP (`DepositView` pattern).
   recorder (`SELF_COUNTERSIGN_REFUSED`); statements immutable.
 - Retention (P1-7): evidence and statements are `LEGAL_RECORD` class (long retention, legal hold); outcome answers
   are health data (sensitive, PDPL licence scope).
+- Outcome data (P1-18, reviewed for PDPL 2026-10-16): `case_outcomes` scores (0-10) and the complication flag are plain
+  columns on pseudonymous rows keyed by case (the schema checks them, P1-19 counts them); every free text (the
+  complication, the Consultant's review, contact and check-in notes) is encrypted. Readers: the case's Consultant (all),
+  its coordinator and their lead (scores and flags, no free text: `FOLLOW_UP_READ` without `FOLLOW_UP_RECORD`); a reported
+  complication is also the adverse-event incident's summary, read by the incident's Care Coordination Manager and
+  Compliance (`INCIDENT_READ`). Never Finance or Operations. Each answer stores the purpose notice version it was given
+  under and who answered (a representative declares it on the secure link). Messages carry a link only; audit and logs
+  carry the point, the channel and ids. Open (owner/legal): the PDPC licence (D-I), the retention class and period for
+  outcome and follow-up rows (a health-record class, not `LEGAL_RECORD`; complications inherit the incident's legal
+  hold), the breach procedure and DPO; P1-19 reads aggregates only and flags representative answers.
 - Logging: `event.code` for every state change; no document names.
 
 ## 13. Frontend surfaces

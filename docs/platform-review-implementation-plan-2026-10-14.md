@@ -1476,6 +1476,69 @@ phases.
   follow-up gap); `MyCare.tsx` follow-up block and outcomes form; templates `rs_follow_up_reminder`,
   `rs_outcome_request`, `rs_closure_review`.
 - Sessions: 1–2. Model: Opus 5.5 fast, medium; the outcome data classification reviewed by Fable (PDPL).
+- **Status (2026-10-16, session 1 of 2 = backend, Opus 5.5; committed on `claude/goofy-neumann-7a404f`, cut from `7d2e78c` =
+  `claude/p1-17-s2-discharge-ui`):** delivered; no screen. Flyway **V102** (`V102__follow_up_contacts_and_outcomes.sql`; the `V99` name
+  above was stale) is now the newest; V103 is the next free. Two sessions: this one the backend, session 2 the UI and copy.
+  - Decision recorded (owner's standing rule: decide by the recommendation, do not ask): **D-G applied as recommended**: 30 days of
+    follow-up included (`commercial_policies.follow_up_free_days`, 7-90, Finance Managers change it per care area; left out it carries
+    over; frozen on each case at discharge), counted from discharge; paid teleconsultation after it stays P2-25. Further choices made
+    here, each the design's best-practice reading: the window **closes only when no reported complication waits for the Consultant**;
+    the case then **closes on its own** (no button) once every follow-up contact is held, missed or cancelled, the check-ins that fall
+    inside the window are recorded and no reopen review or rebooking is open; the **outcome questions are asked at day 30 and day 90
+    whether or not the case has closed** (day 90 is after the window), each open 30 days; a complication on a closed case does not
+    reopen it automatically — the Consultant or a manager reopens it with P1-13's reopen; check-ins are owed only inside the window,
+    so a case reopened later owes none. The P1-15 money rule (deposit covers the fee first) is untouched and still awaits the owner.
+  - Delivered (`FollowUpService`, `FollowUpReadiness`, journey): **(1) The window**: discharge (`CaseEvents.PatientDischarged`, from
+    P1-17's move) opens `follow_up_windows` (discharged at, free days, ends at); the hourly sweep (`app.follow-up.scan-ms`, leased)
+    writes `FOLLOW_UP_WINDOW_CLOSED` when it is over and then tries FOLLOW_UP -> CLOSED (`CaseExitService.closeAfterFollowUp`, exit
+    reason `FOLLOW_UP_COMPLETED`, My Care's `COMPLETED`); the policy refuses the move otherwise (`FOLLOW_UP_NOT_COMPLETE`, blockers
+    `FOLLOW_UP_WINDOW_OPEN`, `FOLLOW_UP_CONTACT_OPEN`, `CHECK_IN_OPEN`, `COMPLICATION_UNDER_REVIEW`, `FOLLOW_UP_REVIEW_OPEN`).
+    **(2) Contacts** (`follow_up_contacts`; Consultant, `FOLLOW_UP_RECORD`): the plan's first contact is scheduled at discharge (also
+    for a plan recorded after it), then as the Consultant adds; held (note required) or missed with a `FOLLOW_UP_CONTACT` ledger row, or
+    cancelled with a reason; notes encrypted. One `FOLLOW_UP_CONTACT` item points at the next contact (due on its date); a missed one
+    opens the coordinator's `REBOOK_FOLLOW_UP` (1 working day), closed by booking a new one; the patient is reminded once the day
+    before (`follow-up-reminder`). **(3) Check-ins** (coordinator, `CHECK_IN_RECORD`): `CHECK_IN_D3/D14/D30` opened the day before
+    their day, due 18:00 Cairo, recorded once as reached / not reached with a note (`CHECK_IN` ledger row, encrypted). **(4)
+    Outcomes** (`case_outcomes`; patient or representative, `OUTCOME_REPORT`, no step-up): at day 30 and 90 the question is asked (a
+    new secure link of purpose **`OUTCOME`**, 30 days, `outcome-request`; My Care `REPORT_OUTCOME`); pain, function, satisfaction
+    0-10 and complication yes/no (+ what happened); answered once from My Care or the OUTCOME link only (`LINK_PURPOSE_MISMATCH` for
+    another purpose). A complication opens an adverse-event incident (P1-13, HIGH, origin `OUTCOME_D30|D90`), the Consultant's
+    `REVIEW_COMPLICATION` (4 working hours, survives exit) and tells the coordinators (`COMPLICATION_REPORTED`); the review (note)
+    lets the window close. **(5) Closure**: `CaseEvents.CaseClosed` (here or "no follow-up needed") sends `closure-review` once per
+    case, and the settlement module issues the **`CLOSURE` statement** (`RS-SC-<case>-<rev>`, `StatementService`; the same account with
+    refunds since discharge; a new revision only when the figures changed). **(6) PDPL** (review by a Fable 5.1 sub-agent, fixes
+    applied): outcome rows are health data; scores and the flag plain on pseudonymous rows, all free text encrypted; readers
+    `FOLLOW_UP_READ` = the case's Consultant (everything) and coordinator + lead (no clinical free text: contact notes, complication
+    and review text are null for them), never Finance or Operations; the complication text also reaches the incident's manager and
+    Compliance as the incident summary (stated in the code and architecture §12); each answer stores the purpose notice version it
+    was given under (`OUTCOME_NOTICE_VERSION` = `outcome-notice-2026-10`, `OUTCOME_NOTICE_OUTDATED`) and who answered (the link's
+    `answeredBy`: PATIENT or REPRESENTATIVE → `PATIENT_REPRESENTATIVE`); audit and logs carry point, channel and ids, never an answer.
+    **API**: `FollowUpController` — `GET /{doctor|coordinator}/cases/{id}/follow-up`; `POST /doctor/cases/{id}/follow-up/contacts`
+    (+ `/{contactId}`, `/{contactId}/cancel`), `/doctor/cases/{id}/follow-up/outcomes/{point}/review`;
+    `POST /coordinator/cases/{id}/follow-up/check-ins/{point}`; patient `GET /patient/cases/{id}/follow-up`,
+    `POST /patient/cases/{id}/follow-up/outcomes/{point}`; links `POST /public/cases/{token}/follow-up`, `/public/cases/{token}/outcomes/{point}`.
+    Control Center: `followUpFreeDays` on the commercial policy (`FOLLOW_UP_WINDOW_INVALID`). Templates `follow-up-reminder`,
+    `outcome-request`, `closure-review` (EN/AR, bound to `rs_follow_up_reminder`, `rs_outcome_request`, `rs_closure_review`).
+  - Tests and numbers: new `FollowUpServiceTest` (3: the schedule kept — reminder once, held, missed and rebooked, cancelled — the
+    check-ins inside the window, the case closing on its own with the CLOSURE statement and the review request, the day-30 answer in
+    My Care, day 90, an expired question, Operations refused the view; a complication on the OUTCOME link from a declared
+    representative (encrypted text, no answer in audit, the coordinator sees the flag not the text) holding the window until the
+    Consultant's review, then closing, reopened and closing again with no second statement or message; only the OUTCOME link answers),
+    and the three templates in `NotificationOutboxProcessorTest` (+1 test). Backend `mvn -o -q test`: 937 tests, 3 skips (933 before, 4
+    new); green except the 5 facility-package tests that fail only between 00:00 and 04:00 local time (pre-existing zone flake; they ran
+    at 01:30 and are green with `-Duser.timezone=UTC`). `ArchitectureRulesTest` and `RolePolicyTest` green (JPA only, no native query,
+    no module cycle: settlement listens to the journey's event). `PostgresJpaMappingTest` green on a disposable PostgreSQL 17 (V102
+    applied, Hibernate validated, every repository query executed, the three new repositories included). No frontend change.
+  - Not done here (session 2 and later): **no screens or copy**: the Consultant "Follow-up" panel (closes the P0-2 follow-up gap), the
+    coordinator's check-ins, My Care's follow-up block, the outcomes form with the purpose notice (it sends `noticeVersion`), the
+    status link's OUTCOME page, the Control Center "Free follow-up (days)" field, work copy for the six new work types. No reminder
+    for an unanswered outcome question; the review request is a message only (where reviews are published is the owner's call);
+    retention class for outcome and follow-up rows waits for P1-7 and counsel; the PDPC licence (D-I), breach procedure and DPO are
+    the owner's; P1-19 must read outcome aggregates only and flag representative answers. Templates `rs_follow_up_reminder`,
+    `rs_outcome_request`, `rs_closure_review` need Meta approval; the P1-16/P1-17 keys (`treatment-update`, `change-order-review`,
+    `change-order-applied`, `discharge-pack-ready`, `statement-ready`) are still not bound in `application.yml` (pre-existing).
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `7d2e78c`) and rebuilds the dev backend for
+    V102; then P1-18 session 2 (UI and copy, started in a new session; contract in the shared notes folder, `p1-18-session-1-handover.md`).
 
 ### P1-19  Hospital-agreement audit  (design §7; architecture §5.7)
 - `consultant_affiliations` (yearly declaration, Compliance review, eligibility condition D-H, `UNDECLARED_FACILITY`

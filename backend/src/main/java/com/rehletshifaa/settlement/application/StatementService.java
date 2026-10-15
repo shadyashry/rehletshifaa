@@ -43,6 +43,11 @@ import java.util.stream.Collectors;
  * medical care is the reconciled amount: an unapproved extra or a billing error on the invoice is never on it. The balance is the
  * total charged less every payment plus every refund: above zero it is still due, below zero it is a credit Finance refunds to
  * source ({@code REFUND_CREDIT}). A statement is immutable; the platform e-invoice reference is the one slot filled later.
+ *
+ * <p>P1-18: the {@code CLOSURE} statement is the same account when the case closes (refunds made since discharge included); it is
+ * issued on {@link com.rehletshifaa.journey.application.CaseEvents.CaseClosed}, again only when the figures changed since the last
+ * closure statement (a reopened case that closes again with the same account gets no second one). The patient hears about it in
+ * the closure message ({@code closure-review}), not in a separate one.
  */
 @Service
 public class StatementService {
@@ -57,11 +62,14 @@ public class StatementService {
     private final SettlementBasis basis;
     private final StatementRepository statements;
     private final ReconciliationLineRepository lines;
+    private final com.rehletshifaa.settlement.infrastructure.ReconciliationRepository reconciliations;
     private final PublicCaseAccessService publicAccess;
     private final ObjectMapper json;
 
     public StatementService(Authority authority, Clock clock, AuditTrail auditTrail, SettlementBasis basis, StatementRepository statements,
-                            ReconciliationLineRepository lines, PublicCaseAccessService publicAccess, ObjectMapper json) {
+                            ReconciliationLineRepository lines, PublicCaseAccessService publicAccess, ObjectMapper json,
+                            com.rehletshifaa.settlement.infrastructure.ReconciliationRepository reconciliations) {
+        this.reconciliations = reconciliations;
         this.authority = authority; this.clock = clock; this.auditTrail = auditTrail; this.basis = basis; this.statements = statements; this.lines = lines;
         this.publicAccess = publicAccess; this.json = json;
     }
@@ -72,22 +80,51 @@ public class StatementService {
      */
     @Transactional
     public Statement issueDischarge(UUID caseId, Reconciliation reconciliation, String subject) {
+        Statement statement = issue(caseId, Statement.Kind.DISCHARGE, reconciliation, subject);
+        basis.notifyPatient(caseId, "statement-ready", "statement-ready:" + statement.getId());
+        return statement;
+    }
+
+    /** The case closed: its CLOSURE statement from the settled reconciliation, when it has one and the account changed. */
+    @org.springframework.context.event.EventListener
+    public void on(com.rehletshifaa.journey.application.CaseEvents.CaseClosed event) {
+        UUID caseId = event.caseId();
+        Reconciliation reconciliation = reconciliations.findByCaseId(caseId).filter(Reconciliation::settled).orElse(null);
+        if (reconciliation == null) return;
+        Statement last = statements.findFirstByCaseIdAndKindOrderByRevisionDesc(caseId, Statement.Kind.CLOSURE.name()).orElse(null);
+        if (last != null && sameAccount(last.totals(), totals(caseId, reconciliation))) return;
+        issue(caseId, Statement.Kind.CLOSURE, reconciliation, "SYSTEM");
+    }
+
+    private static boolean sameAccount(Statement.Totals a, Statement.Totals b) {
+        return a.totalChargedEgp().compareTo(b.totalChargedEgp()) == 0 && a.refundedEgp().compareTo(b.refundedEgp()) == 0
+                && a.balanceDueEgp().compareTo(b.balanceDueEgp()) == 0 && a.creditDueEgp().compareTo(b.creditDueEgp()) == 0;
+    }
+
+    private Statement.Totals totals(UUID caseId, Reconciliation reconciliation) {
         Money money = basis.money(caseId);
-        List<ReconciliationLine> invoiceLines = lines.findByReconciliationIdOrderByLineNoAsc(reconciliation.getId());
         BigDecimal medical = reconciliation.getChargedEgp();
         BigDecimal fee = money.platformFeeEgp();
         BigDecimal total = medical.add(fee);
         BigDecimal paid = money.depositPaidEgp().add(money.feeBalancePaidEgp()).add(reconciliation.getPaidAtFacilityEgp());
         BigDecimal net = total.subtract(paid).add(money.depositRefundedEgp());
-        BigDecimal changeOrders = basis.countedChangeOrdersEgp(caseId);
-        Statement.Totals totals = new Statement.Totals(money.packageEgp(), changeOrders, medical, fee, total, money.depositPaidEgp(), money.feeBalancePaidEgp(),
+        return new Statement.Totals(money.packageEgp(), basis.countedChangeOrdersEgp(caseId), medical, fee, total, money.depositPaidEgp(), money.feeBalancePaidEgp(),
                 reconciliation.getPaidAtFacilityEgp(), money.depositRefundedEgp(), net.max(BigDecimal.ZERO), net.negate().max(BigDecimal.ZERO));
+    }
+
+    /** The next revision of a kind from the reconciliation and the money now; the caller tells the patient. */
+    private Statement issue(UUID caseId, Statement.Kind kind, Reconciliation reconciliation, String subject) {
+        Money money = basis.money(caseId);
+        List<ReconciliationLine> invoiceLines = lines.findByReconciliationIdOrderByLineNoAsc(reconciliation.getId());
+        Statement.Totals totals = totals(caseId, reconciliation);
+        BigDecimal fee = totals.platformFeeEgp(), total = totals.totalChargedEgp();
+        BigDecimal net = totals.balanceDueEgp().subtract(totals.creditDueEgp());
 
         List<Line> out = new ArrayList<>();
         for (ReconciliationLine l : invoiceLines) {
             if (l.getChargedEgp().signum() == 0) continue; // never charged: not on the patient's statement
-            String kind = l.getChargedEgp().signum() < 0 ? CREDIT : l.getMatchedSource() == ReconciliationLine.Source.PACKAGE ? PACKAGE : CHANGE_ORDER;
-            out.add(new Line(kind, l.getDescription(), l.getChargedEgp()));
+            String line = l.getChargedEgp().signum() < 0 ? CREDIT : l.getMatchedSource() == ReconciliationLine.Source.PACKAGE ? PACKAGE : CHANGE_ORDER;
+            out.add(new Line(line, l.getDescription(), l.getChargedEgp()));
         }
         if (fee.signum() > 0) out.add(new Line(PLATFORM_FEE, null, fee));
         if (money.depositPaidEgp().signum() > 0) out.add(new Line(DEPOSIT_PAID, null, money.depositPaidEgp().negate()));
@@ -95,14 +132,13 @@ public class StatementService {
         if (reconciliation.getPaidAtFacilityEgp().signum() > 0) out.add(new Line(PAID_AT_FACILITY, null, reconciliation.getPaidAtFacilityEgp().negate()));
         if (money.depositRefundedEgp().signum() > 0) out.add(new Line(REFUNDED, null, money.depositRefundedEgp()));
 
-        Statement previous = statements.findFirstByCaseIdAndKindOrderByRevisionDesc(caseId, Statement.Kind.DISCHARGE.name()).orElse(null);
+        Statement previous = statements.findFirstByCaseIdAndKindOrderByRevisionDesc(caseId, kind.name()).orElse(null);
         int revision = previous == null ? 1 : previous.getRevision() + 1;
         Instant now = clock.instant();
-        Statement statement = statements.saveAndFlush(new Statement(caseId, Statement.Kind.DISCHARGE, basis.caseNumber(caseId), revision, reconciliation.getId(),
+        Statement statement = statements.saveAndFlush(new Statement(caseId, kind, basis.caseNumber(caseId), revision, reconciliation.getId(),
                 money.displayCurrency() == null ? "EGP" : money.displayCurrency(), money.fxRate(), totals, write(out), previous == null ? null : previous.getId(),
                 subject, now));
-        basis.notifyPatient(caseId, "statement-ready", "statement-ready:" + statement.getId());
-        auditTrail.event("STATEMENT_ISSUED").actor(subject, "FINANCE").caseId(caseId).entity("Statement", statement.getId()).action("ISSUE")
+        auditTrail.event("STATEMENT_ISSUED").actor(subject, "SYSTEM".equals(subject) ? "SYSTEM" : "FINANCE").caseId(caseId).entity("Statement", statement.getId()).action("ISSUE")
                 .reason(statement.getStatementNumber() + " total EGP " + total.toPlainString() + " balance EGP " + net.toPlainString()).record();
         return statement;
     }

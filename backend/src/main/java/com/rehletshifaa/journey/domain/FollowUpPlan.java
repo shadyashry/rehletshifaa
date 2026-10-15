@@ -38,6 +38,9 @@ public class FollowUpPlan extends AssignedIdEntity {
     }
 
     public UUID getCaseId() { return caseId; }
+    public UUID getPractitionerId() { return practitionerId; }
+    public String getRequiredTests() { return requiredTests; }
+    public String getInstructions() { return instructions; }
     public Instant getDueAt() { return dueAt; }
     public String getMode() { return mode; }
     public String getStatus() { return status; }

@@ -245,6 +245,9 @@ app:
         proposal-decision-recorded: ${WHATSAPP_TEMPLATE_DECISION_RECORDED:rs_decision_recorded}
         intake-followup: ${WHATSAPP_TEMPLATE_FOLLOWUP:rs_followup_window_closed}
         coordinator-intro: ${WHATSAPP_TEMPLATE_COORDINATOR_INTRO:rs_coordinator_intro}
+        follow-up-reminder: ${WHATSAPP_TEMPLATE_FOLLOW_UP_REMINDER:rs_follow_up_reminder}
+        outcome-request: ${WHATSAPP_TEMPLATE_OUTCOME_REQUEST:rs_outcome_request}
+        closure-review: ${WHATSAPP_TEMPLATE_CLOSURE_REVIEW:rs_closure_review}
         out-of-hours: ${WHATSAPP_TEMPLATE_OUT_OF_HOURS:rs_out_of_hours}
       languages:
         en: ${WHATSAPP_TEMPLATE_LANGUAGE_EN:en}

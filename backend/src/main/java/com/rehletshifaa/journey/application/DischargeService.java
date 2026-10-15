@@ -107,12 +107,15 @@ public class DischargeService {
     private final DepositPaymentNotices notices;
     private final PublicCaseAccessService publicAccess;
     private final ObjectMapper json;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public DischargeService(Authority authority, Clock clock, AuditTrail auditTrail, EvidenceLedger ledger, DischargeReadiness readiness, TreatmentViews treatment,
                             CaseTransitionPolicy policy, CaseStatusLog statusLog, MedicalCaseRepository cases, CaseAssignmentRepository assignments,
                             FacilityAdmissionRepository admissions, FacilityDirectory facilities, FollowUpPlanRepository followUps,
                             CommercialPolicyService commercialPolicies, StaffWorkService work, FinanceWork financeWork, SlaPolicy sla,
-                            DepositPaymentNotices notices, PublicCaseAccessService publicAccess, ObjectMapper json) {
+                            DepositPaymentNotices notices, PublicCaseAccessService publicAccess, ObjectMapper json,
+                            org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
         this.authority = authority; this.clock = clock; this.auditTrail = auditTrail; this.ledger = ledger; this.readiness = readiness; this.treatment = treatment;
         this.policy = policy; this.statusLog = statusLog; this.cases = cases; this.assignments = assignments; this.admissions = admissions;
         this.facilities = facilities; this.followUps = followUps; this.commercialPolicies = commercialPolicies; this.work = work;
@@ -261,6 +264,7 @@ public class DischargeService {
                 work.notifyStaff(subject, caseId, null, "PATIENT_DISCHARGED", "Patient discharged",
                         "The discharge pack is complete. Confirm the return travel and the departure.", "patient-discharged:" + caseId + ":" + subject, false,
                         WorkCopy.of("PATIENT_DISCHARGED", "caseNumber", number));
+            events.publishEvent(new CaseEvents.PatientDischarged(caseId));
             status = "DISCHARGED";
         }
         if ("DISCHARGED".equals(status) && policy.mayEnter(caseId, status, "FOLLOW_UP"))

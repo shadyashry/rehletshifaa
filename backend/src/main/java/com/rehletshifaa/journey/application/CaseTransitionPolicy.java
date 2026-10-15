@@ -35,6 +35,8 @@ import java.util.*;
  *       on file); only ADMISSION_READY opens treatment, and only with the hospital's admission number.</li>
  *   <li>Discharge (P1-17, D-F): TREATMENT_IN_PROGRESS moves to DISCHARGED only with the treatment evidence, the discharge pack, the
  *       follow-up plan and the hospital's final invoice on file; DISCHARGED moves on only once that invoice is reconciled.</li>
+ *   <li>Follow-up (P1-18, D-G): FOLLOW_UP closes only once the free window is over and nothing is still owed
+ *       ({@link FollowUpReadiness}); the scheduler closes it ({@link CaseExitService#closeAfterFollowUp}).</li>
  * </ul>
  */
 @Component
@@ -108,10 +110,11 @@ public class CaseTransitionPolicy {
     private final CaseActionService caseActions;
     private final AdmissionReadiness admission;
     private final DischargeReadiness discharge;
+    private final FollowUpReadiness followUp;
 
     public CaseTransitionPolicy(PaymentService payment, CaseActionService caseActions, ProposalVersionRepository proposalVersions, CaseTaskRepository tasks,
-                                AdmissionReadiness admission, DischargeReadiness discharge) { this.tasks = tasks; this.proposalVersions = proposalVersions;
-        this.payment = payment; this.caseActions = caseActions; this.admission = admission; this.discharge = discharge;
+                                AdmissionReadiness admission, DischargeReadiness discharge, FollowUpReadiness followUp) { this.tasks = tasks; this.proposalVersions = proposalVersions;
+        this.payment = payment; this.caseActions = caseActions; this.admission = admission; this.discharge = discharge; this.followUp = followUp;
     }
 
     /** Refuses a move the lifecycle or a stage's entry invariant does not allow. Conflicts are 409s the client can act on. */
@@ -125,6 +128,11 @@ public class CaseTransitionPolicy {
         if ("DISCHARGED".equals(current)) {
             List<String> settlement = discharge.settlementBlockers(caseId).stream().map(DischargeReadiness::label).toList();
             if (!settlement.isEmpty()) throw new ApiException(409, "SETTLEMENT_PENDING", "The case cannot move on from discharge yet: " + String.join("; ", settlement));
+        }
+        // P1-18 (D-G): follow-up closes once the window is over and every contact, check-in and complication review is done.
+        if ("FOLLOW_UP".equals(current) && "CLOSED".equals(target)) {
+            List<String> open = followUp.closureBlockers(caseId).stream().map(FollowUpReadiness::label).toList();
+            if (!open.isEmpty()) throw new ApiException(409, "FOLLOW_UP_NOT_COMPLETE", "The case cannot close yet: " + String.join("; ", open));
         }
         List<String> gate = entryBlockers(caseId, target);
         if (gate.isEmpty()) return;

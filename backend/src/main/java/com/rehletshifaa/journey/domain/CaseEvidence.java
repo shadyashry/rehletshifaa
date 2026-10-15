@@ -69,7 +69,14 @@ public class CaseEvidence extends AssignedIdEntity {
         /** Operations confirmed the return travel (flight with a valid fit-to-fly, or ground); effective at = departure time. */
         RETURN_CONFIRMED,
         /** Operations confirmed the patient left. */
-        DEPARTURE_CONFIRMED;
+        DEPARTURE_CONFIRMED,
+        // P1-18 (design §5 stage 6): follow-up.
+        /** The Consultant held (or the patient missed) a follow-up contact; the reference is the contact's id, the note encrypted. */
+        FOLLOW_UP_CONTACT,
+        /** The coordinator's check-in after discharge; the reference is the point (D3, D14, D30), the outcome and note encrypted. */
+        CHECK_IN,
+        /** The free follow-up window (D-G) is over with no complication waiting for review (the scheduler). */
+        FOLLOW_UP_WINDOW_CLOSED;
 
         public boolean milestone() { return name().startsWith("MILESTONE_"); }
 

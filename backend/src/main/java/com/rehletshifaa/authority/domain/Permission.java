@@ -38,6 +38,12 @@ public enum Permission {
     // final invoice with a fresh sign-in, a Finance Manager countersigns a variance above the band and settles a facility dispute;
     // the case team and Finance read the settlement; Finance records the platform e-invoice reference on a statement.
     DISCHARGE_RECORD(false), RECONCILE(true), RECONCILE_COUNTERSIGN(true), SETTLEMENT_READ(false), STATEMENT_ISSUE(true),
+    // P1-18 (D-G): follow-up. The Consultant keeps the contact schedule and reviews a reported complication; the coordinator records
+    // the day-3/14/30 check-ins; the patient (or representative) answers the day-30/90 outcome questions (no step-up: an answer,
+    // not a decision). The staff follow-up view holds the outcome answers (health data, PDPL): the case's Consultant and coordinator
+    // (the clinical free text only with FOLLOW_UP_RECORD), never Finance or Operations (data minimisation); a reported complication
+    // also reaches the incident's owner and Compliance through the incident (INCIDENT_READ).
+    FOLLOW_UP_RECORD(false), CHECK_IN_RECORD(false), OUTCOME_REPORT(false), FOLLOW_UP_READ(false),
     // consultants, credentials, identity
     CONSULTANT_ONBOARD(true), CREDENTIAL_READ(false), CREDENTIAL_DECIDE(true), PATIENT_IDENTITY_REVIEW(true), PATIENT_IDENTITY_READ(false),
     CLINIC_MANAGE(false), CLINIC_APPROVE(true), CAPABILITY_DECIDE(true),

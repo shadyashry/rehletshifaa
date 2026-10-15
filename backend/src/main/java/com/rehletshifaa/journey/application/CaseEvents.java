@@ -54,6 +54,18 @@ public final class CaseEvents {
     public record DischargeEvidenceChanged(UUID caseId) {}
 
     /**
+     * P1-18: the case just moved TREATMENT_IN_PROGRESS -> DISCHARGED. {@link FollowUpService} opens the follow-up window (D-G) and
+     * schedules the plan's first contact. Synchronous, inside the move's transaction.
+     */
+    public record PatientDischarged(UUID caseId) {}
+
+    /**
+     * P1-18: the case just closed (its follow-up completed, or no follow-up needed). The settlement module issues the CLOSURE
+     * statement and {@link FollowUpService} asks the patient for a review. Synchronous, inside the exit's transaction.
+     */
+    public record CaseClosed(UUID caseId) {}
+
+    /**
      * Work, an assignment, the proposal's sign-offs or who has the ball changed on the case: the stage's own steps are
      * re-derived ({@link CaseActionService#syncStageWork}) so every step someone owes is in their My work (QA A3).
      */

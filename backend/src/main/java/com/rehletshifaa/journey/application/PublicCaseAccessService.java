@@ -143,6 +143,29 @@ public class PublicCaseAccessService {
         return new CaseLinkContext(link.caseId(),link.patientId());
     }
 
+    /**
+     * P1-18: the outcome question's secure link (purpose OUTCOME): an earlier live OUTCOME link of the case is revoked, the new one
+     * lasts 30 days and goes to the case's communication contact with the {@code outcome-request} message. Returns the link's id
+     * (the outcome row keeps it).
+     */
+    @Transactional public UUID issueOutcomeLink(UUID caseId,String language){
+        Instant now=clock.instant();CaseContact contact=contacts.resolve(caseId);links.revokeForCase(caseId,"OUTCOME",micros(now));
+        String token=randomToken();UUID id=UUID.randomUUID();
+        links.saveAndFlush(new CaseAccessLink(id,caseId,contact.patientId(),"OUTCOME",intake.hash(token),now.plus(Duration.ofDays(30)),now));
+        String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();
+        if(hasText(destination))
+            notificationOutbox.enqueueOnce("FOLLOW_UP", channel, destination, "outcome-request", intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+("ar".equals(language)?"ar":"en")+"\"}"), "outcome-request:"+id, now);
+        audit("OUTCOME_LINK_CREATED",caseId,id.toString(),"CREATE");
+        return id;
+    }
+
+    /** P1-18: resolve a verified grant on an OUTCOME link; a link of another purpose cannot answer the outcome questions. */
+    @Transactional(readOnly=true) public CaseLinkContext requireOutcomeGrant(String token,String grant){
+        Link link=requireGrant(token,grant);
+        if(!"OUTCOME".equals(link.purpose()))throw new ApiException(403,"LINK_PURPOSE_MISMATCH","This link cannot be used to answer the follow-up questions");
+        return new CaseLinkContext(link.caseId(),link.patientId());
+    }
+
     /** Resolve a verified information-response grant without exposing the link's internal id. */
     @Transactional(readOnly=true) public InformationLinkContext requireInformationGrant(String token,String grant){
         Link link=requireGrant(token,grant);

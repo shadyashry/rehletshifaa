@@ -111,6 +111,12 @@ public final class RolePolicy {
             g(FINANCE, SETTLEMENT_READ, CASE_ASSIGNED), g(FINANCE, SETTLEMENT_READ, CASE_MONEY_OPEN), g(FINANCE_MANAGER, SETTLEMENT_READ, PLATFORM),
             g(COORDINATOR, SETTLEMENT_READ, CASE_ASSIGNED), g(OPERATIONS, SETTLEMENT_READ, CASE_ASSIGNED),
             g(FINANCE, STATEMENT_ISSUE, PLATFORM),
+            // P1-18 (D-G): follow-up by the case's Consultant (contacts, complication review) and coordinator (check-ins); the
+            // patient and their representative answer the outcome questions. The staff follow-up view (the outcome answers are health
+            // data) is the Consultant's and the coordinator's (and their lead's), not Finance's or Operations'.
+            g(CONSULTANT, FOLLOW_UP_RECORD, CASE_ASSIGNED), g(COORDINATOR, CHECK_IN_RECORD, CASE_ASSIGNED),
+            g(CONSULTANT, FOLLOW_UP_READ, CASE_ASSIGNED), g(COORDINATOR, FOLLOW_UP_READ, CASE_ASSIGNED), g(COORDINATOR, FOLLOW_UP_READ, SUPERVISED),
+            g(PATIENT, OUTCOME_REPORT, OWN_PATIENT), g(PATIENT_REPRESENTATIVE, OUTCOME_REPORT, OWN_PATIENT),
             // Other function managers: hierarchy and staffing only; no execution, clinical or decision authority.
             g(OPERATIONS_MANAGER, TEAM_MANAGE, PLATFORM), g(OPERATIONS_MANAGER, STAFFING_REQUEST, PLATFORM),
             g(FINANCE_MANAGER, TEAM_MANAGE, PLATFORM), g(FINANCE_MANAGER, STAFFING_REQUEST, PLATFORM),

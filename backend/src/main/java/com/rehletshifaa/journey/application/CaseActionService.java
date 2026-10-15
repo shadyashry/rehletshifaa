@@ -60,6 +60,8 @@ public class CaseActionService {
     /** Stages in which "prepare the proposal" is still real work; anywhere else the item is obsolete. */
     private static final Set<String> PROPOSAL_WORK_STAGES = Set.of("CLINICAL_RECOMMENDATION_READY", "REVISION_REQUESTED", "EXPIRED");
     private static final Set<String> TERMINAL = Set.of("DRAFT", "CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE", "EXPIRED");
+    /** P1-18: where the patient may be asked the follow-up outcome questions. */
+    private static final Set<String> FOLLOW_UP_QUESTION_STAGES = Set.of("DISCHARGED", "FOLLOW_UP", "CLOSED");
     private static final Set<String> CONSULTANT_ASSIGNABLE = Set.of("INTAKE_REVIEW", "INFORMATION_REQUIRED", "READY_FOR_CONSULTANT");
     /**
      * Stages where the case — and the next move — belongs to the consultant. The coordinator keeps the
@@ -89,12 +91,15 @@ public class CaseActionService {
     private final com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders;
     private final DischargeReadiness discharge;
     private final EvidenceLedger ledger;
+    private final com.rehletshifaa.journey.infrastructure.CaseOutcomeRepository outcomes;
 
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
                              StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock,
                              com.rehletshifaa.workforce.application.WorkforceDirectory workforce, CaseExitReasonRepository exitReasons,
                              TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla, AdmissionReadiness admission,
-                             com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders, DischargeReadiness discharge, EvidenceLedger ledger) {
+                             com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders, DischargeReadiness discharge, EvidenceLedger ledger,
+                             com.rehletshifaa.journey.infrastructure.CaseOutcomeRepository outcomes) {
+        this.outcomes = outcomes;
         this.admission = admission; this.changeOrders = changeOrders; this.discharge = discharge; this.ledger = ledger;
         this.exitReasons = exitReasons; this.travelPlans = travelPlans; this.statusChanges = statusChanges; this.sla = sla;
         this.workforce = workforce;
@@ -179,6 +184,9 @@ public class CaseActionService {
             Optional<BlockerView> step = mine.stream().filter(b -> code.equals(b.code())).findFirst();
             if (step.isPresent()) return new CurrentActionView(code.equals("IDENTITY_NOT_VERIFIED") ? "VERIFY_IDENTITY" : "COMPLETE_PROFILE", "FOCUS", null, null, null, null, null, null, false, code);
         }
+        // P1-18: the day-30 / day-90 outcome questions, while open, come first after discharge (also on a closed case).
+        if (FOLLOW_UP_QUESTION_STAGES.contains(status) && outcomes.findFirstByCaseIdAndReportedAtIsNullAndRequestedAtAfterOrderByRequestedAtAsc(caseId,
+                clock.instant().minus(java.time.Duration.ofDays(FollowUpService.OUTCOME_OPEN_DAYS))).isPresent()) return simple("REPORT_OUTCOME", "FOCUS");
         String exit = exitWord(caseId, status);
         if (exit != null) return new CurrentActionView("NONE", "NONE", null, null, null, null, null, null, false, null, null, exit);
         if (TERMINAL.contains(status) && !"EXPIRED".equals(status)) return none(); // an expired estimate is re-prepared, not closed
@@ -331,7 +339,7 @@ public class CaseActionService {
     private String exitWord(UUID caseId, String status) {
         return switch (status) {
             case "CANCELLED" -> latestExit(caseId) == CaseExitReason.Reason.PATIENT_WITHDREW ? "WITHDRAWN" : "CANCELLED";
-            case "CLOSED" -> latestExit(caseId) == CaseExitReason.Reason.NO_FOLLOW_UP_NEEDED ? "COMPLETED" : "CLOSED";
+            case "CLOSED" -> Set.of(CaseExitReason.Reason.NO_FOLLOW_UP_NEEDED, CaseExitReason.Reason.FOLLOW_UP_COMPLETED).contains(latestExit(caseId)) ? "COMPLETED" : "CLOSED";
             case "EXPIRED" -> exitReasons.findFirstByCaseIdOrderByRecordedAtDesc(caseId)
                     .filter(exit -> exit.getReason() == CaseExitReason.Reason.DEPOSIT_UNPAID && isCurrentMove(caseId, exit))
                     .map(exit -> "EXPIRED").orElse(null);

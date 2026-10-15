@@ -73,7 +73,11 @@ public class SlaPolicy {
             Map.entry("RECONCILE_INVOICE", 2),
             Map.entry("REFUND_CREDIT", 2),
             Map.entry("COUNTERSIGN_RECONCILIATION", 1),
-            Map.entry("FACILITY_DISPUTE", 5));
+            Map.entry("FACILITY_DISPUTE", 5),
+            // P1-18 (architecture §9): the coordinator rebooks a missed follow-up contact in one working day. The Consultant's
+            // contact (its date), the check-ins (the end of day 3, 14, 30 after discharge) and the review of a reported
+            // complication (4 working hours) are dated by the caller.
+            Map.entry("REBOOK_FOLLOW_UP", 1));
 
     /**
      * P1-6 session 2 (D-02): the queue each waiting state waits on, so "usually within N working days" is read from the

@@ -186,7 +186,10 @@ class NotificationOutboxProcessorTest {
                 {"change-order-review", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
                 {"change-order-applied", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
                 {"discharge-pack-ready", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
-                {"statement-ready", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"}};
+                {"statement-ready", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
+                {"follow-up-reminder", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
+                {"closure-review", "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"%s\"}"},
+                {"outcome-request", "{\"token\":\"t1\",\"lang\":\"%s\"}"}};
         for (String[] t : templates) {
             var ar = render(t[0], t[1].formatted("ar"));
             assertThat(arabic(ar.subject()) && arabic(ar.body())).as(t[0] + " in Arabic").isTrue();
@@ -209,11 +212,19 @@ class NotificationOutboxProcessorTest {
     /** The patient's admission messages link to their own case page; no amount travels in the message. */
     @Test void theAdmissionMessagesLinkToTheCasePage() {
         for (String template : List.of("admission-balance-due", "cleared-for-admission", "treatment-update", "change-order-review", "change-order-applied",
-                "discharge-pack-ready", "statement-ready")) {
+                "discharge-pack-ready", "statement-ready", "follow-up-reminder", "closure-review")) {
             var en = render(template, "{\"case\":\"0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00\",\"lang\":\"en\"}");
             assertThat(en.linkPath()).as(template).isEqualTo("en/portal?case=0b0d8f8e-6f6c-4a3e-9c1d-2f8f3c2a1b00");
             assertThat(en.body()).as(template).doesNotContainPattern("[0-9]{3,}[.][0-9]{2}");
         }
+    }
+
+    /** P1-18: the outcome questions go on their own secure link (one-time code first); the message never carries an answer. */
+    @Test void theOutcomeRequestLinksToTheSecureStatusPage() {
+        var en = render("outcome-request", "{\"token\":\"t1\",\"lang\":\"en\"}");
+        assertThat(en.linkPath()).isEqualTo("en/status/t1");
+        assertThat(en.body()).contains("one-time code");
+        assertThat(render("outcome-request", "{\"token\":\"t1\",\"lang\":\"ar\"}").linkPath()).isEqualTo("ar/status/t1");
     }
 
     /** A file cleared in the sweep: the patient is sent to their own case page (sign-in), never told the file's name. */

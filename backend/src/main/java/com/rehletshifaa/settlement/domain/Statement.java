@@ -25,7 +25,8 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 @Entity
 @Table(name = "statements")
 public class Statement extends AssignedIdEntity {
-    public enum Kind { DISCHARGE }
+    /** DISCHARGE when the final invoice is reconciled (P1-17); CLOSURE when the case closes (P1-18). */
+    public enum Kind { DISCHARGE, CLOSURE }
 
     /** Every total, in EGP; {@code balanceDueEgp} and {@code creditDueEgp} are never both above zero. */
     public record Totals(BigDecimal packageEgp, BigDecimal changeOrdersEgp, BigDecimal medicalChargedEgp, BigDecimal platformFeeEgp, BigDecimal totalChargedEgp,
@@ -64,7 +65,7 @@ public class Statement extends AssignedIdEntity {
     public Statement(UUID caseId, Kind kind, String caseNumber, int revision, UUID reconciliationId, String displayCurrency, BigDecimal fxRate, Totals t,
                      String lines, UUID supersedesId, String issuedBy, Instant at) {
         super(UUID.randomUUID());
-        this.caseId = caseId; this.kind = kind.name(); this.statementNumber = number(caseNumber, revision); this.revision = revision;
+        this.caseId = caseId; this.kind = kind.name(); this.statementNumber = number(kind, caseNumber, revision); this.revision = revision;
         this.reconciliationId = reconciliationId; this.displayCurrency = displayCurrency; this.fxRate = fxRate;
         this.packageEgp = t.packageEgp(); this.changeOrdersEgp = t.changeOrdersEgp(); this.medicalChargedEgp = t.medicalChargedEgp();
         this.platformFeeEgp = t.platformFeeEgp(); this.totalChargedEgp = t.totalChargedEgp(); this.depositPaidEgp = t.depositPaidEgp();
@@ -73,10 +74,13 @@ public class Statement extends AssignedIdEntity {
         this.lines = lines; this.supersedesId = supersedesId; this.issuedBy = issuedBy; this.issuedAt = micros(at);
     }
 
-    /** {@code RS-ST-<case number without RS->-<revision>}: readable on the phone and unique without a sequence. */
-    public static String number(String caseNumber, int revision) {
+    /**
+     * {@code RS-ST-<case number without RS->-<revision>} for the discharge statement, {@code RS-SC-…} for the closure statement:
+     * readable on the phone and unique without a sequence.
+     */
+    public static String number(Kind kind, String caseNumber, int revision) {
         String base = caseNumber == null ? "" : caseNumber.startsWith("RS-") ? caseNumber.substring(3) : caseNumber;
-        return "RS-ST-" + base + "-" + revision;
+        return (kind == Kind.CLOSURE ? "RS-SC-" : "RS-ST-") + base + "-" + revision;
     }
 
     /** The platform's e-invoice reference: the statement's one later write, set once. */
