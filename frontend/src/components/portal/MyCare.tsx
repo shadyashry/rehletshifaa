@@ -17,7 +17,9 @@ import { CareAreaMark, CaseSwitcher, phaseIndex, takeArrivalFocus } from "@/comp
 import { formatMoney } from "@/lib/money";
 import type { CaseActions } from "@/components/portal/CurrentAction";
 /** The backend's one answer to "may the patient see a proposal, and which one" — rendered, never re-derived from the stage. */
-export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null; releasedAt?: string | null };
+export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null; releasedAt?: string | null;
+  /** PRELIMINARY_ESTIMATE or FINAL_TREATMENT_QUOTE: which noun the step uses (one noun per document). */
+  documentType?: string | null };
 /**
  * D-1: when the three stamped moments happened, from the case's status history (patient-safe; staff get none). Each is
  * an ISO instant or null; a page prints a stamp only from one of these, never from today.
@@ -67,7 +69,10 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
   const t = work.myCare;
   const c = caseSummary;
   const code = actions.currentAction.code;
-  const step = stepText(code, t.steps, { proposalState: patientProposal?.state ?? null, status: c.status, exit: actions.currentAction.exit ?? null });
+  // A final quote is reviewed as a quote, never called an estimate, and carries no estimate stamp.
+  const finalQuote = patientProposal?.documentType === "FINAL_TREATMENT_QUOTE";
+  const step: StepText = code === "REVIEW_PROPOSAL" && finalQuote ? t.steps.REVIEW_FINAL_QUOTE
+    : stepText(code, t.steps, { proposalState: patientProposal?.state ?? null, status: c.status, exit: actions.currentAction.exit ?? null });
   const body = code === "PROVIDE_INFORMATION" ? patientAction?.message?.trim() || step.body : step.body;
   // A case closed or cancelled says nothing about how far it got, so its journey shows no step as reached or current.
   const phase = c.status === "CLOSED" || c.status === "CANCELLED" ? -1 : phaseIndex(c.status);
@@ -86,7 +91,7 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
   const focus = actions.currentAction.kind === "FOCUS";
   const expectedDays = actions.currentAction.expectedWorkingDays ?? null;
   const showSwitcher = cases.length > 1;
-  const stamp = stampFor(code, { ...milestones, estimateReadyAt: milestones?.estimateReadyAt ?? patientProposal?.releasedAt }, t.stamp);
+  const stamp = code === "REVIEW_PROPOSAL" && finalQuote ? null : stampFor(code, { ...milestones, estimateReadyAt: milestones?.estimateReadyAt ?? patientProposal?.releasedAt }, t.stamp);
 
   // Arriving from the case switcher: the card that was pressed is gone, so the new case's heading takes focus.
   useEffect(() => { if (takeArrivalFocus(c.id)) document.getElementById("case-heading")?.focus(); }, [c.id]);
@@ -189,7 +194,7 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
 
             {/* Exactly one primary action, and only when the backend says the patient owes something. */}
             {focus && code === "REVIEW_PROPOSAL" && (
-              <button type="button" className="btn-primary mt-6" onClick={onOpenProposal}>{t.step.reviewProposal}</button>
+              <button type="button" className="btn-primary mt-6" onClick={onOpenProposal}>{finalQuote ? t.step.reviewQuote : t.step.reviewProposal}</button>
             )}
             {focus && code === "PROVIDE_INFORMATION" && (
               <button type="button" className="btn-primary mt-6" onClick={() => onView("messages")}>{t.step.replyInMessages}</button>

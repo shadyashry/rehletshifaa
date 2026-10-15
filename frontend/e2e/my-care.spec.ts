@@ -162,9 +162,9 @@ test("deposit confirmed: success state, no stale arrangement step", async ({ pag
 test("a proposal waiting for a decision is the one primary action and opens in place", async ({ page }) => {
   const { writes } = await setupPatient(page, "proposal-ready");
   await page.goto("/en/portal");
-  await expect(page.getByRole("heading", { name: "Your proposal is ready to review" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your estimate is ready to review" })).toBeVisible();
   await expect(page.getByText("No action is required from you right now.")).toHaveCount(0);
-  const review = page.getByRole("button", { name: "Review proposal" });
+  const review = page.getByRole("button", { name: "Review estimate" });
   await expect(review).toHaveCount(1);
   await expect(page.getByRole("button", { name: /^view proposal/i })).toHaveCount(0); // not twice
   await review.click();
@@ -257,7 +257,7 @@ test("identity verification shows a rejection with its reason and the form to re
 for (const [scenario, title, words] of [
   ["case-received", "We have your case", "Received, Sep 1"],
   ["consultant-review", "A Consultant is reviewing your case", "In review, Sep 4"],
-  ["proposal-ready", "Your proposal is ready to review", "Estimate ready, Sep 12"],
+  ["proposal-ready", "Your estimate is ready to review", "Estimate ready, Sep 12"],
 ] as const) {
   test(`the ${scenario} step carries its stamp with the recorded date`, async ({ page }) => {
     await setupPatient(page, scenario);

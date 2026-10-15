@@ -26,7 +26,7 @@ test("the proposal drawer fills the phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await setupPatient(page, "proposal-ready");
   await page.goto("/en/portal");
-  await page.getByRole("button", { name: "Review proposal" }).click();
+  await page.getByRole("button", { name: "Review estimate" }).click();
   const box = await page.getByRole("dialog").boundingBox();
   expect(box && box.width).toBeGreaterThanOrEqual(388);
   expect(box && box.height).toBeGreaterThanOrEqual(840);

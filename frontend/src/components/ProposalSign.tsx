@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, CircleCheck, Clock, LockKeyhole, ShieldCheck } from "lucide-react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { ProposalDecisionDialog } from "@/components/ProposalDecisionDialog";
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
+import { CaseStamp } from "@/components/brand/CaseStamp";
+import { DossierPage } from "@/components/brand/DossierPage";
 import { apiUrl } from "@/lib/api";
 import { ARABIC_TERMS_APPROVED, estimateTerms, exchangeRateStatement, finalQuoteTerms, generalDisclaimers, isForeignCurrency, LEGACY_PLACEHOLDER_TERMS } from "@/lib/commercial-terms";
 import type { Dictionary } from "@/lib/dictionary";
@@ -25,7 +28,7 @@ type Proposal = {
   depositDueDisplay?: number; depositPaidDisplay?: number; consultantName?: string | null;
   /** Day of the exchange rate frozen on this version at release; absent on legacy versions. */
   fxRateDate?: string | null;
-  /** D-1: when this version was released to the patient (the "Estimate ready" stamp, slice C). */
+  /** D-1: when this version was released to the patient, printed on the "Estimate ready" stamp; no date, no stamp. */
   releasedAt?: string | null;
   /** When the patient asked their coordinator to go through the terms in Arabic (assisted path); absent until then. */
   assistance?: { requestedAt?: string | null } | null;
@@ -33,15 +36,18 @@ type Proposal = {
 type Decision = "ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED";
 /** Terminal states the patient cannot act out of; each gets its own honest explanation, never a raw error. */
 type Blocked = "EXPIRED" | "SUPERSEDED" | "DECIDED" | null;
+/** A failed call: the HTTP status and the backend's stable `code`, never its English message (that is not patient copy). */
+type Failure = Error & { status?: number; code?: string };
 
 
 /**
- * The page's words, from messages/{en,ar}.json (`secureLink.proposal`, plus the assisted path and the services plural),
- * passed by the server page so this client bundle carries no dictionary.
+ * The page's words, from messages/{en,ar}.json (`secureLink.proposal`, plus the assisted path, the services plural and
+ * the stamp's words), passed by the server page so this client bundle carries no dictionary.
  */
 export type ProposalCopy = Dictionary["secureLink"]["proposal"] & {
   assisted: Dictionary["portalProposal"]["assisted"];
   services: Dictionary["portalWork"]["plural"]["services"];
+  stampEstimateReady: string;
 };
 
 /**
@@ -64,12 +70,12 @@ const TERMS = {
 type Phase = "loading" | "invalid" | "intro" | "code" | "view" | "done";
 
 /** A titled block of the consultant's or coordinator's own words; absent when there is nothing to say. */
-function Prose({ label, text, id }: { label: string; text?: string; id?: string }) {
+function Prose({ label, text, id, first = false }: { label: string; text?: string; id?: string; first?: boolean }) {
   if (!text) return null;
   return (
-    <section aria-labelledby={id} className="mt-7">
-      <h2 id={id} className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{label}</h2>
-      <p dir="auto" className="mt-2 whitespace-pre-line text-[1rem] leading-7 text-ink-800">{text}</p>
+    <section aria-labelledby={id} className={first ? "" : "mt-7"}>
+      <h2 id={id} className="label-micro text-brand-700">{label}</h2>
+      <p dir="auto" className="mt-2 whitespace-pre-line leading-7 text-ink-800">{text}</p>
     </section>
   );
 }
@@ -92,6 +98,12 @@ function takeHandoffGrant(token: string): string | null {
   } catch { return null; }
 }
 
+/** Reads a failed response into its status and stable code; the message stays unread. */
+async function failure(response: Response, fallback: string): Promise<Failure> {
+  const body = (await response.json().catch(() => null)) as { code?: unknown } | null;
+  return Object.assign(new Error(fallback), { status: response.status, code: typeof body?.code === "string" ? body.code : undefined });
+}
+
 export function ProposalSign({ locale, token, copy }: { locale: Locale; token: string; copy: ProposalCopy }) {
   const t = { ...copy, ...TERMS[locale] };
   const [phase, setPhase] = useState<Phase>("loading");
@@ -106,6 +118,8 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
   const [moreOpen, setMoreOpen] = useState(false);
   const [blocked, setBlocked] = useState<Blocked>(null);
   const [error, setError] = useState("");
+  /** Why the link no longer opens a decidable document (expired, already decided); the generic line otherwise. */
+  const [invalidReason, setInvalidReason] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const decisionRef = useRef<HTMLDivElement>(null);
   const [decisionVisible, setDecisionVisible] = useState(true);
@@ -113,10 +127,30 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
   // Each successful send starts a fresh code step (the typed code is kept when a resend fails).
   const [codeRound, setCodeRound] = useState(0);
   const requestedRef = useRef<HTMLParagraphElement>(null);
+  const blockedRef = useRef<HTMLParagraphElement>(null);
+  const ackRef = useRef<HTMLInputElement>(null);
+  const requestFailedRef = useRef<HTMLParagraphElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const shownPage = useRef<Phase | "sealed">("loading");
   // Until the terms have approved Arabic wording, an Arabic page asks the coordinator to go through them with the
   // patient in Arabic and record the decision (owner decision, GATE P2-1) instead of asking for an acknowledgement.
   const assisted = locale === "ar" && !ARABIC_TERMS_APPROVED;
   const assistedCopy = copy.assisted;
+
+  // Focus moves to the new page's heading on every step the patient takes (not on arrival; sending the code stays on
+  // the sealed page, where the code field takes focus itself).
+  const page = phase === "intro" || phase === "code" ? "sealed" : phase;
+  useEffect(() => {
+    const from = shownPage.current;
+    shownPage.current = page;
+    if (from !== "loading" && from !== page) headingRef.current?.focus();
+  }, [page]);
+
+  /** The document can no longer be decided (expired, superseded): the notice replaces the decision and takes focus. */
+  function block(reason: Exclude<Blocked, null>) {
+    setBlocked(reason);
+    requestAnimationFrame(() => { scrollIntoView(blockedRef.current, { behavior: "smooth", block: "center" }); blockedRef.current?.focus({ preventScroll: true }); });
+  }
 
   /** Asks the coordinator for the Arabic conversation; the page then says it was asked, also after a reload. */
   async function requestAssistance() {
@@ -124,9 +158,13 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
     try {
       const r = await fetch(apiUrl(`/public/proposals/${token}/assistance`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grant }) });
       // An expired or replaced version is explained like any decision on it, never offered again.
-      if (r.status === 410) { setBlocked("EXPIRED"); return; }
-      if (r.status === 409) { setBlocked("SUPERSEDED"); return; }
-      if (!r.ok) { setRequestFailed(true); scrollIntoView(decisionRef.current, { behavior: "smooth", block: "center" }); return; }
+      if (r.status === 410) { block("EXPIRED"); return; }
+      if (r.status === 409) { block("SUPERSEDED"); return; }
+      if (!r.ok) {
+        setRequestFailed(true);
+        requestAnimationFrame(() => { scrollIntoView(requestFailedRef.current, { behavior: "smooth", block: "center" }); requestFailedRef.current?.focus({ preventScroll: true }); });
+        return;
+      }
       const assistance = (await r.json()) as Proposal["assistance"];
       setProposal(current => current ? { ...current, assistance } : current);
       // The button (inline or in the sticky bar) is replaced by the confirmation: bring it into view and give it focus.
@@ -176,15 +214,26 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
     return () => observer.disconnect();
   }, [phase, proposal]);
 
+  /** The code step's failures, in the patient's words; a link that no longer works ends on the invalid page. */
+  function codeFailure(e: unknown) {
+    const f = e as Failure;
+    if (f.code === "PROPOSAL_LINK_INVALID" || f.code === "PROPOSAL_EXPIRED" || f.code === "PROPOSAL_NOT_DECIDABLE") {
+      setInvalidReason(f.code === "PROPOSAL_EXPIRED" ? t.blockedExpired : f.code === "PROPOSAL_NOT_DECIDABLE" ? t.blockedDecided : null);
+      setPhase("invalid");
+      return;
+    }
+    // The gateway's own rate limit answers 429 without a code.
+    setError(f.code === "TOO_MANY_REQUESTS" || f.status === 429 ? t.tooMany : f.code === "VERIFICATION_INVALID" ? t.codeInvalid : t.error);
+  }
+
   async function requestAccess(ch: "WHATSAPP" | "EMAIL" = channel) {
     setBusy(true); setError("");
     try {
       const r = await fetch(apiUrl(`/public/proposals/${token}/request-access`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch }) });
-      if (r.status === 429) throw new Error(t.tooMany);
-      if (!r.ok) throw new Error(t.error);
+      if (!r.ok) throw await failure(r, t.error);
       setSummary((await r.json()) as Summary); setCodeRound(round => round + 1);
       setPhase("code");
-    } catch (e) { setError(e instanceof Error && e.message ? e.message : t.error); } finally { setBusy(false); }
+    } catch (e) { codeFailure(e); } finally { setBusy(false); }
   }
 
   async function verify(code: string) {
@@ -192,15 +241,15 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
     setBusy(true); setError("");
     try {
       const g = await fetch(apiUrl(`/public/proposals/${token}/verify`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: code.trim() }) })
-        .then(async (r) => { if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { message?: string }).message ?? t.error); return r.json() as Promise<{ grant: string }>; });
+        .then(async (r) => { if (!r.ok) throw await failure(r, t.error); return r.json() as Promise<{ grant: string }>; });
       setGrant(g.grant);
       const full = await fetch(apiUrl(`/public/proposals/${token}/view`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grant: g.grant }) })
-        .then(async (r) => { if (!r.ok) throw new Error(t.error); return r.json() as Promise<Proposal>; });
+        .then(async (r) => { if (!r.ok) throw await failure(r, t.error); return r.json() as Promise<Proposal>; });
       setProposal(full);
       if (full.decided) setBlocked("DECIDED");
       else if (hasLapsed(full.validUntil)) setBlocked("EXPIRED");
       setPhase("view");
-    } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
+    } catch (e) { codeFailure(e); } finally { setBusy(false); }
   }
 
   /** One operation for every decision, whichever control invoked it. Backend status decides the outcome. */
@@ -213,16 +262,25 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
       });
       if (!r.ok) {
         // A stale document must not look like a transient failure: say what happened and stop offering actions.
-        if (r.status === 410) { setBlocked("EXPIRED"); return; }
-        if (r.status === 409) { setBlocked("SUPERSEDED"); return; }
-        throw new Error(((await r.json().catch(() => ({}))) as { message?: string }).message ?? t.error);
+        if (r.status === 410) { block("EXPIRED"); return; }
+        if (r.status === 409) { block("SUPERSEDED"); return; }
+        throw await failure(r, t.error);
       }
       setOutcome(decision); setPhase("done");
-    } catch (e) { setError(e instanceof Error ? e.message : t.error); } finally { setBusy(false); }
+    } catch (e) {
+      const f = e as Failure;
+      if (f.code === "ACKNOWLEDGEMENT_REQUIRED") { setAckError(true); return; }
+      setError(f.code === "VERIFICATION_REQUIRED" ? t.sessionEnded : t.error);
+    } finally { setBusy(false); }
   }
 
   function submitPrimary() {
-    if (!acknowledged) { setAckError(true); scrollIntoView(decisionRef.current, { behavior: "smooth", block: "center" }); return; }
+    if (!acknowledged) {
+      setAckError(true);
+      scrollIntoView(decisionRef.current, { behavior: "smooth", block: "center" });
+      ackRef.current?.focus({ preventScroll: true });
+      return;
+    }
     setAckError(false);
     void decide(isFinal ? "ACCEPTED" : "ACKNOWLEDGED", undefined, true);
   }
@@ -234,6 +292,8 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
     if (n == null) return "—";
     return formatMoney(n, currency, locale);
   };
+  const longDate = (iso: string) => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(iso));
+  const heading = (text: string) => <h1 ref={headingRef} tabIndex={-1} className="statement mt-5 text-brand-900 outline-none">{text}</h1>;
   const items = useMemo(() => proposal?.items.filter((i) => !i.optional) ?? [], [proposal]);
   const itemsTotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
   const expected = proposal?.totalExpected ?? itemsTotal;
@@ -266,116 +326,131 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
   const nextSteps = (isFinal ? t.nextFinal : t.nextPrelim)
     .map((step, index) => assisted && index === 0 ? (isFinal ? assistedCopy.nextFirstQuote : assistedCopy.nextFirst) : step)
     .filter((_, index) => !(!isFinal && index === 2 && !(proposal?.depositDueDisplay && proposal.depositDueDisplay > 0)));
+  // The profile link goes where the backend sends it: the patient's WhatsApp when the case has one, otherwise email.
+  const profileLinkSent = summary?.whatsappHint ? t.ackDoneWhatsApp : summary?.emailHint ? t.ackDoneEmail : t.ackDoneMsg;
   const doneCopy = outcome === "DECLINED" ? { title: t.declinedTitle, msg: t.declinedMsg }
     : outcome === "REVISION_REQUESTED" ? { title: t.revisionTitle, msg: t.revisionMsg }
     : isFinal ? { title: t.acceptedTitle, msg: t.acceptedMsg }
-    : { title: t.ackDoneTitle, msg: depositDue && t.ackDoneDeposit ? `${t.ackDoneMsg} ${t.ackDoneDeposit}` : t.ackDoneMsg };
+    : { title: t.ackDoneTitle, msg: depositDue && t.ackDoneDeposit ? `${profileLinkSent} ${t.ackDoneDeposit}` : profileLinkSent };
   const blockedMessage = blocked === "EXPIRED" ? (isFinal ? t.blockedExpiredFinal : t.blockedExpired)
     : blocked === "SUPERSEDED" ? t.blockedSuperseded : t.blockedDecided;
 
   return (
-    <section className="section bg-mist">
+    <section className="section section-soft">
       <div className="container-site max-w-[1120px]">
-        {phase === "loading" && <p className="card p-6" aria-live="polite">{t.loading}</p>}
-        {phase === "invalid" && <p role="alert" className="card bg-alert-50 p-6 text-alert-800">{t.invalid}</p>}
+        {phase === "loading" && (
+          <DossierPage className={`mx-auto max-w-xl ${PAGE_PAD}`}><p role="status" className="text-ink-600">{t.loading}</p></DossierPage>
+        )}
+        {phase === "invalid" && (
+          <DossierPage className={`mx-auto max-w-xl ${PAGE_PAD}`}>
+            <LockKeyhole aria-hidden size={28} className="text-ink-400"/>
+            {heading(t.invalidTitle)}
+            <p className="mt-3 max-w-[65ch] text-ink-600">{invalidReason ?? t.invalid}</p>
+            <p className="mt-2 max-w-[65ch] text-ink-600">{t.contactCoordinator}</p>
+          </DossierPage>
+        )}
 
         {(phase === "intro" || phase === "code") && summary && (
-          <div className="card mx-auto max-w-xl p-6 sm:p-8">
-            <p className="eyebrow">RehletShifaa · {summary.caseNumber}</p>
-            <h1 className="headline mt-2">{t.verifyTitle}</h1>
-            <div className="mt-3">
-              <OneTimeCodeStep key={codeRound}
+          // The sealed page of the document: the case it belongs to, where the code goes, one action.
+          <DossierPage className={`mx-auto max-w-xl ${PAGE_PAD}`} kicker={t.caseRef} reference={summary.caseNumber}>
+            {heading(t.verifyTitle)}
+            <div className="mt-4 border-t border-line pt-5">
+              <OneTimeCodeStep round={codeRound}
                 copy={{ sendTo: channel === "WHATSAPP" ? t.verifyIntroWhatsapp : t.verifyIntroEmail, sentTo: t.codeSent, send: t.sendCode, sending: t.sending,
-                        codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend }}
+                        codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend, incomplete: t.codeIncomplete }}
                 destination={(channel === "WHATSAPP" ? summary.whatsappHint : summary.emailHint) ?? summary.destinationHint}
                 sent={phase === "code"} busy={busy} onSend={() => void requestAccess()} onVerify={code => void verify(code)}
-                channelSwitch={(channel === "WHATSAPP" ? summary.emailHint : summary.whatsappHint) ? {
+                notice={phase === "code" && codeRound > 1 ? t.codeResent : null}
+                // One rule for the three links: the other channel is offered only before a code is sent.
+                channelSwitch={phase === "intro" && (channel === "WHATSAPP" ? summary.emailHint : summary.whatsappHint) ? {
                   label: channel === "WHATSAPP" ? t.emailInstead : t.whatsappInstead,
-                  // Before a code is sent the switch only changes where it will go; after, it sends one there.
-                  onSwitch: () => { const other = channel === "WHATSAPP" ? "EMAIL" : "WHATSAPP"; setChannel(other); if (phase === "code") void requestAccess(other); },
+                  onSwitch: () => setChannel(channel === "WHATSAPP" ? "EMAIL" : "WHATSAPP"),
                 } : null}
-                error={error || null}/>
+                error={error || null}>
+                <p className="mt-2 flex items-start gap-2 text-[0.9375rem] leading-6 text-ink-600">
+                  <ShieldCheck className="mt-0.5 flex-none text-brand-600" size={17} aria-hidden/>{t.neverAsk}
+                </p>
+              </OneTimeCodeStep>
             </div>
-          </div>
+          </DossierPage>
         )}
 
         {phase === "view" && proposal && (
           <>
-            {/* Identity of the document first: what it is, who it is for, and how long it stands. */}
-            <header className="rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(28,51,58,0.05)] sm:p-7">
-              <span className={`inline-block rounded-full px-3 py-1 text-[0.72rem] font-bold ${isFinal ? "bg-brand-600 text-white" : "bg-status-warning-surface text-status-warning-fg ring-1 ring-status-warning-border"}`}>
-                {isFinal ? t.finalBadge : t.prelimBadge}
-              </span>
-              <h1 className="mt-3 text-[1.6rem] font-bold leading-8 text-brand-900 sm:text-[1.9rem]">{isFinal ? t.finalTitle : t.prelimTitle}</h1>
-              <dl className="mt-5 grid gap-x-8 gap-y-3 border-t border-line pt-4 text-[0.9rem] sm:grid-cols-2 lg:grid-cols-4">
+            {/* The document's first page: what it is, who it is for, the case, how long it stands — stamped when the
+                estimate was released to the patient (a final quote carries no stamp: three moments only). */}
+            <DossierPage edge="tab" className={PAGE_PAD} kicker={isFinal ? t.finalBadge : t.prelimBadge}
+                         stamp={!isFinal && !blocked && proposal.releasedAt ? <CaseStamp label={t.stampEstimateReady} date={proposal.releasedAt} locale={locale}/> : null}>
+              {heading(isFinal ? t.finalTitle : t.prelimTitle)}
+              <dl className="dossier-page-full mt-5 grid gap-x-8 gap-y-3 border-t border-line pt-4 text-[0.9375rem] sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.greeting}</dt>
-                  <dd dir="auto" className="mt-0.5 font-bold text-ink-900">{proposal.patientName}</dd>
+                  <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.greeting}</dt>
+                  <dd className="mt-0.5 font-bold text-ink-900"><bdi>{proposal.patientName}</bdi></dd>
                 </div>
                 <div>
-                  <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.caseRef}</dt>
-                  <dd className="mt-0.5 font-bold text-ink-900" dir="ltr">{proposal.caseNumber}</dd>
+                  <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.caseRef}</dt>
+                  <dd className="mt-0.5 font-bold text-ink-900"><bdi dir="ltr">{proposal.caseNumber}</bdi></dd>
                 </div>
                 {/* The technical version number stays internal; a patient only needs to know this document was updated. */}
                 {proposal.versionNumber != null && proposal.versionNumber > 1 && (
                   <div>
-                    <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.versionLabel}</dt>
+                    <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.versionLabel}</dt>
                     <dd className="mt-0.5 font-bold text-ink-900">{t.updatedVersion}</dd>
                   </div>
                 )}
                 {proposal.validUntil && (
                   <div>
-                    <dt className="text-[0.72rem] font-semibold uppercase tracking-[0.06em] text-ink-500">{t.validUntil}</dt>
-                    <dd className="mt-0.5 font-bold text-ink-900">{new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(proposal.validUntil))}</dd>
+                    <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.validUntil}</dt>
+                    <dd className="mt-0.5 font-bold text-ink-900">{longDate(proposal.validUntil)}</dd>
                   </div>
                 )}
               </dl>
-            </header>
+            </DossierPage>
 
             {blocked && (
-              <p role="status" className="mt-4 rounded-lg border border-status-warning-border bg-status-warning-surface p-4 text-[0.92rem] leading-6 text-status-warning-fg">
-                {blockedMessage} <span className="text-ink-700">{t.contactCoordinator}</span>
+              <p ref={blockedRef} tabIndex={-1} role="status" className="mt-4 flex items-start gap-2.5 border-b border-line pb-4 text-[0.9375rem] leading-6 text-ink-800 outline-none">
+                <Clock aria-hidden size={18} className="mt-0.5 flex-none text-alert-700"/>
+                <span>{blockedMessage}{blocked !== "EXPIRED" && <> <span className="text-ink-600">{t.contactCoordinator}</span></>}</span>
               </p>
             )}
 
             <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-              <div className="min-w-0 rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(28,51,58,0.05)] sm:p-7">
-                <Prose id="recommendation-heading" label={isFinal ? t.assessmentLabel : t.treatmentLabel} text={proposal.recommendedTreatment} />
+              {/* One reading column, in the order a patient decides: recommendation, price, scope, basis, next, terms, decision. */}
+              <div className="card min-w-0 p-5 sm:p-7">
+                <Prose id="recommendation-heading" label={isFinal ? t.assessmentLabel : t.treatmentLabel} text={proposal.recommendedTreatment} first />
                 {proposal.consultantName && (
-                  <p className="mt-2 text-[0.88rem] font-semibold text-brand-800">{t.reviewedBy} <span dir="auto">{proposal.consultantName}</span></p>
+                  <p className="mt-2 text-[0.875rem] font-semibold text-brand-800">{t.reviewedBy} <bdi>{proposal.consultantName}</bdi></p>
                 )}
                 {isFinal && <Prose id="scope-heading" label={t.scopeLabel} text={proposal.scopeChangeReason} />}
                 {!isFinal && <Prose id="assumptions-heading" label={t.assumptionsLabel} text={proposal.assumptions} />}
                 <Prose id="risks-heading" label={isFinal ? t.risksLabel : t.changeLabel} text={proposal.risksAndLimitations} />
 
-                {/* The price breakdown: names left, amounts aligned to the line end, one rhythm. */}
+                {/* The price breakdown: names at the start, amounts aligned to the line end, one rhythm. */}
                 <section aria-labelledby="services-heading" className="mt-8">
-                  <h2 id="services-heading" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">
-                    {isFinal ? t.confirmedLabel : t.servicesLabel}
-                  </h2>
+                  <h2 id="services-heading" className="label-micro text-brand-700">{isFinal ? t.confirmedLabel : t.servicesLabel}</h2>
                   {groups.map((group) => (
                     <div key={group.category ?? "all"} className="mt-3">
-                      {group.category && <p className="border-b border-line pb-1.5 text-[0.8rem] font-bold text-ink-600">{group.category}</p>}
+                      {group.category && <p className="border-b border-line pb-1.5 text-[0.8125rem] font-bold text-ink-600">{group.category}</p>}
                       <ul>
                         {group.rows.map((item) => (
                           <li key={item.id} className="flex items-baseline justify-between gap-6 border-b border-line py-3 last:border-0">
-                            <span dir="auto" className="min-w-0 text-[0.95rem] leading-6 text-ink-800">{item.description}</span>
-                            <span className="flex-none whitespace-nowrap text-[0.95rem] font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(item.quantity * item.unitPrice)}</bdi></span>
+                            <span dir="auto" className="min-w-0 text-[0.9375rem] leading-6 text-ink-800">{item.description}</span>
+                            <span className="flex-none whitespace-nowrap text-[0.9375rem] font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(item.quantity * item.unitPrice)}</bdi></span>
                           </li>
                         ))}
                       </ul>
                     </div>
                   ))}
                   {/* A stored range is always shown as a range, with the expected figure beside it — never "expected" alone. */}
-                  <div className="mt-3 border-t-2 border-brand-200 pt-3">
+                  <div className="mt-3 border-t border-line-strong pt-3">
                     <p className="flex items-baseline justify-between gap-6">
-                      <span className="text-[0.95rem] font-bold text-ink-800">{isFinal ? t.finalPriceLabel : hasRange ? t.rangeLabel : t.servicesTotal}</span>
-                      <span className="whitespace-nowrap text-[1.05rem] font-bold tabular-nums text-brand-900">{rangeText ?? <bdi dir="ltr">{money(expected)}</bdi>}</span>
+                      <span className="text-[0.9375rem] font-bold text-ink-800">{isFinal ? t.finalPriceLabel : hasRange ? t.rangeLabel : t.totalLabel}</span>
+                      <span className="whitespace-nowrap text-[1.0625rem] font-bold tabular-nums text-brand-900">{rangeText ?? <bdi dir="ltr">{money(expected)}</bdi>}</span>
                     </p>
                     {hasRange && (
                       <p className="mt-1 flex items-baseline justify-between gap-6">
-                        <span className="text-[0.9rem] text-ink-700">{t.expectedLabel}</span>
-                        <span className="whitespace-nowrap text-[0.95rem] font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(expected)}</bdi></span>
+                        <span className="text-[0.9375rem] text-ink-700">{t.expectedLabel}</span>
+                        <span className="whitespace-nowrap text-[0.9375rem] font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(expected)}</bdi></span>
                       </p>
                     )}
                   </div>
@@ -384,52 +459,53 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                 <section aria-labelledby="scope-of-cover" className="mt-8 grid gap-5 sm:grid-cols-2">
                   <h2 id="scope-of-cover" className="sr-only">{t.scopeHeading}</h2>
                   <div>
-                    <p className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.includedLabel}</p>
-                    <p dir="auto" className="mt-2 text-[0.92rem] leading-6 text-ink-700">{proposal.includedServices || items.map((i) => i.description).join(" · ")}</p>
-                    <p className="mt-2 text-[0.85rem] leading-6 text-ink-600">{t.coordinationNote}</p>
+                    <p className="label-micro text-brand-700">{isFinal ? t.includedQuoteLabel : t.includedLabel}</p>
+                    <p dir="auto" className="mt-2 text-[0.9375rem] leading-6 text-ink-700">{proposal.includedServices || items.map((i) => i.description).join(" · ")}</p>
+                    <p className="mt-2 text-[0.875rem] leading-6 text-ink-600">{t.coordinationNote}</p>
                   </div>
                   <div>
-                    <p className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-ink-500">{!isFinal && en ? estimateTerms.notIncludedTitle : t.excludedLabel}</p>
+                    <p className="label-micro text-ink-500">{!isFinal && en ? estimateTerms.notIncludedTitle : t.excludedLabel}</p>
                     {!isFinal && en ? (
                       <>
-                        <ul className="mt-2 list-disc space-y-0.5 ps-5 text-[0.92rem] leading-6 text-ink-700">
+                        <ul className="mt-2 list-disc space-y-0.5 ps-5 text-[0.9375rem] leading-6 text-ink-700">
                           {estimateTerms.notIncluded.map((item) => <li key={item}>{item}</li>)}
                         </ul>
-                        {storedExclusions && <p dir="auto" className="mt-2 text-[0.92rem] leading-6 text-ink-700">{storedExclusions}</p>}
+                        {storedExclusions && <p dir="auto" className="mt-2 text-[0.9375rem] leading-6 text-ink-700">{storedExclusions}</p>}
                       </>
                     ) : (
-                      <p dir="auto" className="mt-2 text-[0.92rem] leading-6 text-ink-700">{storedExclusions || t.excludedFallback}</p>
+                      <p dir="auto" className="mt-2 text-[0.9375rem] leading-6 text-ink-700">{storedExclusions || (isFinal ? t.excludedFallbackQuote : t.excludedFallback)}</p>
                     )}
                   </div>
                 </section>
 
                 {!isFinal && en && (
                   <section aria-labelledby="basis-heading" className="mt-8">
-                    <h2 id="basis-heading" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{estimateTerms.basisTitle}</h2>
-                    <p className="mt-2 text-[0.95rem] font-semibold leading-6 text-ink-900">{estimateTerms.nonBinding}</p>
-                    <ul className="mt-2 list-disc space-y-0.5 ps-5 text-[0.92rem] leading-6 text-ink-700">
+                    <h2 id="basis-heading" className="label-micro text-brand-700">{estimateTerms.basisTitle}</h2>
+                    <p className="mt-2 text-[0.9375rem] font-semibold leading-6 text-ink-900">{estimateTerms.nonBinding}</p>
+                    <ul className="mt-2 list-disc space-y-0.5 ps-5 text-[0.9375rem] leading-6 text-ink-700">
                       {basisPoints.map((point) => <li key={point}>{point}</li>)}
                     </ul>
-                    <p className="mt-2 text-[0.92rem] leading-6 text-ink-700">{estimateTerms.mayChange} {estimateTerms.finalQuoteFollows}</p>
+                    <p className="mt-2 text-[0.9375rem] leading-6 text-ink-700">{estimateTerms.mayChange} {estimateTerms.finalQuoteFollows}</p>
                   </section>
                 )}
 
                 {isFinal && en && (
                   <section aria-labelledby="quote-terms-heading" className="mt-8">
-                    <h2 id="quote-terms-heading" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.aboutQuote}</h2>
-                    <p className="mt-2 text-[0.92rem] leading-6 text-ink-700">{finalQuoteTerms.basis} {finalQuoteTerms.changes}</p>
-                    <p className="mt-3 text-[0.85rem] font-bold text-ink-800">{finalQuoteTerms.paymentTitle}</p>
-                    <p className="mt-1 text-[0.92rem] leading-6 text-ink-700">{finalQuoteTerms.payment}</p>
+                    <h2 id="quote-terms-heading" className="label-micro text-brand-700">{t.aboutQuote}</h2>
+                    <p className="mt-2 text-[0.9375rem] leading-6 text-ink-700">{finalQuoteTerms.basis} {finalQuoteTerms.changes}</p>
+                    <p className="mt-3 text-[0.875rem] font-bold text-ink-800">{finalQuoteTerms.paymentTitle}</p>
+                    <p className="mt-1 text-[0.9375rem] leading-6 text-ink-700">{finalQuoteTerms.payment}</p>
                   </section>
                 )}
 
-                <section aria-labelledby="next-heading" className="mt-8 rounded-xl bg-mist p-4 sm:p-5">
-                  <h2 id="next-heading" className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.nextTitle}</h2>
-                  <ol className="mt-3 space-y-2.5">
+                {/* What happens next, numbered like the journey: hairline-separated, no tinted panel. */}
+                <section aria-labelledby="next-heading" className="mt-8 border-t border-line pt-6">
+                  <h2 id="next-heading" className="label-micro text-brand-700">{t.nextTitle}</h2>
+                  <ol className="mt-4 space-y-3">
                     {nextSteps.map((step, index) => (
-                      <li key={step} className="flex gap-3 text-[0.92rem] leading-6 text-ink-800">
-                        <span aria-hidden className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-brand-100 text-[0.72rem] font-bold text-brand-800">{index + 1}</span>
-                        {step}
+                      <li key={step} className="flex items-start gap-3 text-[0.9375rem] leading-6 text-ink-800">
+                        <span aria-hidden className="journey-marker flex-none">{index + 1}</span>
+                        <span className="pt-1">{step}</span>
                       </li>
                     ))}
                   </ol>
@@ -444,76 +520,78 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
 
                 <Prose id="notes-heading" label={t.notesLabel} text={proposal.notes} />
                 {(en || proposal.disclaimers) && (
-                  <div className="mt-6 space-y-1 border-t border-line pt-4 text-[0.78rem] leading-5 text-ink-500">
+                  <div className="mt-6 space-y-1 border-t border-line pt-4 text-[0.8125rem] leading-5 text-ink-500">
                     {en && <p>{generalDisclaimers}</p>}
-                    {proposal.disclaimers && <p>{proposal.disclaimers}</p>}
+                    {proposal.disclaimers && <p dir="auto">{proposal.disclaimers}</p>}
                   </div>
                 )}
 
                 {!blocked && (
                   <div ref={decisionRef} className="mt-8 border-t border-line pt-6">
-                    <h2 className="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-brand-700">{t.beforeTitle}</h2>
+                    <h2 className="label-micro text-brand-700">{t.beforeTitle}</h2>
                     {assisted ? (
                       <div className="mt-3 space-y-3">
-                        <p className="max-w-[60ch] text-[0.95rem] leading-7 text-ink-800">{isFinal ? assistedCopy.explainQuote : assistedCopy.explain}</p>
+                        <p className="max-w-[60ch] text-[0.9375rem] leading-7 text-ink-800">{isFinal ? assistedCopy.explainQuote : assistedCopy.explain}</p>
                         {proposal.assistance?.requestedAt ? (
-                          <p ref={requestedRef} tabIndex={-1} role="status" className="text-[0.95rem] font-semibold leading-6 text-brand-900 outline-none">
-                            {fillTemplate(assistedCopy.requested, { date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(proposal.assistance.requestedAt)), name: assistedCopy.nameFallback })}
+                          <p ref={requestedRef} tabIndex={-1} role="status" className="text-[0.9375rem] font-semibold leading-6 text-brand-900 outline-none">
+                            {fillTemplate(assistedCopy.requested, { date: longDate(proposal.assistance.requestedAt), name: assistedCopy.nameFallback })}
                           </p>
                         ) : (
                           <div>
                             <button type="button" className="btn-primary min-h-11 px-6" disabled={busy} onClick={() => void requestAssistance()}>
                               {busy ? assistedCopy.sending : fillTemplate(assistedCopy.ask, { name: assistedCopy.askFallback })}
                             </button>
-                            {requestFailed && <p role="alert" className="mt-2 text-[0.85rem] font-semibold text-alert-700">{assistedCopy.requestFailed}</p>}
+                            {requestFailed && <p ref={requestFailedRef} tabIndex={-1} role="alert" className="mt-2 text-[0.875rem] font-semibold text-alert-800 outline-none">{assistedCopy.requestFailed}</p>}
                           </div>
                         )}
-                        <p className="flex flex-wrap items-center gap-x-1.5 text-[0.88rem] leading-6 text-ink-600">
+                        <p className="flex flex-wrap items-center gap-x-1.5 text-[0.875rem] leading-6 text-ink-600">
                           {assistedCopy.englishPrompt}
                           <a href={`/en/proposal/${token}`} hrefLang="en" onClick={keepGrantForEnglish} className="inline-flex min-h-11 items-center font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current">{assistedCopy.englishLink}</a>
                         </p>
                       </div>
                     ) : (<>
-                    <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white p-4 has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
-                      <input type="checkbox" className="mt-0.5 h-5 w-5 flex-none accent-brand-600" checked={acknowledged}
-                             aria-describedby={depositDue ? "ack-detail deposit-terms" : "ack-detail"} aria-invalid={ackError || undefined}
+                    <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-lg border border-ink-350 bg-white p-4 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                      <input ref={ackRef} type="checkbox" className="mt-0.5 h-5 w-5 flex-none accent-brand-600" checked={acknowledged}
+                             aria-describedby={[depositDue ? "ack-detail deposit-terms" : "ack-detail", ackError ? "ack-error" : ""].join(" ").trim()} aria-invalid={ackError || undefined}
                              onChange={(e) => { setAcknowledged(e.target.checked); if (e.target.checked) setAckError(false); }} />
                       <span>
-                        <span className="block text-[0.95rem] font-semibold leading-6 text-ink-900">{ackShort}</span>
-                        <span id="ack-detail" className="mt-1 block text-[0.85rem] leading-6 text-ink-600">{ackLong}</span>
+                        <span className="block text-[0.9375rem] font-semibold leading-6 text-ink-900">{ackShort}</span>
+                        <span id="ack-detail" className="mt-1 block text-[0.875rem] leading-6 text-ink-600">{ackLong}</span>
                       </span>
                     </label>
-                    {ackError && <p role="alert" className="mt-2 text-[0.85rem] font-semibold text-alert-700">{t.ackRequired}</p>}
+                    {ackError && <p id="ack-error" role="alert" className="mt-2 text-[0.875rem] font-semibold text-alert-800">{t.ackRequired}</p>}
                     </>)}
-                    {error && <p role="alert" className="mt-3 rounded-xl bg-alert-50 p-3 text-[0.9rem] text-alert-800">{error}</p>}
+                    {error && <p role="alert" className="mt-3 text-[0.9375rem] font-semibold leading-6 text-alert-800">{error}</p>}
 
                     <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
                       {!assisted && <button className="btn-primary min-h-11 px-6" disabled={busy} onClick={submitPrimary}>{busy ? t.deciding : primaryLabel}</button>}
-                      <button type="button" className="min-h-11 text-[0.92rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
+                      <button type="button" className="min-h-11 text-[0.9375rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
                               disabled={busy} onClick={() => setDialog("REVISION_REQUESTED")}>{t.requestRevision}</button>
                     </div>
 
-                    <details className="mt-4" open={moreOpen} onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}>
-                      <summary className="inline-block cursor-pointer text-[0.85rem] font-semibold text-ink-500 hover:text-ink-700">{t.moreOptions}</summary>
-                      <button type="button" className="mt-3 min-h-11 text-[0.9rem] font-semibold text-ink-600 underline underline-offset-4 hover:text-alert-700 disabled:opacity-50"
-                              disabled={busy} onClick={() => setDialog("DECLINED")}>{t.decline}</button>
+                    <details className="group mt-2" open={moreOpen} onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}>
+                      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-[0.875rem] font-semibold text-ink-500 hover:text-ink-700 [&::-webkit-details-marker]:hidden">
+                        {t.moreOptions}<ChevronDown aria-hidden size={16} className="transition-transform group-open:rotate-180"/>
+                      </summary>
+                      <button type="button" className="mt-1 min-h-11 text-[0.9375rem] font-semibold text-ink-600 underline underline-offset-4 hover:text-alert-700 disabled:opacity-50"
+                              disabled={busy} onClick={() => setDialog("DECLINED")}>{isFinal ? t.declineQuote : t.decline}</button>
                     </details>
                   </div>
                 )}
               </div>
 
-              {/* The commercial answer, kept beside the reading rather than buried under it. */}
+              {/* The commercial answer, kept beside the reading rather than buried under it (first on phones). */}
               <aside aria-labelledby="summary-heading" className="order-first lg:order-none lg:sticky lg:top-6">
                 <div className="rounded-lg border border-line bg-white p-5">
                   <h2 id="summary-heading" className="label-micro text-brand-700">{isFinal ? t.quoteSummaryHeading : t.summaryHeading}</h2>
-                  <p className="mt-3 text-[0.85rem] font-semibold text-ink-700">{isFinal ? t.finalPriceLabel : hasRange ? t.rangeLabel : t.totalLabel}</p>
+                  <p className="mt-3 text-[0.875rem] font-semibold text-ink-700">{isFinal ? t.finalPriceLabel : hasRange ? t.rangeLabel : t.totalLabel}</p>
                   {hasRange ? (
                     <>
-                      <p className="mt-1 text-[1.5rem] font-bold leading-8 text-brand-900"><bdi dir="ltr">{money(proposal.totalMin)}</bdi> <span className="text-[0.9rem] font-normal text-ink-500">{t.rangeSep}</span> <bdi dir="ltr">{money(proposal.totalMax)}</bdi></p>
-                      <p className="mt-1 text-[0.88rem] text-ink-700">{t.expectedLabel}: <strong><bdi dir="ltr">{money(expected)}</bdi></strong></p>
+                      <p className="statement mt-1 text-brand-900"><bdi dir="ltr">{money(proposal.totalMin)}</bdi> <span className="text-[0.9375rem] font-normal text-ink-500">{t.rangeSep}</span> <bdi dir="ltr">{money(proposal.totalMax)}</bdi></p>
+                      <p className="mt-1 text-[0.875rem] text-ink-700">{t.expectedLabel}: <strong><bdi dir="ltr">{money(expected)}</bdi></strong></p>
                     </>
                   ) : (
-                    <p className="mt-1 text-[1.75rem] font-bold leading-9 text-brand-900"><bdi dir="ltr">{money(expected)}</bdi></p>
+                    <p className="statement mt-1 text-brand-900"><bdi dir="ltr">{money(expected)}</bdi></p>
                   )}
                   {/* A final quote is never described with the estimate's "may change" basis. */}
                   {(!isFinal || en) && (
@@ -522,7 +600,7 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                   {showRate && (
                     <p lang="en" dir="ltr" className="mt-2 text-start text-[0.8125rem] leading-5 text-ink-600">{exchangeRateStatement(currency, docKind, rateDate)}</p>
                   )}
-                  <dl className="mt-3 space-y-1.5 text-[0.85rem]">
+                  <dl className="mt-3 space-y-1.5 text-[0.875rem]">
                     <div className="flex justify-between gap-4">
                       <dt className="text-ink-600">{t.servicesLabel}</dt>
                       <dd className="font-semibold text-ink-800">{plural(locale, items.length, copy.services)}</dd>
@@ -530,19 +608,19 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                     {proposal.validUntil && (
                       <div className="flex justify-between gap-4">
                         <dt className="text-ink-600">{t.validUntil}</dt>
-                        <dd className="font-semibold text-ink-800">{new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(proposal.validUntil))}</dd>
+                        <dd className="font-semibold text-ink-800">{longDate(proposal.validUntil)}</dd>
                       </div>
                     )}
                   </dl>
                   {depositDue && (
                     <div className="mt-4 border-t border-line pt-3">
                       <p className="text-[0.8125rem] font-bold text-brand-800">{t.payNow}</p>
-                      <p className="mt-0.5 text-[1.15rem] font-bold text-ink-900"><bdi dir="ltr">{money(proposal.depositDueDisplay)}</bdi></p>
+                      <p className="mt-0.5 text-[1.125rem] font-bold text-ink-900"><bdi dir="ltr">{money(proposal.depositDueDisplay)}</bdi></p>
                       <p className="mt-1 text-[0.8125rem] leading-5 text-ink-600">{t.payNowNote}</p>
                     </div>
                   )}
                   {isFinal && proposal.depositPaidDisplay != null && proposal.depositPaidDisplay > 0 && (
-                    <p className="mt-4 text-[0.85rem] text-ink-700">{t.alreadyPaid}: <strong><bdi dir="ltr">{money(proposal.depositPaidDisplay)}</bdi></strong></p>
+                    <p className="mt-4 text-[0.875rem] text-ink-700">{t.alreadyPaid}: <strong><bdi dir="ltr">{money(proposal.depositPaidDisplay)}</bdi></strong></p>
                   )}
                 </div>
               </aside>
@@ -550,17 +628,17 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
 
             {/* Carries the same two operations while the decision block is out of view; never a third choice. */}
             {!blocked && !decisionVisible && !(assisted && proposal.assistance?.requestedAt) && (
-              <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white px-4 py-3 shadow-[0_-2px_12px_rgba(28,51,58,0.08)]">
+              <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line-strong bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <div className="container-site flex max-w-[1120px] flex-col gap-2 px-0 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between min-[480px]:gap-3">
                   <div className="min-w-0">
-                    <p className="text-[1.05rem] font-bold leading-6 text-brand-900">{rangeText ?? <bdi dir="ltr">{money(expected)}</bdi>}</p>
+                    <p className="text-[1.0625rem] font-bold leading-6 text-brand-900">{rangeText ?? <bdi dir="ltr">{money(expected)}</bdi>}</p>
                     <p className="text-[0.8125rem] text-ink-600">
                       {isFinal ? t.finalPriceLabel : hasRange ? t.rangeLabel : t.totalLabel}
                       {hasRange && <> · {t.expectedLabel} <bdi dir="ltr">{money(expected)}</bdi></>}
                     </p>
                   </div>
                   <div className="flex items-center justify-end gap-3 min-[480px]:flex-none">
-                    <button type="button" className="min-h-11 text-[0.9rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
+                    <button type="button" className="min-h-11 text-[0.9375rem] font-bold text-brand-800 underline underline-offset-4 disabled:opacity-50"
                             disabled={busy} onClick={() => setDialog("REVISION_REQUESTED")}>{t.requestRevision}</button>
                     <button className="btn-primary min-h-11 flex-1 justify-center px-5 sm:flex-none" disabled={busy} onClick={assisted ? () => void requestAssistance() : submitPrimary}>
                       {busy ? (assisted ? assistedCopy.sending : t.deciding) : assisted ? assistedCopy.askShort : primaryLabel}
@@ -569,7 +647,7 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                 </div>
               </div>
             )}
-            {!blocked && !decisionVisible && !(assisted && proposal.assistance?.requestedAt) && <div aria-hidden className="h-20" />}
+            {!blocked && !decisionVisible && !(assisted && proposal.assistance?.requestedAt) && <div aria-hidden className="h-40 min-[480px]:h-24" />}
 
             {dialog && (
               <ProposalDecisionDialog locale={locale} kind={dialog} busy={busy}
@@ -580,12 +658,17 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
         )}
 
         {phase === "done" && (
-          <div className="card mx-auto max-w-xl p-8 text-center">
-            <h1 className="headline">{doneCopy.title}</h1>
-            <p className="lead mt-4">{doneCopy.msg}</p>
-          </div>
+          // The same file, one page on: the case, what was recorded, and the real next step.
+          <DossierPage className={`mx-auto max-w-xl ${PAGE_PAD}`} kicker={t.caseRef} reference={proposal?.caseNumber ?? summary?.caseNumber}>
+            <CircleCheck aria-hidden size={28} className="mt-6 text-brand-600"/>
+            {heading(doneCopy.title)}
+            <p className="mt-3 max-w-[65ch] text-ink-600">{doneCopy.msg}</p>
+          </DossierPage>
         )}
       </div>
     </section>
   );
 }
+
+/** The page's padding, read by `.dossier-page` through `--page-pad` (its rule is unlayered, so padding utilities would lose). */
+const PAGE_PAD = "[--page-pad:1.25rem] sm:[--page-pad:2rem]";

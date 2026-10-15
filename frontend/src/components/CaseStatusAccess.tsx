@@ -299,7 +299,7 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
         {heading(t.title, "status-heading")}
         <p className="mt-3 flex items-start gap-2 text-ink-600"><LockKeyhole className="mt-1.5 flex-none text-ink-400" size={17} aria-hidden/>{t.private}</p>
         <div className="mt-5 border-t border-line pt-5">
-          <OneTimeCodeStep key={codeRound}
+          <OneTimeCodeStep round={codeRound} notice={phase === "code" && codeRound > 1 ? t.codeResent : null}
                            copy={{ sendTo: channel === "WHATSAPP" ? t.sendToWhatsApp : channel === "EMAIL" ? t.sendToEmail : t.sendTo,
                                    sentTo: channel === "WHATSAPP" ? t.sentWhatsApp : channel === "EMAIL" ? t.sentEmail : t.sent,
                                    send: t.send, sending: t.sending, codeLabel: t.code, verify: t.verify, verifying: t.verifying, resend: t.resend, incomplete: t.codeIncomplete }}
@@ -491,7 +491,7 @@ function stampFor(status: Status, labels: StatusCopy["stamp"]): { label: string;
 /** The page's story when the estimate itself is what this page is about (nothing is asked of the patient). */
 function proposalStory(state: string, quote: boolean, t: StatusCopy): { title: string; body: string; next?: string } | null {
   switch (state) {
-    case "READY": return quote ? { title: t.quoteReadyTitle, body: t.quoteReady, next: t.proposalReadyNext } : { title: t.proposalReadyTitle, body: t.proposalReady, next: t.proposalReadyNext };
+    case "READY": return quote ? { title: t.quoteReadyTitle, body: t.quoteReady, next: t.quoteReadyNext } : { title: t.proposalReadyTitle, body: t.proposalReady, next: t.proposalReadyNext };
     case "PREPARING": return { title: t.proposalPreparingTitle, body: t.proposalPreparing, next: t.proposalPreparingNext };
     case "REVISION_REQUESTED": return { title: t.revisionTitle, body: t.proposalRevision, next: t.proposalPreparingNext };
     case "DECLINED": return { title: t.declinedTitle, body: t.proposalDeclined };

@@ -443,7 +443,8 @@
 }
 @media (max-width: 639px) {
   .dossier-page[data-depth="1"] { padding-inline-end: 1.125rem; padding-block-start: 3.25rem; }
-  .dossier-page-static[data-stamped] { padding-inline-end: 1.75rem; padding-block-start: 4rem; }
+  /* Phones: the stamp sits above the text; its tilted box is about 4.5rem tall on one line ("Estimate ready"). */
+  .dossier-page-static[data-stamped] { padding-inline-end: 1.75rem; padding-block-start: calc(var(--stamp-inset) + 4.75rem); }
   .my-care-step.dossier-page-static[data-stamped] { padding-inline-end: var(--page-pad); }
   .dossier-page-static[data-stamped] .dossier-page-full { margin-inline-end: calc(var(--page-pad, 1.125rem) - 1.75rem); }
 }

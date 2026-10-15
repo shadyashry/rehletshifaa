@@ -1355,9 +1355,10 @@
       },
       "step": {
         "eyebrow": "Current step",
+        "reviewQuote": "Review final quote",
         "next": "What happens next",
         "noAction": "No action is required from you right now.",
-        "reviewProposal": "Review proposal",
+        "reviewProposal": "Review estimate",
         "replyInMessages": "Reply in Messages",
         "requested": "What we need from you",
         "provided": "provided",
@@ -1385,9 +1386,14 @@
           "next": "Reply here, or use the secure link we sent you to upload documents. Your coordinator then reviews it and continues."
         },
         "REVIEW_PROPOSAL": {
-          "title": "Your proposal is ready to review",
+          "title": "Your estimate is ready to review",
           "body": "Your treatment plan and its estimated cost are ready. Take the time you need — nothing happens until you decide.",
-          "next": "If you accept, we start arranging your care."
+          "next": "Once you acknowledge it, your next step appears here in My Care."
+        },
+        "REVIEW_FINAL_QUOTE": {
+          "title": "Your final quote is ready to review",
+          "body": "Your final quote is ready. Take the time you need — nothing happens until you decide.",
+          "next": "If you accept it, your coordinator confirms your schedule and arrangements."
         },
         "COMPLETE_PROFILE": {
           "title": "A few details are still needed",
@@ -2031,6 +2037,8 @@
   "secureLink": {
     "status": {
       "title": "Track your case securely",
+      "codeResent": "We sent a new code.",
+      "quoteReadyNext": "If you accept it, your coordinator confirms your schedule and arrangements.",
       "loading": "Checking your secure link…",
       "send": "Send verification code",
       "sent": "We sent a 6-digit code to",
@@ -2065,7 +2073,7 @@
       "proposalPreparing": "Your proposal is being prepared. We will send you a secure link as soon as it is ready.",
       "proposalReadyTitle": "Your estimate is ready to review",
       "proposalReady": "Your treatment plan and its estimated cost are ready. Take the time you need — nothing happens until you decide.",
-      "proposalReadyNext": "If you accept, we start arranging your care.",
+      "proposalReadyNext": "When you acknowledge it, we send you a secure link to complete your profile.",
       "proposalPreparingTitle": "We are preparing your proposal",
       "proposalPreparingNext": "You will receive a secure link to review it in your own time.",
       "proposalReview": "Review estimate",
@@ -2104,6 +2112,17 @@
     },
     "proposal": {
       "greeting": "Prepared for",
+      "invalidTitle": "This link no longer works",
+      "includedQuoteLabel": "Included in this quote",
+      "excludedFallbackQuote": "Services not listed in this quote are not included, and would be discussed with you before being added.",
+      "neverAsk": "No one from RehletShifaa will ever ask you for this code, by phone or by message. Do not share it with anyone.",
+      "codeIncomplete": "Enter all six digits of the code.",
+      "codeInvalid": "That code is not right, or it has expired. Check the six digits, or resend the code.",
+      "codeResent": "We sent a new code.",
+      "sessionEnded": "Your secure session has ended. Reload this page and verify again to continue.",
+      "ackDoneWhatsApp": "We've sent you a secure link on WhatsApp to complete your profile.",
+      "ackDoneEmail": "We've emailed you a secure link to complete your profile.",
+      "declineQuote": "Decline quote",
       "caseRef": "Case reference",
       "versionLabel": "Document",
       "updatedVersion": "Updated version",

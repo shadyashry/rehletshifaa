@@ -149,14 +149,22 @@ describe("MyCare", () => {
     expect(screen.getByRole("heading", { name: "We are arranging your treatment" })).toBeTruthy();
   });
 
+  it("a final quote is reviewed as a quote, with no estimate stamp", () => {
+    renderCare({ actions: focus("REVIEW_PROPOSAL"), patientProposal: { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v3", versionNumber: 1, validUntil: "2026-12-31T00:00:00Z", releasedAt: "2026-04-01T10:00:00Z", documentType: "FINAL_TREATMENT_QUOTE" },
+      proposal: { ...proposal, status: "RELEASED", documentType: "FINAL_TREATMENT_QUOTE" }, deposit: null });
+    expect(screen.getByRole("heading", { name: "Your final quote is ready to review" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Review final quote" })).toBeTruthy();
+    expect(document.querySelector(".case-stamp")).toBeNull();
+  });
+
   it("a released proposal is the one primary action, and the summary does not repeat it", () => {
     const { onOpenProposal } = renderCare({ actions: focus("REVIEW_PROPOSAL"), patientProposal: { state: "READY", action: "REVIEW_PROPOSAL", versionId: "v2", versionNumber: 2, validUntil: "2026-12-31T00:00:00Z" },
       proposal: { ...proposal, status: "RELEASED", versionNumber: 2 }, deposit: null });
-    expect(screen.getByRole("heading", { name: "Your proposal is ready to review" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Your estimate is ready to review" })).toBeTruthy();
     expect(screen.queryByText(/No action is required/)).toBeNull();
-    const buttons = screen.getAllByRole("button", { name: /proposal/i });
+    const buttons = screen.getAllByRole("button", { name: /proposal|estimate/i });
     expect(buttons).toHaveLength(1);
-    expect(buttons[0].textContent).toBe("Review proposal");
+    expect(buttons[0].textContent).toBe("Review estimate");
     fireEvent.click(buttons[0]);
     expect(onOpenProposal).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/Ready to review/)).toBeTruthy();

@@ -6,6 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { setupPatient } from "./patient-fixture";
 import { setupPortal } from "./portal-fixture";
+import { openProposalView, PROPOSAL_TOKEN, setupProposalLink } from "./proposal-fixture";
 import { INFORMATION_REQUESTED, openStatusView, setupStatusLink, STATUS_TOKEN } from "./status-fixture";
 
 /**
@@ -48,6 +49,8 @@ const PUBLIC: Target[] = [
   { name: "track-case", path: "/track-case" },
   // The secure status link after the code (plan section 10): the current page, the journey and the response form.
   { name: "status-link", path: `/status/${STATUS_TOKEN}`, prepare: page => setupStatusLink(page, INFORMATION_REQUESTED), ready: openStatusView },
+  // The secure proposal link after the code: the estimate as a document, with its decision (Arabic: the assisted path).
+  { name: "proposal-link", path: `/proposal/${PROPOSAL_TOKEN}`, prepare: page => setupProposalLink(page), ready: openProposalView },
   { name: "cardiology", path: "/cardiology" },
 ];
 const PORTAL: Target[] = [
