@@ -602,3 +602,10 @@ Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max) + d
 | LOW | Choice cards (activation, payment) use Tailwind `bg-white` rather than the surface token, and have no pressed state on touch. | Pro Max, web guidelines | `ProfileActivation.tsx`, `PatientDepositPayment.tsx` | /impeccable polish |
 | LOW | §7 "checking" for an agent payment is covered by copy ("Keep your transfer or agent receipt") but not captured; My Care's `deposit-checking` fixture is a bank transfer. | Pro Max | `e2e/patient-fixture.ts` | tests |
 | LOW | Slice F's My Care screenshots predate the quiet emergency notice (D-4) applied to My Care in E. | slice E | `screenshots/area-1/after/f-*` | info |
+
+## Area 1 — gate (2026-10-15)
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| MEDIUM | The In review and Estimate ready stamps were not seen live at the gate (the owner stopped the walk at Received); they are covered by the specs against the live build and the backend D-1 tests. RS-2026-000006 (synthetic, `INTAKE_REVIEW`) can carry the live check once a coordinator sends it to a Consultant and an estimate is released. | area 1 gate | dev data | live run |
+| LOW | The dev frontend container was built from the area worktree (`-p rehletshifaa`); a later canonical rebuild from the main checkout serves whatever that checkout has (today `feat/review-p0`, which does not yet contain area 1). | area 1 gate | docker compose | owner: merge area 1 into `feat/review-p0` |
