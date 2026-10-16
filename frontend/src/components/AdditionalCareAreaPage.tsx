@@ -31,7 +31,7 @@ export default async function AdditionalCareArea({ params }: Props) {
   const area = ADDITIONAL_CARE_AREAS.find(a => a.slug === careArea);
   if (!isLocale(locale) || !area) notFound();
   const d = getDictionary(locale);
-  const focus = [...new Set(getConsultants(locale).filter(p => p.careAreaHref === careArea).flatMap(p => p.focusAreas))];
+  const focus = [...new Set((await getConsultants(locale)).filter(p => p.careAreaHref === careArea).flatMap(p => p.focusAreas))];
   return (
     <CareAreaDetail
       locale={locale}

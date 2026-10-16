@@ -1,6 +1,6 @@
 import { additionalCareAreas } from "./additional-care-areas";
 import { CARE_AREA_SLUGS } from "./care-areas";
-import { getConsultants, type ConsultantProfile } from "./consultants";
+import type { ConsultantProfile } from "./consultants";
 import type { Dictionary } from "./dictionary";
 import type { Locale } from "./i18n";
 
@@ -52,13 +52,15 @@ export type AtlasArea = {
 
 export type AtlasSystem = { key: CareSystem; title: string; body: string; areas: readonly AtlasArea[] };
 
-/** Every public care area with its copy, presentation metadata and attached consultants, in wheel order. */
-export function careAreaAtlas(locale: Locale, d: Dictionary): readonly AtlasArea[] {
+/**
+ * Every public care area with its copy, presentation metadata and attached consultants, in wheel order. Consultants
+ * come from the platform ({@link getConsultants}, server-side); pass them where the page shows people.
+ */
+export function careAreaAtlas(locale: Locale, d: Dictionary, consultants: readonly ConsultantProfile[] = []): readonly AtlasArea[] {
   const copy = new Map<string, { title: string; body: string }>([
     ...CARE_AREA_SLUGS.map((slug, index) => [slug, d.home.areas[index]] as const),
     ...additionalCareAreas(locale).map((area) => [area.slug, area] as const),
   ]);
-  const consultants = getConsultants(locale);
   return CATALOG.flatMap((entry) => {
     const text = copy.get(entry.slug);
     if (!text) return [];

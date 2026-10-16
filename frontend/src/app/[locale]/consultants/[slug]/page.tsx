@@ -9,7 +9,7 @@ import { SpecialtyMotif } from "@/components/care-areas/SpecialtyMotif";
 import { ConsultantPortrait } from "@/components/ConsultantProfileCard";
 import { FocusMap, PROFILE_TONES as tone } from "@/components/consultants/ProfileVisuals";
 import { careAreaMeta } from "@/lib/care-area-catalog";
-import { CONSULTANT_SLUGS, consultantUi, getConsultant, getConsultants } from "@/lib/consultants";
+import { consultantUi, getConsultant, getConsultants } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
@@ -17,14 +17,10 @@ import { pageMetadata } from "@/lib/metadata";
 
 type Props = { params: Promise<{ locale: string; slug: string }> };
 
-export function generateStaticParams() {
-  return ["en", "ar"].flatMap(locale => CONSULTANT_SLUGS.map(slug => ({ locale, slug })));
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
   if (!isLocale(locale)) return {};
-  const profile = getConsultant(locale, slug);
+  const profile = await getConsultant(locale, slug);
   return profile ? pageMetadata(locale, `consultants/${slug}`, profile.name, profile.summary) : {};
 }
 
@@ -82,7 +78,7 @@ function Entry({ text, icon }: { text: string; icon: ReactNode }) {
 export default async function ConsultantProfilePage({ params }: Props) {
   const { locale, slug } = await params;
   if (!isLocale(locale)) notFound();
-  const profile = getConsultant(locale, slug);
+  const profile = await getConsultant(locale, slug);
   if (!profile) notFound();
   const ui = consultantUi[locale];
   const d = getDictionary(locale);
@@ -110,7 +106,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
     { value: String(profile.focusAreas.length), label: t.statFocus },
   ].filter((stat) => stat !== null);
 
-  const all = getConsultants(locale).filter((p) => p.slug !== profile.slug);
+  const all = (await getConsultants(locale)).filter((p) => p.slug !== profile.slug);
   const sameSystem = all.filter((p) => careAreaMeta(p.careAreaHref)?.system === meta.system);
   const related = (sameSystem.length ? sameSystem : all).slice(0, 3);
 

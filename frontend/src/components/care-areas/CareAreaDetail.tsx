@@ -7,7 +7,7 @@ import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIco
 import { ConsultantCard } from "@/components/consultants/ConsultantCard";
 import { HeroStats } from "@/components/HeroStats";
 import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
-import { consultantUi, universityFacultySlugs } from "@/lib/consultants";
+import { consultantUi, getConsultants, universityFacultySlugs } from "@/lib/consultants";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
@@ -27,7 +27,7 @@ const fill = (template: string, values: Record<string, string | number>) =>
  * 4. other care areas (same system first) and the closing router.
  * Areas without curated scope copy show their Consultants' CV-verified focus areas instead.
  */
-export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsLabel, closing }: {
+export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsLabel, closing }: {
   locale: Locale;
   d: Dictionary;
   slug: string;
@@ -37,7 +37,8 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
   signsLabel?: string;
   closing?: { title: string; body: string };
 }) {
-  const atlas = careAreaAtlas(locale, d);
+  const consultants = await getConsultants(locale);
+  const atlas = careAreaAtlas(locale, d, consultants);
   const area = atlas.find((item) => item.slug === slug);
   if (!area) notFound();
   const t = d.careAreaDetail;
@@ -45,7 +46,7 @@ export function CareAreaDetail({ locale, d, slug, scope, note, highlight, signsL
   const systems = careAtlasSystems(atlas, d);
   const system = systems.find((item) => item.key === area.system)!;
   const style = SYSTEM_STYLES[area.system];
-  const faculty = universityFacultySlugs();
+  const faculty = universityFacultySlugs(consultants);
   const singleConsultant = area.consultants.length === 1;
   const namedLeads = area.consultants.length > 0 && area.consultants.length <= 2;
   const facultyCount = area.consultants.filter((p) => faculty.has(p.slug)).length;

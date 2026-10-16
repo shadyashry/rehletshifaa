@@ -30,6 +30,10 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
         seedCoordinationRouting(now);
         // One verified consultant per care category. The cardiology consultant reuses the
         // seeded doctor login (DOCTOR_SUBJECT) so the accept/review flow can be demonstrated.
+        // The demo logins take over their public directory profiles (V105) instead of creating a second profile.
+        linkDirectoryProfile("ahmed-alashry",DOCTOR_SUBJECT);
+        linkDirectoryProfile("hanan-elshoura","00000000-0000-0000-0000-000000000201");
+        linkDirectoryProfile("hossam-kibba",ORTHOPEDICS_DOCTOR_SUBJECT);
         seedConsultant(DOCTOR_SUBJECT,"Dr Ahmed Alashry","General and Interventional Cardiology","Interventional cardiology","cardiology",now);
         seedConsultant("00000000-0000-0000-0000-000000000201","Dr Hanan Elshoura","Rheumatology, Rehabilitation and Physical Medicine","Adult & pediatric dysphagia rehabilitation","rheumatology-rehabilitation",now);
         seedConsultant(ORTHOPEDICS_DOCTOR_SUBJECT,"Dr Hossam Kibba","Orthopedics, Trauma and Joint Replacement","Hip & knee replacement, lower-extremity","orthopedics",now);
@@ -40,6 +44,24 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
         // The second Consultant login (realm user doctor-orthopedics, another care area), so a referral can be accepted
         // by a receiving Consultant on dev (QA W-34). No password in the repo: it is activated like the invited QA accounts.
         seedPractitionerEmail(ORTHOPEDICS_DOCTOR_SUBJECT,"doctor-orthopedics@local.test",now);
+        // Every other Consultant the site shows is eligible on dev too, so any care area on the site can be routed.
+        seedDirectoryConsultants(now);
+    }
+
+    private void linkDirectoryProfile(String slug,String subject){
+        jdbc.sql("UPDATE practitioner_profiles SET external_subject=? WHERE id=(SELECT d.practitioner_id FROM consultant_directory_profiles d WHERE d.slug=?) AND external_subject IS NULL AND NOT EXISTS(SELECT 1 FROM practitioner_profiles q WHERE q.external_subject=?)")
+            .params(subject,slug,subject).update();
+    }
+
+    /** Directory Consultants without a sign-in get a local subject (no realm login) and the eligibility facts. Idempotent. */
+    private void seedDirectoryConsultants(Instant now){
+        for(String slug:jdbc.sql("SELECT d.slug FROM consultant_directory_profiles d JOIN practitioner_profiles p ON p.id=d.practitioner_id WHERE p.external_subject IS NULL OR p.external_subject LIKE 'local-directory-%' ORDER BY d.sort_order").query(String.class).list()){
+            String subject="local-directory-"+slug;
+            linkDirectoryProfile(slug,subject);
+            jdbc.sql("UPDATE practitioner_profiles SET credentialing_status='VERIFIED',availability_status='AVAILABLE',contract_status='ACTIVE',account_status='ACTIVE',expected_review_hours=24,registration_number=COALESCE(registration_number,?),updated_at=? WHERE external_subject=?")
+                .params("LOCAL-"+slug,timestamp(now),subject).update();
+            makeEligible(subject,now);
+        }
     }
     public static final String ADMIN_SUBJECT="00000000-0000-0000-0000-000000000106";
     private static final UUID COORDINATION_TEAM=UUID.fromString("00000000-0000-0000-0000-00000000c001");
@@ -168,8 +190,13 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
     private void seedConsultant(String subject,String name,String specialty,String subspecialty,String category,Instant now){
         jdbc.sql("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,registration_number,specialty,subspecialty,care_category,practitioner_type,qualifications,languages,approved_procedures,contract_status,availability_status,expected_review_hours,credentialing_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0) ON CONFLICT (external_subject) DO UPDATE SET display_name=EXCLUDED.display_name,legal_name=EXCLUDED.legal_name,specialty=EXCLUDED.specialty,subspecialty=EXCLUDED.subspecialty,care_category=EXCLUDED.care_category,practitioner_type=EXCLUDED.practitioner_type,contract_status='ACTIVE',availability_status='AVAILABLE',expected_review_hours=EXCLUDED.expected_review_hours,credentialing_status='VERIFIED',updated_at=EXCLUDED.updated_at")
             .params(UUID.randomUUID(),subject,name,name,"LOCAL-"+subject.substring(subject.length()-3),specialty,subspecialty,category,"CONSULTANT","Local development profile","Arabic, English","Clinical review","ACTIVE","AVAILABLE",24,"VERIFIED",timestamp(now),timestamp(now)).update();
+        makeEligible(subject,now);
+    }
+
+    /** A current verified credential, an affiliation declaration and the care-area price list. Idempotent. */
+    private void makeEligible(String subject,Instant now){
         jdbc.sql("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,reference_number,source,issued_at,verified_at,verified_by,status,created_at) SELECT ?,p.id,'LOCAL_DEMO_LICENSE',?,'Local development seed',?,?,?,'VERIFIED',? FROM practitioner_profiles p WHERE p.external_subject=? AND NOT EXISTS(SELECT 1 FROM practitioner_credentials pc WHERE pc.practitioner_id=p.id AND pc.status='VERIFIED' AND (pc.expires_at IS NULL OR pc.expires_at>?))")
-            .params(UUID.randomUUID(),"LOCAL-DEMO-"+subject.substring(subject.length()-3),timestamp(now),timestamp(now),"local-demo-seeder",timestamp(now),subject,timestamp(now)).update();
+            .params(UUID.randomUUID(),"LOCAL-DEMO-"+subject.substring(Math.max(0,subject.length()-12)),timestamp(now),timestamp(now),"local-demo-seeder",timestamp(now),subject,timestamp(now)).update();
         // P1-19 (D-H): a current affiliation declaration ("no facility") so the demo consultant stays eligible for new cases.
         jdbc.sql("INSERT INTO affiliation_declarations(id,practitioner_id,declared_by,declared_at,valid_until,attestation_version,review_status,version) SELECT ?,p.id,'local-demo-seeder',?,?,?,'PENDING',0 FROM practitioner_profiles p WHERE p.external_subject=? AND NOT EXISTS(SELECT 1 FROM affiliation_declarations d WHERE d.practitioner_id=p.id AND d.superseded_at IS NULL AND d.valid_until>?)")
             .params(UUID.randomUUID(),timestamp(now),timestamp(now.plus(java.time.Duration.ofDays(365))),com.rehletshifaa.clinic.application.ConsultantAffiliationService.ATTESTATION_VERSION,subject,timestamp(now)).update();

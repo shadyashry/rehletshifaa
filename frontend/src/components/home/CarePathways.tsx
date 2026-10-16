@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react";
 
 import { TrackedLink } from "@/components/TrackedLink";
 import { careAreaAtlas, careAtlasSystems, type CareAreaIconName, type CareSystem } from "@/lib/care-area-catalog";
+import { getConsultants } from "@/lib/consultants";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
@@ -22,9 +23,9 @@ const SYSTEM_ICON: Record<CareSystem, CareAreaIconName> = {
  * care areas and the named Consultants who lead it. Every area keeps equal standing (no featured specialty); the same
  * systems, tones and icons as the Care Areas page, so the two read as one system.
  */
-export function CarePathways({ locale, d }: { locale: Locale; d: Dictionary }) {
+export async function CarePathways({ locale, d }: { locale: Locale; d: Dictionary }) {
   const ar = locale === "ar";
-  const areas = careAreaAtlas(locale, d);
+  const areas = careAreaAtlas(locale, d, await getConsultants(locale));
   // "Dr A and Dr B", "Dr A, Dr B and 2 more".
   const ledBy = (names: readonly string[]) => {
     const shown = names.slice(0, 2);

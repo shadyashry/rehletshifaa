@@ -8,6 +8,7 @@ import { CareNetwork } from "@/components/care-areas/CareNetwork";
 import { CaseRouter } from "@/components/care-areas/CaseRouter";
 import { PageHero } from "@/components/PageHero";
 import { careAreaAtlas, careAtlasSystems } from "@/lib/care-area-catalog";
+import { getConsultants } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
@@ -37,7 +38,7 @@ export default async function CareAreas({ params }: Props) {
   if (!isLocale(locale)) notFound();
   const d = getDictionary(locale);
   const page = d.careAreasPage;
-  const areas = careAreaAtlas(locale, d);
+  const areas = careAreaAtlas(locale, d, await getConsultants(locale));
   const systems = careAtlasSystems(areas, d);
 
   const consultantsLabel = (n: number) =>

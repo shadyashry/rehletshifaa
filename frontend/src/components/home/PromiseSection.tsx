@@ -15,11 +15,11 @@ const SHOWN_MONOGRAMS = 5;
  * principles, each with one meaningful icon (numerals are kept for real sequences only). Beneath, the evidence: the panel of
  * named Consultants as monograms with three derived facts and one way to meet them.
  */
-export function PromiseSection({ d, locale }: { d: Dictionary; locale: Locale }) {
+export async function PromiseSection({ d, locale }: { d: Dictionary; locale: Locale }) {
   const p = d.home.consultantsPromise;
   const panel = d.home.panel;
-  const profiles = getConsultants(locale);
-  const faculty = universityFacultySlugs();
+  const profiles = await getConsultants(locale);
+  const faculty = universityFacultySlugs(profiles);
   const facts = [
     { value: profiles.length, label: panel.consultants },
     { value: profiles.filter((profile) => faculty.has(profile.slug)).length, label: panel.faculty },

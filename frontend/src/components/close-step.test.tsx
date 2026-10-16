@@ -9,7 +9,7 @@ import { HideOnCaseForm } from "@/components/nav/HideOnCaseForm";
 import { ConsultantCard } from "@/components/consultants/ConsultantCard";
 import { statusLabel } from "@/components/portal/portal-model";
 import { countryName } from "@/lib/countries";
-import { getConsultants } from "@/lib/consultants";
+import type { ConsultantProfile } from "@/lib/consultants";
 
 describe("staff status words", () => {
   it("speak in the staff voice and never fall back to a raw value for proposal or work states", () => {
@@ -43,15 +43,18 @@ describe("the header's Send my case", () => {
   });
 });
 
+/** Profiles come from the platform; the card is exercised with a neutral sample. */
+const sampleProfile: ConsultantProfile = {
+  slug: "sample", initials: "SC", name: "Dr Sample Consultant", credentials: "MD", achievementBadges: [], specialty: "Cardiology",
+  role: "Consultant", location: "Cairo, Egypt", summary: "Sample.", cardSummary: "Sample.", expertise: { anchor: "Cardiology", areas: [] },
+  signals: [], focusAreas: [], qualifications: [], appointments: [], professionalStanding: [], careAreaHref: "cardiology",
+  careAreaLabel: "Cardiology", verification: "",
+};
+
 describe("Consultant pages", () => {
   afterEach(cleanup);
-  it("carry no CV sourcing notes", () => {
-    for (const locale of ["en", "ar"] as const)
-      for (const profile of getConsultants(locale)) expect(`${profile.role} ${profile.distinction ?? ""}`).not.toMatch(/\bCV\)/);
-  });
-
   it("do not repeat the role as a distinction", () => {
-    const profile = { ...getConsultants("en")[0], role: "Professor of Cardiology, Ain Shams University", distinction: "Professor of Cardiology" };
+    const profile: ConsultantProfile = { ...sampleProfile, role: "Professor of Cardiology, Ain Shams University", distinction: "Professor of Cardiology" };
     render(<ConsultantCard profile={profile} system="heart" icon="heart" href="/en/consultants/x" labels={{ view: "View", viewOf: "View profile", distinction: "Professional distinction", focus: "Focus" }} />);
     expect(screen.queryByText("Professional distinction")).toBeNull();
   });

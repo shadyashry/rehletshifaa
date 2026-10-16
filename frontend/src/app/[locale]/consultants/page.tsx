@@ -35,7 +35,7 @@ export default async function Consultants({ params }: Props) {
   const d = getDictionary(locale);
   const ui = consultantUi[locale];
   const page = d.consultantsPage;
-  const profiles = getConsultants(locale);
+  const profiles = await getConsultants(locale);
 
   const entries: PanelEntry[] = profiles.flatMap((profile) => {
     const meta = careAreaMeta(profile.careAreaHref);
