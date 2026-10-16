@@ -283,20 +283,20 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   // ---- Returning, signed-in patient: saved details reused, only the new case is entered ----
   if (isPatient && session?.linked) {
-    return <div className="grid min-w-0 gap-5">{emergency}<form className="card intake-card overflow-hidden" onSubmit={submitReturning} noValidate>
-      <div className="border-b border-line px-6 py-5 md:px-9">
+    return <div className="grid min-w-0 gap-3">{emergency}<form className="card intake-card overflow-hidden" onSubmit={submitReturning} noValidate>
+      <div className="border-b border-line px-5 py-4 md:px-7">
         <p className="text-sm text-ink-500">{t.signedInAs}</p>
         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1"><strong className="text-lg text-brand-900">{session.displayName}</strong><a className="text-sm font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/portal`}>{t.goToPortal}</a></p>
         <p className="mt-2 text-sm leading-6 text-ink-600">{t.savedDetails}</p>
       </div>
-      <div className="p-6 md:p-9">
+      <div className="p-5 md:p-7">
         {whoForField()}
         {someoneElse && <>
           <p className="mt-3 text-sm leading-6 text-ink-600">{t.someoneElseSignedIn}</p>
           {patientFields()}
           <div className="mt-6 sm:max-w-[50%] sm:pe-3">{relationshipField()}</div>
         </>}
-        <fieldset className="mt-8 min-w-0 border-0 p-0">
+        <fieldset className="mt-7 min-w-0 border-0 p-0">
           <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.aboutThisCase : (ar ? "عن حالتك الجديدة" : "About your new case")}</legend>
           {caseFields()}
         </fieldset>
@@ -313,10 +313,10 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     return <>
         <fieldset className="min-w-0 border-0 p-0">
           <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{t.whoTitle}</legend>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t.whoTitle}>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t.whoTitle}>
             {([["MYSELF", t.myself, t.myselfHelp, UserRound], ["SOMEONE_ELSE", t.someoneElse, t.someoneElseHelp, Users]] as const).map(([key, label, help, Icon]) => {
               const selected = values.caseFor === key;
-              return <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition ${selected ? "border-brand-600 bg-brand-50 shadow-[0_0_0_3px_var(--color-brand-100)]" : "border-line bg-white hover:border-brand-300"}`}>
+              return <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 transition ${selected ? "border-brand-600 bg-brand-50 shadow-[0_0_0_3px_var(--color-brand-100)]" : "border-line bg-white hover:border-brand-300"}`}>
                 <input type="radio" name="caseFor" className="sr-only" value={key} checked={selected} onChange={() => update("caseFor", key)} />
                 <span className={`flex h-10 w-10 flex-none items-center justify-center rounded-md ${selected ? "bg-brand-700 text-white" : "bg-mist-deep text-brand-700"}`} aria-hidden><Icon size={20} /></span>
                 <span className="min-w-0"><strong className="block text-ink-900">{label}</strong><span className="mt-0.5 block text-sm leading-5 text-ink-500">{help}</span></span>
@@ -329,7 +329,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   }
   function patientFields() {
     return <>
-        <fieldset className="mt-8 min-w-0 border-0 p-0">
+        <fieldset className="mt-7 min-w-0 border-0 p-0">
           <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.patientSection : t.patientSectionSelf}</legend>
           <p className="mt-1 text-sm text-ink-500">{t.namesHelp}</p>
           <div className="mt-4 grid gap-6 sm:grid-cols-2">
@@ -374,24 +374,24 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     </>;
   }
 
-  return <div className="grid min-w-0 gap-5">
+  return <div className="grid min-w-0 gap-3">
     {emergency}
     {siteKey && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" />}
     <form className="card intake-card overflow-hidden" onSubmit={submit} noValidate>
-      <div className="border-b border-line px-6 py-5 md:px-9">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-line px-5 py-4 md:px-7">
         <p id="case-form-heading" tabIndex={-1} className="text-[1.0625rem] font-semibold leading-6 text-brand-900">{t.steps[step-1]}</p>
-        <ol className="intake-steps mt-4 grid list-none grid-cols-3 p-0" aria-label={t.progress}>
-          {t.steps.map((label,index) => { const n = index + 1; const state = n < step ? "reached" : n === step ? "current" : "upcoming"; return <li key={label} className="intake-step relative min-w-0" data-state={state} aria-current={n === step ? "step" : undefined}><span className="journey-marker" data-state={state} aria-hidden>{n < step ? <Check size={15} strokeWidth={2.4}/> : n}</span><span className="mt-2 block pe-2 text-[0.8125rem] font-semibold leading-5 text-ink-500">{label}</span></li>; })}
+        <ol className="intake-steps m-0 flex list-none items-center p-0" aria-label={t.progress}>
+          {t.steps.map((label,index) => { const n = index + 1; const state = n < step ? "reached" : n === step ? "current" : "upcoming"; return <li key={label} className="intake-step flex items-center" data-state={state} aria-current={n === step ? "step" : undefined}><span className="journey-marker" data-state={state} aria-hidden>{n < step ? <Check size={15} strokeWidth={2.4}/> : n}</span><span className="sr-only">{label}</span>{n < t.steps.length && <span aria-hidden className="intake-step-line mx-1.5 block h-[2px] w-7 sm:w-10" />}</li>; })}
         </ol>
       </div>
-      <div className="p-6 md:p-9">
+      <div className="p-5 md:p-7">
       {/* Section 1 — who the case is for, the patient's name, and how to reach the submitter */}
       {step===1&&<div className="min-w-0">
         {whoForField()}
 
         {patientFields()}
 
-        {someoneElse && <fieldset className="mt-8 min-w-0 rounded-lg border border-line bg-surface-pearl p-5">
+        {someoneElse && <fieldset className="mt-7 min-w-0 rounded-lg border border-line bg-surface-pearl p-5">
           <legend className="px-1 text-sm font-bold uppercase tracking-wide text-accent-700">{t.repSection}</legend>
           <div className="mt-2 grid gap-6 sm:grid-cols-2">
             <Field label={t.repName} required requiredMark={t.requiredMark} valid={valid.representativeName && !!values.representativeName} error={fieldError("representativeName")}>
@@ -401,7 +401,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
           </div>
         </fieldset>}
 
-        <fieldset className="mt-8 min-w-0 border-0 p-0">
+        <fieldset className="mt-7 min-w-0 border-0 p-0">
           <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.contactSectionRep : t.contactSection}</legend>
           {someoneElse && <p className="mt-1 text-sm text-ink-500">{t.contactRepHint}</p>}
           <div className="mt-4 grid gap-6 sm:grid-cols-2">
