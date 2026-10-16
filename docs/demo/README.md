@@ -34,4 +34,6 @@ Staff names that were not obvious demo data (coordinator, Consultant and hospita
 - Arabic: screenshots exist for most steps but are not wired in (intake, discharge and follow-up have none). No EN/AR toggle.
 - Final quote and the patient-side outcome questionnaire.
 
+Narration: the "Narration" button in the header reads each slide aloud with the browser's built-in speech (off by default, English, voice varies by device). No audio files are included; a recorded voice-over is not done.
+
 Fonts: the page asks for Alexandria and Plus Jakarta Sans and falls back to system fonts offline. Colours follow the Petrol & Paper tokens in `DESIGN.md`.

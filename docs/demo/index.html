@@ -110,7 +110,10 @@ footer{padding:12px 24px 20px;text-align:center;font-size:.8rem;color:var(--ink-
 <body>
 <header class="top">
   <div class="brand"><i aria-hidden="true"></i>RehletShifaa <span style="font-weight:400;color:var(--ink-400);font-size:.9rem">platform demo</span></div>
-  <div class="counter" id="counter" aria-live="polite"></div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <button class="btn ghost" id="narr" type="button" aria-pressed="false" style="padding:6px 12px;font-size:.85rem">Narration: off</button>
+    <div class="counter" id="counter" aria-live="polite"></div>
+  </div>
 </header>
 <div class="progress" role="progressbar" aria-label="Demo progress" aria-valuemin="0" aria-valuemax="100" id="pb"><div id="bar"></div></div>
 <main id="stage"></main>
@@ -252,6 +255,21 @@ document.addEventListener('keydown',e=>{
  if(e.altKey||e.ctrlKey||e.metaKey)return;
  if(e.key==='ArrowRight')go(cur+1);else if(e.key==='ArrowLeft')go(cur-1);
 });
+/* Narration: browser speech synthesis reads each slide aloud (off by default, no audio files) */
+const narrBtn=document.getElementById('narr'),synth=window.speechSynthesis;let narrOn=false;
+function script(){
+ if(cur===0)return 'RehletShifaa coordinates specialist medical care in Egypt for international patients. This tour follows one demo case through twelve steps. A Consultant reviews the case before the patient travels, pays or decides. One bilingual coordinator stays with the patient. Costs move from a preliminary estimate to a final quote.';
+ if(cur>total)return 'That is the journey at a glance. Step one is an illustrative mock. Arabic screens, the final quote and the patient questionnaire are not shown yet.';
+ const s=steps[cur-1];return `Step ${cur}. ${s.role}. ${s.title}. ${s.cap} ${s.why}`;
+}
+function speak(){
+ if(!synth)return;synth.cancel();
+ if(!narrOn)return;
+ const u=new SpeechSynthesisUtterance(script());u.lang='en-US';u.rate=.95;synth.speak(u);
+}
+if(!synth){narrBtn.hidden=true}
+narrBtn.addEventListener('click',()=>{narrOn=!narrOn;narrBtn.setAttribute('aria-pressed',narrOn);narrBtn.textContent='Narration: '+(narrOn?'on':'off');speak()});
+const _render=render;render=function(){_render();speak()};
 render();
 </script>
 </body>
