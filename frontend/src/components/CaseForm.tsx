@@ -7,7 +7,7 @@ import { intlLocale, type Locale } from "@/lib/i18n";
 import { buildCaseSchema, filesAreValid, RELATIONSHIPS, type Relationship } from "@/lib/case-form-schema";
 import { track } from "@/lib/analytics";
 import { whatsappEntry } from "@/lib/links";
-import { COUNTRIES, flagEmoji, type Country } from "@/lib/countries";
+import { countryName, COUNTRIES, flagEmoji, type Country } from "@/lib/countries";
 import { apiUrl, apiFetchAs } from "@/lib/api";
 import { ADDITIONAL_CARE_AREAS, additionalCareAreas } from "@/lib/additional-care-areas";
 import { useAuth } from "@/components/AuthProvider";
@@ -31,7 +31,7 @@ type Session = { linked: boolean; displayName: string | null; accountStatus: str
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M} .'-]*$/u;
 
-export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
+export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; d: Dictionary; withEmergency?: boolean }) {
   const ar = locale === "ar";
   const { user, roles, loading: authLoading } = useAuth();
   const [values, setValues] = useState<FormValues>({ caseFor: "MYSELF", givenName: "", familyName: "", singleLegalName: false, representativeName: "", representativeRelationship: "", country: "", whatsappNumber: "", email: "", conditionDescription: "", consent: false });
@@ -262,7 +262,8 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   // A-02: anyone describing symptoms is told first that this is not emergency care.
   // One quiet line on the form's first screen (the opening words are the promise), the full banner elsewhere.
-  const emergency = <EmergencyGuidance variant="quiet" title={d.common.emergencyNotice.title} body={d.common.emergencyNotice.body} more={d.common.emergencyNotice.more}/>;
+  // The send-my-case page sets it under its title instead (withEmergency={false}), so the form and its aside align.
+  const emergency = withEmergency ? <EmergencyGuidance variant="quiet" title={d.common.emergencyNotice.title} body={d.common.emergencyNotice.body} more={d.common.emergencyNotice.more}/> : null;
 
   if (caseNumber) {
     const statusHref = statusToken ? `/${locale}/status/${statusToken}` : undefined;
@@ -362,7 +363,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   function caseFields() {
     return <>
       <div className="mt-4"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.category.label} <span className="font-normal text-ink-400">({d.form.optional})</span></span><select className="field" value={careArea} onChange={e => { begin(); setCareArea(e.target.value as CareAreaKey); }}><option value="">{d.form.category.placeholder}</option><option value="cardiology">{d.form.category.options.cardiology}</option><option value="rheumatology-rehabilitation">{d.form.category.options.rheumatology}</option><option value="orthopedics">{d.form.category.options.orthopedics}</option>{additionalCareAreas(locale).map(area => <option key={area.slug} value={area.slug}>{area.title}</option>)}</select><span className="mt-2 block text-sm leading-6 text-ink-500">{d.form.category.help}</span></label></div>
-      <div className="mt-6"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.description} <span className="font-normal text-ink-400">({d.form.optional})</span></span><textarea className="field min-h-28 resize-y" value={values.conditionDescription} maxLength={1900} onChange={e => update("conditionDescription", e.target.value)} /></label></div>
+      <div className="mt-6"><label className="block"><span className="mb-2 block text-sm font-bold text-ink-800">{d.form.description} <span className="font-normal text-ink-400">({d.form.optional})</span></span><textarea className="field min-h-28 resize-y" placeholder={d.form.descriptionPlaceholder} value={values.conditionDescription} maxLength={1900} onChange={e => update("conditionDescription", e.target.value)} /></label></div>
       <div className="mt-6"><div className="mb-3 flex items-end justify-between gap-3"><span className="block text-sm font-bold text-ink-800">{d.form.files} <span className="font-normal text-ink-400">({d.form.optional})</span></span>{files.length>0&&<span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800">{files.length} {d.form.selected}</span>}</div><div className="overflow-hidden rounded-lg border border-line bg-white"><label className="flex cursor-pointer items-center gap-4 border-b border-dashed border-line-strong bg-surface-pearl p-5 transition hover:border-brand-600 hover:bg-brand-50"><span className="flex h-12 w-12 flex-none items-center justify-center rounded-lg bg-white text-brand-700 ring-1 ring-line"><FileUp aria-hidden /></span><span className="min-w-0 flex-1"><strong className="block text-brand-800">{d.form.choose}</strong><span className="mt-1 block text-sm text-ink-500">{d.form.uploadHelp}</span><span className="mt-1 block text-sm text-ink-500">{d.form.uploadCamera}</span></span><Plus aria-hidden className="flex-none text-brand-700"/><input className="sr-only" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={e => { onFiles(Array.from(e.currentTarget.files ?? []));e.currentTarget.value="";touch("files"); }} /></label>{files.length>0&&<ul className="grid gap-2 p-3 sm:grid-cols-2">{files.map((file,index)=><li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-lg border border-line bg-surface-pearl p-3"><FileText aria-hidden className="flex-none text-brand-600" size={20}/><span className="min-w-0 flex-1"><strong className="block truncate text-sm" title={file.name}>{file.name}</strong><span className="text-xs text-ink-500">{new Intl.NumberFormat(intlLocale(locale),{style:"unit",unit:"megabyte",unitDisplay:"short",maximumFractionDigits:file.size<1024*1024?2:1}).format(file.size/1024/1024)}</span></span><button type="button" className="inline-grid h-11 w-11 flex-none place-items-center rounded-lg text-ink-500 hover:bg-alert-50 hover:text-alert-800" aria-label={`${ar?"حذف":"Remove"} ${file.name}`} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><Trash2 aria-hidden size={17}/></button></li>)}</ul>}</div><p className="mt-2 flex items-start gap-2 text-[0.8125rem] leading-5 text-ink-600"><LockKeyhole size={14} aria-hidden className="mt-0.5 flex-none text-brand-700" />{d.form.uploadPrivacy}</p>{fieldError("files") && <p className="error-text mt-2">{fieldError("files")}</p>}</div>
     </>;
   }
@@ -379,9 +380,9 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     {siteKey && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" />}
     <form className="card intake-card overflow-hidden" onSubmit={submit} noValidate>
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-line px-5 py-4 md:px-7">
-        <p id="case-form-heading" tabIndex={-1} className="text-[1.0625rem] font-semibold leading-6 text-brand-900">{t.steps[step-1]}</p>
-        <ol className="intake-steps m-0 flex list-none items-center p-0" aria-label={t.progress}>
-          {t.steps.map((label,index) => { const n = index + 1; const state = n < step ? "reached" : n === step ? "current" : "upcoming"; return <li key={label} className="intake-step flex items-center" data-state={state} aria-current={n === step ? "step" : undefined}><span className="journey-marker" data-state={state} aria-hidden>{n < step ? <Check size={15} strokeWidth={2.4}/> : n}</span><span className="sr-only">{label}</span>{n < t.steps.length && <span aria-hidden className="intake-step-line mx-1.5 block h-[2px] w-7 sm:w-10" />}</li>; })}
+        <p id="case-form-heading" tabIndex={-1} className="text-[1.0625rem] font-semibold leading-6 text-brand-900 lg:sr-only">{t.steps[step-1]}</p>
+        <ol className="intake-steps m-0 flex list-none items-center p-0 lg:flex-1" aria-label={t.progress}>
+          {t.steps.map((label,index) => { const n = index + 1; const state = n < step ? "reached" : n === step ? "current" : "upcoming"; return <li key={label} className={`intake-step flex items-center ${n < t.steps.length ? "lg:flex-1" : ""}`} data-state={state} aria-current={n === step ? "step" : undefined}><span className="journey-marker" data-state={state} aria-hidden>{n < step ? <Check size={15} strokeWidth={2.4}/> : n}</span><span className="intake-step-label sr-only lg:not-sr-only lg:ms-2.5 lg:whitespace-nowrap">{label}</span>{n < t.steps.length && <span aria-hidden className="intake-step-line mx-1.5 block h-[2px] w-7 sm:w-10 lg:mx-3 lg:w-auto lg:min-w-6 lg:flex-1" />}</li>; })}
         </ol>
       </div>
       <div className="p-5 md:p-7">
@@ -440,7 +441,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       </fieldset>}
 
       {/* Section 3 — review, options & consent */}
-      {step===3&&<><div className="rounded-lg border border-line bg-surface-pearl p-5"><h2 className="title">{t.review}</h2><p className="mt-2 text-sm leading-6 text-ink-600">{t.reviewHelp}</p><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-ink-500">{t.forName}</dt><dd className="font-bold text-ink-900">{[values.givenName.trim(), values.familyName.trim()].filter(Boolean).join(" ")}</dd></div>{someoneElse && <div><dt className="text-ink-500">{t.submittedBy}</dt><dd className="font-bold text-ink-900">{values.representativeName.trim()} <span className="font-normal text-ink-500">({values.representativeRelationship ? t.relationships[values.representativeRelationship] : ""})</span></dd></div>}<div><dt className="text-ink-500">{t.countryLabel}</dt><dd className="font-bold text-ink-900">{country?.name}</dd></div><div><dt className="text-ink-500">{d.form.phone}</dt><dd dir="ltr" className="font-bold text-ink-900">{fullPhone}</dd></div><div><dt className="text-ink-500">{d.form.files}</dt><dd className="font-bold text-ink-900">{files.length}</dd></div></dl></div>
+      {step===3&&<><div className="rounded-lg border border-line bg-surface-pearl p-5"><h2 className="title">{t.review}</h2><p className="mt-2 text-sm leading-6 text-ink-600">{t.reviewHelp}</p><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-ink-500">{t.forName}</dt><dd className="font-bold text-ink-900">{[values.givenName.trim(), values.familyName.trim()].filter(Boolean).join(" ")}</dd></div>{someoneElse && <div><dt className="text-ink-500">{t.submittedBy}</dt><dd className="font-bold text-ink-900">{values.representativeName.trim()} <span className="font-normal text-ink-500">({values.representativeRelationship ? t.relationships[values.representativeRelationship] : ""})</span></dd></div>}<div><dt className="text-ink-500">{t.countryLabel}</dt><dd className="font-bold text-ink-900">{country ? countryName(country.iso2, locale) : ""}</dd></div><div><dt className="text-ink-500">{d.form.phone}</dt><dd dir="ltr" className="font-bold text-ink-900">{fullPhone}</dd></div><div><dt className="text-ink-500">{t.filesAttached}</dt><dd className="font-bold text-ink-900">{files.length > 0 ? files.length : <span className="font-normal text-ink-600">{t.noFiles}</span>}</dd></div></dl></div>
       {consentField()}
 
       {siteKey && <div className="cf-turnstile mt-6" data-sitekey={siteKey} data-callback="onRehletShifaaTurnstile" />}
@@ -451,7 +452,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       <p className="mt-4 flex items-center justify-center gap-2 text-sm text-ink-600"><LockKeyhole size={15} aria-hidden />{d.form.secureNote}</p></>}
 
       <div className="mt-7 flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:justify-between">
-        {step>1?<button className="btn-secondary" type="button" onClick={previousStep}><ArrowLeft size={18} className="rtl:-scale-x-100"/>{t.back}</button>:<span/>}
+        {step>1?<button className="btn-secondary" type="button" onClick={previousStep}><ArrowLeft size={18} className="rtl:-scale-x-100"/>{t.back}</button>:<p className="flex items-center gap-2 self-center text-[0.875rem] font-semibold text-ink-600"><LockKeyhole size={15} aria-hidden className="text-brand-600" />{t.privateNote}</p>}
         {step<3?<button className="btn-primary" type="button" onClick={nextStep}>{t.next}<ArrowRight size={18} className="rtl:-scale-x-100"/></button>:null}
       </div>
       </div>
@@ -488,18 +489,21 @@ class SubmitFailure extends Error {
 /** Identifies a chosen file well enough to skip re-uploading it on a retry. */
 const fileKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
 
-function CountrySelect({ value, placeholder, emptyLabel, clearLabel, invalid, onChange, onBlur, ...aria }: { locale: Locale; value: Country | null; placeholder: string; emptyLabel: string; clearLabel: string; invalid?: boolean; onChange: (c: Country | null) => void; onBlur?: () => void; "aria-invalid"?: boolean; "aria-describedby"?: string }) {
+function CountrySelect({ locale, value, placeholder, emptyLabel, clearLabel, invalid, onChange, onBlur, ...aria }: { locale: Locale; value: Country | null; placeholder: string; emptyLabel: string; clearLabel: string; invalid?: boolean; onChange: (c: Country | null) => void; onBlur?: () => void; "aria-invalid"?: boolean; "aria-describedby"?: string }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
+  // Each country in the reader's own word ("Egypt" / "مصر"), in their alphabetical order; the English name still searches.
+  const named = useMemo(() => COUNTRIES.map(c => ({ country: c, label: countryName(c.iso2, locale) }))
+    .sort((a, b) => a.label.localeCompare(b.label, locale)), [locale]);
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return COUNTRIES;
-    return COUNTRIES.filter(c => c.name.toLowerCase().includes(q) || c.iso2.toLowerCase() === q || c.dial.replace("+", "").startsWith(q.replace("+", "")));
-  }, [query]);
+    if (!q) return named;
+    return named.filter(({ country: c, label }) => label.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.iso2.toLowerCase() === q || c.dial.replace("+", "").startsWith(q.replace("+", "")));
+  }, [query, named]);
 
   useEffect(() => {
     if (!open) return;
@@ -512,7 +516,7 @@ function CountrySelect({ value, placeholder, emptyLabel, clearLabel, invalid, on
   function onKey(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") { e.preventDefault(); if (!open) setOpen(true); else setActive(a => Math.min(a + 1, results.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive(a => Math.max(a - 1, 0)); }
-    else if (e.key === "Enter") { if (open && results[active]) { e.preventDefault(); choose(results[active]); } }
+    else if (e.key === "Enter") { if (open && results[active]) { e.preventDefault(); choose(results[active].country); } }
     else if (e.key === "Escape") { setOpen(false); }
   }
 
@@ -525,7 +529,7 @@ function CountrySelect({ value, placeholder, emptyLabel, clearLabel, invalid, on
         role="combobox" aria-expanded={open} aria-controls={listId} aria-autocomplete="list" autoComplete="off"
         className="min-w-0 flex-1 bg-transparent px-2 py-3 text-ink-900 outline-none placeholder:text-ink-400"
         placeholder={value && !open ? "" : placeholder}
-        value={open ? query : value?.name ?? ""}
+        value={open ? query : value ? countryName(value.iso2, locale) : ""}
         onChange={e => { setQuery(e.target.value); setActive(0); if (!open) setOpen(true); }}
         onFocus={() => { setOpen(true); setActive(0); }}
         onKeyDown={onKey}
@@ -534,13 +538,13 @@ function CountrySelect({ value, placeholder, emptyLabel, clearLabel, invalid, on
       <ChevronDown size={18} aria-hidden className={`me-2 flex-none text-ink-400 transition ${open ? "rotate-180" : ""}`} />
     </div>
     {open && <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-line bg-white py-1 shadow-[var(--shadow-raised)]">
-      {results.length === 0 ? <li className="px-4 py-3 text-sm text-ink-500">{emptyLabel}</li> : results.map((c, i) => {
+      {results.length === 0 ? <li className="px-4 py-3 text-sm text-ink-500">{emptyLabel}</li> : results.map(({ country: c, label }, i) => {
         const selected = value?.iso2 === c.iso2;
         return <li key={c.iso2} role="option" aria-selected={selected}
           className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm ${i === active ? "bg-brand-50" : ""} ${selected ? "font-bold" : ""}`}
           onMouseEnter={() => setActive(i)} onMouseDown={e => { e.preventDefault(); choose(c); }}>
           <span className="text-lg leading-none" aria-hidden>{flagEmoji(c.iso2)}</span>
-          <span className="min-w-0 flex-1 truncate text-ink-800">{c.name}</span>
+          <span className="min-w-0 flex-1 truncate text-ink-800">{label}</span>
           <span className="flex-none text-ink-400" dir="ltr">{c.dial}</span>
           {selected && <Check size={16} className="flex-none text-brand-600" aria-hidden />}
         </li>;

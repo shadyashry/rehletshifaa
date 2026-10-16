@@ -1182,3 +1182,8 @@
 .home-section { padding-block: clamp(2.75rem, 1.9rem + 2.2vw, 4rem); }
 /* The closing panel follows the travel section on the same paper: one section gap between them, not two. */
 .home-final-cta > section { padding-block-start: 0; }
+
+/* The intake steps named from lg: the current step reads first, reached steps in petrol, the rest waiting. */
+.intake-step-label { font-size: 0.875rem; font-weight: 600; line-height: 1.25rem; color: var(--color-ink-500); }
+.intake-step[data-state="current"] .intake-step-label { color: var(--color-brand-900); font-weight: 700; }
+.intake-step[data-state="reached"] .intake-step-label { color: var(--color-brand-700); }

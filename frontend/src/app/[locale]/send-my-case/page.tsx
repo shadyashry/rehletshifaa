@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Clock, HandHeart, MessageCircle } from "lucide-react";
 import { notFound } from "next/navigation";
 import { CaseForm } from "@/components/CaseForm";
+import { EmergencyGuidance } from "@/components/EmergencyGuidance";
 import { NextStepsAside } from "@/components/NextStepsAside";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
@@ -24,6 +25,10 @@ export default async function SendMyCase({ params }: Props) {
             <p className="eyebrow">{d.form.eyebrow}</p>
             <h1 className="display mt-3 max-w-[22ch] rtl:max-w-[30ch] [text-wrap:balance]">{d.form.title}</h1>
             <p className="lead mt-3 max-w-[58ch]">{d.form.intro}</p>
+            {/* A-02 emergency line closes the title block, so the form card and the aside below start on one line. */}
+            <div className="mt-4">
+              <EmergencyGuidance variant="quiet" title={d.common.emergencyNotice.title} body={d.common.emergencyNotice.body} more={d.common.emergencyNotice.more} />
+            </div>
           </div>
           <ul className="intake-promise m-0 grid list-none gap-0 border-b border-line p-0 sm:grid-cols-3 lg:grid-cols-1" aria-label={d.form.promise.label}>
             {promise.map(([Icon, label]) => (
@@ -36,8 +41,8 @@ export default async function SendMyCase({ params }: Props) {
             ))}
           </ul>
         </div>
-        <div className="mt-6 grid items-start gap-7 md:mt-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <CaseForm locale={locale} d={d} />
+        <div className="mt-6 grid items-start gap-7 md:mt-7 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <CaseForm locale={locale} d={d} withEmergency={false} />
           <NextStepsAside locale={locale} d={d} />
         </div>
       </div>
