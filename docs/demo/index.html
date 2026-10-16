@@ -55,14 +55,11 @@ main{flex:1;width:100%;max-width:1320px;margin:0 auto;padding:24px 28px 12px}
 .scroller{overflow-x:auto;background:var(--paper);text-align:center}
 .shot{position:relative;display:inline-block;line-height:0;vertical-align:top;max-width:100%}
 .shot img{display:block;width:auto;height:auto;max-width:100%;max-height:calc(100vh - 250px);margin:0 auto}
-/* callouts: outline only, no fill */
-.hs{position:absolute;border-radius:8px;border:2px solid var(--petrol-600);background:transparent;padding:0;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
-.hs::after{content:"";position:absolute;inset:-3px;border-radius:10px;border:2px solid var(--petrol-600);animation:pulse 2s ease-out infinite;pointer-events:none}
-.hs b{position:absolute;top:-12px;left:-12px;width:24px;height:24px;border-radius:50%;background:var(--petrol-600);color:#fff;font:600 .78rem/24px var(--body);text-align:center;box-shadow:0 0 0 2px #fff}
-.hs em{position:absolute;left:16px;top:-14px;transform:translateY(-100%);background:var(--petrol-900);color:#fff;font:500 .72rem/1.2 var(--body);font-style:normal;padding:4px 9px;border-radius:6px;white-space:nowrap;pointer-events:none;line-height:1.3}
-.hs.below em{top:auto;bottom:-14px;transform:translateY(100%)}
-@keyframes pulse{0%{opacity:.75;transform:scale(1)}100%{opacity:0;transform:scale(1.05,1.14)}}
-@media (prefers-reduced-motion:reduce){.hs::after{animation:none;opacity:.3}.rail button i{transition:none}}
+/* callouts: a brief logo-coral border flash (transparent inside) on the fields that matter; invisible otherwise */
+.hs{position:absolute;border-radius:8px;border:2px solid transparent;background:transparent;padding:0;cursor:pointer;transition:border-color .25s ease,box-shadow .25s ease}
+.hs.on{border-color:#e07a5f;box-shadow:0 0 0 1px rgba(224,122,95,.3)}
+.hs:hover{border-color:rgba(224,122,95,.4)}
+@media (prefers-reduced-motion:reduce){.hs{transition:none}}
 /* caption card */
 aside.cap{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:22px;position:sticky;top:16px}
 .rule{display:block;width:28px;height:3px;background:var(--coral);border-radius:2px;margin-bottom:12px}
@@ -71,8 +68,9 @@ aside.cap{background:var(--white);border:1px solid var(--line);border-radius:10p
 aside h2{font-size:1.3rem;margin-bottom:8px}
 aside p{margin:0 0 12px;color:var(--ink-600);font-size:.95rem}
 aside ol{margin:0 0 14px;padding:0;list-style:none;font-size:.875rem;color:var(--ink-600)}
-aside li{display:flex;gap:10px;margin-bottom:6px}
-aside li b{flex:none;width:20px;height:20px;border-radius:50%;background:var(--petrol-600);color:#fff;font-size:.7rem;line-height:20px;text-align:center}
+aside li{margin-bottom:4px}
+aside li b{flex:none;width:20px;height:20px;border-radius:50%;background:#fde8d4;color:#9a4a16;font-size:.7rem;line-height:20px;text-align:center}
+aside li button{display:flex;gap:10px;background:none;border:0;padding:2px 4px;margin:0 -4px;border-radius:6px;text-align:left;color:inherit;width:100%}aside li button:hover{background:#fdf3ea}
 .why{border-top:1px solid var(--line);padding-top:12px;margin:0 0 4px}
 .why strong{display:block;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--petrol-600);margin-bottom:2px}
 details.ar{border-top:1px solid var(--line);margin-top:10px;padding-top:8px;font-size:.85rem;color:var(--ink-600)}
@@ -89,6 +87,14 @@ details.ar p{direction:rtl;text-align:right;font-size:.95rem;line-height:1.9;mar
 .voice{display:flex;gap:8px;align-items:center}
 .voice .btn svg{width:14px;height:14px;vertical-align:-2px;margin-inline-end:6px;fill:currentColor}
 /* intro + closing */
+.panel.intro .lead{font-size:1.1rem;margin-bottom:6px}
+.flow{list-style:none;margin:30px 0 6px;padding:0;display:flex;position:relative}
+.flow::before{content:"";position:absolute;left:7%;right:7%;top:17px;height:2px;background:var(--petrol-200)}
+.flow li{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;text-align:center}
+.flow .dot{width:36px;height:36px;border-radius:50%;background:var(--petrol-600);color:#fff;display:grid;place-items:center;font-weight:600;font-size:.9rem;box-shadow:0 0 0 5px var(--white)}
+.flow .lbl{font-size:.78rem;color:var(--ink-600);max-width:90px;line-height:1.3}
+.pts svg{width:26px;height:26px;fill:none;stroke:var(--petrol-600);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;display:block;margin-bottom:8px}
+@media (max-width:640px){.flow{flex-wrap:wrap;gap:14px 0}.flow::before{display:none}.flow li{flex:0 0 25%}}
 .panel{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:44px 40px;max-width:900px;margin:12px auto}
 .panel h1{font-size:clamp(1.6rem,4vw,2.3rem);margin-bottom:14px}
 .panel p{color:var(--ink-600);margin:0 0 14px;max-width:62ch}
@@ -120,11 +126,11 @@ body.film header.top{padding:14px 40px}
 body.film .rail{padding:6px 40px}
 body.film main{max-width:1840px;padding:20px 40px 0;flex:none}
 body.film .layout{grid-template-columns:minmax(0,1fr) 430px}
-body.film .shot img{max-height:calc(100vh - 330px)}
+body.film .shot img{max-height:calc(100vh - 215px)}
 body.film aside.cap{position:static}
 body.film aside h2{font-size:1.5rem}body.film aside p,body.film aside ol{font-size:1.02rem}
-body.film .sub{display:flex;position:fixed;left:0;right:0;bottom:0;height:140px;background:var(--petrol-900);color:#fff;align-items:center;justify-content:center;padding:0 120px;text-align:center;direction:rtl;font:500 30px/1.7 "Segoe UI",Tahoma,system-ui,sans-serif}
-body.film .panel{max-width:1280px;margin-top:24px;font-size:20px}body.film .panel h1{font-size:2.8rem}body.film .pts div{font-size:1.1rem}body.film .panel p{max-width:80ch}body.film .sub.long{font-size:24px;line-height:1.6}body.film .notshown ul{font-size:1.05rem}
+body.film .sub{display:none}
+body.film .panel{max-width:1400px;margin-top:120px;font-size:21px}body.film .flow .lbl{font-size:1rem;max-width:150px}body.film .flow .dot{width:46px;height:46px}body.film .flow::before{top:22px}body.film .pts b{font-size:1.2rem}body.film .panel h1{font-size:2.8rem}body.film .pts div{font-size:1.1rem}body.film .panel p{max-width:80ch}body.film .notshown ul{font-size:1.05rem}
 @media (max-width:960px){
   .layout{grid-template-columns:1fr}
   aside.cap{position:static}
@@ -153,16 +159,16 @@ body.film .panel{max-width:1280px;margin-top:24px;font-size:20px}body.film .pane
   <div class="legend"><span>Click a segment to jump to a step</span><span class="keys"><span class="chip">Patient</span><span class="chip coordinator">Coordinator</span><span class="chip consultant">Consultant</span></span></div>
 </nav>
 <main id="stage"></main>
-<footer>Demo data only. Costs shown are estimates, not prices. Use the ← → keys, or click a ringed element, to move on.</footer>
+<footer>Demo data only. Costs shown are estimates, not prices. Use the ← → keys to move on.</footer>
 <div class="sub" id="sub" lang="ar"></div>
 
 <script>
 const IMG='assets/',AUD='assets/audio/';
-const AR=["مرحبًا بكم في عرض منصّة رحلة شفاء. تنسّق المنصّة الرعاية الطبية التخصصية في مصر للمرضى القادمين من الخارج. يراجع استشاري الحالة قبل أن يسافر المريض أو يدفع أو يقرّر. ويبقى منسّق واحد، يتحدّث العربية والإنجليزية، مع المريض من أول رسالة حتى المتابعة. وتنتقل التكلفة بوضوح من تقدير أولي إلى عرض نهائي. سنتابع معًا حالة تجريبية خلال أربع عشرة خطوة.", "الخطوة الأولى: الصفحة الرئيسية. يبدأ المريض من الموقع العام، ويرى بوضوح كيف تعمل الخدمة: يرسل حالته، ثم يراجعها استشاري، ثم تصله خطة وتكلفة تقديرية. والقرار يبقى دائمًا بيد المريض.", "الخطوة الثانية: إرسال الحالة. يملأ المريض، أو من ينوب عنه، نموذجًا قصيرًا من ثلاث خطوات: بيانات المريض، ثم وصف الحالة والتقارير، ثم الموافقة والمراجعة. ولا يحتاج المريض أن يعرف التخصص المناسب، ولا أن تكون كل التقارير معه.", "الخطوة الثالثة: استلام الحالة. فور الإرسال يحصل المريض على رقم للحالة وصفحة متابعة آمنة. تقول الصفحة بوضوح إن المنسّق يراجع الحالة، وإنه لا يُطلب من المريض أي إجراء الآن، وتعرض مراحل الرحلة السبع.", "الخطوة الرابعة: مهامي، من جهة المنسّق. يبدأ المنسّق يومه من قائمة واحدة مرتّبة بحسب الأهمية. كل بند يوضّح الخطوة التالية ومن ننتظر. وتظهر الحالة الجديدة تحت عنوان: عيّن استشاريًا.", "الخطوة الخامسة: مساحة عمل الحالة. يؤكّد المنسّق مجال الرعاية، ويستكمل أي نقص، ثم يختار استشاريًا محدّدًا بالاسم. ولا يظهر في الاختيار إلا الاستشاريون أصحاب الاعتماد السارِي في هذا المجال. وفي هذه البيانات التجريبية لا يوجد استشاري مؤهّل بعد.", "الخطوة السادسة: مراجعة الاستشاري. يطّلع الاستشاري على ملف المريض ومستنداته، ويسجّل توصيته السريرية، وأي مخاطر أو قيود ينبغي أن يعرفها المريض قبل المضي. وهنا يُتّخذ القرار الطبي، قبل أي التزام مالي.", "الخطوة السابعة: التقدير الأولي. بعد توصية الاستشاري يُعدّ المنسّق التقدير الأولي، ويراه المريض في صفحته. هذا التقدير غير مُلزِم، وليس سعرًا نهائيًا. ولا يحدث شيء حتى يقرّر المريض.", "الخطوة الثامنة: التحقّق برمز لمرة واحدة. لقراءة العرض يفتح المريض الرابط الآمن، ويدخل رمزًا من ستة أرقام يصله على هاتفه أو بريده. الرمز لا يُعرض هنا أبدًا، لأن العرض يحتوي معلومات خاصة.", "الخطوة التاسعة: وديعة التنسيق. بعد القبول يدفع المريض وديعة التنسيق بتحويل بنكي، أو عبر وكيل، ثم يُدخل رقم مرجع التحويل. وتتحقق الإدارة المالية من المرجع. والبيانات البنكية في هذه الشاشة بيانات تجريبية.", "الخطوة العاشرة: تأكيد الوديعة. عند التأكّد من الدفع يرى المريض ختم الاستلام، ثم يبدأ المنسّق ترتيب العلاج. وتُخصم الوديعة من السعر النهائي لخطة العلاج.", "الخطوة الحادية عشرة: الدخول والقسيمة. عند تأكيد الدخول تعرض الحالة خطاب القبول وقسيمة المستشفى: ما أُضيف إلى حساب المستشفى، وما يدفعه المريض عند الكاشير، وما تبقّى. المبالغ بالجنيه المصري، مع سعر الصرف المثبّت.", "الخطوة الثانية عشرة: مراحل العلاج. تُسجَّل المراحل أثناء العلاج، ويصادق عليها الاستشاري. وإذا لزم علاج إضافي يُقترح أمر تغيير بسبب سريري واضح، وتسعّره الإدارة المالية قبل أن يُحتسب.", "الخطوة الثالثة عشرة: ملف الخروج. الخروج ليس زرًّا. تعرض الحالة ما ينقص، ومجموعة المستندات التي يحملها المريض معه: ملخّص الخروج، وقائمة الأدوية، وتقرير العملية، وغيرها.", "الخطوة الرابعة عشرة: المتابعة. بعد الخروج تُجدوَل مكالمات متابعة، وتصل أسئلة عن الحالة عبر رابط آمن. وإذا احتاجت إجابة إلى انتباه فهي ترجع إلى الاستشاري، ولا تُغلق الحالة قبل أن ينتهي كل شيء معلّق.", "هذه هي الرحلة كاملة. الشاشات المعروضة تعتمد على بيانات تجريبية، والتكاليف المعروضة تقديرات وليست أسعارًا. شكرًا لكم."];
+const AR=["مرحبًا بكم في رحلة شفاء، منصّة تنسّق الرعاية الطبية التخصصية في مصر للمرضى من الخارج. استشاري يراجع الحالة أولًا، ومنسّق واحد يرافق المريض، وتكلفة واضحة المراحل.", "الخطوة الأولى: الصفحة الرئيسية. يرى المريض كيف تعمل الخدمة، ويبدأ بإرسال حالته. والقرار يبقى بيده.", "الخطوة الثانية: إرسال الحالة. يملأ المريض، أو من ينوب عنه، نموذجًا قصيرًا من ثلاث خطوات: بيانات المريض، ثم وصف الحالة والتقارير، ثم الموافقة والمراجعة. ولا يحتاج المريض أن يعرف التخصص المناسب، ولا أن تكون كل التقارير معه.", "الخطوة الثالثة: استلام الحالة. فور الإرسال يحصل المريض على رقم للحالة وصفحة متابعة آمنة. تقول الصفحة بوضوح إن المنسّق يراجع الحالة، وإنه لا يُطلب من المريض أي إجراء الآن، وتعرض مراحل الرحلة السبع.", "الخطوة الرابعة: مهامي، من جهة المنسّق. يبدأ المنسّق يومه من قائمة واحدة مرتّبة بحسب الأهمية. كل بند يوضّح الخطوة التالية ومن ننتظر. وتظهر الحالة الجديدة تحت عنوان: عيّن استشاريًا.", "الخطوة الخامسة: مساحة عمل الحالة. يؤكّد المنسّق مجال الرعاية، ويستكمل أي نقص، ثم يختار استشاريًا محدّدًا بالاسم. ولا يظهر في الاختيار إلا الاستشاريون أصحاب الاعتماد السارِي في هذا المجال. وفي هذه البيانات التجريبية لا يوجد استشاري مؤهّل بعد.", "الخطوة السادسة: مراجعة الاستشاري. يطّلع الاستشاري على ملف المريض ومستنداته، ويسجّل توصيته السريرية، وأي مخاطر أو قيود ينبغي أن يعرفها المريض قبل المضي. وهنا يُتّخذ القرار الطبي، قبل أي التزام مالي.", "الخطوة السابعة: التقدير الأولي. بعد توصية الاستشاري يُعدّ المنسّق التقدير الأولي، ويراه المريض في صفحته. هذا التقدير غير مُلزِم، وليس سعرًا نهائيًا. ولا يحدث شيء حتى يقرّر المريض.", "الخطوة الثامنة: التحقّق برمز لمرة واحدة. لقراءة العرض يفتح المريض الرابط الآمن، ويدخل رمزًا من ستة أرقام يصله على هاتفه أو بريده. الرمز لا يُعرض هنا أبدًا، لأن العرض يحتوي معلومات خاصة.", "الخطوة التاسعة: وديعة التنسيق. بعد القبول يدفع المريض وديعة التنسيق بتحويل بنكي، أو عبر وكيل، ثم يُدخل رقم مرجع التحويل. وتتحقق الإدارة المالية من المرجع. والبيانات البنكية في هذه الشاشة بيانات تجريبية.", "الخطوة العاشرة: تأكيد الوديعة. عند التأكّد من الدفع يرى المريض ختم الاستلام، ثم يبدأ المنسّق ترتيب العلاج. وتُخصم الوديعة من السعر النهائي لخطة العلاج.", "الخطوة الحادية عشرة: الدخول والقسيمة. عند تأكيد الدخول تعرض الحالة خطاب القبول وقسيمة المستشفى: ما أُضيف إلى حساب المستشفى، وما يدفعه المريض عند الكاشير، وما تبقّى. المبالغ بالجنيه المصري، مع سعر الصرف المثبّت.", "الخطوة الثانية عشرة: مراحل العلاج. تُسجَّل المراحل أثناء العلاج، ويصادق عليها الاستشاري. وإذا لزم علاج إضافي يُقترح أمر تغيير بسبب سريري واضح، وتسعّره الإدارة المالية قبل أن يُحتسب.", "الخطوة الثالثة عشرة: ملف الخروج. الخروج ليس زرًّا. تعرض الحالة ما ينقص، ومجموعة المستندات التي يحملها المريض معه: ملخّص الخروج، وقائمة الأدوية، وتقرير العملية، وغيرها.", "الخطوة الرابعة عشرة: المتابعة. بعد الخروج تُجدوَل مكالمات متابعة، وتصل أسئلة عن الحالة عبر رابط آمن. وإذا احتاجت إجابة إلى انتباه فهي ترجع إلى الاستشاري، ولا تُغلق الحالة قبل أن ينتهي كل شيء معلّق.", "هذه هي الرحلة كاملة. الشاشات المعروضة تعتمد على بيانات تجريبية، والتكاليف المعروضة تقديرات وليست أسعارًا. شكرًا لكم."];
 const steps=[
 {role:'Patient',view:'Public website',title:'The home page',img:'01-home.webp',w:1440,h:960,
  alt:'RehletShifaa home page: "Understand your treatment options before you travel", a Send my case button and a strip showing the five stages from sending the case to treatment and follow-up.',
- hs:[{x:8,y:52,w:12.5,h:6,t:'Send my case'},{x:55,y:16,w:34,h:9,t:'The journey at a glance'},{x:8,y:64,w:44,h:9,t:'The decision stays yours'}],
+ hs:[],
  cap:'A patient starts on the public site. It explains the service plainly and offers one clear first action: send the case.',
  notes:['One primary action: Send my case.','The page says up front that recommendations and cost estimates are preliminary.'],
  why:'Patients see the whole picture first, before they share anything.'},
@@ -251,10 +257,15 @@ const film=/[?&]film=1/.test(location.search);if(film)document.body.classList.ad
 let cur=0,tour=false,audio=null,timer=null;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const chip=r=>`<span class="chip ${r.toLowerCase()}">${r}</span>`;
-function intro(){return `<section class="panel"><span class="rule"></span><h1>One case, from first visit to follow-up</h1>
-<p>RehletShifaa coordinates specialist medical care in Egypt for international patients. This tour follows one demo case through ${total} steps, as the patient, the coordinator and the Consultant see it.</p>
-<div class="pts"><div><b>Consultant review first</b>A Consultant reviews the case before the patient travels, pays or decides.</div><div><b>One bilingual coordinator</b>One person stays with the patient from the first message to follow-up.</div><div><b>Honest cost staging</b>A preliminary estimate first, a final quote later, each labelled as such.</div></div>
-<div class="cta"><button class="btn" data-go="1">Start the tour</button><button class="btn ghost" id="introPlay" type="button">Play with Arabic voice-over</button></div><p class="hint">About 5 minutes with the voice-over. Screens are in English; the voice-over is in Arabic.</p></section>`}
+function intro(){
+ const st=['Case received','Coordinator review','Consultant review','Your proposal','Coordination deposit','Treatment','Follow-up'];
+ const ic={a:'<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',b:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',c:'<path d="M4 20h4v-6H4zM10 20h4V9h-4zM16 20h4V4h-4z"/>'};
+ const pts=[['a','Consultant review first','Before the patient travels, pays or decides.'],['b','One bilingual coordinator','Arabic and English, from first message to follow-up.'],['c','Honest cost staging','A preliminary estimate first, a final quote later.']];
+ return `<section class="panel intro"><span class="rule"></span><h1>One case, from first visit to follow-up</h1>
+<p class="lead">RehletShifaa coordinates specialist medical care in Egypt for international patients.</p>
+<ol class="flow" aria-label="The seven stages of the care journey">${st.map((t,i)=>`<li><span class="dot">${i+1}</span><span class="lbl">${t}</span></li>`).join('')}</ol>
+<div class="pts">${pts.map(([k,t,d])=>`<div><svg viewBox="0 0 24 24" aria-hidden="true">${ic[k]}</svg><b>${t}</b>${d}</div>`).join('')}</div>
+<div class="cta"><button class="btn" data-go="1">Start the tour</button><button class="btn ghost" id="introPlay" type="button">Play with Arabic voice-over</button></div></section>`}
 function closing(){
  const lanes=['Patient','Coordinator','Consultant'];
  const grid=`<div class="grid"><div></div>${steps.map((s,i)=>`<div class="h">${i+1}</div>`).join('')}`+lanes.map(l=>`<div class="lane">${l}</div>`+steps.map((s,i)=>`<div class="c">${s.role===l?`<button data-go="${i+1}" aria-label="Step ${i+1}: ${esc(s.title)}">${i+1}</button>`:''}</div>`).join('')).join('')+`</div>`;
@@ -270,17 +281,17 @@ function closing(){
 <div class="cta"><button class="btn ghost" data-go="${total}">Back</button><button class="btn" data-go="0">Restart</button></div></section>`}
 function step(i){
  const s=steps[i-1];
- const hs=s.hs.map((h,k)=>`<button class="hs${h.y<8?' below':''}" data-n="${k+1}" aria-label="${esc(h.t)}" style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%"><b>${k+1}</b></button>`).join('');
+ const hs=s.hs.map((h,k)=>`<button class="hs" data-n="${k+1}" aria-label="${esc(h.t)}" style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%"></button>`).join('');
  return `<div class="layout"><div class="frame"><div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="addr">${esc(s.view)}</span><span class="sp"></span></div>
  <div class="scroller"><div class="shot"><img src="${IMG}${s.img}" width="${s.w}" height="${s.h}" alt="${esc(s.alt)}">${hs}</div></div></div>
  <aside class="cap" aria-live="polite"><span class="rule"></span>
  <div class="meta">${chip(s.role)}<small>Step ${i} of ${total}</small></div>
  <h2>${esc(s.title)}</h2><p>${esc(s.cap)}</p>
- <ol>${s.hs.map((h,k)=>`<li><b>${k+1}</b><span>${esc(h.t)}</span></li>`).join('')}</ol>
+ ${s.hs.length?`<ol>${s.hs.map((h,k)=>`<li><button type="button" data-flash="${k}"><b>${k+1}</b><span>${esc(h.t)}</span></button></li>`).join('')}</ol>`:''}
  <div class="why"><strong>Why it matters</strong>${esc(s.why)}</div>
  <details class="ar"><summary>Arabic voice-over text</summary><p lang="ar" dir="rtl">${esc(AR[i]||'')}</p></details>
  <div class="nav"><button class="btn ghost" data-go="${i-1}">Back</button><button class="btn" data-go="${i+1}">${i===total?'Summary':'Next'}</button></div>
- <p class="hint">Click a ringed element or press → to continue.</p></aside></div>`}
+ <p class="hint">${s.hs.length?'Key points flash briefly. Select one in the list to see it again, and press → to continue.':'Press → to continue.'}</p></aside></div>`}
 function stopAudio(){clearTimeout(timer);if(audio){audio.onended=null;audio.pause();audio=null}}
 function playAudio(){
  stopAudio();if(!tour)return;
@@ -302,13 +313,17 @@ function render(){
  document.title=(cur&&cur<=total?`${cur}. ${steps[cur-1].title} – `:'')+'RehletShifaa platform demo';
  const ip=document.getElementById('introPlay');if(ip)ip.onclick=()=>{go(1);setTour(true)};
  if(!film)window.scrollTo(0,0);
- playAudio();
+ playAudio();flashAll();
 }
 function go(n){cur=Math.max(0,Math.min(total+1,n));render()}
 window.go=go;
+let flashTimers=[];
+function flash(k){const el=stage.querySelectorAll('.hs')[k];if(!el)return;el.classList.add('on');flashTimers.push(setTimeout(()=>el.classList.remove('on'),1100))}
+function flashAll(){flashTimers.forEach(clearTimeout);flashTimers=[];if(film)return;stage.querySelectorAll('.hs').forEach((_,k)=>flashTimers.push(setTimeout(()=>flash(k),700+k*1400)))}
 document.addEventListener('click',e=>{
  const b=e.target.closest('[data-go]');if(b){go(+b.dataset.go);return}
- if(e.target.closest('.hs'))go(cur+1);
+ const f=e.target.closest('[data-flash]');if(f){flashTimers.forEach(clearTimeout);stage.querySelectorAll('.hs').forEach(x=>x.classList.remove('on'));flash(+f.dataset.flash);return}
+ const hs=e.target.closest('.hs');if(hs){const k=[...stage.querySelectorAll('.hs')].indexOf(hs);flash(k)}
 });
 playBtn.addEventListener('click',()=>{if(cur===0)go(1);setTour(!tour)});
 document.addEventListener('keydown',e=>{
