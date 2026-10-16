@@ -1738,10 +1738,19 @@ phases.
     composition-patterns (one review form with an outcome map, the sampled case takes its review as a slot rather than a flag),
     web-design-guidelines (labels, inline errors with focus, Intl dates and numbers, 44px targets, long text wraps) and Impeccable
     (detector: no findings; screenshots checked at 390 and 1440 in both languages; the mismatch list now shows its bullets).
-  - Not done (later or owner): the final UX design of these screens (UX plan); tab and filter state in the URL (as the other Control
-    Center review pages); the preliminary estimate's manual lines have no payee choice yet (the backend defaults them to OTHER); a prompt
-    for a Consultant who has never declared, and the reason on the Virtual Clinic's "not eligible" line (from session 1);
-    `e2e/me-fixture.ts` still lacks the P1-19 grants (the new spec adds them locally); not walked live — needs the dev stack rebuilt at V103
+  - **Follow-ups done in the same session** (owner asked to close the open items before P1-7): the Compliance page keeps its tab and
+    filters in the link (`?tab=declarations|flags|scorecards|samples&review=PENDING|CLEARED|FINDING&flags=all`, read by the route page,
+    kept in step with `history.replaceState`); the preliminary estimate's off-list lines get the same "Paid to" choice as the final
+    assessment (`ClinicalReviewPanel` takes `payees`, sends `payee`, seeds it from the draft); the Virtual Clinic overview reads the owner's
+    declaration status and shows the prompt (a first declaration: "Declare your hospital affiliations"; a lapsed one; one ending within 30
+    days) with "Go to Affiliations", and the "not eligible" line now says why ("no current affiliation declaration"; copy
+    `portalWork.affiliations.overview`, en + ar); `e2e/me-fixture.ts` carries the P1-19 grants (Consultant Operations: AFFILIATION_READ,
+    SCORECARD_READ; Compliance: those plus AUDIT_SAMPLE_READ and COMPLIANCE_REVIEW, a step-up permission) and the spec no longer patches
+    them. Tests: +1 `CompliancePage` (link state), `ClinicalReview` (off-list payee), +2 `VirtualClinic` (first-declaration prompt and
+    reason, renewal reminder, never for a practice manager); the Playwright spec asserts the overview prompt and `tab=samples`. vitest 89
+    files / 688 tests green; Playwright `hospital-agreement-audit.spec.ts` 12 and `ux8-commercial-journeys.spec.ts` 4 green on a dev
+    server; typecheck and eslint clean.
+  - Not done (owner or outside): the final UX design of these screens (UX plan); not walked live — needs the dev stack rebuilt at V103
     with this frontend; counsel on the attestation wording; native Arabic review.
   - Next exact action: owner fast-forwards `feat/review-p0` to `claude/modest-dirac-4e4ffa` (it contains `9e4f216`), rebuilds backend and
     frontend, and walks it live (Consultant files a declaration → Compliance reviews it → a reservation at an undeclared facility raises

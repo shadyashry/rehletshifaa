@@ -34,6 +34,17 @@ export type SampleCase = {
 };
 export type SampleView = { sample: SampleSummary; cases: SampleCase[] };
 
+/** Deep-linkable state (`?tab=…&review=…&flags=all`): read once from the route, kept in step as the viewer changes it. */
+export type ComplianceQuery = { tab?: string; review?: string; flags?: string };
+const TABS = ["declarations", "flags", "scorecards", "samples"] as const;
+const REVIEW_STATUSES = ["PENDING", "CLEARED", "FINDING"] as const;
+function syncQuery(changes: Record<string, string | null>) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  for (const [key, value] of Object.entries(changes)) { if (value) url.searchParams.set(key, value); else url.searchParams.delete(key); }
+  window.history.replaceState(window.history.state, "", url);
+}
+
 const REVIEW_TONE: Record<string, Tone> = { PENDING: "warning", CLEARED: "success", FINDING: "danger", NO_FINDING: "success" };
 const word = (map: Record<string, string>, code?: string | null) => (code ? map[code] ?? code : "—");
 
@@ -42,19 +53,20 @@ const word = (map: Record<string, string>, code?: string | null) => (code ? map[
  * sampled cases (its only writes, COMPLIANCE_REVIEW) and draws extra samples; Consultant Operations read the declarations, the flags and
  * the scorecards. Every tab is shown only to a caller who can read it; the backend authorises every call.
  */
-export function CompliancePage({ locale, copy }: { locale: Locale; copy: ComplianceCopy }) {
+export function CompliancePage({ locale, copy, query }: { locale: Locale; copy: ComplianceCopy; query?: ComplianceQuery }) {
   return <WorkforcePage locale={locale} active="compliance" title={copy.title} intro={copy.intro} allowed={(a) => a.canAny(["SCORECARD_READ", "AUDIT_SAMPLE_READ"])}>
-    {({ access, api }) => <Compliance locale={locale} copy={copy} api={api} can={access.can} />}
+    {({ access, api }) => <Compliance locale={locale} copy={copy} api={api} can={access.can} query={query} />}
   </WorkforcePage>;
 }
 
-export function Compliance({ locale, copy, api, can }: { locale: Locale; copy: ComplianceCopy; api: AdminApi; can: (permission: string) => boolean }) {
+export function Compliance({ locale, copy, api, can, query = {} }: { locale: Locale; copy: ComplianceCopy; api: AdminApi; can: (permission: string) => boolean; query?: ComplianceQuery }) {
   const tabs = useMemo(() => ([
     ...(can("AFFILIATION_READ") ? ["declarations", "flags"] as const : []),
     ...(can("SCORECARD_READ") ? ["scorecards"] as const : []),
     ...(can("AUDIT_SAMPLE_READ") ? ["samples"] as const : []),
   ] as Tab[]), [can]);
-  const [chosen, setTab] = useState<Tab | null>(null);
+  const [chosen, setChosen] = useState<Tab | null>(() => (TABS as readonly string[]).includes(query.tab ?? "") ? query.tab as Tab : null);
+  const setTab = (next: Tab) => { setChosen(next); syncQuery({ tab: next }); };
   const tab = chosen && tabs.includes(chosen) ? chosen : tabs[0];
   const canReview = can("COMPLIANCE_REVIEW");
   if (!tab) return null;
@@ -62,8 +74,9 @@ export function Compliance({ locale, copy, api, can }: { locale: Locale; copy: C
     {!canReview && <p className="cc-meta">{copy.readOnly}</p>}
     <SectionTabs label={copy.tabs.label} active={tab} onChange={setTab} tabs={tabs.map((key) => ({ key, label: copy.tabs[key] }))} />
     <TabPanel id={tab}>
-      {tab === "declarations" && <Declarations locale={locale} copy={copy} api={api} canReview={canReview} />}
-      {tab === "flags" && <Flags locale={locale} copy={copy} api={api} />}
+      {tab === "declarations" && <Declarations locale={locale} copy={copy} api={api} canReview={canReview}
+        initialStatus={(REVIEW_STATUSES as readonly string[]).includes(query.review ?? "") ? query.review! : ""} />}
+      {tab === "flags" && <Flags locale={locale} copy={copy} api={api} initialOpenOnly={query.flags !== "all"} />}
       {tab === "scorecards" && <Scorecards locale={locale} copy={copy} api={api} />}
       {tab === "samples" && <Samples locale={locale} copy={copy} api={api} canReview={canReview} />}
     </TabPanel>
@@ -130,9 +143,10 @@ function ReviewForm<O extends string>({ title, legend, outcomes, finding, noteLa
 
 // ---- Declarations ----
 
-function Declarations({ locale, copy, api, canReview }: { locale: Locale; copy: ComplianceCopy; api: AdminApi; canReview: boolean }) {
+function Declarations({ locale, copy, api, canReview, initialStatus }: { locale: Locale; copy: ComplianceCopy; api: AdminApi; canReview: boolean; initialStatus: string }) {
   const t = copy.declarations;
-  const [status, setStatus] = useState("");
+  const [status, setStatusState] = useState(initialStatus);
+  const setStatus = (next: string) => { setStatusState(next); syncQuery({ review: next || null }); };
   const [selected, setSelected] = useState<Declaration | null>(null);
   const { data, error, reload } = useRead<Declaration[]>(api, `/compliance/affiliations/declarations${status ? `?reviewStatus=${status}` : ""}`);
   const day = useDates(locale);
@@ -225,9 +239,10 @@ function groupLines(lines: Declaration["lines"], kinds: Record<string, string>) 
 
 // ---- Undeclared-facility flags ----
 
-function Flags({ locale, copy, api }: { locale: Locale; copy: ComplianceCopy; api: AdminApi }) {
+function Flags({ locale, copy, api, initialOpenOnly }: { locale: Locale; copy: ComplianceCopy; api: AdminApi; initialOpenOnly: boolean }) {
   const t = copy.flags;
-  const [openOnly, setOpenOnly] = useState(true);
+  const [openOnly, setOpenOnlyState] = useState(initialOpenOnly);
+  const setOpenOnly = (next: boolean) => { setOpenOnlyState(next); syncQuery({ flags: next ? null : "all" }); };
   const { data, error, reload } = useRead<AffiliationFlag[]>(api, `/compliance/affiliations/flags?openOnly=${openOnly}`);
   const day = useDates(locale);
   return <>

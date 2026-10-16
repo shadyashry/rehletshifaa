@@ -149,6 +149,21 @@ describe("Control Center › Compliance", () => {
     expect(screen.getByText("DECLARATION_ALREADY_REVIEWED")).toBeVisible();
   });
 
+  it("opens on the tab and filters in the link, and keeps the link in step", async () => {
+    window.history.replaceState({}, "", "/en/portal/control-center/compliance?tab=declarations&review=PENDING");
+    const { api, calls } = fakeApi({ "/compliance/affiliations/declarations": [declaration], "/compliance/affiliations/flags": [] });
+    render(<Compliance locale="en" copy={copyOf("en")} api={api} can={can(COMPLIANCE)} query={{ tab: "declarations", review: "PENDING" }} />);
+    await waitFor(() => expect(calls.some((c) => c.path === "/compliance/affiliations/declarations?reviewStatus=PENDING")).toBe(true));
+    expect(screen.getByRole("combobox", { name: "Review" })).toHaveValue("PENDING");
+    fireEvent.change(screen.getByRole("combobox", { name: "Review" }), { target: { value: "" } });
+    expect(window.location.search).toBe("?tab=declarations");
+    fireEvent.click(screen.getByRole("tab", { name: "Undeclared facilities" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Only open flags" }));
+    expect(new URLSearchParams(window.location.search).get("tab")).toBe("flags");
+    expect(new URLSearchParams(window.location.search).get("flags")).toBe("all");
+    window.history.replaceState({}, "", "/");
+  });
+
   it("speaks Arabic", async () => {
     const { api } = fakeApi({ "/compliance/affiliations/declarations": [declaration] });
     render(<Compliance locale="ar" copy={copyOf("ar")} api={api} can={can(COMPLIANCE)} />);

@@ -12,7 +12,11 @@ import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageE
 export type CatalogService = { id: string; serviceCode: string; serviceName: string; category?: string; priceEgp: number; active: boolean };
 export type FxRate = { currency: string; rate: number; rateDate: string; source: string };
 export type ReviewDocument = { documentId: string; fileName: string; status: string };
-export type DraftEstimate = { serviceDescription: string; estimatedCost: number; currency: string; catalogServiceId?: string | null; facilityPackageId?: string | null };
+export type DraftEstimate = { serviceDescription: string; estimatedCost: number; currency: string; catalogServiceId?: string | null; facilityPackageId?: string | null; payee?: string | null };
+/** P1-19: who an off-list line is paid to; a catalogue line is always the Consultant's and a facility package the hospital's. */
+const OFF_LIST_PAYEES = ["CONSULTANT", "FACILITY", "OTHER"] as const;
+type OffListPayee = (typeof OFF_LIST_PAYEES)[number];
+export type PayeeWords = { choice: string; choices: Record<OffListPayee, string> };
 export type ReviewDraft = { id: string; recommendedTreatment?: string | null; risksAndLimitations?: string | null; costEstimates?: DraftEstimate[]; proposalCurrency?: string | null } | null;
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
 
@@ -39,9 +43,10 @@ function money(amount: number, currency: string, locale: Locale) {
  * normal completion — Submit recommendation — which the backend turns into a coordinator handoff by
  * itself; the exceptional outcomes stay behind a single disclosure so they never compete with it.
  */
-export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, facilities = [], documents, draft, viewDoc, downloadDoc, mutate }: {
+export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, facilities = [], documents, draft, viewDoc, downloadDoc, mutate, payees }: {
   locale: Locale; caseId: string; busy: boolean; catalog: CatalogService[]; fxRates: FxRate[]; /** P0-5: active facilities with Finance-approved packages. */ facilities?: DirectoryFacility[];
   documents: ReviewDocument[]; draft?: ReviewDraft; viewDoc: (id: string) => void; downloadDoc: (id: string) => void; mutate: Mutate;
+  /** P1-19: the "Paid to" words for an off-list line (`portalProposal.price.payees`). */ payees: PayeeWords;
 }) {
   const ar = locale === "ar";
   const t = copy(ar);
@@ -53,7 +58,8 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, fa
   const [recommendation, setRecommendation] = useState(draft?.recommendedTreatment ?? "");
   const [considerations, setConsiderations] = useState(draft?.risksAndLimitations ?? "");
   const [selected, setSelected] = useState<Set<string>>(() => seedSelection(draft, catalog));
-  const [offList, setOffList] = useState<{ description: string; amountEgp: number }[]>(() => seedOffList(draft));
+  const [offList, setOffList] = useState<{ description: string; amountEgp: number; payee: OffListPayee }[]>(() => seedOffList(draft));
+  const [offPayee, setOffPayee] = useState<OffListPayee>("OTHER");
   // P0-5: Finance-approved facility packages; the consultant sets the expected figure inside each range.
   const [packagePicks, setPackagePicks] = useState<Map<string, number>>(() => seedPackages(draft));
   const [proposalCurrency, setProposalCurrency] = useState(draft?.proposalCurrency ?? BASE);
@@ -113,7 +119,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, fa
     ...picks.map(s => ({ serviceDescription: s.serviceName, estimatedCost: s.priceEgp, currency: BASE, catalogServiceId: s.id })),
     // Facility packages (P0-5): the expected EGP figure inside the approved range; the server re-checks the package and the range.
     ...packageLines.map(packageEstimate),
-    ...offList.map(row => ({ serviceDescription: row.description, estimatedCost: row.amountEgp, currency: BASE })),
+    ...offList.map(row => ({ serviceDescription: row.description, estimatedCost: row.amountEgp, currency: BASE, payee: row.payee })),
   ];
 
   const submit = () => {
@@ -154,8 +160,8 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, fa
     const amount = Number(offAmount);
     if (!offName.trim() || !Number.isFinite(amount) || amount <= 0) { setError(t.errOffList); return; }
     setError("");
-    setOffList(rows => [...rows, { description: offName.trim(), amountEgp: Math.round(amount * 100) / 100 }]);
-    setOffName(""); setOffAmount("");
+    setOffList(rows => [...rows, { description: offName.trim(), amountEgp: Math.round(amount * 100) / 100, payee: offPayee }]);
+    setOffName(""); setOffAmount(""); setOffPayee("OTHER");
   };
 
   return (
@@ -252,6 +258,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, fa
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[0.9rem] font-semibold text-ink-900">{row.description}</span>
                   <span className="mt-0.5 flex items-center gap-1 text-[0.8125rem] font-bold text-status-warning-fg"><Clock size={13} strokeWidth={2.25} aria-hidden/>{t.needsFinance}</span>
+                  <span className="mt-0.5 block text-[0.8125rem] text-ink-600">{payees.choice}: {payees.choices[row.payee]}</span>
                 </span>
                 <span className="flex-none whitespace-nowrap text-[0.9rem] font-bold text-ink-800">{money(row.amountEgp, BASE, locale)}</span>
                 <button type="button" className="flex-none text-[0.8rem] font-bold text-ink-500 hover:text-alert-700"
@@ -272,6 +279,11 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, fa
             </label>
             <label className="block text-[0.8rem] font-bold text-ink-700">{t.offListAmount}
               <input className="field mt-1" type="number" min="0" step="0.01" value={offAmount} onChange={event => setOffAmount(event.target.value)}/>
+            </label>
+            <label className="block text-[0.8rem] font-bold text-ink-700">{payees.choice}
+              <select className="field mt-1" value={offPayee} onChange={event => setOffPayee(event.target.value as OffListPayee)}>
+                {OFF_LIST_PAYEES.map(p => <option key={p} value={p}>{payees.choices[p]}</option>)}
+              </select>
             </label>
             <button type="button" className="btn-secondary" onClick={addOffList}>{t.offListAdd}</button>
           </div>
@@ -387,7 +399,8 @@ function seedPackages(draft: ReviewDraft | undefined) {
 function seedOffList(draft: ReviewDraft | undefined) {
   return (draft?.costEstimates ?? [])
     .filter(e => !e.catalogServiceId && !e.facilityPackageId)
-    .map(e => ({ description: e.serviceDescription, amountEgp: Number(e.estimatedCost) || 0 }));
+    .map(e => ({ description: e.serviceDescription, amountEgp: Number(e.estimatedCost) || 0,
+      payee: ((OFF_LIST_PAYEES as readonly string[]).includes(e.payee ?? "") ? e.payee : "OTHER") as OffListPayee }));
 }
 
 function copy(ar: boolean) {

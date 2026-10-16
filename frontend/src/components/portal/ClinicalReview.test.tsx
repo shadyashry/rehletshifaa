@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 import { ClinicalReviewPanel, type CatalogService, type FxRate, type ReviewDocument } from "./ClinicalReview";
+import { getDictionary } from "@/lib/dictionary";
 
 const catalog: CatalogService[] = [
   { id: "svc-1", serviceCode: "PACE-DUAL", serviceName: "Dual-chamber pacemaker implant", category: "Procedure", priceEgp: 390000, active: true },
@@ -17,7 +18,7 @@ function setup(overrides: Partial<Parameters<typeof ClinicalReviewPanel>[0]> = {
   const mutate = vi.fn().mockResolvedValue({ status: "SAVED" });
   const viewDoc = vi.fn();
   render(<ClinicalReviewPanel locale="en" caseId="case-1" busy={false} catalog={catalog} fxRates={fxRates}
-                              documents={documents} viewDoc={viewDoc} downloadDoc={vi.fn()} mutate={mutate} {...overrides}/>);
+                              documents={documents} viewDoc={viewDoc} downloadDoc={vi.fn()} mutate={mutate} payees={getDictionary("en").portalProposal.price.payees} {...overrides}/>);
   return { mutate, viewDoc };
 }
 
@@ -115,9 +116,13 @@ describe("ClinicalReviewPanel", () => {
     fireEvent.change(screen.getByLabelText("Clinical recommendation"), { target: { value: "Lead extraction" } });
     fireEvent.change(screen.getByLabelText("Service name"), { target: { value: "Bespoke lead extraction" } });
     fireEvent.change(screen.getByLabelText("Estimated amount (EGP)"), { target: { value: "50000" } });
+    // P1-19: an off-list line says whose it is (default: someone else).
+    expect((screen.getByLabelText("Paid to") as HTMLSelectElement).value).toBe("OTHER");
+    fireEvent.change(screen.getByLabelText("Paid to"), { target: { value: "FACILITY" } });
     fireEvent.click(screen.getByRole("button", { name: "Add service" }));
 
     expect(screen.getByText("Requires Finance approval")).toBeTruthy();
+    expect(screen.getByText("Paid to: The hospital")).toBeTruthy();
     // QA #8: the summary never calls an off-list amount "approved".
     const summary = (label: string) => screen.getByText(label).nextElementSibling?.textContent;
     expect(summary("Approved catalogue price")).toMatch(/^EGP\s?0/);
@@ -125,7 +130,7 @@ describe("ClinicalReviewPanel", () => {
     expect(summary("Estimate total")).toMatch(/50,000/);
     fireEvent.click(screen.getByRole("button", { name: "Submit recommendation" }));
     expect(mutate).toHaveBeenCalledWith("/doctor/cases/case-1/review-decision", expect.objectContaining({
-      costEstimates: [{ serviceDescription: "Bespoke lead extraction", estimatedCost: 50000, currency: "EGP" }],
+      costEstimates: [{ serviceDescription: "Bespoke lead extraction", estimatedCost: 50000, currency: "EGP", payee: "FACILITY" }],
     }));
   });
 

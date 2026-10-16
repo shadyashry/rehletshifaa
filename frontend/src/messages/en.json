@@ -3689,6 +3689,15 @@
     },
     "affiliations": {
       "tab": "Affiliations",
+      "overview": {
+        "firstTitle": "Declare your hospital affiliations",
+        "firstBody": "Before you can receive your first case, file this year's declaration: every hospital or centre where you treat patients and any relationship you have with each.",
+        "lapsedTitle": "No current affiliation declaration",
+        "lapsedBody": "You cannot receive new cases until you file this year's declaration. Cases you already hold go on.",
+        "renewSoon": "Your affiliation declaration ends on {date}. File the new one before then to keep receiving new cases.",
+        "action": "Go to Affiliations",
+        "reason": "no current affiliation declaration"
+      },
       "title": "Hospital affiliations",
       "lead": "Once a year, declare every hospital or centre where you treat RehletShifaa patients, and any relationship you have with each. Compliance reviews every declaration.",
       "loading": "Loading your affiliations…",

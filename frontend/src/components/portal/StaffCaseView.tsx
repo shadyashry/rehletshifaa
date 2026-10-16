@@ -148,7 +148,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  // A second-opinion consultant reads the case and gives an opinion; the clinical decision stays with the primary consultant.
  const secondOpinionOnly=isDoctor&&current.workType==="SECOND_OPINION";
  const clinicalReviewPanel=isDoctor&&c.status==="CONSULTANT_REVIEW"&&!secondOpinionOnly
-  ?<ClinicalReviewPanel locale={locale} caseId={c.id} busy={busy} catalog={catalog} fxRates={fxRates} facilities={facilities} documents={documents}
+  ?<ClinicalReviewPanel locale={locale} caseId={c.id} busy={busy} catalog={catalog} fxRates={fxRates} facilities={facilities} documents={documents} payees={proposalCopy.price.payees}
      draft={reviewDraft&&{id:reviewDraft.id,recommendedTreatment:reviewDraft.recommendedTreatment,risksAndLimitations:reviewDraft.risksAndLimitations,costEstimates:reviewDraft.costEstimates,proposalCurrency:reviewDraft.proposalCurrency}}
      viewDoc={viewDoc} downloadDoc={downloadDoc} mutate={mutate}/>
   :null;

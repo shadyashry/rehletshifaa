@@ -30,7 +30,7 @@ const clinic = {
   publicProfile: {}, draft: null, managerChangesRequireApproval: true, services: [], pendingChanges: [], slots: [], managers: [], version: 1,
 };
 
-async function serve(page: Page, roles: string[], extraPermissions: string[], data: Record<string, unknown>) {
+async function serve(page: Page, roles: string[], data: Record<string, unknown>) {
   await page.addInitScript(({ authority }) => sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({
     access_token: "synthetic-access", token_type: "Bearer", scope: "openid", profile: { sub: "kc-staff", name: "Synthetic Staff", auth_time: Math.floor(Date.now() / 1000) },
     expires_at: Math.floor(Date.now() / 1000) + 3600 })), { authority: OIDC_AUTHORITY });
@@ -42,9 +42,7 @@ async function serve(page: Page, roles: string[], extraPermissions: string[], da
     const body = path in data ? data[path] : path === "/notifications" ? { items: [], unread: 0 } : path === "/account/preferences" ? { displayName: null, locale: null } : [];
     return route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
-  // The fixture's tables predate P1-19; add this phase's grants (RolePolicy) on top of the role's.
-  const me = meFor("kc-staff", roles, { displayName: "Synthetic Staff" });
-  await routeMe(page, { ...me, permissions: [...new Set([...me.permissions, ...extraPermissions])].sort() });
+  await routeMe(page, meFor("kc-staff", roles, { displayName: "Synthetic Staff" }));
   return writes;
 }
 
@@ -53,7 +51,7 @@ for (const locale of ["en", "ar"] as const) for (const width of [390, 1440]) {
 
   test(`Compliance reviews a declaration and opens a sample (${locale}, ${width})`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    await serve(page, ["COMPLIANCE_AUDITOR"], ["AFFILIATION_READ", "SCORECARD_READ", "AUDIT_SAMPLE_READ", "COMPLIANCE_REVIEW", "FACILITY_READ", "INCIDENT_READ"], {
+    await serve(page, ["COMPLIANCE_AUDITOR"], {
       "/compliance/affiliations/declarations": [declaration], "/compliance/audit-samples": [sample.sample], "/compliance/audit-samples/s1": sample,
     });
     await page.goto(`/${locale}/portal/control-center/compliance`);
@@ -69,6 +67,7 @@ for (const locale of ["en", "ar"] as const) for (const width of [390, 1440]) {
     await shot(page, `compliance-declaration-${locale}-${width}`);
 
     await page.getByRole("tab", { name: en ? "Audit samples" : "عينات التدقيق" }).click();
+    await expect(page).toHaveURL(/[?&]tab=samples/);
     await page.getByRole("button", { name: en ? "Open sample 2026-09" : "فتح عينة 2026-09" }).click();
     await expect(page.getByText(en ? "The hospital billed an extra nobody approved." : "فوترت المستشفى بندًا إضافيًا لم يعتمده أحد.")).toBeVisible();
     await expect(page.getByText("ST-2026-0007")).toBeVisible();
@@ -78,13 +77,15 @@ for (const locale of ["en", "ar"] as const) for (const width of [390, 1440]) {
 
   test(`a Consultant with no current declaration sees why and files one (${locale}, ${width})`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    const writes = await serve(page, ["CONSULTANT"], ["AFFILIATION_DECLARE", "AFFILIATION_READ"], {
+    const writes = await serve(page, ["CONSULTANT"], {
       "/clinics/mine": [{ practitionerId: "p1", consultantName: "Dr Ahmed Saleh", relation: "OWNER", permissions: ["PROFILE", "SCHEDULE", "SERVICES"] }],
       "/clinics/p1": clinic, "/facilities/directory": directory,
       "/clinics/p1/affiliations": { practitionerId: "p1", declarationCurrent: false, renewBy: null, attestationVersion: "affiliation-attestation-2026-10", current: null, history: [], flags: [] },
     });
     await page.goto(`/${locale}/portal/virtual-clinic`);
-    await page.getByRole("tab", { name: en ? "Affiliations" : "الارتباطات" }).click();
+    // The overview says why no case comes and leads to the declaration (a Consultant who never declared).
+    await expect(page.getByText(en ? "Declare your hospital affiliations" : "صرّح بارتباطك بالمستشفيات")).toBeVisible();
+    await page.getByRole("button", { name: en ? "Go to Affiliations" : "الانتقال إلى الارتباطات" }).click();
     await expect(page.getByText(en ? "No current declaration: you cannot receive new cases." : "لا يوجد تصريح ساري: لا يمكنك استقبال حالات جديدة.")).toBeVisible();
     await page.getByRole("combobox", { name: en ? "Facility" : "المنشأة" }).selectOption("f1");
     await page.getByRole("button", { name: en ? "Add facility" : "إضافة المنشأة" }).click();

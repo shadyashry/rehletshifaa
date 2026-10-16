@@ -9,7 +9,7 @@ import {
   SERVICE_KINDS, formatEgp, useVirtualClinics, virtualClinicHref,
   type Clinic, type ClinicAuditEntry, type ClinicPermission, type ClinicService, type ServiceChange,
 } from "./virtual-clinic-model";
-import { Affiliations, type AffiliationCopy } from "./Affiliations";
+import { Affiliations, DeclarationPrompt, useDeclarationStatus, type AffiliationCopy } from "./Affiliations";
 
 type Section = "overview" | "services" | "schedule" | "team" | "affiliations" | "history";
 export type ClinicCall = <T = unknown>(path: string, method?: string, body?: unknown) => Promise<T>;
@@ -156,6 +156,9 @@ export function ClinicWorkspace({ locale, clinic, call, reload, affiliationsCopy
     // P1-19: the yearly affiliation declaration is the Consultant's own attestation; a practice manager never files or reads it.
     ...(owner ? ["team" as const, "affiliations" as const, "history" as const] : [])];
   const [section, setSection] = useState<Section>("overview");
+  // P1-19: the owner's declaration status, re-read with each clinic load, so the overview can say why no new case comes.
+  const declaration = useDeclarationStatus(call, clinic.practitionerId, owner, clinic);
+  const [now] = useState(() => Date.now());
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const run = async (path: string, method: string, body?: unknown) => {
@@ -175,7 +178,9 @@ export function ClinicWorkspace({ locale, clinic, call, reload, affiliationsCopy
     </div>
     {error && <p role="alert" className="mt-4 rounded-xl bg-alert-50 p-3 text-sm text-alert-800">{error}</p>}
     <fieldset disabled={busy} className="mt-5 min-w-0 space-y-5">
-      {section === "overview" && <Overview locale={locale} t={t} clinic={clinic} owner={owner} canProfile={can("PROFILE")} base={base} run={run}/>}
+      {section === "overview" && <Overview locale={locale} t={t} clinic={clinic} owner={owner} canProfile={can("PROFILE")} base={base} run={run}
+        notice={owner ? <DeclarationPrompt locale={locale} copy={affiliationsCopy} view={declaration} now={now} onOpen={() => setSection("affiliations")}/> : null}
+        ineligibleReason={declaration && !declaration.declarationCurrent ? affiliationsCopy.overview.reason : null}/>}
       {section === "services" && <Services locale={locale} t={t} clinic={clinic} owner={owner} base={base} run={run} call={call}/>}
       {section === "schedule" && <Schedule locale={locale} t={t} clinic={clinic} base={base} run={run}/>}
       {section === "team" && owner && <Team t={t} clinic={clinic} locale={locale} base={base} run={run}/>}
@@ -187,7 +192,11 @@ export function ClinicWorkspace({ locale, clinic, call, reload, affiliationsCopy
 
 type Run = (path: string, method: string, body?: unknown) => Promise<boolean>;
 
-function Overview({ locale, t, clinic, owner, canProfile, base, run }: { locale: Locale; t: Copy; clinic: Clinic; owner: boolean; canProfile: boolean; base: string; run: Run }) {
+function Overview({ locale, t, clinic, owner, canProfile, base, run, notice, ineligibleReason }: {
+  locale: Locale; t: Copy; clinic: Clinic; owner: boolean; canProfile: boolean; base: string; run: Run;
+  /** P1-19: the declaration prompt, above the profile (a slot, so the overview stays unaware of affiliations). */ notice?: React.ReactNode;
+  /** Why the Consultant is not eligible, when it is known (no current affiliation declaration). */ ineligibleReason?: string | null;
+}) {
   const p = clinic.professional;
   const [accepting, setAccepting] = useState(p.availabilityStatus === "AVAILABLE");
   const [hours, setHours] = useState(p.expectedReviewHours ? String(p.expectedReviewHours) : "");
@@ -200,6 +209,7 @@ function Overview({ locale, t, clinic, owner, canProfile, base, run }: { locale:
     void run(`${base}/profile-draft?publish=${publish}`, "PUT", body).then(ok => { if (ok) setEditing(false); });
   };
   return <>
+    {notice}
     <section className="card p-4 sm:p-5" aria-label={t.professional}>
       <h2 className="font-bold text-brand-900">{t.professional}</h2>
       <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -210,7 +220,7 @@ function Overview({ locale, t, clinic, owner, canProfile, base, run }: { locale:
       <p className="mt-4 text-[0.7rem] font-bold uppercase tracking-[0.08em] text-ink-500">{t.capabilities}</p>
       {p.capabilities.length ? <ul className="mt-1.5 flex flex-wrap gap-2">{p.capabilities.map(c => <li key={`${c.type}:${c.code}`} className="rounded-full bg-brand-50 px-3 py-1 text-[0.8rem] font-semibold text-brand-800">{c.label}</li>)}</ul>
         : <p className="mt-1 text-sm text-ink-500">{t.noCapabilities}</p>}
-      <p className={`mt-4 inline-flex items-center gap-1.5 text-sm font-bold ${p.assignable ? "text-brand-800" : "text-ink-600"}`}><ShieldCheck size={16} aria-hidden/>{p.assignable ? t.assignable : t.notAssignable}</p>
+      <p className={`mt-4 inline-flex items-center gap-1.5 text-sm font-bold ${p.assignable ? "text-brand-800" : "text-ink-600"}`}><ShieldCheck size={16} aria-hidden/>{p.assignable ? t.assignable : ineligibleReason ? `${t.notAssignable}: ${ineligibleReason}` : t.notAssignable}</p>
     </section>
 
     {owner && <section className="card p-4 sm:p-5" aria-label={t.availability}>

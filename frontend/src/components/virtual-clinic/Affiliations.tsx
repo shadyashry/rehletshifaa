@@ -224,3 +224,40 @@ function DeclaredLines({ copy, declaration, nameOf }: { copy: AffiliationCopy; d
     {[...byFacility.entries()].map(([facilityId, entry]) => <li key={facilityId}><bdi className="font-semibold text-ink-900">{entry.name}</bdi> <span className="text-ink-600">· {entry.kinds.join(" · ")}</span></li>)}
   </ul>;
 }
+
+/**
+ * The owner's declaration status for the Virtual Clinic overview (P1-19 follow-up): read once per clinic load, so the overview can
+ * say why the Consultant is not eligible and prompt a first or overdue declaration. Null until read, or when it cannot be read.
+ */
+export function useDeclarationStatus(call: AffiliationCall, practitionerId: string, enabled: boolean, refresh: unknown) {
+  const [status, setStatus] = useState<{ key: string; view: AffiliationsView | null } | null>(null);
+  const key = `${practitionerId}`;
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    call<AffiliationsView>(`/clinics/${practitionerId}/affiliations`)
+      .then((view) => { if (live) setStatus({ key, view: view && typeof view === "object" && "declarationCurrent" in view ? view : null }); },
+        () => { if (live) setStatus({ key, view: null }); });
+    return () => { live = false; };
+  }, [call, practitionerId, enabled, refresh, key]);
+  return enabled && status?.key === key ? status.view : null;
+}
+
+const RENEW_NOTICE_MS = 30 * 86_400_000;
+
+/** The overview's prompt: a first declaration, a lapsed one, or one ending within 30 days; nothing otherwise. One quiet action. */
+export function DeclarationPrompt({ locale, copy, view, now, onOpen }: { locale: Locale; copy: AffiliationCopy; view: AffiliationsView | null; now: number; onOpen: () => void }) {
+  if (!view) return null;
+  const words = copy.overview;
+  const renewBy = view.renewBy ? new Date(view.renewBy) : null;
+  if (view.declarationCurrent && !(renewBy && renewBy.getTime() - now < RENEW_NOTICE_MS)) return null;
+  const first = !view.current && view.history.length === 0;
+  const action = <button type="button" className="link-cta mt-2 inline-flex min-h-11 items-center" onClick={onOpen}>{words.action}</button>;
+  if (view.declarationCurrent && renewBy) return <div role="status" className="rounded-lg border border-line bg-brand-50 p-3 text-sm text-ink-800">
+    <p>{fillTemplate(words.renewSoon, { date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(renewBy) })}</p>{action}
+  </div>;
+  return <div role="status" className="flex items-start gap-2.5 rounded-lg bg-alert-50 p-3 text-alert-800">
+    <AlertTriangle size={18} aria-hidden className="mt-0.5 flex-none" />
+    <div><p className="font-bold">{first ? words.firstTitle : words.lapsedTitle}</p><p className="mt-0.5 text-sm">{first ? words.firstBody : words.lapsedBody}</p>{action}</div>
+  </div>;
+}
