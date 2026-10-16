@@ -1,13 +1,26 @@
 const {chromium}=require('C:/Users/hp/Projects/rehletshifaa/frontend/node_modules/playwright-core');
 const fs=require('fs');
+const ANIM=[0,10,12], N=18, FPS=15, SECS=5.2;
 (async()=>{
+ fs.mkdirSync('fr4',{recursive:true});
  const b=await chromium.launch(); const p=await b.newPage({viewport:{width:1920,height:1080}});
- await p.goto('http://localhost:8765/index.html?film=1'); const rects={};
- for(let i=0;i<=15;i++){
+ await p.goto('http://localhost:8765/index.html?film=1'); const meta={};
+ for(let i=0;i<N;i++){
   await p.evaluate(n=>go(n),i); await p.waitForTimeout(300);
   await p.evaluate(()=>Promise.all([...document.images].map(i=>i.decode().catch(()=>{}))));
-  rects[i]=await p.evaluate(()=>[...document.querySelectorAll('.hs')].map(e=>{const r=e.getBoundingClientRect();return {x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)}}));
-  await p.screenshot({path:`fr2/s${String(i).padStart(2,'0')}.png`});
+  const n=String(i).padStart(2,'0');
+  meta[i]={hs:await p.evaluate(()=>[...document.querySelectorAll('.hs')].map(e=>{const r=e.getBoundingClientRect();return {x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)}})),
+    video:await p.evaluate(()=>{const v=document.querySelector('#heroVid');if(!v)return null;const r=v.getBoundingClientRect();return {x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)}})};
+  if(ANIM.includes(i)){
+   const frames=Math.round(SECS*FPS);
+   for(let k=0;k<frames;k++){
+    await p.evaluate(t=>setT(t),k/FPS-0.3);
+    await p.screenshot({path:`fr4/s${n}_${String(k).padStart(3,'0')}.png`});
+   }
+  } else {
+   await p.evaluate(()=>{const v=document.querySelector('#heroVid');if(v){v.pause();v.currentTime=0}});
+   await p.screenshot({path:`fr4/s${n}.png`});
+  }
  }
- fs.writeFileSync('fr2/rects.json',JSON.stringify(rects)); await b.close();
+ fs.writeFileSync('fr4/meta.json',JSON.stringify(meta)); await b.close();
 })();

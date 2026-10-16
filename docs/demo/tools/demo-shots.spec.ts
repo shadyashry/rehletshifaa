@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { API } from "./env";
 import { setupConsultantDay } from "./consultant-fixture";
 import { setupCoordinatorDay } from "./coordinator-fixture";
 import { setupPatient } from "./patient-fixture";
@@ -32,6 +33,13 @@ test("verify", async ({ page }) => {
 });
 test("coordinator", async ({ page }) => {
   await setupCoordinatorDay(page);
+  const eligible = [
+    { practitionerId: "pr-1", displayName: "Dr Samir Example", specialty: "Cardiology", subspecialty: "Interventional cardiology", careArea: "cardiology", matchedBy: "PRIMARY_CARE_AREA",
+      capabilities: [{ type: "PROCEDURE", code: "angioplasty", label: "Coronary angioplasty" }], expectedReviewHours: 48, activeCases: 2, pendingOffers: 0 },
+    { practitionerId: "pr-2", displayName: "Dr Nadia Example", specialty: "Cardiology", subspecialty: "Cardiac surgery", careArea: "cardiology", matchedBy: "PRIMARY_CARE_AREA",
+      capabilities: [{ type: "PROCEDURE", code: "valve", label: "Valve repair" }], expectedReviewHours: 72, activeCases: 1, pendingOffers: 0 },
+  ];
+  await page.route(`${API}/coordinator/cases/*/eligible-consultants*`, route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(eligible) }));
   await page.goto("/en/portal?view=work"); await expect(page.getByRole("heading", { level: 1 })).toBeVisible(); await settle(page);
   await page.screenshot({ path: out("my-work"), fullPage: true });
   await page.goto("/en/portal?case=owned"); await page.locator("#case-heading").waitFor(); await settle(page);
