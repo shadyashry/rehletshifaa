@@ -1,17 +1,16 @@
-import { ArrowRight, Check, HandHeart, HeartPulse, Languages, Stethoscope, UserRoundCheck } from "lucide-react";
+import { ArrowRight, HandHeart, HeartPulse, Languages, Stethoscope, UserRoundCheck } from "lucide-react";
 import Link from "next/link";
 
-import { DossierPreview } from "@/components/home/DossierPreview";
+import { CaseStory } from "@/components/home/story/CaseStory";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 import { TrackedLink } from "@/components/TrackedLink";
 
 /**
- * The opening screen carries one claim, one action and the product itself: the case file the patient will receive,
- * shown as three stamped pages placed on the desk (DossierPreview), instead of a photograph that could belong to any
- * clinic. The "start with what you have" note docks onto the file's lower edge so the two read as one composed unit:
- * what you send, what you get back.
+ * The opening screen carries one claim, one action and the product itself: one example case told in five scenes that
+ * follow How It Works (CaseStory), each opening on a moment from the patient film, so the visitor sees what happens to
+ * their file, who reads it and what comes back before they send anything.
  * Below, the reassurance rail runs as one quiet line on the clinical mist — the hero's closing thought,
  * not a separate section.
  */
@@ -50,21 +49,8 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
           </div>
         </div>
 
-        {/* One composed visual unit: the case file, and the note docked onto its lower edge. */}
-        <DossierPreview locale={locale} d={d}>
-          <figcaption className="home-hero-card relative z-[5] -mt-4 mx-4 rounded-[12px] border border-border-subtle bg-surface-elevated px-4 py-3.5 shadow-[0_10px_30px_-24px_rgba(28,51,58,0.35)] sm:mx-8 sm:px-5 sm:py-4 lg:mx-6">
-            <p className="text-[0.875rem] font-semibold text-brand-900">{d.home.heroCardTitle}</p>
-            <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-              {d.home.prepareItems.map((item) => (
-                <li key={item} className="flex items-center gap-1.5 text-[0.875rem] leading-6 text-ink-600">
-                  <Check size={14} strokeWidth={2.4} className="flex-none text-accent-700" aria-hidden="true" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-1 text-[0.875rem] leading-5 text-ink-500">{d.home.reassurance}</p>
-          </figcaption>
-        </DossierPreview>
+        {/* The picture is the product: one example case, from the first file to follow-up at home. */}
+        <CaseStory locale={locale} d={d} />
       </div>
 
       {/* The reassurance rail: one line of five, separated by hairlines, on the clinical mist. On phones the fifth

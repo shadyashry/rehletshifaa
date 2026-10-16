@@ -8,11 +8,21 @@ for (const locale of ["en", "ar"] as const) {
   test(`homepage image and journey video load ${locale}`, async ({ page }) => {
     await page.setViewportSize({ width: locale === "ar" ? 390 : 1440, height: 900 });
     await page.goto(`/${locale}`);
-    // The hero shows the case file itself (three stamped pages), not a photograph (review 2026-10-14).
-    const dossier = page.locator("main .dossier").first();
-    await expect(dossier).toBeVisible();
-    await expect(dossier.locator(".dossier-page")).toHaveCount(3);
-    await expect(dossier.locator(".case-stamp")).toBeVisible();
+    // The hero tells one example case in five scenes, each opening on a moment from the patient film (2026-10-16).
+    const story = page.locator("main .case-story").first();
+    await expect(story).toBeVisible();
+    const tabs = story.getByRole("tab");
+    await expect(tabs).toHaveCount(5);
+    await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
+    const first = story.getByRole("tabpanel").first();
+    // The stamped case file sits beside the uploads from 640px; phones show the uploads alone.
+    if (locale === "en") await expect(first.locator(".case-stamp")).toBeVisible();
+    await expect.poll(() => first.locator("img").first().evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    // Choosing a step shows its scene and hides the others from assistive technology.
+    await tabs.nth(2).click();
+    await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
+    await expect(story.getByRole("tabpanel")).toHaveCount(1);
+    await expect(story.getByRole("tabpanel").locator("img").first()).toBeVisible();
     const video = page.locator("#how-it-works video");
     await expect(video).toBeVisible();
     await expect(video).toHaveAttribute("src", new RegExp(`journey-${locale}\\.mp4`));

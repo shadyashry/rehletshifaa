@@ -61,33 +61,101 @@
     "intro": "Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.",
     "primaryAction": "Send my case",
     "watchJourney": "See how it works",
-    "reassurance": "No final diagnosis required.",
     "assurances": [
       "A Consultant reviews your case before you decide anything",
       "Reports are uploaded through private, short-lived links",
       "One bilingual coordinator, from your first message onwards"
     ],
     "preliminaryNotice": "Recommendations and cost estimates are preliminary and can change after an in-person assessment.",
-    "heroCardTitle": "Start with what you have",
-    "prepareItems": [
-      "Medical report or discharge summary",
-      "Test results or scans",
-      "A short note about your concern"
-    ],
     "heroCardNote": "If anything else is needed, your coordinator will tell you before the review.",
-    "dossier": {
-      "label": "What you receive: the three pages of your case file",
-      "example": "Example",
-      "stamp": "Received",
-      "page1Kicker": "Case received",
-      "page1Title": "RS-2026-000421",
-      "page1Body": "Your file is with the coordination team. Replies Saturday to Thursday, 10:00–20:00 Cairo time.",
-      "page2Kicker": "Reviewed by",
-      "page2Title": "A Consultant in the right specialty",
-      "page2Body": "The recommendation, the risks, and what is still unknown.",
-      "page3Kicker": "Preliminary estimate",
-      "page3Title": "A price range in your currency",
-      "page3Body": "What it includes, what it does not, and what you pay now."
+    "story": {
+      "label": "Your case, step by step",
+      "pause": "Pause the story",
+      "play": "Play the story",
+      "example": "Example case, from our patient film. Every plan, stay and price is specific to the patient.",
+      "preliminary": "Preliminary until the in-person assessment.",
+      "steps": [
+        { "label": "Send your case", "title": "Send what you already have", "body": "Reports, scans, even a photo of a paper. Your coordinator checks nothing important is missing." },
+        { "label": "Consultant review", "title": "A named Consultant reviews every page", "body": "With your coordinator beside them. Every scan and report is read before anything is recommended." },
+        { "label": "Recommended plan", "title": "Your recommendation, priced in your currency", "body": "What is recommended and why, what still needs checking, and what the estimate includes." },
+        { "label": "You decide", "title": "Nothing is arranged until you decide", "body": "Continue to care in Egypt, or stop here. The decision stays yours." },
+        { "label": "Treatment & follow-up", "title": "Treatment in Egypt, follow-up at home", "body": "Care from your treating Consultant as agreed, then follow-up after you return." }
+      ],
+      "send": {
+        "photoAlt": "A patient at home, reading through his medical reports",
+        "tag": "Sent from home",
+        "coordinator": "Your coordinator",
+        "coordinatorMessage": "Your file is complete. A Consultant review starts now.",
+        "files": [
+          { "name": "Discharge summary", "kind": "PDF", "lang": "en" },
+          { "name": "Scans · 24 images", "kind": "SCAN", "lang": "en" },
+          { "name": "Photo of blood tests", "kind": "PHOTO", "lang": "en" },
+          { "name": "تقرير الطبيب المعالج", "kind": "PDF", "lang": "ar" }
+        ],
+        "caseFile": "Your case file",
+        "private": "Private to your care team",
+        "check": "Coordinator check: nothing missing",
+        "stamp": "Received"
+      },
+      "review": {
+        "photoAlt": "A Consultant and a coordinator reviewing a patient's file together",
+        "consultantTag": "Your Consultant · the right specialty",
+        "coordinatorTag": "Your coordinator",
+        "chips": ["Chosen for your case", "Credentials reviewed", "A profile you can read"],
+        "scansTitle": "Your scans",
+        "scansRead": "24 / 24 read",
+        "scans": ["X-ray", "CT · 120 slices", "Ultrasound"],
+        "reportBefore": "Symptoms for ",
+        "reportMark1": "eight months",
+        "reportMiddle": "; imaging shows ",
+        "reportMark2": "a change to review",
+        "reportAfter": ".",
+        "notes": ["Key finding, noted", "Still needed: one recent test", "Your question, answered"]
+      },
+      "recommendation": {
+        "photoAlt": "The patient reading his Consultant's recommendation on his phone",
+        "ready": "Your recommendation is ready",
+        "validUntil": "Valid until {date}",
+        "title": "Minimally invasive procedure",
+        "recommended": "Recommended",
+        "why": "Why: the best balance of recovery and risk for your case.",
+        "facts": [
+          { "label": "In hospital", "value": "1–2 nights" },
+          { "label": "Back to normal", "value": "About 4 weeks" },
+          { "label": "Still to confirm", "value": "One test on arrival" }
+        ],
+        "estimate": "Preliminary estimate",
+        "estimateValue": "A price range in",
+        "currencyLabel": "your currency",
+        "includes": ["Consultant & procedure", "Hospital stay", "Tests on arrival", "Coordination"]
+      },
+      "decide": {
+        "photoAlt": "The patient in a car in Cairo, on his way to his appointment",
+        "landTag": "If you continue: met when you land",
+        "coordinatorMessage": "Welcome to Cairo. Your appointment is tomorrow, and I'll be with you.",
+        "continueKicker": "If you continue",
+        "continueTitle": "We arrange it around your plan",
+        "continueSteps": ["Confirm with a coordination deposit", "Appointment timing first", "Then travel support, where required"],
+        "stopKicker": "Or stop here",
+        "stopTitle": "No commitment",
+        "stopBody": "Keep the Consultant's written recommendation and share it with your own doctor."
+      },
+      "care": {
+        "photoAlt": "The patient with his treating Consultant, going through his report",
+        "youTag": "You",
+        "youLabel": "In Cairo, day 2",
+        "consultantTag": "Your treating Consultant",
+        "days": [
+          { "day": "Day 1", "label": "Met at the airport" },
+          { "day": "Day 2", "label": "Tests & visit" },
+          { "day": "Day 3", "label": "Treatment" },
+          { "day": "Day 4–9", "label": "Recovery" },
+          { "day": "Home", "label": "Discharge report" }
+        ],
+        "followTitle": "Week 2 · follow-up from home",
+        "followBody": "With your Consultant and coordinator, after you return",
+        "followAlt": "The patient at home on a follow-up call"
+      }
     },
     "video": {
       "eyebrow": "Your journey, explained",
