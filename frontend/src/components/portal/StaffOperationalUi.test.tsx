@@ -118,6 +118,26 @@ describe("CurrentActionPanel", () => {
     expect(screen.getAllByRole("button")).toHaveLength(3);
   });
 
+  // UX 3-1: the step's form is on the page, so the strip only points to it and the form's submit is the one filled action.
+  it("points to the step's form with a quiet link, never a second filled button", () => {
+    const onFocusAction = vi.fn();
+    renderWithWork(<CurrentActionPanel locale="en" role="doctor" action={{ code: "RECORD_CLINICAL_DECISION", kind: "FOCUS" }} onFocusAction={onFocusAction}/>);
+    const link = screen.getByRole("button", { name: "Go to the form: Record clinical decision" });
+    expect(link.className).toContain("link-cta");
+    expect(document.querySelector(".btn-primary")).toBeNull();
+    fireEvent.click(link);
+    expect(onFocusAction).toHaveBeenCalled();
+  });
+
+  it("words the clinical step as the final assessment once the patient has arrived (copy only)", () => {
+    renderWithWork(<CurrentActionPanel locale="en" role="doctor" stage="ARRIVAL_CONFIRMED" action={{ code: "RECORD_CLINICAL_DECISION", kind: "FOCUS" }} onFocusAction={vi.fn()}/>);
+    expect(screen.getByRole("heading", { name: "Record your final assessment" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Go to the form: Record final assessment" })).toBeTruthy();
+    cleanup();
+    renderWithWork(<CurrentActionPanel locale="ar" role="doctor" stage="ARRIVAL_CONFIRMED" action={{ code: "RECORD_CLINICAL_DECISION", kind: "FOCUS" }} onFocusAction={vi.fn()}/>, "ar");
+    expect(screen.getByRole("heading", { name: "سجّل تقييمك النهائي" })).toBeTruthy();
+  });
+
   it("shows no primary action while the ball is with the patient", () => {
     renderWithWork(<CurrentActionPanel locale="en" role="coordinator" action={{ code: "WAIT_PATIENT_INFORMATION", kind: "WAIT" }}
                                onFocusAction={vi.fn()} secondary={[{ label: "Record patient response", onClick: vi.fn() }]}/>);

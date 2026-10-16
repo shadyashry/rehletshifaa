@@ -1,499 +1,142 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { scrollIntoView } from "@/lib/scroll";
-import { Clock, FileText } from "lucide-react";
+import { useId, useRef, useState } from "react";
 
 import type { Locale } from "@/lib/i18n";
-import { formatMoney } from "@/lib/money";
-import type { DirectoryFacility } from "@/components/portal/portal-model";
-import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageEstimate } from "@/components/portal/FacilityPackagePicker";
+import { fillTemplate } from "@/lib/portal-labels";
+import { CURRENCY_LABELS, type DirectoryFacility } from "@/components/portal/portal-model";
+import { useWorkCopy } from "@/components/portal/portal-copy";
+import { ConfirmDialog } from "@/components/portal/portal-ui";
+import { BASE, DecisionSummary, DisclosureChevron, EstimateLines, RecommendationFields, currencyName, land, useClinicalDecision, type CatalogService, type DecisionLine } from "@/components/portal/ClinicalDecision";
 
-export type CatalogService = { id: string; serviceCode: string; serviceName: string; category?: string; priceEgp: number; active: boolean };
+export type { CatalogService } from "@/components/portal/ClinicalDecision";
 export type FxRate = { currency: string; rate: number; rateDate: string; source: string };
-export type ReviewDocument = { documentId: string; fileName: string; status: string };
-export type DraftEstimate = { serviceDescription: string; estimatedCost: number; currency: string; catalogServiceId?: string | null; facilityPackageId?: string | null };
-export type ReviewDraft = { id: string; recommendedTreatment?: string | null; risksAndLimitations?: string | null; costEstimates?: DraftEstimate[]; proposalCurrency?: string | null } | null;
+export type ReviewDraft = { id: string; recommendedTreatment?: string | null; risksAndLimitations?: string | null; costEstimates?: DecisionLine[]; proposalCurrency?: string | null } | null;
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
 
-const BASE = "EGP";
-
-/** Only the outcomes the domain actually accepts, in the order a consultant would consider them. */
+/** Only the outcomes the domain actually accepts, in the order a Consultant would consider them. */
 // Transfers and second opinions go through the controlled referral flow (ConsultantReferrals), never through here.
 const OUTCOMES = ["INFO", "RETURN_TO_COORDINATOR", "NOT_SUITABLE"] as const;
 type Outcome = (typeof OUTCOMES)[number];
 
-const CURRENCY_LABELS: Record<string, string> = {
-  EGP: "EGP", USD: "USD", EUR: "EUR", AED: "AED", SAR: "SAR", GBP: "GBP", KWD: "KWD", QAR: "QAR", JOD: "JOD",
-};
-
-function money(amount: number, currency: string, locale: Locale) {
-  return formatMoney(amount, currency, locale);
-}
-
 /**
- * The consultant's clinical review: read the evidence, record the recommendation, pick the recommended
- * services from the approved price list, then submit.
+ * The Consultant's clinical review: "1 Recommendation", "2 Estimate lines", then the summary and its one filled button.
+ * The evidence (intake summary, documents on file) opens the sheet above this panel, or in the case rail on large screens.
  *
- * <p>Two deliberate constraints. Clinical content outranks commercial content visually. And there is one
- * normal completion — Submit recommendation — which the backend turns into a coordinator handoff by
- * itself; the exceptional outcomes stay behind a single disclosure so they never compete with it.
+ * <p>There is one normal completion — Submit recommendation — which the backend turns into a coordinator handoff by
+ * itself; the exceptional outcomes stay behind a single disclosure and are confirmed in a dialog before they are sent.
+ * The form is seeded once from the draft: the case view is mounted per case, and a saved draft is what was just typed.
  */
-export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, facilities = [], documents, draft, viewDoc, downloadDoc, mutate }: {
+export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, facilities = [], documentsOnFile, draft, mutate }: {
   locale: Locale; caseId: string; busy: boolean; catalog: CatalogService[]; fxRates: FxRate[]; /** P0-5: active facilities with Finance-approved packages. */ facilities?: DirectoryFacility[];
-  documents: ReviewDocument[]; draft?: ReviewDraft; viewDoc: (id: string) => void; downloadDoc: (id: string) => void; mutate: Mutate;
+  /** How many documents are on file (the evidence above lists them). */ documentsOnFile: number; draft?: ReviewDraft; mutate: Mutate;
 }) {
-  const ar = locale === "ar";
-  const t = copy(ar);
-
-  // Resume an existing draft, and re-seed when the consultant switches case. A sync key beats an effect:
-  // the values are derived from props, never fetched again.
-  const seedKey = `${caseId}|${draft?.id ?? ""}`;
-  const [synced, setSynced] = useState(seedKey);
-  const [recommendation, setRecommendation] = useState(draft?.recommendedTreatment ?? "");
-  const [considerations, setConsiderations] = useState(draft?.risksAndLimitations ?? "");
-  const [selected, setSelected] = useState<Set<string>>(() => seedSelection(draft, catalog));
-  const [offList, setOffList] = useState<{ description: string; amountEgp: number }[]>(() => seedOffList(draft));
-  // P0-5: Finance-approved facility packages; the consultant sets the expected figure inside each range.
-  const [packagePicks, setPackagePicks] = useState<Map<string, number>>(() => seedPackages(draft));
+  const copy = useWorkCopy().clinicalDecision;
+  const id = useId();
+  const decision = useClinicalDecision({ seed: draft, catalog, facilities });
   const [proposalCurrency, setProposalCurrency] = useState(draft?.proposalCurrency ?? BASE);
-  if (synced !== seedKey) {
-    setSynced(seedKey);
-    setRecommendation(draft?.recommendedTreatment ?? "");
-    setConsiderations(draft?.risksAndLimitations ?? "");
-    setSelected(seedSelection(draft, catalog));
-    setOffList(seedOffList(draft));
-    setPackagePicks(seedPackages(draft));
-    setProposalCurrency(draft?.proposalCurrency ?? BASE);
-  }
-
-  const [offName, setOffName] = useState("");
-  const [offAmount, setOffAmount] = useState("");
+  const [draftError, setDraftError] = useState("");
   const [outcome, setOutcome] = useState<Outcome | "">("");
   const [outcomeReason, setOutcomeReason] = useState("");
-  const [error, setError] = useState("");
-  // Field-level validation mirrors the server rule (CLINICAL_RECOMMENDATION_REQUIRED) so the consultant is
-  // told next to the field, before the round trip; the server still decides.
-  const [recommendationError, setRecommendationError] = useState("");
-  const recommendationRef = useRef<HTMLTextAreaElement>(null);
+  const [outcomeError, setOutcomeError] = useState("");
+  const [confirming, setConfirming] = useState<Outcome | null>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
 
-  const rate = proposalCurrency === BASE ? 1 : (fxRates.find(fx => fx.currency === proposalCurrency)?.rate ?? 1);
-  const converted = proposalCurrency !== BASE && rate !== 1;
-  const currencies = [BASE, ...fxRates.filter(fx => fx.currency !== BASE).map(fx => fx.currency)];
-
-  const picks = catalog.filter(service => selected.has(service.id));
-  // QA #8: only catalogue lines are "approved"; anything off the list is shown apart, as awaiting Finance.
-  const catalogueTotal = picks.reduce((sum, s) => sum + s.priceEgp, 0);
-  // P0-5: packages are approved lines too; the expected figure must stay inside the approved range (the server refuses otherwise).
-  const packages = facilityPackages(facilities);
-  const { lines: packageLines, total: packageTotal, inRange: packagesInRange } = facilityPackageLines(packages, packagePicks);
-  const offListTotal = offList.reduce((sum, row) => sum + row.amountEgp, 0);
-  const baseTotal = catalogueTotal + packageTotal + offListTotal;
+  // The chosen currency stays listed even when its rate is gone (or not loaded yet), so the control shows what will be sent.
+  const currencies = [...new Set([BASE, ...fxRates.filter(fx => fx.currency !== BASE).map(fx => fx.currency), proposalCurrency])];
+  const fx = fxRates.find(rate => rate.currency === proposalCurrency);
+  const noRate = proposalCurrency !== BASE && !fx;
+  const rate = fx?.rate ?? 1;
   // QA #12, one rounding rule: each line converted and rounded to the cent, then added — the proposal's own arithmetic.
-  const convertedTotal = [...picks.map(s => s.priceEgp), ...packageLines.map(p => p.amountEgp), ...offList.map(row => row.amountEgp)].reduce((sum, egp) => sum + Math.round(egp * rate * 100) / 100, 0);
-  const serviceCount = picks.length + packageLines.length + offList.length;
-  const readyDocuments = documents.filter(doc => doc.status === "CLEAN");
-  const canSubmit = recommendation.trim().length > 0 && serviceCount > 0 && packagesInRange;
-
-  const toggle = (id: string) => setSelected(current => {
-    const next = new Set(current);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const togglePackage = (id: string, minEgp: number) => setPackagePicks(current => {
-    const next = new Map(current);
-    if (next.has(id)) next.delete(id); else next.set(id, minEgp);
-    return next;
-  });
-  const setPackageAmount = (id: string, amount: number) => setPackagePicks(current => new Map(current).set(id, amount));
-
-  const estimates = () => [
-    // Catalogue picks always travel at their approved EGP price. The display currency is a lens, never a
-    // value the server should trust — and the server re-reads the catalogue price regardless.
-    ...picks.map(s => ({ serviceDescription: s.serviceName, estimatedCost: s.priceEgp, currency: BASE, catalogServiceId: s.id })),
-    // Facility packages (P0-5): the expected EGP figure inside the approved range; the server re-checks the package and the range.
-    ...packageLines.map(packageEstimate),
-    ...offList.map(row => ({ serviceDescription: row.description, estimatedCost: row.amountEgp, currency: BASE })),
-  ];
+  const convertedTotal = decision.lines.amountsEgp().reduce((sum, egp) => sum + Math.round(egp * rate * 100) / 100, 0);
+  const body = () => ({ proposalCurrency, risksAndLimitations: decision.risks.trim() || undefined, costEstimates: decision.lines.estimates() });
 
   const submit = () => {
-    if (!recommendation.trim()) {
-      setRecommendationError(t.errRecommendation); setError("");
-      recommendationRef.current?.focus();
-      scrollIntoView(recommendationRef.current, { behavior: "smooth", block: "center" });
-      return;
-    }
-    setRecommendationError("");
-    if (!canSubmit) { setError(t.errServices); return; }
-    setError("");
-    void mutate(`/doctor/cases/${caseId}/review-decision`, {
-      decision: "ACCEPT", recommendedTreatment: recommendation.trim(), proposalCurrency,
-      risksAndLimitations: considerations.trim() || undefined, costEstimates: estimates(),
-    });
+    setDraftError("");
+    if (!decision.validate()) return;
+    void mutate(`/doctor/cases/${caseId}/review-decision`, { decision: "ACCEPT", recommendedTreatment: decision.recommendation.trim(), ...body() });
   };
-
   const saveDraft = () => {
-    if (!recommendation.trim() && serviceCount === 0) { setError(t.errDraft); return; }
-    setError("");
-    void mutate(`/doctor/cases/${caseId}/reviews`, {
-      suitability: "SUITABLE", recommendedTreatment: recommendation.trim() || undefined, proposalCurrency,
-      risksAndLimitations: considerations.trim() || undefined, costEstimates: estimates(),
-    });
+    if (!decision.recommendation.trim() && decision.lines.count === 0) { setDraftError(copy.errors.draft); return; }
+    setDraftError("");
+    void mutate(`/doctor/cases/${caseId}/reviews`, { suitability: "SUITABLE", recommendedTreatment: decision.recommendation.trim() || undefined, ...body() });
   };
 
-  const submitOutcome = () => {
+  const askOutcome = () => {
     if (!outcome) return;
-    if (!outcomeReason.trim()) { setError(t.errReason); return; }
-    setError("");
-    void mutate(`/doctor/cases/${caseId}/review-decision`, {
-      decision: outcome, risksAndLimitations: outcomeReason.trim(),
-    }).then(result => { if (result) { setOutcome(""); setOutcomeReason(""); } });
+    if (!outcomeReason.trim()) { setOutcomeError(copy.errors.reason); land(reasonRef.current); return; }
+    setOutcomeError("");
+    setConfirming(outcome);
   };
-
-  const addOffList = () => {
-    const amount = Number(offAmount);
-    if (!offName.trim() || !Number.isFinite(amount) || amount <= 0) { setError(t.errOffList); return; }
-    setError("");
-    setOffList(rows => [...rows, { description: offName.trim(), amountEgp: Math.round(amount * 100) / 100 }]);
-    setOffName(""); setOffAmount("");
+  const sendOutcome = (chosen: Outcome) => {
+    void mutate(`/doctor/cases/${caseId}/review-decision`, { decision: chosen, risksAndLimitations: outcomeReason.trim() })
+      .then(result => { if (result) { setOutcome(""); setOutcomeReason(""); } });
   };
 
   return (
-    <section aria-labelledby="clinical-review-title" className="card p-4 sm:p-5">
-      <h3 id="clinical-review-title" className="text-[1.05rem] font-bold leading-6 text-brand-900">{t.title}</h3>
+    <section id="clinical-decision" aria-labelledby={`${id}-title`} className="card p-4 sm:p-5">
+      <h3 id={`${id}-title`} className="text-[1.125rem] font-bold leading-7 text-brand-900">{copy.review.title}</h3>
 
-      {/* Evidence first: composing a recommendation should never mean leaving the page to find a file. Sections inside
-          this card are separated by hairlines, never boxed again (no nested cards). */}
-      <section aria-labelledby="review-documents" className="mt-4 border-t border-line pt-3">
-        <h4 id="review-documents" className="label-micro text-ink-500">
-          {t.documents}{documents.length > 0 && <span className="text-ink-400"> · {documents.length}</span>}
-        </h4>
-        {documents.length === 0
-          ? <p className="mt-1.5 text-[0.85rem] text-ink-500">{t.noDocuments}</p>
-          : <ul className="mt-1">
-              {documents.map(doc => (
-                <li key={doc.documentId} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-1.5 last:border-0">
-                  <FileText size={14} aria-hidden className="flex-none text-brand-600"/>
-                  <span className="min-w-0 flex-1 truncate text-[0.88rem] font-semibold text-ink-800">{doc.fileName}</span>
-                  {doc.status === "CLEAN"
-                    ? <span className="flex gap-3">
-                        <button type="button" className="link-cta text-[0.85rem]" onClick={() => viewDoc(doc.documentId)}>{t.preview}<span className="sr-only"> {doc.fileName}</span></button>
-                        <button type="button" className="link-cta text-[0.85rem]" onClick={() => downloadDoc(doc.documentId)}>{t.download}<span className="sr-only"> {doc.fileName}</span></button>
-                      </span>
-                    : <span className="text-[0.8rem] text-ink-500">{doc.status === "PENDING" || doc.status === "UPLOADED" ? t.scanning : t.unavailable}</span>}
-                </li>
-              ))}
-            </ul>}
-      </section>
+      <RecommendationFields decision={decision} hint={copy.recommendation.hint}/>
 
-      <div className="mt-5">
-        {/* The asterisk sits beside the label, not inside it: the accessible name stays clean and required-ness is carried by the attributes. */}
-        <div className="flex items-baseline gap-1">
-          <label htmlFor="clinical-recommendation" className="block text-[0.95rem] font-bold text-ink-900">{t.recommendation}</label>
-          <span className="text-alert-600" aria-hidden>*</span>
+      <EstimateLines locale={locale} decision={decision}>
+        <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-1">
+          <label className="block text-[0.875rem] font-bold text-ink-800">{copy.lines.currency}
+            <select className="field mt-1 block w-auto" value={proposalCurrency} onChange={event => setProposalCurrency(event.target.value)}
+                    aria-describedby={noRate ? `${id}-currency-hint ${id}-no-rate` : `${id}-currency-hint`}>
+              {currencies.map(code => <option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale] ?? code}</option>)}
+            </select>
+          </label>
+          <p id={`${id}-currency-hint`} className="max-w-sm pb-2 text-[0.8125rem] leading-5 text-ink-500">{copy.lines.currencyHint}</p>
         </div>
-        <p id="clinical-recommendation-hint" className="mt-0.5 text-[0.85rem] leading-6 text-ink-600">{t.recommendationHint} <span className="text-ink-500">{t.requiredLegend}</span></p>
-        <textarea id="clinical-recommendation" ref={recommendationRef} className={`field mt-2 min-h-32 ${recommendationError ? "field-error" : ""}`} maxLength={20000} value={recommendation}
-                  aria-describedby={recommendationError ? "clinical-recommendation-error clinical-recommendation-hint" : "clinical-recommendation-hint"}
-                  aria-required="true" required aria-invalid={recommendationError ? true : undefined}
-                  onChange={event => { setRecommendation(event.target.value); if (recommendationError && event.target.value.trim()) setRecommendationError(""); }}
-                  placeholder={t.recommendationPlaceholder}/>
-        {recommendationError && <p id="clinical-recommendation-error" role="alert" className="error-text mt-1">{recommendationError}</p>}
-      </div>
+        {noRate && <p id={`${id}-no-rate`} className="mt-2 max-w-[65ch] text-[0.875rem] leading-6 text-alert-800">{fillTemplate(copy.lines.noRate, { currency: currencyName(proposalCurrency, locale) })}</p>}
+      </EstimateLines>
 
-      <section aria-labelledby="recommended-services" className="mt-5 border-t border-line pt-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h4 id="recommended-services" className="text-[0.95rem] font-bold text-ink-900">{t.services}</h4>
-            <p className="mt-0.5 max-w-xl text-[0.85rem] leading-6 text-ink-600">{t.servicesHint}</p>
-          </div>
-          <div className="flex-none">
-            <label className="flex items-center justify-end gap-2 text-[0.82rem] font-semibold text-ink-600">
-              {t.proposalCurrency}
-              <select className="field !mt-0 w-auto py-1" value={proposalCurrency} onChange={event => setProposalCurrency(event.target.value)}
-                      aria-describedby="proposal-currency-hint">
-                {currencies.map(code => <option key={code} value={code}>{CURRENCY_LABELS[code] ?? code}</option>)}
-              </select>
-            </label>
-            <p id="proposal-currency-hint" className="mt-1 max-w-xs text-[0.8125rem] leading-5 text-ink-500">{t.currencyHint}</p>
-          </div>
+      <DecisionSummary locale={locale} title={copy.summary.title} decision={decision} documentsOnFile={documentsOnFile}
+                       proposal={proposalCurrency !== BASE && fx ? { amount: convertedTotal, currency: proposalCurrency } : null}>
+        {draftError && <p role="alert" className="error-text mt-3">{draftError}</p>}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button type="button" className="btn-primary" disabled={busy} onClick={submit}>{copy.submit}</button>
+          <button type="button" className="btn-secondary" disabled={busy} onClick={saveDraft}>{copy.saveDraft}</button>
         </div>
+      </DecisionSummary>
 
-        {catalog.length === 0
-          ? <p className="mt-3 rounded-lg bg-mist p-3 text-[0.85rem] text-ink-600">{t.noCatalog}</p>
-          : <ul className="mt-3 space-y-1">
-              {catalog.map(service => {
-                const on = selected.has(service.id);
-                return (
-                  <li key={service.id}>
-                    <label className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 transition ${on ? "border-brand-500 bg-brand-50" : "border-line hover:border-brand-300"}`}>
-                      <input type="checkbox" className="h-4 w-4 flex-none accent-brand-600" checked={on} onChange={() => toggle(service.id)}/>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[0.9rem] font-semibold text-ink-900">{service.serviceName}</span>
-                        {service.category && <span className="block text-[0.8125rem] text-ink-500">{service.category}</span>}
-                      </span>
-                      <span className="flex-none text-end">
-                        <span className="block whitespace-nowrap text-[0.9rem] font-bold text-ink-800">{money(service.priceEgp, BASE, locale)}</span>
-                        {converted && <span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">≈ {money(service.priceEgp * rate, proposalCurrency, locale)}</span>}
-                      </span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>}
-
-        <FacilityPackagePicker locale={locale} packages={packages} picks={packagePicks} onToggle={togglePackage} onAmount={setPackageAmount}
-                               labels={{ title: t.packagesTitle, hint: t.packagesHint, expected: t.packageExpected, outOfRange: t.packageOutOfRange }}/>
-
-        {offList.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {offList.map((row, index) => (
-              <li key={`${row.description}-${index}`} className="flex items-center gap-3 rounded-lg border border-status-warning-border bg-status-warning-surface p-2.5">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[0.9rem] font-semibold text-ink-900">{row.description}</span>
-                  <span className="mt-0.5 flex items-center gap-1 text-[0.8125rem] font-bold text-status-warning-fg"><Clock size={13} strokeWidth={2.25} aria-hidden/>{t.needsFinance}</span>
-                </span>
-                <span className="flex-none whitespace-nowrap text-[0.9rem] font-bold text-ink-800">{money(row.amountEgp, BASE, locale)}</span>
-                <button type="button" className="flex-none text-[0.8rem] font-bold text-ink-500 hover:text-alert-700"
-                        onClick={() => setOffList(rows => rows.filter((_, i) => i !== index))}
-                        aria-label={`${t.removeService}: ${row.description}`}>×</button>
+      {/* One disclosure, not permanent cards: these are exits from the normal path, not alternatives to it. */}
+      <details className="group mt-5 border-t border-line pt-1">
+        <summary id={`${id}-exits`} className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-[0.875rem] font-semibold text-ink-700 [&::-webkit-details-marker]:hidden">
+          {copy.exits.toggle}<DisclosureChevron/>
+        </summary>
+        <fieldset className="mt-1" aria-labelledby={`${id}-exits`}>
+          <ul className="divide-y divide-line border-y border-line">
+            {OUTCOMES.map(option => (
+              <li key={option}>
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2.5">
+                  <input type="radio" name={`${id}-outcome`} className="mt-1 h-4 w-4 flex-none accent-brand-600"
+                         checked={outcome === option} onChange={() => { setOutcome(option); setOutcomeError(""); }}/>
+                  <span className="min-w-0">
+                    <span className="block text-[0.9375rem] font-bold text-ink-900">{copy.exits.label[option]}</span>
+                    <span className="mt-0.5 block text-[0.875rem] leading-6 text-ink-600">{copy.exits.hint[option]}</span>
+                  </span>
+                </label>
               </li>
             ))}
           </ul>
+        </fieldset>
+        {outcome && (
+          <div className="mt-3 max-w-xl pb-1">
+            <label htmlFor={`${id}-reason`} className="block text-[0.875rem] font-bold text-ink-800">{copy.exits.reason}</label>
+            <textarea id={`${id}-reason`} ref={reasonRef} dir="auto" className={`field mt-1.5 min-h-20 ${outcomeError ? "field-error" : ""}`} maxLength={20000} value={outcomeReason} aria-required="true"
+                      aria-invalid={outcomeError ? true : undefined} aria-describedby={outcomeError ? `${id}-reason-error` : undefined}
+                      onChange={event => { setOutcomeReason(event.target.value); if (outcomeError && event.target.value.trim()) setOutcomeError(""); }}
+                      placeholder={copy.exits.reasonPlaceholder}/>
+            {outcomeError && <p id={`${id}-reason-error`} role="alert" className="error-text mt-1">{outcomeError}</p>}
+            <button type="button" disabled={busy} className="btn-secondary mt-3" aria-haspopup="dialog" onClick={askOutcome}>{copy.exits.action[outcome]}</button>
+          </div>
         )}
-
-        {/* The exception path, collapsed: outside the approved list means Finance has to price it. */}
-        <details className="mt-3 rounded-lg border border-line px-3 py-2">
-          <summary className="cursor-pointer text-[0.85rem] font-semibold text-brand-800">+ {t.offListToggle}</summary>
-          <div className="mt-3 space-y-2">
-            <p className="text-[0.8rem] leading-6 text-ink-600">{t.offListHint}</p>
-            <label className="block text-[0.8rem] font-bold text-ink-700">{t.offListName}
-              <input className="field mt-1" value={offName} maxLength={500} onChange={event => setOffName(event.target.value)}/>
-            </label>
-            <label className="block text-[0.8rem] font-bold text-ink-700">{t.offListAmount}
-              <input className="field mt-1" type="number" min="0" step="0.01" value={offAmount} onChange={event => setOffAmount(event.target.value)}/>
-            </label>
-            <button type="button" className="btn-secondary" onClick={addOffList}>{t.offListAdd}</button>
-          </div>
-        </details>
-      </section>
-
-      <div className="mt-5">
-        <label htmlFor="clinical-considerations" className="block text-[0.95rem] font-bold text-ink-900">{t.considerations}</label>
-        <p id="clinical-considerations-hint" className="mt-0.5 text-[0.85rem] leading-6 text-ink-600">{t.considerationsHint}</p>
-        <textarea id="clinical-considerations" className="field mt-2 min-h-24" maxLength={20000} value={considerations}
-                  aria-describedby="clinical-considerations-hint"
-                  onChange={event => setConsiderations(event.target.value)}/>
-      </div>
-
-      {/* A last read-through before it leaves the consultant's hands — not another page, not another click. */}
-      <section aria-labelledby="recommendation-summary" className="mt-5 border-t border-line pt-4">
-        <h4 id="recommendation-summary" className="label-micro text-brand-700">{t.summary}</h4>
-        <dl className="mt-3 grid gap-x-6 gap-y-3 text-[0.85rem] sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.recommendation}</dt>
-            <dd className="mt-0.5 line-clamp-2 font-semibold text-ink-900">{recommendation.trim() || <span className="font-normal text-ink-400">{t.notRecorded}</span>}</dd>
-          </div>
-          <div>
-            <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.servicesShort}</dt>
-            <dd className="mt-0.5 font-semibold text-ink-900">{t.selectedCount(serviceCount)}</dd>
-          </div>
-          <div>
-            <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.documentsReviewed}</dt>
-            <dd className="mt-0.5 font-semibold text-ink-900">{readyDocuments.length}</dd>
-          </div>
-          <div>
-            <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.baseEstimate}</dt>
-            <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(catalogueTotal, BASE, locale)}</dd>
-          </div>
-          {packageTotal > 0 && (
-            <div>
-              <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.packageEstimate}</dt>
-              <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(packageTotal, BASE, locale)}</dd>
-            </div>
-          )}
-          {offListTotal > 0 && (
-            <>
-              <div>
-                <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.offListEstimate}</dt>
-                <dd className="mt-0.5 text-[1rem] font-bold text-status-warning-fg">{money(offListTotal, BASE, locale)}</dd>
-              </div>
-              <div>
-                <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.estimateTotal}</dt>
-                <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(baseTotal, BASE, locale)}</dd>
-              </div>
-            </>
-          )}
-          {converted && (
-            <div>
-              <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.proposalEstimate}</dt>
-              <dd className="mt-0.5 text-[1rem] font-bold text-brand-900">{money(convertedTotal, proposalCurrency, locale)}</dd>
-            </div>
-          )}
-        </dl>
-        {converted && <p className="mt-2 text-[0.8125rem] text-ink-500">{t.approxNote}</p>}
-
-        {error && <p role="alert" className="mt-3 rounded-lg bg-alert-50 px-3 py-2 text-[0.85rem] font-semibold text-alert-700">{error}</p>}
-
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button type="button" className="btn-primary" disabled={busy} onClick={submit}>{t.submit}</button>
-          <button type="button" className="btn-secondary" disabled={busy} onClick={saveDraft}>{t.saveDraft}</button>
-        </div>
-      </section>
-
-      {/* One disclosure, not four permanent cards: these are exits from the normal path, not alternatives to it. */}
-      <details className="mt-4 rounded-lg border border-line px-4 py-3">
-        <summary className="cursor-pointer text-[0.85rem] font-semibold text-ink-600">{t.otherOutcome}</summary>
-        <div className="mt-3 space-y-2" role="group" aria-label={t.otherOutcome}>
-          {OUTCOMES.map(option => (
-            <label key={option} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${outcome === option ? "border-brand-500 bg-brand-50" : "border-line hover:border-brand-300"}`}>
-              <input type="radio" name="clinical-outcome" className="mt-1 h-4 w-4 flex-none accent-brand-600"
-                     checked={outcome === option} onChange={() => { setOutcome(option); setError(""); }}/>
-              <span className="min-w-0">
-                <span className="block text-[0.9rem] font-bold text-ink-900">{t.outcomeLabel[option]}</span>
-                <span className="mt-0.5 block text-[0.8rem] leading-6 text-ink-600">{t.outcomeHint[option]}</span>
-              </span>
-            </label>
-          ))}
-          {outcome && (
-            <div className="rounded-lg border border-line bg-mist p-3">
-              <label htmlFor="outcome-reason" className="block text-[0.82rem] font-bold text-ink-800">{t.outcomeReason}</label>
-              <textarea id="outcome-reason" className="field mt-1.5 min-h-20" maxLength={20000} value={outcomeReason} aria-required="true"
-                        onChange={event => setOutcomeReason(event.target.value)} placeholder={t.outcomeReasonPlaceholder}/>
-              <button type="button" disabled={busy || !outcomeReason.trim()}
-                      className={outcome === "NOT_SUITABLE"
-                        ? "mt-3 rounded-lg border border-alert-300 bg-alert-50 px-4 py-2 text-[0.9rem] font-bold text-alert-700 transition hover:border-alert-400 disabled:opacity-50"
-                        : "btn-secondary mt-3"}
-                      onClick={() => { if (outcome !== "NOT_SUITABLE" || window.confirm(t.confirmUnsuitable)) submitOutcome(); }}>
-                {t.outcomeConfirm[outcome]}
-              </button>
-            </div>
-          )}
-        </div>
       </details>
+      {confirming && <ConfirmDialog title={copy.exits.confirm[confirming].title} body={copy.exits.confirm[confirming].body}
+                                    confirm={copy.exits.action[confirming]} cancel={copy.exits.keep}
+                                    onCancel={() => setConfirming(null)} onConfirm={() => { const chosen = confirming; setConfirming(null); sendOutcome(chosen); }}/>}
     </section>
   );
-}
-
-function seedSelection(draft: ReviewDraft | undefined, catalog: CatalogService[]) {
-  const known = new Set(catalog.map(service => service.id));
-  return new Set((draft?.costEstimates ?? []).map(e => e.catalogServiceId).filter((id): id is string => !!id && known.has(id)));
-}
-
-function seedPackages(draft: ReviewDraft | undefined) {
-  return new Map((draft?.costEstimates ?? []).filter(e => !!e.facilityPackageId).map(e => [e.facilityPackageId as string, Number(e.estimatedCost) || 0]));
-}
-
-function seedOffList(draft: ReviewDraft | undefined) {
-  return (draft?.costEstimates ?? [])
-    .filter(e => !e.catalogServiceId && !e.facilityPackageId)
-    .map(e => ({ description: e.serviceDescription, amountEgp: Number(e.estimatedCost) || 0 }));
-}
-
-function copy(ar: boolean) {
-  return ar ? {
-    title: "المراجعة السريرية",
-    documents: "المستندات", noDocuments: "لم تُرفع مستندات.", preview: "معاينة", download: "تنزيل",
-    scanning: "جارٍ الفحص الأمني", unavailable: "غير متاح",
-    recommendation: "التوصية السريرية",
-    recommendationHint: "لخّص العلاج أو الإجراء الذي توصي به لهذه الحالة.",
-    requiredLegend: "(* مطلوب قبل الإرسال)",
-    recommendationPlaceholder: "مثال: زراعة منظم ضربات قلب ثنائي الحجرة",
-    services: "الخدمات الموصى بها والتقدير",
-    servicesHint: "اختر الخدمات التي توصي بها لهذه الحالة. الأسعار مأخوذة من قائمة خدماتك المعتمدة.",
-    proposalCurrency: "عملة العرض",
-    currencyHint: "ستُعدّ التوصية وعرض المريض بهذه العملة.",
-    noCatalog: "لا توجد لديك قائمة خدمات معتمدة بعد. أضف خدمة خارج القائمة أدناه (تتطلب موافقة مالية).",
-    needsFinance: "تتطلب موافقة مالية",
-    packagesTitle: "باقات المنشآت (معتمدة ماليًا)", packagesHint: "باقات المستشفى وغرفة العمليات والعناية المركزة والمستلزمات التي اعتمدها الفريق المالي. حدّد الرقم المتوقع داخل النطاق؛ يُطلق البند دون موافقة مالية.",
-    packageExpected: "المتوقع (ج.م)", packageOutOfRange: "الرقم خارج النطاق المعتمد", packageEstimate: "باقات المنشآت المعتمدة",
-    removeService: "إزالة الخدمة",
-    offListToggle: "إضافة خدمة خارج قائمتي المعتمدة",
-    offListHint: "أي خدمة خارج قائمتك المعتمدة تتطلب موافقة مالية قبل أن تصل إلى عرض المريض.",
-    offListName: "اسم الخدمة", offListAmount: "المبلغ التقديري (ج.م)", offListAdd: "إضافة الخدمة",
-    considerations: "المخاطر والقيود والاعتبارات السريرية",
-    considerationsHint: "اختياري. أضف ما ينبغي أن يعرفه المنسق والمريض قبل المتابعة.",
-    summary: "ملخص التوصية", notRecorded: "لم تُسجَّل بعد",
-    servicesShort: "الخدمات", documentsReviewed: "المستندات المراجَعة",
-    baseEstimate: "السعر المعتمد في قائمتك", proposalEstimate: "قيمة العرض",
-    offListEstimate: "خارج قائمتك — تحتاج موافقة المالية", estimateTotal: "إجمالي التقدير",
-    approxNote: "تبقى أسعار قائمتك المعتمدة بالجنيه المصري؛ يُعدّ عرض المريض بالعملة المختارة أعلاه.",
-    cataloguePrice: "سعر القائمة المعتمد",
-    selectedCount: (n: number) => `${n} مختارة`,
-    submit: "إرسال التوصية", saveDraft: "حفظ مسودة",
-    otherOutcome: "نتيجة سريرية أخرى",
-    outcomeLabel: {
-      INFO: "طلب معلومات إضافية",
-      RETURN_TO_COORDINATOR: "إعادة دون توصية", NOT_SUITABLE: "غير مناسبة سريريًا",
-    } as Record<Outcome, string>,
-    outcomeHint: {
-      INFO: "يُرسل طلبًا آمنًا للمريض وينقل المسؤولية إليه.",
-      RETURN_TO_COORDINATOR: "يعيد المسؤولية إلى المنسق دون تسجيل توصية.",
-      NOT_SUITABLE: "يسجّل أن الحالة غير مناسبة سريريًا للعلاج.",
-    } as Record<Outcome, string>,
-    outcomeConfirm: {
-      INFO: "إرسال الطلب",
-      RETURN_TO_COORDINATOR: "إعادة إلى المنسق", NOT_SUITABLE: "تأكيد عدم المناسبة السريرية",
-    } as Record<Outcome, string>,
-    outcomeReason: "السبب السريري",
-    outcomeReasonPlaceholder: "اشرح ما يحتاجه المنسق ليتصرف.",
-    confirmUnsuitable: "تأكيد أن هذه الحالة غير مناسبة سريريًا؟ لن تستكمل كتوصية عادية.",
-    errRecommendation: "سجّل التوصية السريرية قبل الإرسال.",
-    errServices: "اختر خدمة واحدة على الأقل قبل الإرسال.",
-    errDraft: "أضف توصية أو خدمة قبل حفظ المسودة.",
-    errReason: "أضف السبب السريري قبل المتابعة.",
-    errOffList: "أدخل اسم الخدمة ومبلغًا أكبر من صفر.",
-  } : {
-    title: "Clinical review",
-    documents: "Documents", noDocuments: "No documents were uploaded.", preview: "Preview", download: "Download",
-    scanning: "Security scan in progress", unavailable: "Unavailable",
-    recommendation: "Clinical recommendation",
-    recommendationHint: "Summarise the treatment or procedure you recommend for this case.",
-    requiredLegend: "(* Required before submitting)",
-    recommendationPlaceholder: "For example: dual-chamber pacemaker implantation",
-    services: "Recommended services & estimate",
-    servicesHint: "Select the services you recommend for this case. Prices are taken from your approved service list.",
-    proposalCurrency: "Proposal currency",
-    currencyHint: "The recommendation and the patient proposal will be prepared in this currency.",
-    noCatalog: "You have no approved service list yet. Add a service outside your list below (it needs Finance approval).",
-    needsFinance: "Requires Finance approval",
-    packagesTitle: "Facility packages (Finance-approved)", packagesHint: "Hospital, theatre, ICU and implant packages Finance has approved. Set the expected figure inside the range; the line releases without Finance.",
-    packageExpected: "Expected (EGP)", packageOutOfRange: "Outside the approved range", packageEstimate: "Approved facility packages",
-    removeService: "Remove service",
-    offListToggle: "Add service outside my approved list",
-    offListHint: "Anything outside your approved list needs Finance approval before it can reach the patient proposal.",
-    offListName: "Service name", offListAmount: "Estimated amount (EGP)", offListAdd: "Add service",
-    considerations: "Risks, limitations & clinical considerations",
-    considerationsHint: "Optional. Anything the coordinator and patient should know before proceeding.",
-    summary: "Recommendation summary", notRecorded: "Not recorded yet",
-    servicesShort: "Services", documentsReviewed: "Documents reviewed",
-    baseEstimate: "Approved catalogue price", proposalEstimate: "Proposal value",
-    offListEstimate: "Outside your list — needs Finance approval", estimateTotal: "Estimate total",
-    approxNote: "Your approved catalogue prices stay in EGP; the patient proposal is prepared in the currency selected above.",
-    cataloguePrice: "Approved catalogue price",
-    selectedCount: (n: number) => `${n} selected`,
-    submit: "Submit recommendation", saveDraft: "Save draft",
-    otherOutcome: "Other clinical outcome",
-    outcomeLabel: {
-      INFO: "Request additional information",
-      RETURN_TO_COORDINATOR: "Return without recommendation", NOT_SUITABLE: "Not clinically suitable",
-    } as Record<Outcome, string>,
-    outcomeHint: {
-      INFO: "Sends a secure request to the patient and moves responsibility to them.",
-      RETURN_TO_COORDINATOR: "Hands responsibility back to the coordinator with no recommendation recorded.",
-      NOT_SUITABLE: "Records that this case is not clinically suitable for treatment.",
-    } as Record<Outcome, string>,
-    outcomeConfirm: {
-      INFO: "Send request",
-      RETURN_TO_COORDINATOR: "Return to coordinator", NOT_SUITABLE: "Confirm not clinically suitable",
-    } as Record<Outcome, string>,
-    outcomeReason: "Clinical reason",
-    outcomeReasonPlaceholder: "Explain what the coordinator needs in order to act.",
-    confirmUnsuitable: "Confirm this case is not clinically suitable? It will not continue as a normal recommendation.",
-    errRecommendation: "Record your clinical recommendation before submitting.",
-    errServices: "Select at least one recommended service before submitting.",
-    errDraft: "Add a recommendation or a service before saving a draft.",
-    errReason: "Add the clinical reason before continuing.",
-    errOffList: "Enter a service name and an amount greater than zero.",
-  };
 }

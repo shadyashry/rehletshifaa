@@ -1118,6 +1118,22 @@
       "hint": "Up to 30 days. For a longer absence, ask your lead to reassign your cases."
     },
     "caseView": {
+      "startTreatment": {
+        "title": "Start treatment",
+        "hint": "After your final assessment, once the patient is cleared for admission, record where and when treatment starts. Milestones, the discharge pack and follow-up have their own sections.",
+        "facility": "Facility",
+        "choose": "Choose a facility",
+        "waiting": "Opens once the patient is cleared for admission; the Admission section shows what is still owed.",
+        "required": "Choose a facility and when treatment starts.",
+        "confirmTitle": "Start treatment at {facility}?",
+        "confirmBody": "The case moves into treatment with this admission recorded. Milestones then follow in the Treatment section.",
+        "keep": "Not yet",
+        "none": "No active facility is set up yet. Ask Consultant Operations to add one in the Control Center.",
+        "startsAt": "Treatment starts",
+        "save": "Start treatment"
+      },
+      "reviewHistory": "Consultant reviews",
+      "reviewVersion": "Version {version}",
       "tabs": {
         "overview": "Overview",
         "clinical": "Clinical",
@@ -1235,27 +1251,6 @@
         "rateToday": "Today's rate: ⁦1 EGP = {rate} {currency}⁩. The rate is frozen when the proposal is released.",
         "rateTodayDated": "Today's rate: ⁦1 EGP = {rate} {currency}⁩ ({date}). The rate is frozen when the proposal is released.",
         "noRate": "No exchange rate is available for {currency} right now, so the amounts cannot be quoted in it and the proposal cannot be created until a rate is available."
-      },
-      "finalAssessment": {
-        "title": "Final in-person assessment",
-        "intro": "Record your assessment after examining the patient. The coordinator builds the final quote from the confirmed services.",
-        "treatment": "Final recommended treatment",
-        "risks": "Risks & limitations",
-        "services": "Your approved services",
-        "manual": "Service not on your list (needs finance approval)",
-        "currency": "Display currency",
-        "add": "Add a service",
-        "remove": "Remove service",
-        "save": "Save final assessment",
-        "service": "Service",
-        "amount": "Amount",
-        "amountIn": "Amount ({currency})",
-        "packages": {
-          "title": "Facility packages (Finance-approved)",
-          "hint": "Hospital, theatre, ICU and implant packages Finance has approved. Set the expected figure inside the range; the line releases without Finance.",
-          "expected": "Expected (EGP)",
-          "outOfRange": "Outside the approved range"
-        }
       },
       "finalQuote": {
         "title": "Final treatment quote",
@@ -1488,6 +1483,181 @@
       "chooseArea": "Choose a care area",
       "teamUnavailable": "The team list couldn't be loaded. Reload the page to try again."
     },
+    "clinicalDecision": {
+      "evidence": {
+        "title": "The patient's file",
+        "intake": "Intake summary",
+        "noIntake": "No intake summary was written.",
+        "readAll": "Read the whole summary",
+        "readLess": "Show less",
+        "documents": "Documents on file",
+        "noDocuments": "No documents are on file.",
+        "preview": "Preview",
+        "download": "Download",
+        "scanning": "Security scan in progress",
+        "unavailable": "Unavailable",
+        "preliminary": "Your preliminary recommendation",
+        "risks": "Risks and limitations",
+        "lines": "Estimate lines",
+        "proposalCurrency": "Patient's proposal currency: {currency}"
+      },
+      "review": {
+        "title": "Clinical review"
+      },
+      "final": {
+        "title": "Final assessment",
+        "intro": "Record what you recommend now that you have examined the patient. The coordinator builds the final quote from these lines."
+      },
+      "recommendation": {
+        "part": "Recommendation",
+        "label": "Clinical recommendation",
+        "hint": "Summarise the treatment or procedure you recommend for this case.",
+        "finalHint": "What you recommend after examining the patient; say what changed from your preliminary recommendation.",
+        "required": "(* required)",
+        "placeholder": "For example: dual-chamber pacemaker implantation",
+        "risks": "Risks, limitations and clinical considerations",
+        "risksHint": "Optional. Anything the coordinator and the patient should know before going ahead."
+      },
+      "lines": {
+        "part": "Estimate lines",
+        "hint": "Choose the services you recommend. Prices come from your approved list, in EGP.",
+        "approved": "Your approved services",
+        "noCatalog": "You have no approved service list yet. Add a line outside your list below; Finance prices it.",
+        "packages": {
+          "title": "Facility packages approved by Finance",
+          "hint": "Hospital, theatre, ICU and implant packages Finance has approved. Set the expected figure inside the range; the line needs no further Finance approval.",
+          "expected": "Expected (EGP)",
+          "outOfRange": "Outside the approved range",
+          "range": "{min} – {max}"
+        },
+        "offList": {
+          "toggle": "Add a line outside my approved list",
+          "hint": "A line outside your approved list needs Finance approval before it reaches the patient.",
+          "name": "Service",
+          "amount": "Estimated amount (EGP)",
+          "add": "Add line",
+          "needsFinance": "Needs Finance approval",
+          "remove": "Remove {service}"
+        },
+        "currency": "Proposal currency",
+        "currencyHint": "The patient's proposal is prepared in this currency; your list stays in EGP.",
+        "noRate": "No current exchange rate for {currency}, so the patient's proposal value can't be shown. Choose another currency or ask Finance.",
+        "finalCurrencyNone": "The patient's final quote is prepared in the currency the coordinator chooses. Your lines stay in EGP.",
+        "reenter": "Lines from your earlier estimate that were priced in another currency are not carried over; add them again in EGP.",
+        "finalCurrency": "The patient's final quote is prepared in {currency}, the currency of your preliminary estimate; the coordinator can change it. Your lines stay in EGP."
+      },
+      "summary": {
+        "title": "Before you send",
+        "titleFinal": "Before you save",
+        "recommendation": "Recommendation",
+        "notRecorded": "Not recorded yet",
+        "lines": "Estimate lines",
+        "documents": "Documents on file",
+        "approved": "Your approved list",
+        "packages": "Facility packages",
+        "offList": "Outside your list, needs Finance",
+        "total": "Estimate total",
+        "proposal": "Patient's proposal",
+        "approxNote": "Your list prices stay in EGP; the patient's proposal is in {currency} at today's rate."
+      },
+      "submit": "Submit recommendation",
+      "saveDraft": "Save draft",
+      "saveFinal": "Save final assessment",
+      "saveFinalAgain": "Save a new version",
+      "finalSaved": "Saved on {date}. The coordinator prepares the final quote from it.",
+      "exits": {
+        "toggle": "Other clinical outcome",
+        "label": {
+          "INFO": "Request additional information",
+          "RETURN_TO_COORDINATOR": "Return without recommendation",
+          "NOT_SUITABLE": "Not clinically suitable"
+        },
+        "hint": {
+          "INFO": "The case waits for the patient's reply; no recommendation is sent.",
+          "RETURN_TO_COORDINATOR": "Hands the case back to the coordinator with no recommendation recorded.",
+          "NOT_SUITABLE": "Records that this case is not clinically suitable for treatment."
+        },
+        "action": {
+          "INFO": "Send request",
+          "RETURN_TO_COORDINATOR": "Return to coordinator",
+          "NOT_SUITABLE": "Record not clinically suitable"
+        },
+        "reason": "Clinical reason",
+        "reasonPlaceholder": "What the coordinator needs to know to act.",
+        "confirm": {
+          "INFO": {
+            "title": "Ask the patient for more information?",
+            "body": "The patient gets a secure request and the case waits on them; no recommendation is sent."
+          },
+          "RETURN_TO_COORDINATOR": {
+            "title": "Return the case without a recommendation?",
+            "body": "The case goes back to the coordinator with your reason and no recommendation recorded."
+          },
+          "NOT_SUITABLE": {
+            "title": "Record this case as not clinically suitable?",
+            "body": "It will not continue as a recommendation; it goes back to the coordinator with your reason."
+          }
+        },
+        "keep": "Keep reviewing"
+      },
+      "errors": {
+        "recommendation": "Record your clinical recommendation first.",
+        "lines": "Choose at least one estimate line.",
+        "range": "Set each package's expected figure inside its approved range.",
+        "draft": "Add a recommendation or a line before saving a draft.",
+        "reason": "Add the clinical reason before you continue.",
+        "offList": "Enter a service and an amount greater than zero."
+      }
+    },
+    "referrals": {
+      "noneEligible": "No eligible Consultant is available for this care area right now.",
+      "loading": "Loading eligible Consultants…",
+      "reviewTime": "Usual review time {hours}",
+      "viaCapability": "Eligible through an approved capability",
+      "choose": "Eligible Consultants",
+      "chooseHint": "Care area is only the first filter. Compare subspecialty, capabilities and workload, then choose.",
+      "transfer": "Transfer",
+      "secondOpinion": "Second opinion",
+      "requestedBy": "Requested by {name}",
+      "reason": "Clinical reason",
+      "suggested": "Suggested",
+      "declinedBy": "The previous Consultant declined",
+      "careArea": "Care area",
+      "note": "Note to the Consultant (optional)",
+      "confirm": "Confirm handover",
+      "decline": "Decline referral",
+      "declineNote": "Why this referral is not confirmed",
+      "sendDecline": "Decline",
+      "cancel": "Cancel",
+      "noOpen": "There is no referral waiting for you on this case.",
+      "refer": "Refer this case",
+      "referHint": "Nothing is shared until the coordinator confirms and the receiving Consultant accepts. A transfer ends your assignment only once it is accepted.",
+      "type": "Referral type",
+      "transferHint": "Hand the case to another Consultant.",
+      "secondHint": "Ask another Consultant for a limited opinion; you stay the case's Consultant.",
+      "clinicalReason": "Clinical reason for the referral",
+      "suggestArea": "Suggested care area (optional)",
+      "sameArea": "Same care area",
+      "suggestCapability": "Suggested capability or subspecialty (optional)",
+      "suggestConsultant": "Suggested Consultant (optional)",
+      "noSuggestion": "No specific Consultant",
+      "send": "Send to the coordinator",
+      "referrals": "Referrals",
+      "status": {
+        "AWAITING_COORDINATOR": "Waiting for the coordinator",
+        "AWAITING_CONSULTANT": "Offered to the receiving Consultant",
+        "IN_PROGRESS": "Second opinion in progress",
+        "COMPLETED": "Completed",
+        "DECLINED_BY_COORDINATOR": "Not confirmed by the coordinator",
+        "WITHDRAWN": "Withdrawn"
+      },
+      "to": "to {name}",
+      "opinion": "Second opinion",
+      "yourOpinion": "Your second opinion",
+      "opinionHint": "Submitting ends your access to this case.",
+      "submitOpinion": "Submit second opinion",
+      "coordinatorNote": "Coordinator note"
+    },
     "confirm": {
       "cancel": "Cancel",
       "keepEditing": "Keep editing",
@@ -1537,6 +1707,22 @@
       "patientResponded": "Patient responded"
     },
     "plural": {
+      "estimateLines": {
+        "one": "{count} line",
+        "other": "{count} lines"
+      },
+      "reviewHours": {
+        "one": "{count} h",
+        "other": "{count} h"
+      },
+      "activeCases": {
+        "one": "{count} active case",
+        "other": "{count} active cases"
+      },
+      "pendingOffers": {
+        "one": "{count} offer pending",
+        "other": "{count} offers pending"
+      },
       "moreCovers": {
         "one": "{count} more",
         "other": "{count} more"
@@ -1586,6 +1772,8 @@
     },
     "unread": "Unread",
     "currentAction": {
+      "goToForm": "Go to the form",
+      "goToFormFor": "Go to the form: {action}",
       "overdue": "Overdue",
       "due": "Due",
       "note": "Note for the record (optional)",
@@ -1645,6 +1833,7 @@
         "PREPARE_TRAVEL_PACKAGE": "Plan the travel package",
         "ASSIGN_FINANCE": "Assign Finance",
         "RECORD_CLINICAL_DECISION": "Record clinical decision",
+        "RECORD_FINAL_ASSESSMENT": "Record final assessment",
         "UPDATE_TRAVEL_PLAN": "Complete arrangements",
         "APPROVE_COMMERCIAL_TERMS": "Approve commercial terms",
         "RECORD_HOSPITAL_BALANCE": "Record the receipt",
@@ -1727,6 +1916,10 @@
         "WAIT_INTERNAL_APPROVAL": {
           "title": "Waiting for internal sign-off",
           "body": "The assigned team completes their part; release unlocks once every requirement is met."
+        },
+        "RECORD_FINAL_ASSESSMENT": {
+          "title": "Record your final assessment",
+          "body": "You have examined the patient: confirm or change your recommendation and its estimate lines."
         },
         "RECORD_CLINICAL_DECISION": {
           "title": "Record your clinical decision",

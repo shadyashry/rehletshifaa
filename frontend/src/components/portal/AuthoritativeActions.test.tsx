@@ -43,9 +43,11 @@ describe("server-authoritative proposal actions", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
   });
 
-  it("leaves deferred downstream consultant actions unchanged", () => {
-    render(<CaseWorkflowActions locale="en" role="doctor" caseSummary={{ id: "case-1", status: "DISCHARGED", version: 1 }} availableActions={[]} mutate={vi.fn()}/>);
-    expect(screen.getByText("Schedule follow-up")).toBeTruthy();
+  // UX 3-1: the follow-up plan is recorded in the discharge panel (P1-17); the legacy duplicate form is retired.
+  it("offers no legacy follow-up form to a Consultant after discharge", () => {
+    const { container } = render(<CaseWorkflowActions locale="en" role="doctor" caseSummary={{ id: "case-1", status: "DISCHARGED", version: 1 }} availableActions={[]} mutate={vi.fn()}/>);
+    expect(container.innerHTML).toBe("");
+    expect(screen.queryByText("Schedule follow-up")).toBeNull();
   });
 
   it("refreshes queue and workspace after a stale/direct API rejection", async () => {

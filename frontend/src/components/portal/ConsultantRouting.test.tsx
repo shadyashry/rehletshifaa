@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 
 import { renderWithWork } from "./test-copy";
 import { ConsultantReferrals, EligibleConsultantPicker, ReferralConfirmation, type EligibleConsultant, type Load, type Referral } from "./ConsultantRouting";
@@ -28,7 +28,7 @@ describe("Consultant routing", () => {
   it("lists eligible consultants with the facts to choose on, addressed by practitioner id", async () => {
     const load = vi.fn().mockResolvedValue(consultants);
     const onChange = vi.fn();
-    render(<EligibleConsultantPicker locale="en" caseId="case-1" careArea="cardiology" value="" onChange={onChange} load={load}/>);
+    renderWithWork(<EligibleConsultantPicker locale="en" caseId="case-1" careArea="cardiology" value="" onChange={onChange} load={load}/>);
     expect(await screen.findByText("Dr A")).toBeTruthy();
     expect(load).toHaveBeenCalledWith("/coordinator/cases/case-1/eligible-consultants?careArea=cardiology");
     expect(screen.getByText("Catheter ablation")).toBeTruthy();

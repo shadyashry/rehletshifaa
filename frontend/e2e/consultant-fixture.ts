@@ -45,7 +45,7 @@ const facilities = [{ id: "f1", name: "Nile Heart Hospital", city: "Cairo", kind
 
 const review = { id: "r1", versionNumber: 1, status: "APPROVED", recommendedTreatment: "Coronary angioplasty with one drug-eluting stent to the left anterior descending artery.",
   risksAndLimitations: "Subject to the in-person assessment and a repeat angiogram on arrival.", createdAt: at(300), proposalCurrency: "USD",
-  costEstimates: [{ serviceDescription: "Coronary angioplasty with one stent (Consultant fee)", estimatedCost: 45000, currency: "EGP" }] };
+  costEstimates: [{ serviceDescription: "Coronary angioplasty with one stent (Consultant fee)", estimatedCost: 45000, currency: "EGP", catalogServiceId: "s2" }] };
 
 const actions = (stage: string, currentAction: Record<string, unknown>, available: string[] = []) =>
   ({ journeyStage: stage, waitingOn: "CONSULTANT", blockers: [], currentAction, availableActions: available });
@@ -56,7 +56,8 @@ const caseView = (id: ConsultantCaseId) => {
     timeline, tasks: [], messages: [], assignments: [{ id: "a1", assigneeSubject: "qa-coordinator", assigneeName: "Dr Samir Example", assigneeRole: "DOCTOR", assignmentType: "PRIMARY", status: "ACTIVE", assignedAt: at(30), version: 1 }] };
   switch (id) {
     case "review": return { ...common, clinicalReviews: [], actions: actions("CONSULTANT_REVIEW", { code: "RECORD_CLINICAL_DECISION", kind: "FOCUS", workItemId: "cw1", workItemVersion: 0 }, ["RECORD_CLINICAL_DECISION"]) };
-    case "assess": return { ...common, clinicalReviews: [review], actions: actions("ARRIVAL_CONFIRMED", { code: "RECORD_CLINICAL_DECISION", kind: "FOCUS" }) };
+    // The backend gives the Consultant no step at arrival yet (CaseActionService: none()); the final assessment is on the page by stage.
+    case "assess": return { ...common, clinicalReviews: [review], actions: actions("ARRIVAL_CONFIRMED", { code: "NONE", kind: "NONE" }) };
     case "treat": return { ...common, clinicalReviews: [review], actions: actions("TREATMENT_IN_PROGRESS", { code: "WORK_ITEM", kind: "FOCUS", workType: "COUNTERSIGN_MILESTONE", workItemId: "cw2", workItemVersion: 0, title: "Countersign a treatment milestone" }) };
     case "discharge": return { ...common, clinicalReviews: [review], actions: actions("TREATMENT_IN_PROGRESS", { code: "WORK_ITEM", kind: "FOCUS", workType: "COMPLETE_DISCHARGE_PACK", workItemId: "cw3", workItemVersion: 0, title: "Complete the discharge pack" }) };
     case "follow": return { ...common, clinicalReviews: [review], actions: actions("FOLLOW_UP", { code: "WORK_ITEM", kind: "FOCUS", workType: "REVIEW_COMPLICATION", workItemId: "cw4", workItemVersion: 0, title: "Review a reported complication", overdue: true }) };

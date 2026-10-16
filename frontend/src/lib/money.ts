@@ -16,3 +16,12 @@ export function formatMoney(amount: number, currency: string, locale: Locale) {
     return `${amount.toLocaleString(tag)} ${currency}`;
   }
 }
+
+/** An amount typed with Western or Arabic-Indic digits (and the Arabic decimal and thousands marks); NaN when empty. */
+export function parseAmount(raw: string) {
+  const western = raw.trim()
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/٫/g, ".").replace(/[٬,\s]/g, "");
+  return western ? Number(western) : Number.NaN;
+}

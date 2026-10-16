@@ -3,14 +3,14 @@
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { createContext, use, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import dynamic from "next/dynamic";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, Gauge, MessageSquare, MoreHorizontal, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
 import { AdmissionPanel, ADMISSION_STAGES, ADMISSION_WORK, type AdmissionRole } from "@/components/portal/AdmissionPanel";
 import { TreatmentPanel, TREATMENT_WORK } from "@/components/portal/TreatmentPanel";
 import { DischargePanel, DISCHARGE_STAGES, DISCHARGE_WORK, type DischargeRole } from "@/components/portal/DischargePanel";
 import { ReconciliationPanel, SETTLEMENT_STAGES, SETTLEMENT_WORK, type SettlementRole } from "@/components/portal/ReconciliationPanel";
 import { FollowUpPanel, FOLLOW_UP_STAGES, FOLLOW_UP_WORK } from "@/components/portal/FollowUpPanel";
-import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageEstimate } from "@/components/portal/FacilityPackagePicker";
+import { BASE, CaseEvidence, DecisionSummary, EstimateLines, RecommendationFields, currencyName, useClinicalDecision } from "@/components/portal/ClinicalDecision";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
 import { RecordProposalDecision } from "@/components/portal/RecordProposalDecision";
@@ -113,7 +113,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   // here printed the same person twice under two labels, one of them the internal word "assignee".
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
  // Operations and consultants keep their stage forms; the coordinator's work is driven by the current action.
- const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired} travelPlan={value.travelPlan??null} admissionNumberCopy={{label:work.admission.forms.numberField,hint:work.admission.forms.numberHint}}/></div>:null;
+ const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired} travelPlan={value.travelPlan??null} busy={busy} load={load}/></div>:null;
  // P1-15: the reservation, the voucher, the balance and its evidence, for every staff role on the case from travel coordination to treatment.
  const admissionRole=(["operations","finance","coordinator","doctor"] as string[]).includes(role)?role as AdmissionRole:null;
  const admissionPanel=admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview?<AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load}/>:null;
@@ -149,18 +149,29 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  const formAction=isCoordinator&&owned&&current.kind==="FOCUS"&&["ASSIGN_CONSULTANT","CONFIRM_REFERRAL","ASSIGN_OPERATIONS","ASSIGN_FINANCE"].includes(formCode)||(formCode==="RECORD_PROPOSAL_DECISION"&&isCoordinator&&owned&&!!value.proposal&&available.includes("RECORD_PROPOSAL_DECISION"));
  const proposalIsWork=isCoordinator&&owned&&(["PREPARE_PROPOSAL","RELEASE_PROPOSAL","WAIT_INTERNAL_APPROVAL","ASSIGN_FINANCE"].includes(current.code)||["PREPARE_PROPOSAL","PROPOSAL_REVISION"].includes(current.workType??"")||(!!approved&&!value.proposal)||c.status==="ARRIVAL_CONFIRMED");
  const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm estimate={approved} onSend={sendProposal}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions reviewId={approved?.id} proposal={value.proposal} gates={value.gates}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}{showActions&&dim&&<p className="mt-4 text-[0.875rem] text-ink-600">{cv.handoffLocked}</p>}{showActions&&<LockedSection locked={dim}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} mutate={mutate} approvalInCard={financeApproval}/></LockedSection>}</Panel>;
- const clinicalPanel=(value.clinicalReviews.length>0||["CONSULTANT_REVIEW","ARRIVAL_CONFIRMED"].includes(c.status))?<Panel title={t.reviews}>{value.clinicalReviews.length?value.clinicalReviews.map(r=><div key={r.id} className="border-b border-line pb-4 last:border-0 last:pb-0"><strong>v{r.versionNumber} · {statusLabel(r.status,locale)}</strong>{r.recommendedTreatment&&<p className="mt-1">{r.recommendedTreatment}</p>}{r.risksAndLimitations&&<p className="mt-1 text-sm text-ink-600">{r.risksAndLimitations}</p>}{r.costEstimates&&r.costEstimates.length>0&&<div className="mt-3 border-t border-line pt-3"><p className="mb-2 label-micro text-brand-700">{t.estimatedByConsultant}</p>{r.proposalCurrency&&<p className="mb-2 text-[0.8125rem] text-ink-600">{cv.proposalCurrency}: <strong>{CURRENCY_LABELS[r.proposalCurrency]?.[locale]??r.proposalCurrency}</strong></p>}<ul className="space-y-1 text-sm">{r.costEstimates.map((e,i)=><li key={i} className="flex items-baseline justify-between gap-3"><span>{e.serviceDescription}</span><span className="text-end"><strong className="block whitespace-nowrap">{e.quotedCost!=null&&e.quotedCurrency?money(e.quotedCost,e.quotedCurrency,locale):money(e.estimatedCost,e.currency,locale)}</strong>{e.quotedCost!=null&&e.quotedCurrency&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{cv.base} <bdi dir="ltr">{money(e.estimatedCost,e.currency,locale)}</bdi></span>}</span></li>)}</ul></div>}</div>):<Empty/>}{isDoctor&&c.status==="ARRIVAL_CONFIRMED"&&<FinalAssessment/>}</Panel>:null;
+ const clinicalPanel=(value.clinicalReviews.length>0||["CONSULTANT_REVIEW","ARRIVAL_CONFIRMED"].includes(c.status))?<Panel title={cv.reviewHistory}>{value.clinicalReviews.length?value.clinicalReviews.map(r=><div key={r.id} className="border-b border-line pb-4 last:border-0 last:pb-0"><strong>{fillTemplate(cv.reviewVersion,{version:new Intl.NumberFormat(intlLocale(locale)).format(r.versionNumber)})} · {statusLabel(r.status,locale)}</strong>{r.recommendedTreatment&&<p dir="auto" className="mt-1">{r.recommendedTreatment}</p>}{r.risksAndLimitations&&<p dir="auto" className="mt-1 text-sm text-ink-600">{r.risksAndLimitations}</p>}{r.costEstimates&&r.costEstimates.length>0&&<div className="mt-3 border-t border-line pt-3"><p className="mb-2 label-micro text-brand-700">{t.estimatedByConsultant}</p>{r.proposalCurrency&&<p className="mb-2 text-[0.8125rem] text-ink-600">{cv.proposalCurrency}: <strong>{CURRENCY_LABELS[r.proposalCurrency]?.[locale]??r.proposalCurrency}</strong></p>}<ul className="space-y-1 text-sm">{r.costEstimates.map((e,i)=><li key={i} className="flex items-baseline justify-between gap-3"><span dir="auto">{e.serviceDescription}</span><span className="text-end"><strong className="block whitespace-nowrap"><bdi dir="ltr">{e.quotedCost!=null&&e.quotedCurrency?money(e.quotedCost,e.quotedCurrency,locale):money(e.estimatedCost,e.currency,locale)}</bdi></strong>{e.quotedCost!=null&&e.quotedCurrency&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{cv.base} <bdi dir="ltr">{money(e.estimatedCost,e.currency,locale)}</bdi></span>}</span></li>)}</ul></div>}</div>):<Empty/>}</Panel>:null;
  // The consultant's clinical review is the page's primary work, not an appendix to the review history.
  const reviewDraft=isDoctor&&c.status==="CONSULTANT_REVIEW"?(value.clinicalReviews.find(r=>r.status==="DRAFT")??null):null;
  // A second-opinion consultant reads the case and gives an opinion; the clinical decision stays with the primary consultant.
  const secondOpinionOnly=isDoctor&&current.workType==="SECOND_OPINION";
  const clinicalReviewPanel=isDoctor&&c.status==="CONSULTANT_REVIEW"&&!secondOpinionOnly
-  ?<ClinicalReviewPanel locale={locale} caseId={c.id} busy={busy} catalog={catalog} fxRates={fxRates} facilities={facilities} documents={documents}
+  ?<ClinicalReviewPanel locale={locale} caseId={c.id} busy={busy} catalog={catalog} fxRates={fxRates} facilities={facilities} documentsOnFile={documents.length}
      draft={reviewDraft&&{id:reviewDraft.id,recommendedTreatment:reviewDraft.recommendedTreatment,risksAndLimitations:reviewDraft.risksAndLimitations,costEstimates:reviewDraft.costEstimates,proposalCurrency:reviewDraft.proposalCurrency}}
-     viewDoc={viewDoc} downloadDoc={downloadDoc} mutate={mutate}/>
+     mutate={mutate}/>
   :null;
+  // UX 3-1, the final in-person assessment: the same decision sheet as the review. The preliminary recommendation is the
+  // latest one approved before the patient arrived (the case's own timeline says when); one approved after it is a saved final
+  // assessment, which the form then starts from. Presentation only: the backend decides what the Consultant may do.
+  const finalAssessmentOn=isDoctor&&c.status==="ARRIVAL_CONFIRMED"&&!value.preview;
+  const arrivedAt=Date.parse(value.timeline.find(entry=>entry.status==="ARRIVAL_CONFIRMED")?.occurredAt??"");
+  const approvedLatestFirst=value.clinicalReviews.filter(r=>r.status==="APPROVED").sort((a,b)=>b.versionNumber-a.versionNumber);
+  const preliminary=finalAssessmentOn?approvedLatestFirst.find(r=>Number.isNaN(arrivedAt)||Date.parse(r.createdAt)<=arrivedAt)??null:null;
+  const finalSaved=finalAssessmentOn&&!Number.isNaN(arrivedAt)?approvedLatestFirst.find(r=>Date.parse(r.createdAt)>arrivedAt)??null:null;
+  // The Consultant's sheet: the evidence opens it (in the case rail on large screens), then the act.
+  const decisionSheet=!!clinicalReviewPanel||finalAssessmentOn;
+  const evidence=decisionSheet?<CaseEvidence locale={locale} intakeSummary={value.intakeSummary} documents={documents} preliminary={preliminary} viewDoc={viewDoc} downloadDoc={downloadDoc}/>:null;
   // Everything needed to act sits above the fold; the rest of the case is one tab away.
-  const [tab,setTab]=useState<"overview"|"clinical"|"documents"|"activity">("overview");
+  const [tab,setTab]=useState<"overview"|"clinical"|"documents"|"activity">(()=>isDoctor&&decisionSheet?"clinical":"overview");
   const [overlay,setOverlay]=useState<CaseOverlay|null>(null);
   // A close only clears the overlay that asked for it, as the separate open flags did: a late close event from a drawer
   // that was just replaced must not shut the one that replaced it.
@@ -171,7 +182,12 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   const newestDocument=documents.length?documents[documents.length-1]:undefined;
   // The clinical review form lives in the Clinical tab, so send a consultant there rather than to an
   // overview panel that does not exist for them.
-  const focusAction=()=>{setTab(isDoctor&&!workflowBlock?"clinical":"overview");requestAnimationFrame(()=>{const target=(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(current.workType??current.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel");scrollIntoView(target,{behavior:"smooth",block:"center"});(target?.querySelector("button,select,input,textarea") as HTMLElement|null)?.focus();});};
+  // The step's control: the Consultant's clinical step lands in the decision sheet (Clinical tab) — the recommendation
+  // field — while a panel's step lands on that panel's next task. Instant scrolls, so the page's smooth scrolling never cuts
+  // the move short before the control is on screen.
+  const panelStep=current.workType==="DEPOSIT_RECORD"||[ADMISSION_WORK,TREATMENT_WORK,DISCHARGE_WORK,SETTLEMENT_WORK,FOLLOW_UP_WORK].some(set=>set.has(current.workType??current.code));
+  const toDecision=isDoctor&&!panelStep&&(decisionSheet||secondOpinionOnly);
+  const focusAction=()=>{setTab(toDecision?"clinical":"overview");requestAnimationFrame(()=>{const target=(toDecision?(document.getElementById("clinical-decision")??document.getElementById("case-actions")):(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(current.workType??current.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel"))??document.getElementById("case-tab-panel");const control=target?.querySelector<HTMLElement>("textarea,select,input,button")??target;scrollIntoView(control,{behavior:"instant",block:"center"});control?.focus({preventScroll:true});});};
   const completeWork=(evidence:string)=>{if(current.workItemId!=null)void mutate(`/tasks/${current.workItemId}/cases/${c.id}/complete`,{evidence,expectedVersion:current.workItemVersion??0});};
   const openMessages=()=>setOverlay("messages");
   // When the step is the patient's reply (the backend's action, never the stage) and this viewer is the one who answers the
@@ -245,7 +261,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
    </div>
 
    <div className="mt-5 border-t border-line pt-5">
-  <CurrentActionPanel locale={locale} role={role} action={current} facts={facts}
+  <CurrentActionPanel locale={locale} role={role} action={current} stage={c.status} facts={facts}
    response={current.workType==="REVIEW_PATIENT_RESPONSE"?{message:latestPatientMessage?.body,documentName:newestDocument?.fileName}:null}
    busy={busy} secondary={replyFromStrip} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
    respondBy={myPending?.offerExpiresAt??null}
@@ -258,7 +274,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
    {alsoOpen.length>0&&<AlsoOpen items={alsoOpen}/>}
   </section>
   {/* Once the cover has scrolled away, the case and its step stay in one slim line under the site header. */}
-  {line.gone&&<CaseLine top={line.top} action={current} title={actionTitle(current,role,work)} next={nextItem&&openNext?{item:nextItem,onOpen:openNext}:null}/>}
+  {line.gone&&<CaseLine top={line.top} action={current} title={actionTitle(current,role,work,c.status)} next={nextItem&&openNext?{item:nextItem,onOpen:openNext}:null}/>}
 
   {/* P1-13: a closed case is reopened into follow-up by a manager or the case's own Consultant; one quiet line, never on another stage. */}
   {c.status==="CLOSED"&&!value.preview&&(isDoctor||(isCoordinator&&canReopen))&&<ReopenCase locale={locale} caseId={c.id} side={isDoctor?"doctor":"coordinator"} busy={busy} mutate={mutate} load={load}/>}
@@ -266,7 +282,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   {isCoordinator&&<CaseBlockers locale={locale} blockers={actions.blockers} deposit={value.deposit}/>}
 
   <div aria-busy={busy||undefined} className="min-w-0">
-   <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
+   <div className={`mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start ${evidence&&tab==="clinical"?"xl:grid-cols-[minmax(0,1fr)_22rem]":""}`}>
     <div className="min-w-0">
      {<div role="tablist" aria-label={t.caseWorkspaceLabel} className="mb-4 flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-line-strong)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {caseTabs.map(item=><button key={item.id} type="button" role="tab" id={`case-tab-${item.id}`} aria-controls="case-tab-panel" aria-selected={tab===item.id}
@@ -298,8 +314,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
        </section>}
        {banners}
        {logistics}
-       {workflowBlock}
+       {!isDoctor&&workflowBlock}
        {admissionPanel}
+       {isDoctor&&workflowBlock}
        {treatmentPanel}
        {dischargePanel}
        {reconciliationPanel}
@@ -318,13 +335,15 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
 
       {/* Kept mounted for the same reason: the clinical review and final assessment drafts. */}
       <div hidden={tab!=="clinical"} className="space-y-4">
-       {doctorReviewComplete&&<div className="flex items-start gap-2 border-y border-line py-3"><Check size={18} aria-hidden className="mt-0.5 flex-none text-brand-600"/><p className="font-semibold text-brand-800">{c.status==="CLINICAL_RECOMMENDATION_READY"?t.doctorAccepted:c.status==="INFORMATION_REQUIRED"?t.doctorInfoSent:c.status==="CLINICALLY_NOT_SUITABLE"?t.doctorNotSuitable:t.doctorReturned}</p></div>}
+       {doctorReviewComplete&&<div role="status" className="flex items-start gap-2 border-y border-line py-3"><Check size={18} aria-hidden className="mt-0.5 flex-none text-brand-600"/><p className="font-semibold text-brand-800">{c.status==="CLINICAL_RECOMMENDATION_READY"?t.doctorAccepted:c.status==="INFORMATION_REQUIRED"?t.doctorInfoSent:c.status==="CLINICALLY_NOT_SUITABLE"?t.doctorNotSuitable:t.doctorReturned}</p></div>}
+       {evidence&&<div className="border-b border-line pb-5 lg:hidden">{evidence}</div>}
        {clinicalReviewPanel}
+       {finalAssessmentOn&&<FinalAssessment seed={finalSaved??preliminary} savedAt={finalSaved?.createdAt??null} documentsOnFile={documents.length}/>}
        {isDoctor&&<ConsultantReferrals key={c.id} locale={locale} caseId={c.id} careCategory={c.careCategory} categories={categories} canRefer={c.status==="CONSULTANT_REVIEW"&&!myPending&&!secondOpinionOnly} busy={busy} load={load} mutate={mutate}/>}
-       {intakePanel}
-       {/* While the consultant is composing, the review history would only repeat their own draft back at them. */}
-       {!clinicalReviewPanel&&clinicalPanel}
-       {!intakePanel&&!clinicalPanel&&!clinicalReviewPanel&&!doctorReviewComplete&&<p className="text-sm text-ink-500">{cv.noClinical}</p>}
+       {/* While the Consultant is composing, the evidence already shows the intake and their preliminary recommendation. */}
+       {!decisionSheet&&intakePanel}
+       {!decisionSheet&&clinicalPanel}
+       {!intakePanel&&!clinicalPanel&&!decisionSheet&&!doctorReviewComplete&&<p className="text-sm text-ink-500">{cv.noClinical}</p>}
       </div>
 
       {tab==="documents"&&(documentsPanel??<p className="text-sm text-ink-500">{cv.noDocuments}</p>)}
@@ -335,6 +354,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
 
     {/* Sticks below the site header (--case-header-bottom), and below the case line once that shows (--case-line-bottom). */}
     <aside className="min-w-0 space-y-4 lg:sticky lg:top-[calc(var(--case-line-bottom,var(--case-header-bottom,4rem))+1rem)]">
+     {evidence&&tab==="clinical"&&<div role="region" aria-label={work.clinicalDecision.evidence.title} tabIndex={0} className="hidden max-h-[55vh] overflow-y-auto border-b border-line pb-4 pe-1 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 lg:block">{evidence}</div>}
      <JourneyPulse stage={c.status} onViewJourney={()=>setOverlay("journey")}/>
      {!value.preview&&team.length>0&&<section aria-labelledby="case-team-title" className="card p-4">
       <h2 id="case-team-title" className="label-micro text-ink-500">{cv.team.title}</h2>
@@ -621,31 +641,33 @@ function ProposalSendForm({estimate,onSend}:{estimate:Review;onSend:(caseId:stri
  </div>;
 }
 
-export function FinalAssessment(){
- const {locale,c:{id:caseId},busy,mutate,catalog,fxRates,facilities}=useCaseWorkspace();const g=useWorkCopy().caseView.finalAssessment;
- const[treatment,setTreatment]=useState("");const[risks,setRisks]=useState("");const[currency,setCurrency]=useState("EGP");const[costs,setCosts]=useState([{description:"",amount:""}]);const[selected,setSelected]=useState<Set<string>>(new Set());const[packagePicks,setPackagePicks]=useState<Map<string,number>>(new Map());
- const currencyOptions=["EGP",...fxRates.filter(f=>f.currency!=="EGP").map(f=>f.currency)];const rate=currency==="EGP"?1:(fxRates.find(f=>f.currency===currency)?.rate??1);
- // P0-5: Finance-approved facility packages are approved lines here too; the expected figure must sit inside the range.
- const pk=g.packages;
- const packages=facilityPackages(facilities);const {lines:packageLines,inRange:packagesInRange}=facilityPackageLines(packages,packagePicks);
- const togglePackage=(id:string,min:number)=>setPackagePicks(m=>{const n=new Map(m);if(n.has(id))n.delete(id);else n.set(id,min);return n;});const setPackageAmount=(id:string,amount:number)=>setPackagePicks(m=>new Map(m).set(id,amount));
- const toggle=(id:string)=>setSelected(s=>{const n=new Set(s);if(n.has(id))n.delete(id);else n.add(id);return n;});
- const updateCost=(i:number,f:"description"|"amount",val:string)=>setCosts(rows=>rows.map((row,idx)=>idx===i?{...row,[f]:val}:row));
- // Catalogue picks travel at their approved EGP price; the selector above only changes what is displayed.
- const save=()=>{const picks=catalog.filter(s=>selected.has(s.id)).map(s=>({serviceDescription:s.serviceName,estimatedCost:s.priceEgp,currency:"EGP",catalogServiceId:s.id}));const manual=costs.filter(row=>row.description.trim()&&row.amount!=="").map(row=>({serviceDescription:row.description.trim(),estimatedCost:Math.round((Number(row.amount)||0)*100)/100,currency}));const packageEstimates=packageLines.map(packageEstimate);if(!picks.length&&!manual.length&&!packageEstimates.length)return;if(!packagesInRange)return;void mutate(`/doctor/cases/${caseId}/final-assessment`,{recommendedTreatment:treatment,risksAndLimitations:risks,costEstimates:[...picks,...packageEstimates,...manual]}).then(r=>{if(r){setTreatment("");setRisks("");setCosts([{description:"",amount:""}]);setSelected(new Set());setPackagePicks(new Map());}});};
- return <div className="mt-4 space-y-4 border-t border-line pt-4">
-  <div><h4 className="title text-base">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.intro}</p></div>
-  <label className="block text-sm font-bold">{g.treatment}<textarea className="field mt-1" value={treatment} onChange={e=>setTreatment(e.target.value)}/></label>
-  <label className="block text-sm font-bold">{g.risks}<textarea className="field mt-1" value={risks} onChange={e=>setRisks(e.target.value)}/></label>
-  <div className="border-y border-line py-4"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-bold text-brand-800">{g.services}</span><select aria-label={g.currency} className="field !mt-0 w-auto py-1" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></div>
-   {catalog.length>0&&<div className="mt-2 space-y-1.5">{catalog.map(s=>{const on=selected.has(s.id);return <button type="button" key={s.id} onClick={()=>toggle(s.id)} aria-pressed={on} className={`flex w-full items-center justify-between gap-3 rounded-lg border p-2.5 text-start transition ${on?"border-brand-600 bg-white":"border-ink-350 bg-white"}`}><span className="flex items-center gap-2.5"><span className={`flex h-5 w-5 flex-none items-center justify-center rounded border ${on?"border-brand-600 bg-brand-600 text-white":"border-ink-350"}`} aria-hidden>{on?<Check size={14} strokeWidth={2.5}/>:null}</span><span className="text-sm font-semibold text-ink-800">{s.serviceName}</span></span><span className="text-sm font-bold"><bdi dir="ltr">{money(s.priceEgp*rate,currency,locale)}</bdi></span></button>;})}</div>}
-   <FacilityPackagePicker locale={locale} packages={packages} picks={packagePicks} onToggle={togglePackage} onAmount={setPackageAmount} labels={pk}/>
-   <p className="mt-3 text-sm font-bold text-ink-700">{g.manual}</p>
-   <div className="mt-1 space-y-2">{costs.map((row,i)=><div key={i} className="flex gap-2"><input aria-label={g.service} className="field flex-1" value={row.description} onChange={e=>updateCost(i,"description",e.target.value)} placeholder={g.service}/><input aria-label={g.amount} className="field w-32" type="number" min="0" step="0.01" value={row.amount} onChange={e=>updateCost(i,"amount",e.target.value)} placeholder={fillTemplate(g.amountIn,{currency})}/>{costs.length>1&&<button type="button" className="btn-secondary" onClick={()=>setCosts(rows=>rows.filter((_,idx)=>idx!==i))} aria-label={g.remove}><X size={16} aria-hidden/></button>}</div>)}</div>
-   <button type="button" className="btn-secondary mt-2" onClick={()=>setCosts(rows=>[...rows,{description:"",amount:""}])}><Plus size={16} aria-hidden/>{g.add}</button>
-  </div>
-  <button className="btn-primary w-full sm:w-auto" disabled={busy||!packagesInRange} onClick={save}>{g.save}</button>
- </div>;
+/**
+ * The final in-person assessment (UX 3-1): the review's grammar — "1 Recommendation", "2 Estimate lines", a summary led by
+ * the clinical text — starting from the Consultant's last word on the case (a saved final assessment, else the preliminary
+ * recommendation) so they confirm or change it. It says which currency the patient's final quote is in and what that comes to
+ * at today's rate; a refusal is said at its control; nothing is cleared when a save fails (there is no draft endpoint: G-2).
+ */
+export function FinalAssessment({seed=null,savedAt=null,documentsOnFile=0}:{seed?:Review|null;savedAt?:string|null;documentsOnFile?:number}){
+ const {locale,c:{id:caseId},busy,mutate,catalog,fxRates,facilities}=useCaseWorkspace();const copy=useWorkCopy().clinicalDecision;
+ const decision=useClinicalDecision({seed,catalog,facilities});
+ // The currency the patient's final quote is prepared in: the preliminary estimate's, carried by the backend (the coordinator may choose another).
+ const currency=seed?.proposalCurrency??null;
+ const fx=currency&&currency!==BASE?fxRates.find(rate=>rate.currency===currency):undefined;
+ const proposal=fx?{amount:decision.lines.amountsEgp().reduce((sum,egp)=>sum+Math.round(egp*fx.rate*100)/100,0),currency:fx.currency}:null;
+ const save=()=>{if(!decision.validate())return;void mutate(`/doctor/cases/${caseId}/final-assessment`,{recommendedTreatment:decision.recommendation.trim(),risksAndLimitations:decision.risks.trim()||undefined,costEstimates:decision.lines.estimates()});};
+ const savedOn=savedAt?new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium"}).format(new Date(savedAt)):null;
+ return <section id="clinical-decision" aria-labelledby="final-assessment-title" className="card p-4 sm:p-5">
+  <h3 id="final-assessment-title" className="text-[1.125rem] font-bold leading-7 text-brand-900">{copy.final.title}</h3>
+  <p className="mt-1 max-w-[65ch] text-[0.9375rem] leading-6 text-ink-600">{copy.final.intro}</p>
+  <RecommendationFields decision={decision} hint={copy.recommendation.finalHint}/>
+  <EstimateLines locale={locale} decision={decision}>
+   <p className="mt-2 max-w-[65ch] text-[0.875rem] leading-6 text-ink-700">{currency?fillTemplate(copy.lines.finalCurrency,{currency:currencyName(currency,locale)}):copy.lines.finalCurrencyNone}</p>
+  </EstimateLines>
+  <DecisionSummary locale={locale} title={copy.summary.titleFinal} decision={decision} documentsOnFile={documentsOnFile} proposal={proposal}>
+   {savedOn&&<p className="mt-3 flex items-start gap-2 text-[0.875rem] text-ink-700"><Check size={16} aria-hidden className="mt-0.5 flex-none text-brand-600"/>{fillTemplate(copy.finalSaved,{date:savedOn})}</p>}
+   <div className="mt-4"><button type="button" className="btn-primary" disabled={busy} onClick={save}>{savedOn?copy.saveFinalAgain:copy.saveFinal}</button></div>
+  </DecisionSummary>
+ </section>;
 }
 
 export function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;proposal?:Proposal;gates?:ProposalGates|null}){
