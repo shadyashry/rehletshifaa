@@ -70,4 +70,9 @@ $K update events/config "${CFG[@]}" -b '{"eventsEnabled": true, "eventsExpiratio
 for user in coordinator coordinator2 doctor doctor-orthopedics operations finance credential-admin journey-manager journey-approver compliance-auditor support-officer patient-identity-reviewer operations-manager finance-manager credentialing-manager support-manager care-manager consultant-operations-manager coordinator-scope care-manager-scope; do
   $K add-roles "${CFG[@]}" --uusername "$user" --rolename rs-staff 2>/dev/null || true
 done
+# Imported users get only the roles listed, so seeded people need the default role (account console: authenticator app,
+# passkeys, password) granted here too.
+for user in patient coordinator coordinator2 doctor doctor-orthopedics operations finance credential-admin journey-manager journey-approver compliance-auditor support-officer patient-identity-reviewer operations-manager finance-manager credentialing-manager support-manager care-manager consultant-operations-manager coordinator-scope care-manager-scope; do
+  $K add-roles "${CFG[@]}" --uusername "$user" --rolename "default-roles-$REALM" 2>/dev/null || true
+done
 echo "keycloak-sync: second factor enforced by Keycloak for staff and for anyone who has one"

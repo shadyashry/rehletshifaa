@@ -7,6 +7,7 @@ import sign_in_spec as m
 flows = {alias: (desc, top, execs) for alias, desc, top, execs in m.FLOWS}
 dev = json.loads(open(os.path.join(m.ROOT, "infrastructure", "keycloak", "realm-rehletshifaa.json"), "rb").read().decode("utf-8"))
 staff = [u["username"] for u in dev["users"] if "rs-staff" in (u.get("realmRoles") or [])]
+seeded = [u["username"] for u in dev["users"] if "serviceAccountClientId" not in u]
 
 def q(value):  # single-quoted for bash
     return "'" + value.replace("'", "'\"'\"'") + "'"
@@ -80,6 +81,11 @@ $K update events/config "${{CFG[@]}}" -b {q(events)}
 
 for user in {" ".join(staff)}; do
   $K add-roles "${{CFG[@]}}" --uusername "$user" --rolename rs-staff 2>/dev/null || true
+done
+# Imported users get only the roles listed, so seeded people need the default role (account console: authenticator app,
+# passkeys, password) granted here too.
+for user in {" ".join(seeded)}; do
+  $K add-roles "${{CFG[@]}}" --uusername "$user" --rolename "default-roles-$REALM" 2>/dev/null || true
 done
 echo "keycloak-sync: second factor enforced by Keycloak for staff and for anyone who has one"
 """

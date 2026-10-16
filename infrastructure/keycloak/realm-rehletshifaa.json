@@ -419,6 +419,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000101",
       "username": "patient",
+      "realmRoles": ["default-roles-rehletshifaa"],
       "email": "patient@local.test",
       "firstName": "Nour",
       "lastName": "Hassan",
@@ -435,7 +436,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000102",
       "username": "coordinator",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "coordinator@local.test",
       "firstName": "Layla",
       "lastName": "Hassan",
@@ -452,7 +453,7 @@
     {
       "id": "06d5980a-76fe-4e34-9900-89aef8a9d87a",
       "username": "coordinator2",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "coordinator2@local.test",
       "firstName": "Omar",
       "lastName": "Nasser",
@@ -469,7 +470,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000103",
       "username": "doctor",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "doctor@local.test",
       "firstName": "Ahmed",
       "lastName": "AlAshry",
@@ -486,7 +487,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000202",
       "username": "doctor-orthopedics",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "doctor-orthopedics@local.test",
       "firstName": "Hossam",
       "lastName": "Kibba",
@@ -501,7 +502,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000104",
       "username": "operations",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "operations@local.test",
       "firstName": "Mariam",
       "lastName": "Soliman",
@@ -518,7 +519,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000105",
       "username": "finance",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "finance@local.test",
       "firstName": "Youssef",
       "lastName": "Adel",
@@ -535,7 +536,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000106",
       "username": "credential-admin",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "credential-admin@local.test",
       "firstName": "Maya",
       "lastName": "Farid",
@@ -552,7 +553,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000301",
       "username": "journey-manager",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "journey-manager@local.test",
       "firstName": "Journey",
       "lastName": "Manager",
@@ -563,7 +564,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000302",
       "username": "journey-approver",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "journey-approver@local.test",
       "firstName": "Journey",
       "lastName": "Approver",
@@ -574,7 +575,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000303",
       "username": "compliance-auditor",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "compliance-auditor@local.test",
       "firstName": "Compliance",
       "lastName": "Auditor",
@@ -585,7 +586,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000304",
       "username": "support-officer",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "support-officer@local.test",
       "firstName": "Support",
       "lastName": "Officer",
@@ -596,7 +597,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000305",
       "username": "patient-identity-reviewer",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "patient-identity-reviewer@local.test",
       "firstName": "Patient Identity",
       "lastName": "Reviewer",
@@ -607,7 +608,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000306",
       "username": "operations-manager",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "operations-manager@local.test",
       "firstName": "Operations",
       "lastName": "Manager",
@@ -618,7 +619,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000307",
       "username": "finance-manager",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "finance-manager@local.test",
       "firstName": "Finance",
       "lastName": "Manager",
@@ -629,7 +630,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000308",
       "username": "credentialing-manager",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "credentialing-manager@local.test",
       "firstName": "Credentialing",
       "lastName": "Manager",
@@ -640,7 +641,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000309",
       "username": "support-manager",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "support-manager@local.test",
       "firstName": "Support",
       "lastName": "Manager",
@@ -651,7 +652,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000310",
       "username": "care-manager",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "care-manager@local.test",
       "firstName": "Care Coordination",
       "lastName": "Manager",
@@ -662,7 +663,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000311",
       "username": "consultant-operations-manager",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "consultant-operations-manager@local.test",
       "firstName": "Consultant Operations",
       "lastName": "Manager",
@@ -673,7 +674,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000312",
       "username": "coordinator-scope",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "coordinator-scope@local.test",
       "firstName": "Scope Test",
       "lastName": "Coordinator",
@@ -684,7 +685,7 @@
     {
       "id": "00000000-0000-0000-0000-000000000313",
       "username": "care-manager-scope",
-      "realmRoles": ["rs-staff"],
+      "realmRoles": ["default-roles-rehletshifaa", "rs-staff"],
       "email": "care-manager-scope@local.test",
       "firstName": "Scope Test Care",
       "lastName": "Manager",
