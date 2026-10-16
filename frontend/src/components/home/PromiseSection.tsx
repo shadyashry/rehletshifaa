@@ -39,7 +39,7 @@ export function PromiseSection({ d, locale }: { d: Dictionary; locale: Locale })
       ];
 
   return (
-    <section className="promise-section canvas-clinical py-[clamp(2.5rem,1.9rem+1.8vw,3.75rem)]">
+    <section className="home-section promise-section canvas-clinical">
       <div className="container-site grid gap-8 sm:gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-16">
         <div className="lg:pt-1">
           <p className="eyebrow">{p.eyebrow}</p>

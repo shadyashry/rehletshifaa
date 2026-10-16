@@ -47,7 +47,7 @@ export function CarePathways({ locale, d }: { locale: Locale; d: Dictionary }) {
   });
 
   return (
-    <section aria-labelledby="home-areas-title" className="bg-surface-pearl pb-[clamp(2.75rem,2rem+2.2vw,4.5rem)] pt-[clamp(2rem,1.5rem+1.8vw,3.25rem)]">
+    <section aria-labelledby="home-areas-title" className="home-section bg-surface-pearl">
       <div className="container-site">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-end lg:gap-16">
           <div>

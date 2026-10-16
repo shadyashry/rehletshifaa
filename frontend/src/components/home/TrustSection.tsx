@@ -6,7 +6,7 @@ const ICONS = [Stethoscope, FileLock2, UserCheck, Siren] as const;
 const PEOPLE_ICONS = [UserRound, UserRoundCog, UserRoundSearch] as const;
 
 /**
- * Privacy and clinical governance. The narrow column carries the heading, one line and the section's one
+ * Privacy and clinical governance. The heading and its one line share a row; beneath, the narrow column carries the section's one
  * visual — "who works with your case": the case in private storage, the three people who work with it
  * (you, your coordinator, your Consultant) on the care-journey line, and the one thing it never is: public.
  * The wide column sets the four commitments as quiet cards (unnumbered: they are rules, not steps). Every statement describes behaviour
@@ -17,14 +17,20 @@ export function TrustSection({ d }: { d: Dictionary }) {
   const access = d.home.trustAccess;
 
   return (
-    <section aria-labelledby="trust-title" className="bg-surface-pearl py-[clamp(2.75rem,2rem+2.2vw,4.5rem)]">
-      <div className="container-site grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-16">
-        <div>
-          <p className="eyebrow">{d.home.trustEyebrow}</p>
-          <h2 id="trust-title" className="headline mt-2 max-w-[16ch] rtl:max-w-[24ch] [text-wrap:balance]">{d.home.trustTitle}</h2>
-          <p className="mt-3 max-w-[40ch] text-[1.0625rem] leading-7 text-ink-600 sm:mt-4">{d.home.trustIntro}</p>
+    <section aria-labelledby="trust-title" className="home-section bg-surface-pearl">
+      <div className="container-site">
+        {/* Heading and its one line on one row, as the travel section does; below, the diagram and the four
+            commitments side by side, the same height, so neither column ends in empty space. */}
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-end lg:gap-16">
+          <div>
+            <p className="eyebrow">{d.home.trustEyebrow}</p>
+            <h2 id="trust-title" className="headline mt-2 max-w-[16ch] rtl:max-w-[24ch] [text-wrap:balance]">{d.home.trustTitle}</h2>
+          </div>
+          <p className="max-w-[44ch] text-[1.0625rem] leading-7 text-ink-600 lg:pb-1">{d.home.trustIntro}</p>
+        </div>
 
-          <figure className="mt-7 rounded-[18px] border border-border-card bg-surface-default p-5 shadow-[0_24px_48px_-40px_rgba(36,64,74,0.5)] sm:p-6">
+        <div className="mt-7 grid gap-6 sm:mt-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-16">
+          <figure className="m-0 flex flex-col rounded-[18px] border border-border-card bg-surface-default p-5 shadow-[0_24px_48px_-40px_rgba(36,64,74,0.5)] sm:p-6">
             <figcaption className="text-[0.75rem] font-semibold uppercase tracking-[0.1em] text-ink-500 rtl:text-[0.8125rem] rtl:normal-case rtl:tracking-normal">{access.title}</figcaption>
 
             <div className="mt-4 flex items-center gap-3.5 rounded-[14px] bg-brand-700 px-4 py-3.5 text-white">
@@ -57,7 +63,9 @@ export function TrustSection({ d }: { d: Dictionary }) {
               })}
             </ul>
 
-            <div className="mt-4 flex items-center gap-3 rounded-[12px] border border-dashed border-border-card px-4 py-3">
+            {/* Takes the extra height when the commitments beside it are taller; never less than the usual gap. */}
+            <span aria-hidden className="block min-h-4 flex-1" />
+            <div className="flex items-center gap-3 rounded-[12px] border border-dashed border-border-card px-4 py-3">
               <span aria-hidden className="grid h-9 w-9 flex-none place-items-center rounded-full bg-surface-pearl text-ink-400 ring-1 ring-border-subtle">
                 <EyeOff size={16} strokeWidth={1.8} />
               </span>
@@ -67,9 +75,8 @@ export function TrustSection({ d }: { d: Dictionary }) {
               </div>
             </div>
           </figure>
-        </div>
 
-        <ul className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+        <ul className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:auto-rows-fr">
           {d.home.trust.map((item, index) => {
             const Icon = ICONS[index] ?? Stethoscope;
             const urgent = index === ICONS.length - 1;
@@ -94,6 +101,7 @@ export function TrustSection({ d }: { d: Dictionary }) {
             );
           })}
         </ul>
+        </div>
       </div>
     </section>
   );

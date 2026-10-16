@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CalendarClock, Clock3, FileText } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCheck, Clock3, FileText } from "lucide-react";
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge } from "@/components/portal/StatusBadge";
@@ -24,7 +24,9 @@ export type WorkItem = {
  * reading the matching notification does not clear it.
  *
  * <p>Rows are a hairline list with one quiet action each. Only an overdue or urgent first item earns the filled
- * button, so the page never shows a column of identical primaries. An empty list points to the next useful place.
+ * button, so the page never shows a column of identical primaries. When it is due and how long it has waited sit with the
+ * action on wide screens, so the eye goes date, then action. An empty list points to the next useful place; the first load
+ * shows the list's shape so the page does not jump.
  *
  * <p>The list is one tab stop (UX 2-2): ↑/↓, Home/End and `j`/`k` move between rows, Enter opens the row's case.
  */
@@ -49,14 +51,19 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
         <p role="status" className={busy ? "text-sm text-ink-500" : "sr-only"}>{busy ? t.loading : items.length ? plural(work.locale, items.length, work.plural.workItems) : ""}</p>
       </div>
 
-      {!busy && items.length === 0 ? (
-        <div className="mt-4 border-t border-line pt-4 text-[0.9375rem]">
-          <p className="font-semibold text-ink-900">{t.empty}</p>
-          {teamWaiting > 0 && onTeamQueue
-            ? <button type="button" className="mt-1 inline-flex min-h-11 items-center gap-1.5 font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current" onClick={onTeamQueue}>
-                {plural(work.locale, teamWaiting, work.plural.teamWaiting)}<ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
-              </button>
-            : <p className="mt-1 text-ink-600">{t.emptyHint}</p>}
+      {busy && items.length === 0 ? (
+        <WorkSkeleton/>
+      ) : items.length === 0 ? (
+        <div className="mt-4 flex items-start gap-4 border-y border-line py-5 text-[0.9375rem]">
+          <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-mist-deep text-brand-700"><CheckCheck size={18}/></span>
+          <div className="min-w-0 pt-1.5">
+            <p className="font-semibold text-ink-900">{t.empty}</p>
+            {teamWaiting > 0 && onTeamQueue
+              ? <button type="button" className="mt-1 inline-flex min-h-11 items-center gap-1.5 font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current" onClick={onTeamQueue}>
+                  {plural(work.locale, teamWaiting, work.plural.teamWaiting)}<ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
+                </button>
+              : <p className="mt-1 text-ink-600">{t.emptyHint}</p>}
+          </div>
         </div>
       ) : (
         <>{roving.hint}<ul {...roving.listProps} className="mt-4 divide-y divide-line border-y border-line">
@@ -84,23 +91,26 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
                     {!!item.documentCount && <span className="inline-flex items-center gap-1"><FileText size={12} aria-hidden/>{plural(work.locale, item.documentCount, work.plural.documents)}</span>}
                   </p>
                   {text.context && <p dir="auto" className="mt-1 line-clamp-2 text-sm leading-6 text-ink-600">{text.context}</p>}
-                  <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.8125rem] text-ink-500">
-                    <span className="inline-flex items-center gap-1"><Clock3 size={13} aria-hidden/>{age(item.createdAt, locale)}</span>
+                  {item.waitingOn && item.waitingOn !== "NONE" && <p className="mt-2 text-[0.8125rem] text-ink-500">{work.waiting.label}: {waitingLabel(item.waitingOn, work.waiting, { role, holdsWork: true })}</p>}
+                </div>
+                {/* When it is due and how long it has waited sit with the action, so the eye goes date, then action. */}
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:flex-none sm:flex-col sm:items-end sm:gap-1.5 sm:text-end">
+                  <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[0.8125rem] text-ink-500 sm:flex-col sm:items-end">
                     {item.dueAt && (
-                      <span className={`inline-flex items-center gap-1 ${item.overdue ? "font-semibold text-alert-700" : ""}`}>
+                      <span className={`inline-flex items-center gap-1 ${item.overdue ? "font-semibold text-alert-700" : "font-semibold text-ink-800"}`}>
                         <CalendarClock size={13} aria-hidden/>{t.due}: {new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short" }).format(new Date(item.dueAt))}
                       </span>
                     )}
-                    {item.waitingOn && item.waitingOn !== "NONE" && <span>{work.waiting.label}: {waitingLabel(item.waitingOn, work.waiting, { role, holdsWork: true })}</span>}
+                    <span className="inline-flex items-center gap-1"><Clock3 size={13} aria-hidden/>{age(item.createdAt, locale)}</span>
                   </p>
+                  <button type="button" {...roving.primary(item.id)}
+                          className={lead ? "btn-primary shrink-0" : "inline-flex min-h-11 shrink-0 items-center gap-1.5 font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current"}
+                          onClick={() => onOpen(item.caseId)}>
+                    {item.type==="CONSULTANT_ASSIGNMENT"?t.reviewAssignment:t.open}
+                    {/* Every row repeats the same action word; the name also says which work it opens. */}
+                    <span className="sr-only">{locale === "ar" ? "، " : ": "}{text.title}{locale === "ar" ? "، " : ", "}{item.caseNumber}</span><ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
+                  </button>
                 </div>
-                <button type="button" {...roving.primary(item.id)}
-                        className={lead ? "btn-primary w-full justify-center sm:w-auto" : "inline-flex min-h-11 items-center gap-1.5 self-start font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current sm:self-center"}
-                        onClick={() => onOpen(item.caseId)}>
-                  {item.type==="CONSULTANT_ASSIGNMENT"?t.reviewAssignment:t.open}
-                  {/* Every row repeats the same action word; the name also says which work it opens. */}
-                  <span className="sr-only">{locale === "ar" ? "، " : ": "}{text.title}{locale === "ar" ? "، " : ", "}{item.caseNumber}</span><ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
-                </button>
               </article>
             </li>
             );
@@ -108,6 +118,24 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
         </ul></>
       )}
     </section>
+  );
+}
+
+/** While the first load runs, the list's shape stands in for it (hairline rows), so the page does not jump when the work arrives. */
+function WorkSkeleton() {
+  return (
+    <ul aria-hidden className="mt-4 divide-y divide-line border-y border-line">
+      {[0, 1, 2].map(row => (
+        <li key={row} className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:gap-6">
+          <div className="min-w-0 flex-1 space-y-2.5 motion-safe:animate-pulse">
+            <div className="h-4 w-40 rounded bg-mist-deep"/>
+            <div className="h-5 w-3/4 max-w-md rounded bg-mist-deep"/>
+            <div className="h-3.5 w-1/2 max-w-xs rounded bg-mist-deep"/>
+          </div>
+          <div className="h-4 w-24 rounded bg-mist-deep motion-safe:animate-pulse"/>
+        </li>
+      ))}
+    </ul>
   );
 }
 
