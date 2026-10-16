@@ -186,19 +186,11 @@
   :root[data-brand-theme="petrol"] .page-hero {
     border-bottom: 1px solid var(--color-line);
   }
-  :root[data-brand-theme="petrol"] .home-hero .home-hero-card {
-    border-color: var(--color-line);
-    box-shadow: var(--shadow-raised);
-  }
   :root[data-brand-theme="petrol"] .page-hero-aside {
     border: 1px solid var(--color-line);
     border-radius: 0.5rem;
     background: #ffffff;
     padding: 1.25rem;
-  }
-  /* The reassurance rail: white, divided by hairlines. */
-  :root[data-brand-theme="petrol"] .home-hero .home-hero-rail {
-    --color-surface-clinical: #ffffff;
   }
 
   /* ---- The closing call to action: one flat petrol panel, a coral rule ---- */
@@ -264,23 +256,7 @@
   background: var(--color-coral);
 }
 
-/* Photography: a printed-photo radius, not a bubble. */
-:root[data-brand-theme="petrol"] .home-hero figure > div {
-  border-radius: 0.5rem;
-}
-:root[data-brand-theme="petrol"] .home-hero-card {
-  border-radius: 0.5rem;
-}
 
-/* Rail icons: plain strokes, no circles. */
-:root[data-brand-theme="petrol"] .home-hero-rail li > span[aria-hidden] {
-  width: auto;
-  height: auto;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--color-brand-600);
-}
 
 /* The hero's supporting statement: the coral is the one warm note on the page. */
 :root[data-brand-theme="petrol"] .home-hero .border-s-\[3px\] {
@@ -399,13 +375,7 @@
   translate: -3px 0;
 }
 
-/* ---- The dossier: three pages of the case file, placed on the desk, the top one stamped ----
-   The stack is sized by the pages themselves (no fixed height): the back pages are pulled up over the front
-   one with negative margins and tilted, so the composition holds at every width and in both directions. */
-.dossier-stack {
-  padding-block-start: 1.5rem;
-  padding-inline-end: 0.75rem;
-}
+/* ---- The dossier page: a page of the case file (DossierPage), flat on the desk ---- */
 .dossier-page {
   position: relative;
   border: 1px solid var(--color-line-strong);
@@ -415,13 +385,6 @@
   box-shadow: 0 14px 28px -24px rgba(19, 41, 46, 0.55);
   transform: rotate(var(--page-tilt, 0deg));
 }
-.dossier-page[data-depth="3"] { --page-tilt: 2.5deg; margin-inline-start: 11%; margin-inline-end: 0; background: var(--color-surface-pearl); }
-.dossier-page[data-depth="2"] { --page-tilt: -1.5deg; margin-block-start: -2.75rem; margin-inline-start: 5%; margin-inline-end: 6%; background: var(--color-surface-pearl); }
-.dossier-page[data-depth="1"] { --page-tilt: 0deg; margin-block-start: -2.5rem; margin-inline-end: 12%; border-top: 2px solid var(--color-brand-600); padding-inline-end: 6.5rem; }
-[dir="rtl"] .dossier-page[data-depth="3"] { --page-tilt: -2.5deg; }
-[dir="rtl"] .dossier-page[data-depth="2"] { --page-tilt: 1.5deg; }
-.dossier-page[data-depth="3"] > p,
-.dossier-page[data-depth="2"] > p { padding-inline-end: 1rem; }
 /* The confirmation page is the same page, resting flat, with no stack above it. */
 /* A flat page has no transform, so nothing inside it (dialogs, sticky bars) gets a new containing block. */
 .dossier-page-static { transform: none; }
@@ -442,7 +405,6 @@
   .dossier-page-static { --stamp-inset: 2.25rem; }
 }
 @media (max-width: 639px) {
-  .dossier-page[data-depth="1"] { padding-inline-end: 1.125rem; padding-block-start: 3.25rem; }
   /* Phones: the stamp sits above the text; its tilted box is about 4.5rem tall on one line ("Estimate ready"). */
   .dossier-page-static[data-stamped] { padding-inline-end: 1.75rem; padding-block-start: calc(var(--stamp-inset) + 4.75rem); }
   .my-care-step.dossier-page-static[data-stamped] { padding-inline-end: var(--page-pad); }
@@ -454,21 +416,6 @@
   letter-spacing: 0.02em;
 }
 [dir="rtl"] .case-stamp { --stamp-tilt: 8deg; letter-spacing: 0; }
-/* The intake card: a petrol top edge, like the tab of a clinical file. */
-:root[data-brand-theme="petrol"] .home-hero-card {
-  border-top: 2px solid var(--color-brand-600);
-}
-:root[data-brand-theme="petrol"] .home-hero-card > p:first-child {
-  color: var(--color-brand-600);
-  font-size: 0.75rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-:root[data-brand-theme="petrol"][dir="rtl"] .home-hero-card > p:first-child {
-  font-size: 0.875rem;
-  letter-spacing: 0;
-}
-
 /* One photographic grade, so stock and future photography read as one set. */
 :root[data-brand-theme="petrol"] :is(#how-it-works figure img, #how-it-works figure video) {
   filter: saturate(0.88) contrast(1.04);
@@ -642,22 +589,40 @@
 :root[data-brand-theme="petrol"] form.card .field:hover:not(:focus) {
   border-color: var(--color-brand-300);
 }
-/* Steps: the current step carries a halo; the progress track is paper, the fill petrol. */
-:root[data-brand-theme="petrol"] form.card .step-dot {
-  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+/* The intake card is the file being opened: a 2px petrol top edge, like the tab of a file. */
+:root[data-brand-theme="petrol"] form.card.intake-card {
+  border-top: 2px solid var(--color-brand-600);
 }
-:root[data-brand-theme="petrol"] form.card .step-dot[data-active="true"] {
+/* Steps are the platform's journey markers on one connector: reached steps filled Deep Petrol, the current one in the
+   coral ring, the rest outlined and waiting. The connector fills petrol as each step is passed. */
+:root[data-brand-theme="petrol"] .intake-steps .journey-marker {
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+:root[data-brand-theme="petrol"] .intake-steps .journey-marker[data-state="reached"] {
   background: var(--color-brand-700);
-  border-color: var(--color-brand-700);
+  color: #ffffff;
   box-shadow: 0 0 0 4px var(--color-brand-100);
 }
-:root[data-brand-theme="petrol"] form.card ol .h-1 {
-  height: 3px;
-  background: var(--paper-deep);
+:root[data-brand-theme="petrol"] .intake-steps .journey-marker[data-state="current"] {
+  color: var(--color-brand-700);
+  box-shadow: inset 0 0 0 2px var(--color-coral), 0 0 0 2px var(--color-brand-600);
 }
-:root[data-brand-theme="petrol"] form.card ol .h-1 > div {
-  transition-duration: 0.6s;
-  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+:root[data-brand-theme="petrol"] .intake-steps .journey-marker[data-state="upcoming"] {
+  color: var(--color-ink-500);
+  box-shadow: inset 0 0 0 1px var(--color-ink-350);
+}
+:root[data-brand-theme="petrol"] .intake-step-line {
+  border-radius: 1px;
+  background: linear-gradient(var(--color-brand-600), var(--color-brand-600)) 0 0 / 0 100% no-repeat, var(--paper-deep);
+  transition: background-size 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+:root[data-brand-theme="petrol"][dir="rtl"] .intake-step-line {
+  background-position: 100% 0, 0 0;
+}
+:root[data-brand-theme="petrol"] .intake-step[data-state="reached"] .intake-step-line {
+  background-size: 100% 100%;
 }
 /* "Who is this case for?" choices answer hover and selection. */
 :root[data-brand-theme="petrol"] form.card [role="radiogroup"] > label {
@@ -724,39 +689,22 @@
   :root[data-brand-theme="petrol"] .home-hero h1 + p { animation-delay: 0.08s; }
   :root[data-brand-theme="petrol"] .home-hero h1 + p + div { animation-delay: 0.14s; }
   :root[data-brand-theme="petrol"] .home-hero h1 + p + div + div { animation-delay: 0.2s; }
-  :root[data-brand-theme="petrol"] .home-hero-card {
-    animation: petrol-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.6s backwards;
-  }
-  /* The one authored moment: the file's pages are placed on the desk one after another, then the stamp is pressed. */
-  @keyframes petrol-page-place {
-    from { opacity: 0; transform: translate3d(0, 18px, 0) rotate(var(--page-tilt, 0deg)); }
-    to { opacity: 1; transform: translate3d(0, 0, 0) rotate(var(--page-tilt, 0deg)); }
-  }
   @keyframes petrol-stamp-press {
     from { opacity: 0; transform: rotate(var(--stamp-tilt, -8deg)) scale(1.35); }
     60% { opacity: 1; transform: rotate(var(--stamp-tilt, -8deg)) scale(0.96); }
     to { opacity: 1; transform: rotate(var(--stamp-tilt, -8deg)) scale(1); }
   }
-  :root[data-brand-theme="petrol"] .dossier-page[data-depth] {
-    animation: petrol-page-place 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
-  }
-  :root[data-brand-theme="petrol"] .dossier-page[data-depth="3"] { animation-delay: 0.1s; }
-  :root[data-brand-theme="petrol"] .dossier-page[data-depth="2"] { animation-delay: 0.26s; }
-  :root[data-brand-theme="petrol"] .dossier-page[data-depth="1"] { animation-delay: 0.42s; }
-  :root[data-brand-theme="petrol"] .dossier-stamp {
-    animation: petrol-stamp-press 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) 0.95s backwards;
-  }
   /* A real event's stamp on the page that matters now presses in once, quickly, as the page arrives. */
   :root[data-brand-theme="petrol"] .dossier-page-static[data-edge="tab"] .case-stamp {
     animation: petrol-stamp-press 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
   }
-  :root[data-brand-theme="petrol"] .home-hero-rail li {
+  :root[data-brand-theme="petrol"] .home-hero-promises li {
     animation: petrol-fade 0.6s ease both;
   }
-  :root[data-brand-theme="petrol"] .home-hero-rail li:nth-child(1) { animation-delay: 0.55s; }
-  :root[data-brand-theme="petrol"] .home-hero-rail li:nth-child(2) { animation-delay: 0.65s; }
-  :root[data-brand-theme="petrol"] .home-hero-rail li:nth-child(3) { animation-delay: 0.75s; }
-  :root[data-brand-theme="petrol"] .home-hero-rail li:nth-child(4) { animation-delay: 0.85s; }
+  :root[data-brand-theme="petrol"] .home-hero-promises li:nth-child(1) { animation-delay: 0.55s; }
+  :root[data-brand-theme="petrol"] .home-hero-promises li:nth-child(2) { animation-delay: 0.65s; }
+  :root[data-brand-theme="petrol"] .home-hero-promises li:nth-child(3) { animation-delay: 0.75s; }
+  :root[data-brand-theme="petrol"] .home-hero-promises li:nth-child(4) { animation-delay: 0.85s; }
 
   @supports (animation-timeline: view()) {
     /* ---- Scroll: the header firms up, and a coral hairline measures how far you have read ---- */
@@ -883,3 +831,359 @@
 :root[data-brand-theme="petrol"]:has(.portal-shell) .site-header::after {
   content: none;
 }
+
+/* ---- The hero story (components/home/story): one example case in five scenes ----
+   Every scene stays mounted in one grid cell, so the card keeps the height of its tallest scene; inactive scenes are
+   hidden (visibility removes them from the accessibility tree too). A scene's motion runs only while it is active —
+   `data-active` is added when it is shown, which (re)starts every animation below — and only without reduced motion.
+   Without motion each element simply sits in its final state, so the scenes read as still pictures. */
+.case-story-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: var(--color-surface-default);
+  box-shadow: var(--shadow-raised);
+}
+.case-story-card::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 0;
+  inset-inline-start: 1.5rem;
+  width: 3rem;
+  height: 3px;
+  background: var(--color-coral);
+}
+.case-story { display: flex; flex-direction: column; }
+/* The steps as one journey: icon nodes on a line. Done steps are petrol with a tick and the line is petrol up to the
+   current step; the current step is petrol inside a coral ring that draws itself over the scene (the timer). */
+.case-story-tabs {
+  --node: 2.5rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 1rem 0.5rem 0.875rem;
+  border-block-end: 1px solid var(--color-line);
+  background: var(--paper);
+}
+.case-story-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 0.25rem;
+  border: 0;
+  background: none;
+  color: var(--color-ink-500);
+  text-align: center;
+  cursor: pointer;
+}
+/* The line: half a segment either side of each node, meeting the next step's half. */
+.case-story-tab::before,
+.case-story-tab::after {
+  content: "";
+  position: absolute;
+  inset-block-start: calc(var(--node) / 2 - 1px);
+  height: 2px;
+  width: calc(50% - var(--node) / 2 - 0.25rem);
+  background: var(--color-line-strong);
+}
+.case-story-tab::before { inset-inline-start: 0; }
+.case-story-tab::after { inset-inline-end: 0; }
+.case-story-tab:first-child::before,
+.case-story-tab:last-child::after { content: none; }
+.case-story-tab:is([data-state="done"], [data-state="active"])::before,
+.case-story-tab[data-state="done"]::after { background: var(--color-brand-600); }
+.case-story-node {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--node);
+  height: var(--node);
+  border-radius: 9999px;
+  background: var(--color-surface-default);
+  color: var(--color-ink-400);
+  box-shadow: inset 0 0 0 1.5px var(--color-line-strong);
+  transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+.case-story-tab:hover .case-story-node { box-shadow: inset 0 0 0 1.5px var(--color-brand-400); color: var(--color-brand-600); }
+.case-story-tab[data-state="done"] .case-story-node { background: var(--color-brand-100); color: var(--color-brand-700); box-shadow: none; }
+.case-story-tab[data-state="active"] .case-story-node {
+  background: var(--color-brand-600);
+  color: #fff;
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--color-brand-700) 70%, transparent);
+}
+.case-story-node-done {
+  position: absolute;
+  inset-block-start: -0.125rem;
+  inset-inline-end: -0.125rem;
+  display: grid;
+  place-items: center;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 9999px;
+  background: var(--color-brand-600);
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--paper);
+}
+/* The ring sits just outside the node; it starts at twelve o'clock and runs in reading direction. */
+.case-story-ring {
+  position: absolute;
+  inset: -0.3125rem;
+  width: calc(100% + 0.625rem);
+  height: calc(100% + 0.625rem);
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+[dir="rtl"] .case-story-ring { transform: rotate(-90deg) scaleY(-1); }
+.case-story-ring-track { fill: none; stroke: color-mix(in srgb, var(--color-coral) 22%, transparent); stroke-width: 2.5; }
+.case-story-ring-fill { fill: none; stroke: var(--color-coral); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 1; }
+.case-story-tab-label { display: block; font-size: 0.75rem; font-weight: 600; line-height: 1.25; hyphens: auto; }
+.case-story-tab[data-state="active"] .case-story-tab-label { color: var(--color-brand-900); font-weight: 700; }
+.case-story-tab:focus-visible { outline: none; }
+.case-story-tab:focus-visible .case-story-node { outline: 2px solid var(--color-brand-600); outline-offset: 5px; }
+/* Phones: the nodes alone; the active scene's caption names the step. */
+@media (max-width: 639px) {
+  .case-story-tabs { --node: 2.25rem; padding-block: 0.875rem 0.75rem; }
+  .case-story-tab-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+.case-story-stage { position: relative; display: grid; }
+.case-story-scene { grid-area: 1 / 1; min-width: 0; }
+.case-story-scene:not([data-active]) { visibility: hidden; }
+.case-story-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  position: absolute;
+  z-index: 3;
+  inset-block-start: calc(11.5rem - 2.375rem);
+  inset-inline-end: 0.75rem;
+  min-height: 1.75rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--color-line);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.92);
+  color: var(--color-ink-600);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+@media (min-width: 640px) { .case-story-toggle { inset-block-start: calc(13.5rem - 2.375rem); } }
+.case-story-toggle:focus-visible { outline: 2px solid var(--color-brand-600); outline-offset: 2px; }
+
+.story-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding-block: 0.3125rem;
+  padding-inline: 0.375rem 0.6875rem;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.95);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-brand-900);
+  box-shadow: 0 8px 20px -12px rgb(11 29 33 / 0.6);
+  white-space: nowrap;
+}
+.story-tag-icon { display: grid; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 9999px; background: var(--color-brand-600); color: #fff; }
+.story-tag-icon-coral { background: var(--color-coral); color: var(--color-brand-900); }
+.story-bubble {
+  border-start-start-radius: 0.75rem;
+  border-start-end-radius: 0.75rem;
+  border-end-end-radius: 0.75rem;
+  border-end-start-radius: 0.25rem;
+  background: #fff;
+  padding: 0.5rem 0.6875rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--color-brand-900);
+  box-shadow: 0 8px 20px -12px rgb(11 29 33 / 0.6);
+}
+.story-page-chip {
+  position: absolute;
+  width: 0.875rem;
+  height: 1.125rem;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 0 0 1.5px var(--color-brand-600);
+  opacity: 0;
+}
+.s-count-b { visibility: hidden; }
+.s-currency:not(.s-currency-0) { visibility: hidden; }
+.s-scan-y { opacity: 0; }
+.s-walk { inset-inline-start: 100%; }
+[dir="rtl"] .case-story { --story-dir: -1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .case-story-ring-fill { animation: story-ring 8s linear both; }
+  .case-story[data-paused] .case-story-ring-fill { animation-play-state: paused; }
+
+  .case-story-scene[data-active] :is(.s-rise, .s-slide, .s-pop, .s-stamp, .s-tag, .s-mark, .s-fill, .s-ken, .s-fly,
+    .s-draw, .s-scan-y, .s-slice, .s-beam, .s-count-a, .s-count-b, .s-currency, .s-seg, .s-walk, .s-node, .s-pulse) {
+    animation-delay: var(--at, 0s);
+    animation-fill-mode: both;
+  }
+  .case-story-scene[data-active] .s-rise { animation-name: story-rise; animation-duration: 0.5s; animation-timing-function: ease-out; }
+  .case-story-scene[data-active] .s-slide { animation-name: story-slide; animation-duration: 0.45s; animation-timing-function: ease-out; }
+  .case-story-scene[data-active] .s-pop { animation-name: story-pop; animation-duration: 0.32s; animation-timing-function: ease-out; }
+  .case-story-scene[data-active] .s-stamp {
+    --at: 2.6s;
+    animation-name: petrol-stamp-press;
+    animation-duration: 0.45s;
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.3, 1.2);
+  }
+  .case-story-scene[data-active] .s-tag { animation-name: story-tag; animation-duration: 0.4s; animation-timing-function: ease-out; }
+  .case-story-scene[data-active] :is(.s-mark, .s-fill) {
+    transform-origin: left center;
+    animation-name: story-grow;
+    animation-duration: var(--dur, 0.5s);
+    animation-timing-function: var(--ease, ease-out);
+  }
+  [dir="rtl"] .case-story-scene[data-active] :is(.s-mark, .s-fill) { transform-origin: right center; }
+  .case-story-scene[data-active] .s-ken { animation-name: story-ken; animation-duration: 8s; animation-timing-function: ease-out; }
+  .case-story-scene[data-active] .s-fly { animation-name: story-fly; animation-duration: 1s; animation-timing-function: ease-in; }
+  .case-story-scene[data-active] .s-draw { stroke-dasharray: 1; animation-name: story-draw; animation-duration: 0.7s; animation-timing-function: ease-out; }
+  .case-story-scene[data-active] .s-scan-y { animation-name: story-scan; animation-duration: 1.1s; animation-timing-function: ease-in-out; }
+  .case-story-scene[data-active] .s-slice {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation-name: story-slice;
+    animation-duration: 1.2s;
+    animation-timing-function: steps(4, end);
+  }
+  .case-story-scene[data-active] .s-beam {
+    transform-box: view-box;
+    transform-origin: 30px 8px;
+    animation-name: story-beam;
+    animation-duration: 1.6s;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: 2;
+    animation-direction: alternate;
+  }
+  .case-story-scene[data-active] .s-count-a { animation-name: story-swap-out; animation-duration: 1.2s; animation-timing-function: steps(1, end); }
+  .case-story-scene[data-active] .s-count-b { animation-name: story-swap-in; animation-duration: 1.2s; animation-timing-function: steps(1, end); }
+  .case-story-scene[data-active] .s-currency { animation-duration: 6s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; }
+  .case-story-scene[data-active] .s-currency-0 { animation-name: story-currency-0; }
+  .case-story-scene[data-active] .s-currency-1 { animation-name: story-currency-1; }
+  .case-story-scene[data-active] .s-currency-2 { animation-name: story-currency-2; }
+  .case-story-scene[data-active] .s-seg { animation-name: story-seg; animation-duration: 1s; animation-timing-function: ease-out; }
+  .case-story-scene[data-active] .s-walk { animation-name: story-walk; animation-duration: 3.6s; animation-timing-function: linear; }
+  .case-story-scene[data-active] .s-node { animation-name: story-node; animation-duration: 0.3s; animation-timing-function: ease-out; }
+  .case-story-scene[data-active] .s-pulse { animation-name: story-pulse; animation-duration: 1.6s; animation-iteration-count: 3; }
+  .case-story-scene[data-active] .s-pop.s-pulse {
+    animation-name: story-pop, story-pulse;
+    animation-duration: 0.4s, 1.6s;
+    animation-delay: var(--at, 0s), calc(var(--at, 0s) + 0.4s);
+    animation-iteration-count: 1, 2;
+  }
+
+  @keyframes story-ring { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  @keyframes story-rise { from { opacity: 0; transform: translateY(10px); } }
+  @keyframes story-slide { from { opacity: 0; transform: translateX(calc(-24px * var(--story-dir, 1))); } }
+  @keyframes story-pop { 0% { opacity: 0; transform: scale(0.4); } 65% { transform: scale(1.12); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes story-tag { from { opacity: 0; transform: translateY(8px) scale(0.92); } }
+  @keyframes story-grow { from { transform: scaleX(0); } }
+  /* A gentle settle: at 1.05 the zoomed photograph never reaches past the page gutter, at any width. */
+  @keyframes story-ken { from { transform: scale(1.05); } to { transform: scale(1); } }
+  @keyframes story-fly {
+    0% { opacity: 0; transform: translate(0, 0) scale(1); }
+    12%, 80% { opacity: 1; }
+    100% { opacity: 0; transform: translate(calc(150px * var(--story-dir, 1)), -40px) scale(0.45) rotate(12deg); }
+  }
+  @keyframes story-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  @keyframes story-scan { 0% { opacity: 0; transform: translateY(0); } 10%, 90% { opacity: 1; } 100% { opacity: 0; transform: translateY(78px); } }
+  @keyframes story-slice { 0% { transform: scale(1); } 25% { transform: scale(0.9); } 50% { transform: scale(1.05); } 75% { transform: scale(0.95); } 100% { transform: scale(1); } }
+  @keyframes story-beam { from { transform: rotate(-34deg); } to { transform: rotate(34deg); } }
+  @keyframes story-swap-out { 0%, 99% { visibility: visible; } 100% { visibility: hidden; } }
+  @keyframes story-swap-in { 0%, 99% { visibility: hidden; } 100% { visibility: visible; } }
+  @keyframes story-currency-0 { 0%, 30% { visibility: visible; opacity: 1; } 33%, 100% { visibility: hidden; opacity: 0; } }
+  @keyframes story-currency-1 { 0%, 30% { visibility: hidden; opacity: 0; } 33%, 63% { visibility: visible; opacity: 1; } 66%, 100% { visibility: hidden; opacity: 0; } }
+  @keyframes story-currency-2 { 0%, 63% { visibility: hidden; opacity: 0; } 66%, 97% { visibility: visible; opacity: 1; } 100% { visibility: hidden; opacity: 0; } }
+  @keyframes story-seg { from { flex-grow: 0; } }
+  @keyframes story-walk { from { inset-inline-start: 0%; } to { inset-inline-start: 100%; } }
+  @keyframes story-node { from { background: #fff; box-shadow: inset 0 0 0 2px var(--color-line-strong); } }
+  @keyframes story-pulse {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-coral) 50%, transparent); }
+    70%, 100% { box-shadow: 0 0 0 10px transparent; }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Nothing moves, so there is nothing to pause. */
+  .case-story-toggle { display: none; }
+}
+
+/* ---- Travel support: a small plane rides the line from the first stop to the last (TravelServices) ---- */
+.travel-plane {
+  position: absolute;
+  inset-block-start: 1rem;
+  inset-inline-start: 2.75rem;
+  translate: 0 -55%;
+  color: var(--color-coral);
+  opacity: 0;
+  pointer-events: none;
+}
+/* Lucide's plane points up and to the right; level it to fly along the line, and the other way in Arabic. */
+.travel-plane svg { transform: rotate(45deg); }
+[dir="rtl"] .travel-plane svg { transform: scaleX(-1) rotate(45deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .travel-plane { animation: travel-plane-fly 9s cubic-bezier(0.45, 0, 0.3, 1) 1s infinite; }
+  @keyframes travel-plane-fly {
+    0% { inset-inline-start: 2.75rem; opacity: 0; translate: 0 -55%; }
+    6% { opacity: 1; }
+    25% { translate: 0 -78%; }
+    50% { translate: 0 -38%; }
+    74% { opacity: 1; translate: 0 -70%; }
+    80%, 100% { inset-inline-start: calc(75% - 0.75rem); opacity: 0; translate: 0 -55%; }
+  }
+}
+
+/* ---- The homepage headline: one size up from the page display scale, its turn underlined by hand ----
+   54px at 1440, ~46px at 1024, ~34px on phones; Arabic one step smaller for the taller script. */
+:root[data-brand-theme="petrol"] .display.home-title {
+  font-size: clamp(2.125rem, 1.64rem + 1.92vw, 3.375rem);
+  line-height: 1.04;
+  letter-spacing: -0.032em;
+}
+:root[data-brand-theme="petrol"][dir="rtl"] .display.home-title {
+  font-size: clamp(1.875rem, 1.4rem + 1.55vw, 2.75rem);
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+.home-title-accent {
+  position: relative;
+  color: var(--color-brand-600);
+  white-space: nowrap;
+}
+.home-title-line {
+  position: absolute;
+  inset-inline: -0.04em;
+  inset-block-end: -0.16em;
+  width: calc(100% + 0.08em);
+  height: 0.3em;
+  overflow: visible;
+  pointer-events: none;
+}
+[dir="rtl"] .home-title-line { transform: scaleX(-1); inset-block-end: -0.05em; }
+.home-title-line path {
+  fill: none;
+  stroke: var(--color-coral);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .home-title-line path { animation: home-title-draw 0.9s cubic-bezier(0.6, 0, 0.3, 1) 0.6s both; }
+  @keyframes home-title-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+}
+
+/* ---- Homepage rhythm: every section below the hero breathes the same, above and below ---- */
+.home-section { padding-block: clamp(2.75rem, 1.9rem + 2.2vw, 4rem); }
+/* The closing panel follows the travel section on the same paper: one section gap between them, not two. */
+.home-final-cta > section { padding-block-start: 0; }
+
+/* The intake steps named from lg: the current step reads first, reached steps in petrol, the rest waiting. */
+.intake-step-label { font-size: 0.875rem; font-weight: 600; line-height: 1.25rem; color: var(--color-ink-500); }
+.intake-step[data-state="current"] .intake-step-label { color: var(--color-brand-900); font-weight: 700; }
+.intake-step[data-state="reached"] .intake-step-label { color: var(--color-brand-700); }

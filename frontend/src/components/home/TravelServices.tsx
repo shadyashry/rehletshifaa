@@ -1,3 +1,5 @@
+import { Plane } from "lucide-react";
+
 import type { Dictionary } from "@/lib/dictionary";
 import { JourneyLine } from "./JourneyConnector";
 
@@ -5,14 +7,15 @@ import { JourneyLine } from "./JourneyConnector";
  * Travel as concierge support around the medical plan, not a travel-site feature grid. The heading in one
  * column, "the medical plan comes first" in the other, and beneath them the four stops as one connected
  * journey — 01 ─ 02 ─ 03 ─ 04 on the warm line — on the soft champagne canvas, the page's one hospitality
- * note. Phone and tablet: the same journey standing upright. No imagery; short copy; no dead space.
+ * note. Phone and tablet: the same journey standing upright. No imagery; short copy; no dead space. From lg a small
+ * coral plane rides the line from the first stop to the last (still, and hidden, without motion).
  */
 export function TravelServices({ d }: { d: Dictionary }) {
   const t = d.home.travel;
   const last = t.items.length - 1;
 
   return (
-    <section className="canvas-hospitality py-[clamp(2.25rem,1.6rem+1.6vw,3.25rem)]">
+    <section className="home-section canvas-hospitality">
       <div className="container-site">
         <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-16">
           <div>
@@ -29,7 +32,8 @@ export function TravelServices({ d }: { d: Dictionary }) {
           </div>
         </div>
 
-        <ol className="mt-6 grid gap-0 sm:mt-7 lg:mt-8 lg:grid-cols-4 lg:gap-x-6">
+        <div className="relative mt-6 sm:mt-7 lg:mt-8">
+        <ol className="grid gap-0 lg:grid-cols-4 lg:gap-x-6">
           {t.items.map((item, index) => (
             <li key={item.title} className="relative flex gap-4 pb-5 last:pb-0 sm:gap-5 lg:block lg:pb-0">
               {/* Upright between stops below lg; from lg the line runs from this stop to the next. */}
@@ -53,6 +57,10 @@ export function TravelServices({ d }: { d: Dictionary }) {
             </li>
           ))}
         </ol>
+          <span aria-hidden className="travel-plane hidden lg:block">
+            <Plane size={18} strokeWidth={2} fill="currentColor" />
+          </span>
+        </div>
         <p className="mt-5 text-[0.875rem] leading-6 text-ink-500">{t.note}</p>
       </div>
     </section>

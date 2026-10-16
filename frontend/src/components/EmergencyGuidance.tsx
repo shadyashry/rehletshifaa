@@ -14,7 +14,7 @@ export function EmergencyGuidance({ title, body, more, variant = "banner", class
   if (variant === "quiet") {
     return (
       <aside role="note" aria-label={title}
-             className={`flex flex-wrap items-start gap-x-2 gap-y-1 rounded-md border border-line bg-surface-pearl px-4 py-2.5 text-[0.875rem] leading-6 text-ink-700 ${className}`}>
+             className={`flex flex-wrap items-start gap-x-2 gap-y-0.5 text-[0.875rem] leading-6 text-ink-700 ${className}`}>
         <TriangleAlert size={16} aria-hidden className="mt-[0.3125rem] flex-none text-alert-700"/>
         <span className="font-semibold text-ink-800">{title}</span>
         <details className="min-w-0 basis-full sm:basis-auto">

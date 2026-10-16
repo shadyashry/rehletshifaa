@@ -54,8 +54,9 @@ test("the type scale stays within the agreed range at 1440", async ({ page }) =>
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/en");
   const size = (sel: string) => page.locator(sel).first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-  expect(await size("h1")).toBeGreaterThanOrEqual(43);
-  expect(await size("h1")).toBeLessThanOrEqual(48);
+  // The homepage headline sits one step above the page display scale (owner review 2026-10-16).
+  expect(await size("h1")).toBeGreaterThanOrEqual(50);
+  expect(await size("h1")).toBeLessThanOrEqual(56);
   expect(await size("main h2")).toBeGreaterThanOrEqual(29);
   expect(await size("main h2")).toBeLessThanOrEqual(34);
 });

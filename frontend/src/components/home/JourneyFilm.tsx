@@ -11,7 +11,8 @@ import { JourneyVideo } from "./JourneyVideo";
  * The process as one care journey: the four stages used on every page (How it works carries the sub-steps), joined by
  * the flowing connector, then who carries the patient through them. Beside
  * them the film inline: a composed poster with one play control, native controls once it plays.
- * Desktop: journey left, film right (≈44% of the section); phone and tablet: journey, then film.
+ * Desktop: journey left; film right with the coordinator beneath it, both columns top-aligned so neither ends in
+ * empty space; phone and tablet: journey, film, coordinator.
  */
 export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
   const v = d.home.video;
@@ -23,7 +24,7 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
   const poster = "/media/rehletshifaa-journey-scene-review.jpg";
 
   return (
-    <section id="how-it-works" className="scroll-mt-20 bg-surface-pearl pb-[clamp(2rem,1.5rem+1.6vw,3.25rem)] pt-[clamp(2.5rem,2rem+2vw,4.25rem)]">
+    <section id="how-it-works" className="home-section scroll-mt-20 bg-surface-pearl">
       <div className="container-site">
         <div className="max-w-2xl">
           <p className="eyebrow">{d.home.howEyebrow}</p>
@@ -31,7 +32,7 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
           <p className="lead mt-2.5 sm:mt-3">{d.home.howIntro}</p>
         </div>
 
-        <div className="mt-7 grid gap-8 sm:mt-9 lg:mt-10 lg:grid-cols-[minmax(0,56fr)_minmax(0,44fr)] lg:items-center lg:gap-16">
+        <div className="mt-7 grid gap-8 sm:mt-9 lg:mt-10 lg:grid-cols-[minmax(0,56fr)_minmax(0,44fr)] lg:items-start lg:gap-16">
           <div>
             <ol className="relative">
               {steps.map((step, index) => (
@@ -50,18 +51,18 @@ export function JourneyFilm({ d, locale }: { d: Dictionary; locale: Locale }) {
                 </li>
               ))}
             </ol>
+          </div>
+
+          <div className="flex w-full flex-col gap-5 sm:mx-auto sm:max-w-[620px] lg:mx-0 lg:max-w-none lg:gap-6">
+            <JourneyVideo src={source} poster={poster} label={v.label} watch={v.watch} duration={v.duration} play={d.home.videoPlay} />
             {/* One person through all four stages: a generic team introduction until real coordinator content exists (D4). */}
-            <p className="journey-afterward mt-6 flex items-start gap-3 rounded-lg border border-border-subtle bg-surface-default px-4 py-3.5 text-[0.9375rem] leading-6 text-ink-700 sm:ms-[3.25rem] lg:mt-7">
+            <p className="journey-afterward flex items-start gap-3 rounded-lg border border-border-subtle bg-surface-default px-4 py-3.5 text-[0.9375rem] leading-6 text-ink-700">
               <MessageCircle size={18} strokeWidth={1.9} aria-hidden="true" className="mt-0.5 flex-none text-brand-700" />
               <span>
                 <strong className="font-semibold text-brand-900">{d.home.coordinatorIntro.title}</strong>
                 <span className="mt-0.5 block">{d.home.coordinatorIntro.body}</span>
               </span>
             </p>
-          </div>
-
-          <div className="w-full sm:mx-auto sm:max-w-[620px] lg:mx-0 lg:max-w-none">
-            <JourneyVideo src={source} poster={poster} label={v.label} watch={v.watch} duration={v.duration} play={d.home.videoPlay} />
           </div>
         </div>
 
