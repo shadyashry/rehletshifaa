@@ -1,6 +1,6 @@
 const {chromium}=require('C:/Users/hp/Projects/rehletshifaa/frontend/node_modules/playwright-core');
 const fs=require('fs');
-const ANIM=[0,10,12], N=18, FPS=15, SECS=5.2;
+const ANIM=[0,6,11,13], N=19, FPS=15, SECS=5.2;
 (async()=>{
  fs.mkdirSync('fr4',{recursive:true});
  const b=await chromium.launch(); const p=await b.newPage({viewport:{width:1920,height:1080}});

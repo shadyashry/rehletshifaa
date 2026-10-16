@@ -3,7 +3,7 @@ from PIL import Image, ImageDraw
 S=os.path.dirname(os.path.abspath(__file__)).replace(chr(92),'/')
 FF=S+'/v/Lib/site-packages/imageio_ffmpeg/binaries/ffmpeg-win-x86_64-v7.1.exe'
 A='docs/demo/assets/audio/'; HERO='docs/demo/assets/hero.mp4'; OUT=S+'/out4'; os.makedirs(OUT,exist_ok=True); os.makedirs(S+'/ov4',exist_ok=True)
-FPS=30; PRE=0.6; POST=1.0; FLASH=1.2; ANIM=[0,10,12]; AFPS=15
+FPS=30; PRE=0.6; POST=1.0; FLASH=1.2; ANIM=[0,6,11,13]; AFPS=15
 meta=json.load(open(S+'/fr4/meta.json'))
 N=len(meta)
 def run(*a):

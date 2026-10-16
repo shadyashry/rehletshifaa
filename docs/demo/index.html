@@ -87,6 +87,16 @@ details.ar p{direction:rtl;text-align:right;font-size:.95rem;line-height:1.9;mar
 .voice{display:flex;gap:8px;align-items:center}
 .voice .btn svg{width:14px;height:14px;vertical-align:-2px;margin-inline-end:6px;fill:currentColor}
 /* intro + closing */
+.duo{display:flex;gap:22px;align-items:stretch;justify-content:center;flex-wrap:wrap}
+.card{border:1px solid var(--line);border-radius:10px;padding:22px 26px;background:var(--white);display:flex;flex-direction:column;gap:10px;align-items:flex-start;min-width:230px;text-align:left}
+.card b{font-family:var(--head);font-size:1.15rem;color:var(--petrol-900)}
+.card.muted{opacity:.7;background:var(--paper);align-items:center;text-align:center}
+.card.muted .ico{stroke:var(--ink-400);width:36px;height:36px}
+.card .no{display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--ink-400)}.card .no .ico{width:20px;height:20px;stroke:var(--ink-400)}
+.card.hero{border:2px solid var(--petrol-600);box-shadow:0 0 0 4px var(--petrol-50)}
+.card.hero>.ico{width:40px;height:40px}
+.card ul{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.card li{display:flex;gap:8px;align-items:center;font-size:.92rem;color:var(--ink-600)}.card li .ico{width:20px;height:20px}
 
 /* motion visuals (intro, finance, travel): every element has a start time --s; film mode steps time with --t */
 .a{opacity:0;animation:aIn .6s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
@@ -118,8 +128,8 @@ details.ar p{direction:rtl;text-align:right;font-size:.95rem;line-height:1.9;mar
 .chip.team{background:var(--paper-deep);border-color:var(--line-strong);color:var(--ink-600)}
 .track{position:relative;margin:34px 0 8px}
 .track .base{position:absolute;left:5%;right:5%;top:17px;height:2px;background:var(--petrol-200);transform-origin:left;transform:scaleX(0);animation:aLine 1.8s ease-in-out both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
-.track .runner{position:absolute;top:11px;left:5%;width:14px;height:14px;border-radius:50%;background:var(--coral);animation:aRun 1.8s ease-in-out both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s);opacity:0}
-@keyframes aRun{0%{left:5%;opacity:1}99%{opacity:1}100%{left:calc(95% - 14px);opacity:0}}
+.track .runner{position:absolute;top:3px;left:5%;width:30px;height:30px;animation:aRun 1.8s ease-in-out both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s);opacity:0}.track .runner .ico{width:30px;height:30px;transform:rotate(45deg);stroke:var(--coral);background:var(--white);border-radius:50%;stroke-width:1.8}
+@keyframes aRun{0%{left:calc(5% - 15px);opacity:1}92%{opacity:1}100%{left:calc(95% - 8px);opacity:0}}
 .track ol{list-style:none;margin:0;padding:0;display:flex;position:relative}
 .track li{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px}
 .dot{width:36px;height:36px;border-radius:50%;background:var(--petrol-600);color:#fff;display:grid;place-items:center;font-weight:600;font-size:.9rem;box-shadow:0 0 0 5px var(--white)}
@@ -206,7 +216,7 @@ body.film .panel{max-width:1400px;margin-top:120px;font-size:21px}body.film .flo
 
 <script>
 const IMG='assets/',AUD='assets/audio/';
-const AR=["رحلة شفاء: من أول رسالة إلى المتابعة. استشاري يراجع حالتك، ومنسّق واحد يرافقك، وتكلفة واضحة.", "الصفحة الرئيسية. يرى المريض كيف تعمل الخدمة، ويبدأ بإرسال حالته. والقرار يبقى بيده.", "إرسال الحالة. نموذج قصير من ثلاث خطوات: بيانات المريض، ثم الحالة والتقارير، ثم الموافقة. ولا يحتاج المريض أن يعرف التخصص، ولا أن تكون كل التقارير معه.", "استلام الحالة. يحصل المريض فورًا على رقم الحالة وصفحة متابعة آمنة، وتُوضَّح له المرحلة الحالية، ولا يُطلب منه أي إجراء.", "مهامي. يبدأ المنسّق يومه من قائمة واحدة مرتّبة بحسب الأهمية، وكل بند يوضّح الخطوة التالية ومن ننتظر.", "مساحة عمل الحالة. يؤكّد المنسّق مجال الرعاية، ثم يختار استشاريًا مؤهَّلًا بالاسم، بحسب التخصص الدقيق وعدد الحالات الحالية.", "مراجعة الاستشاري. يطّلع على الملف، ويسجّل توصيته السريرية وأي مخاطر ينبغي أن يعرفها المريض. وهنا يُتّخذ القرار الطبي، قبل أي التزام مالي.", "التقدير الأولي. يراه المريض في صفحته، وهو غير مُلزِم وليس سعرًا نهائيًا. ولا يحدث شيء حتى يقرّر.", "التحقّق برمز لمرة واحدة. يدخل المريض رمزًا من ستة أرقام يصله على هاتفه أو بريده، لأن العرض يحتوي معلومات خاصة. والرمز لا يُعرض هنا أبدًا.", "وديعة التنسيق. يدفع المريض بتحويل بنكي أو عبر وكيل، ثم يُدخل رقم مرجع التحويل. والبيانات البنكية هنا تجريبية.", "وفريق المالية لدينا يراجع كل فاتورة وكل تحويل مالي، قبل أن يُعتمد أي شيء.", "تأكيد الوديعة. عند التأكّد من الدفع يبدأ المنسّق ترتيب العلاج، وتُخصم الوديعة من السعر النهائي.", "ونساعد أيضًا في السفر والإقامة: تذاكر الطيران، والتأشيرة، وحجز الفندق، عبر مشغّلينا.", "الدخول والقسيمة. تعرض الحالة خطاب القبول وقسيمة المستشفى: ما يُضاف لحساب المستشفى، وما يدفعه المريض عند الكاشير، وما تبقّى.", "مراحل العلاج. تُسجَّل المراحل ويصادق عليها الاستشاري. وأي علاج إضافي يُقترح بسبب سريري واضح، وتسعّره المالية قبل أن يُحتسب.", "ملف الخروج. الخروج ليس زرًّا: تعرض الحالة ما ينقص، والمستندات التي يحملها المريض معه.", "المتابعة. تُجدوَل مكالمات متابعة، وتصل الأسئلة عبر رابط آمن، وما يحتاج انتباهًا يرجع إلى الاستشاري، ولا تُغلق الحالة قبل أن ينتهي كل شيء معلّق.", "هذه هي الرحلة كاملة. الشاشات تعتمد على بيانات تجريبية، والتكاليف المعروضة تقديرات وليست أسعارًا. شكرًا لكم."];
+const AR=["رحلة شفاء… من أول رسالة لحد المتابعة. استشاري بيراجع حالتك، ومنسّق واحد معاك طول الطريق، والتكلفة واضحة من الأول.", "دي الصفحة الرئيسية. المريض بيشوف الخدمة شغّالة إزاي، وبيبدأ بإنه يبعت حالته. والقرار دايمًا في إيده.", "بعت الحالة بسيط: نموذج قصير على تلات خطوات. بيانات المريض، وبعدين الحالة والتقارير، وبعدين الموافقة. ومش لازم المريض يعرف التخصص، ولا يكون معاه كل التقارير.", "أول ما الحالة تتبعت، المريض بياخد رقم للحالة وصفحة متابعة آمنة. الصفحة بتقوله إن المنسّق بيراجع الحالة، وإنه مفيش حاجة مطلوبة منه دلوقتي.", "ده شغل المنسّق. قايمة واحدة مترتّبة بالأهم، وكل بند بيقول الخطوة الجاية إيه، واحنا مستنيين مين.", "المنسّق بيأكّد مجال الرعاية، وبيختار استشاري بالاسم من المؤهّلين، على حسب التخصص الدقيق وعدد الحالات اللي معاه.", "والمهم: اللي بيراجع حالتك استشاري متخصّص في المجال، مش دكتور عادي. استشاري بالاسم، وله بروفايل تقدر تقراه، وبيراجع قبل ما تسافر أو تدفع.", "الاستشاري بيقرا الملف، وبيسجّل توصيته الطبية وأي مخاطر لازم المريض يعرفها. وهنا بيتاخد القرار الطبي، قبل أي التزام مالي.", "بعد كده المريض بيشوف التقدير المبدئي في صفحته. التقدير ده مش ملزم، ومش هو السعر النهائي. ومفيش حاجة بتحصل غير لما المريض يقرر.", "عشان يفتح العرض، المريض بيدخل كود من ستة أرقام بيوصله على تليفونه أو الإيميل، لأن العرض فيه معلومات خاصة. والكود ده عمره ما بيظهر هنا.", "وديعة التنسيق. المريض بيدفع بتحويل بنكي أو عن طريق وكيل، وبعدين بيكتب رقم مرجع التحويل. والبيانات البنكية اللي قدامك تجريبية.", "وفريق المالية عندنا بيراجع كل فاتورة وكل تحويل، قبل ما أي حاجة تتأكّد.", "أول ما الدفع يتأكّد، المنسّق بيبدأ يرتّب العلاج، والوديعة بتتخصم من السعر النهائي.", "وكمان بنساعد في السفر والإقامة: تذاكر الطيران، والتأشيرة، وحجز الفندق، من خلال المشغّلين بتوعنا.", "الدخول والقسيمة. الحالة بتعرض خطاب القبول وقسيمة المستشفى: إيه اللي اتحط على حساب المستشفى، والمريض هيدفع إيه عند الكاشير، وإيه المتبقّي.", "مراحل العلاج. كل مرحلة بتتسجّل، والاستشاري بيراجعها ويصادق عليها. وده معنى زرار كاونترساين: يعني الاستشاري بيوقّع ويأكّد المرحلة. وأي علاج زيادة بيتقدّم بسبب طبي واضح، والمالية بتسعّره الأول.", "ملف الخروج. الخروج مش زرار. الحالة بتعرض اللي ناقص، والمستندات اللي المريض هيمشي بيها.", "المتابعة. بتتحدّد مكالمات متابعة، والأسئلة بتوصل عن طريق لينك آمن. واللي محتاج انتباه بيرجع للاستشاري، والحالة مش بتتقفل غير لما كل حاجة تخلص.", "كده الرحلة خلصت. الشاشات دي ببيانات تجريبية، والتكاليف اللي ظاهرة تقديرات مش أسعار. شكرًا ليكم."];
 const ICO={
  plane:'<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
  bed:'<path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/>',
@@ -217,7 +227,10 @@ const ICO={
  check:'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
  shield:'<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
  chat:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
- bars:'<path d="M4 20h4v-6H4zM10 20h4V9h-4zM16 20h4V4h-4z"/>'};
+ bars:'<path d="M4 20h4v-6H4zM10 20h4V9h-4zM16 20h4V4h-4z"/>',
+ user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+ x:'<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>',
+ steth:'<path d="M6 3v6a4 4 0 0 0 8 0V3"/><path d="M10 13v2a5 5 0 0 0 10 0v-1"/><circle cx="20" cy="12" r="2"/>'};
 const svg=k=>`<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICO[k]}</svg>`;
 const steps=[
 {role:'Patient',view:'Public website',title:'The home page',img:'01-home.webp',video:'hero.mp4',w:1440,h:780,
@@ -245,10 +258,13 @@ const steps=[
  hs:[{x:2,y:37,w:71,h:10,t:'Your step'},{x:2.9,y:68.5,w:69.4,h:19,t:'Eligible Consultants'},{x:2.9,y:89.6,w:13.5,h:5.7,t:'Assign Consultant'}],
  cap:'The coordinator confirms the care area, completes anything missing, then chooses a named Consultant from those who are eligible. Subspecialty, capability and current workload are shown side by side.',
  why:'The case reaches someone qualified to review it, not a general queue.'},
+{role:'Consultant',kind:'anim',anim:'consultant',view:'Consultant · Who reviews your case',title:'Reviewed by a Consultant',hs:[],
+ cap:'The person who reviews the case is a specialist Consultant in the right care area, named and with a profile the patient can read. It is not a general doctor.',
+ why:'That review happens before the patient travels, pays or decides.'},
 {role:'Consultant',view:'Consultant · Clinical review',title:'Consultant review',img:'06-consultant-review.webp',w:1220,h:1000,
  alt:'Consultant view of a case under review with the step "Record your clinical decision", a clinical recommendation field and the patient\'s file with documents.',
  hs:[{x:2,y:24,w:60,h:12,t:'Your step'},{x:2.5,y:64,w:62,h:17,t:'Clinical recommendation'}],
- cap:'The Consultant reads the patient\'s file and records a clinical recommendation, with any risks the patient should know before going ahead.',
+ cap:'The specialist Consultant reads the patient\'s file and records a clinical recommendation, with any risks the patient should know before going ahead.',
  why:'A Consultant reviews before the patient travels, pays or decides.'},
 {role:'Patient',view:'Patient · My Care',title:'Preliminary estimate',img:'07-estimate-ready.webp',w:1220,h:1230,
  alt:'Patient My Care page: "Your estimate is ready to review", an Estimate ready stamp, a Review estimate button, and a preliminary estimate of $4,850 shown with a range bar and described as non-binding.',
@@ -283,9 +299,9 @@ const steps=[
  why:'Everyone works from the same voucher.'},
 {role:'Consultant',view:'Consultant · Case file',title:'Treatment milestones',img:'12-treatment.webp',w:930,h:625,
  alt:'Treatment panel listing milestones Admitted and Procedure started, a Countersign button, and a change order for a second stent that is with Finance for pricing.',
- hs:[{x:82,y:25,w:16,h:10,t:'Countersign'},{x:2,y:47,w:50,h:15,t:'Change order'}],
- cap:'Milestones are recorded as treatment progresses and the Consultant countersigns. If more care is needed, a change order is proposed and priced by Finance.',
- why:'Nothing is added to the plan without a clinical reason and a visible price.'},
+ hs:[{x:82,y:25,w:16,h:10,t:'Countersign: the Consultant signs off the milestone'},{x:2,y:47,w:50,h:15,t:'Change order'}],
+ cap:'Operations records each milestone as treatment progresses. "Countersign" simply means the Consultant reviews it and signs it off. If more care is needed, a change order is proposed and priced by Finance.',
+ why:'A clinician signs off every milestone, and nothing is added to the plan without a clinical reason and a visible price.'},
 {role:'Consultant',view:'Consultant · Case file',title:'Discharge pack',img:'13-discharge.webp',w:930,h:1020,
  alt:'Discharge panel with a "Before discharge" list of blockers and a discharge pack checklist: discharge summary recorded, medication list missing, operative note recorded.',
  hs:[{x:2,y:6,w:95,h:15,t:'What still blocks discharge'},{x:2,y:23,w:95,h:29,t:'Discharge pack'}],
@@ -305,15 +321,19 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const chip=r=>`<span class="chip ${r==='Finance'||r==='Operations'?'team':r.toLowerCase()}">${r}</span>`;
 function intro(){
  const st=['Case received','Coordinator review','Consultant review','Your proposal','Coordination deposit','Treatment','Follow-up'];
- const pts=[['shield','Consultant review first','Before the patient travels, pays or decides.'],['chat','One bilingual coordinator','Arabic and English, start to finish.'],['bars','Honest cost staging','An estimate first, a final quote later.']];
+ const pts=[['shield','Reviewed by a Consultant','A specialist, not a general doctor, before you travel or pay.'],['chat','One bilingual coordinator','Arabic and English, start to finish.'],['bars','Honest cost staging','An estimate first, a final quote later.']];
  return `<section class="panel intro anim"><span class="rule"></span>
 <h1 class="a" style="--s:.1">One case.<br>One journey.</h1>
 <p class="lead a" style="--s:.5">Specialist care in Egypt for international patients.</p>
-<div class="track" aria-label="The seven stages of the care journey"><span class="base" style="--s:.9"></span><span class="runner" style="--s:.9"></span>
+<div class="track" aria-label="The seven stages of the care journey"><span class="base" style="--s:.9"></span><span class="runner" style="--s:.9">${svg('plane')}</span>
 <ol>${st.map((t,i)=>`<li class="a" style="--s:${(1.0+i*0.27).toFixed(2)}"><span class="dot">${i+1}</span><span class="lbl">${t}</span></li>`).join('')}</ol></div>
 <div class="pts">${pts.map(([k,t,d],i)=>`<div class="a" style="--s:${(3.1+i*0.3).toFixed(2)}">${svg(k)}<b>${t}</b>${d}</div>`).join('')}</div>
 <div class="cta a" style="--s:4.1"><button class="btn" data-go="1">Start the tour</button><button class="btn ghost" id="introPlay" type="button">Play with Arabic voice-over</button></div></section>`}
 function visual(k){
+ if(k==='consultant')return `<div class="vis anim"><div class="a" style="--s:0"><h3>Reviewed by a Consultant</h3><p class="vsub">A specialist in the right care area. Not a general doctor.</p></div>
+<div class="duo"><div class="card muted a" style="--s:.5">${svg('user')}<b>General doctor</b><span class="no">${svg('x')}Not who reviews your case</span></div>
+<div class="card hero a" style="--s:1.3">${svg('steth')}<b>Consultant</b><ul><li class="a" style="--s:2.1">${svg('check')}Right specialty, chosen for your case</li><li class="a" style="--s:2.5">${svg('check')}Credentials reviewed</li><li class="a" style="--s:2.9">${svg('check')}A profile you can read</li></ul></div></div>
+<span class="badge-op a" style="--s:3.5">Reviews before you travel, pay or decide</span></div>`;
  if(k==='finance')return `<div class="vis anim"><div class="a" style="--s:0"><h3>Our finance team</h3><p class="vsub">Every invoice and every transfer is checked before anything is confirmed.</p></div>
 <div class="fin"><div class="col"><div class="tile a" style="--s:.5">${svg('receipt')}Invoice</div><div class="tile a" style="--s:.8">${svg('bank')}Bank transfer</div></div>
 <span class="ln" style="--s:1.2"></span><div class="core a" style="--s:1.5">${svg('search')}Finance team</div><span class="ln" style="--s:2.1"></span>
@@ -331,9 +351,9 @@ function closing(){
 <div class="lanes">${grid}</div>
 <div class="list">${steps.map((s,i)=>`<button data-go="${i+1}"><span class="n">${i+1}</span><span class="t">${esc(s.title)}</span></button>`).join('')}</div>
 <div class="notshown"><h2>Not shown yet</h2><ul>
-<li>The final quote, and the patient's own outcome questionnaire (step 16 shows the team's view of follow-up).</li>
+<li>The final quote, and the patient's own outcome questionnaire (step 17 shows the team's view of follow-up).</li>
 <li>An Arabic interface: the voice-over is Arabic, the screens are English.</li>
-<li>Steps 13 to 16 show the Consultant's view of the case file.</li>
+<li>Steps 14 to 17 show the Consultant's view of the case file.</li>
 </ul></div>
 <div class="cta"><button class="btn ghost" data-go="${total}">Back</button><button class="btn" data-go="0">Restart</button></div></section>`}
 function step(i){
