@@ -18,6 +18,7 @@ class KeycloakRealmContractTest {
     private static final Path REALM_EXPORT = Path.of("..", "infrastructure", "keycloak", "realm-rehletshifaa.json");
     /** The production realm import must carry the same step-up levels, or staff could never finish their second step (D1). */
     private static final Path PRODUCTION_REALM = Path.of("..", "deploy", "oracle", "keycloak", "rehletshifaa-realm.json");
+    private static final String DEFAULT_ROLE = "default-roles-rehletshifaa";
     private static final Set<String> IDENTITY_ADMIN_ROLES = Set.of("manage-users", "view-realm", "view-users", "query-users");
 
     @Test
@@ -28,10 +29,14 @@ class KeycloakRealmContractTest {
         // A2b: the only realm role is the sign-in marker rs-staff; it never reaches a token (no roles scope or mapper below).
         assertThat(realm.path("roles").path("realm")).extracting(role -> role.path("name").asText())
                 .as("no business realm roles").containsExactly("rs-staff");
-        assertThat(realm.path("users")).allSatisfy(user -> assertThat(user.path("realmRoles")).extracting(JsonNode::asText)
-                .as("%s carries at most the sign-in marker", user.path("username").asText()).isSubsetOf("rs-staff"));
-        assertThat(findBy(realm.path("users"), "username", "coordinator").path("realmRoles")).extracting(JsonNode::asText).containsExactly("rs-staff");
-        assertThat(findBy(realm.path("users"), "username", "patient").has("realmRoles")).as("patients carry no staff marker").isFalse();
+        // Imported users get only the roles listed, so each seeded person lists the default role: without its
+        // account/manage-account the account console (authenticator app, passkeys, password) refuses them.
+        assertThat(realm.path("users").valueStream().filter(user -> !user.has("serviceAccountClientId"))).allSatisfy(user ->
+                assertThat(user.path("realmRoles")).extracting(JsonNode::asText).as("%s carries the default role and at most the sign-in marker",
+                        user.path("username").asText()).contains(DEFAULT_ROLE).isSubsetOf(DEFAULT_ROLE, "rs-staff"));
+        assertThat(findBy(realm.path("users"), "username", "coordinator").path("realmRoles")).extracting(JsonNode::asText).containsExactly(DEFAULT_ROLE, "rs-staff");
+        assertThat(findBy(realm.path("users"), "username", "patient").path("realmRoles")).extracting(JsonNode::asText)
+                .as("patients carry no staff marker").containsExactly(DEFAULT_ROLE);
 
         JsonNode web = findBy(realm.path("clients"), "clientId", "rehletshifaa-web");
         assertThat(web.path("defaultClientScopes")).extracting(JsonNode::asText)
