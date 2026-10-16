@@ -111,6 +111,8 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   const selectedCases=list.filter(item=>selectedIds.has(item.id));
   const pages=Math.max(1,Math.ceil(list.length/12)), page=Math.min(current.page,pages);
   const pageItems=list.slice((page-1)*12,page*12);
+  // One filled action per list (as in My work): only the first case that can be taken is filled; the rest are quiet.
+  const leadClaim=coordinator?pageItems.find(item=>!item.coordinatorSubject&&item.status==="RECEIVED")?.id:undefined;
   const roving=useRovingList(pageItems.map(item=>item.id),{rowActions:true});
   const shortcuts=useShortcutsEnabled();
   const pageSelected=pageItems.length>0&&pageItems.every(item=>selectedIds.has(item.id));
@@ -217,7 +219,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     </div>}
 
     {/* Bulk actions exist only once something is selected. */}
-    {selectedCases.length>0&&<div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2">
+    {selectedCases.length>0&&<div className="flex flex-wrap items-center gap-2 border-y border-line py-2">
       <p className="text-[0.875rem] font-bold text-brand-900">{plural(work.locale,selectedCases.length,work.plural.selected)}</p>
       <div className="ms-auto flex flex-wrap gap-2">
         {canBulkClaim&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.8125rem]" disabled={busy} onClick={async()=>{const failed:string[]=[];for(const item of selectedCases){const result=await onMutate(`/coordinator/cases/${item.id}/claim`);if(!result)failed.push(item.id);}
@@ -272,15 +274,15 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
               {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><Files size={13} aria-hidden/>{plural(work.locale,item.documentCount??0,work.plural.documents)}</span>}
             </>;
             const actions=<>
-              {claimable&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.8125rem]" disabled={busy} tabIndex={tab} aria-label={named(text.claim)} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
+              {claimable&&<button type="button" className={`${item.id===leadClaim?"btn-primary":"btn-secondary"} !min-h-11 !px-3 !text-[0.8125rem]`} disabled={busy} tabIndex={tab} aria-label={named(text.claim)} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
               {pending&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.8125rem]" disabled={busy} tabIndex={tab} aria-label={named(text.accept)} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
               {transferable&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.8125rem]" disabled={busy} aria-haspopup="dialog" tabIndex={tab} aria-label={named(text.transfer)} onClick={()=>onTransfer?.(item)}>{text.transfer}</button>}
               {/* Opening is the row's quiet default; only a business action (take ownership, accept) is filled. */}
-              <button type="button" {...roving.primary(item.id)} className="btn-secondary !min-h-11 !px-3 !text-[0.8125rem]" aria-disabled={busy||undefined} aria-label={named(text.open)} onClick={()=>{if(!busy)onOpen(item);}}>{text.open}<ArrowRight size={14} aria-hidden className="rtl:rotate-180"/></button>
+              <button type="button" {...roving.primary(item.id)} className="inline-flex min-h-11 items-center gap-1.5 px-1 font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current aria-disabled:cursor-not-allowed aria-disabled:text-ink-500 aria-disabled:no-underline" aria-disabled={busy||undefined} aria-label={named(text.open)} onClick={()=>{if(!busy)onOpen(item);}}>{text.open}<ArrowRight size={16} aria-hidden className="rtl:rotate-180"/></button>
             </>;
 
 
-            return <li key={item.id} data-row={item.id} data-case={item.id} className="flex flex-col gap-3 px-2 py-3.5 transition hover:bg-brand-50/40 has-[[data-roving-primary]:focus-visible]:bg-brand-50 sm:flex-row sm:items-center sm:gap-4">
+            return <li key={item.id} data-row={item.id} data-case={item.id} className={`${selectable?"grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3":"flex flex-col"} gap-y-3 px-2 py-3.5 transition hover:bg-brand-50/40 has-[[data-roving-primary]:focus-visible]:bg-brand-50 sm:flex sm:flex-row sm:items-center sm:gap-4`}>
               {selectable&&<label className="-m-3.5 inline-grid h-11 w-11 flex-none cursor-pointer place-items-center"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={selectedIds.has(item.id)} tabIndex={tab} onChange={()=>toggle(item.id)} aria-label={fillTemplate(text.selectCase,{number:item.caseNumber})}/></label>}
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
@@ -297,7 +299,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
                   <span className="text-[0.8125rem] text-ink-400">{claimable?text.received:text.updated} {new Intl.DateTimeFormat(intlLocale(locale),{day:"numeric",month:"short"}).format(new Date(claimable?item.createdAt:item.updatedAt))}</span>
                 </div>
               </div>
-              <div className="flex flex-none flex-wrap gap-2 sm:justify-end">{actions}</div>
+              <div className="col-span-2 flex flex-none flex-wrap items-center gap-2 sm:justify-end">{actions}</div>
             </li>;
           })}
         </ul></>}

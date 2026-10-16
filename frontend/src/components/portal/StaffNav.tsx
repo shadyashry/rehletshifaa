@@ -36,13 +36,13 @@ export function StaffViewLinks({ locale, label, items, current, clinic, onSelect
   const header = variant === "header";
   // One tab style on the staff side (UX 2-4): the place you are in is underlined in petrol, as the case page's tabs and
   // Conversations' scopes are. The header copy has no rule of its own (the bar's edge is enough); the inline copy sits on one.
-  const base = "-mb-px inline-flex min-h-11 items-center border-b-2 px-3 text-[0.9375rem] font-semibold transition-colors";
+  const base = "-mb-px inline-flex min-h-11 items-center border-b-2 px-2.5 text-[0.875rem] font-semibold transition-colors lg:px-3 lg:text-[0.9375rem]";
   const tone = (on: boolean) => on ? "border-brand-600 text-brand-800" : "border-transparent text-ink-600 hover:text-brand-800";
   return (
-    <nav aria-label={label} className={header ? "hidden items-center md:flex" : "mb-5 border-b border-line-strong md:hidden"}>
-      <ul className={`flex flex-wrap items-center ${header ? "gap-1" : "gap-x-1"}`}>
+    <nav aria-label={label} className={header ? "hidden items-center md:flex" : "mb-5 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-line-strong)] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"}>
+      <ul className={`flex items-center ${header ? "flex-wrap gap-1" : "gap-x-1"}`}>
         {items.map(item => (
-          <li key={item.id}>
+          <li key={item.id} className="flex-none whitespace-nowrap">
             {hrefFor ? (
               <a href={hrefFor(item.id)} aria-current={current === item.id ? "page" : undefined} className={`${base} ${tone(current === item.id)}`}
                  onClick={event => {

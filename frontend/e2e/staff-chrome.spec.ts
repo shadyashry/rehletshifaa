@@ -70,7 +70,7 @@ for (const locale of ["en", "ar"] as const) {
     await page.locator("#staff-view [data-roving-list] [data-row] button").first().click();
     await expect(page.locator("#case-heading")).toBeFocused();
     // The page's own h1 names the case for assistive technology; the cover names the patient visibly.
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(ar ? "الحالة RS-2026-000002" : "Case RS-2026-000002");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(ar ? /^الحالة ⁦?RS-2026-000002⁩?$/ : /^Case ⁦?RS-2026-000002⁩?$/);
   });
 
   test(`closing shots of the coordinator workspace (${locale})`, async ({ page }) => {

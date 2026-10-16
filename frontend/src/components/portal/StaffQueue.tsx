@@ -4,7 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { RoleDashboardSummary, type KpiFilter } from "@/components/portal/RoleDashboardSummary";
 import { CaseQueue, type QueueState } from "@/components/portal/CaseQueue";
-import { StaffViewLinks, type StaffViewId, type StaffViewItem } from "@/components/portal/StaffNav";
+import type { StaffViewId, StaffViewItem } from "@/components/portal/StaffNav";
 import { MyWork, type WorkItem } from "@/components/portal/MyWork";
 import { ReplyCoverPanel, type ReplyCover } from "@/components/portal/ReplyCoverPanel";
 import { ConversationsView } from "@/components/portal/ConversationsView";
@@ -21,7 +21,7 @@ const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnershi
  * The operational dashboard: work first, then the cases I own, then what the team has available.
  * Ownership ("Take ownership") belongs to the team queue; My Cases is accountability, not a task list.
  */
-export function Queue({views,view:current,onSelectView,viewHref,clinic,loading,locale,role,cases,tasks,busy,mySubject,coordinatorLead,staff=[],replyCovers=[],fetchJson,openCase,openCaseById,mutate,queueState,changeQueue}:{views:StaffViewItem[];view:StaffViewId;onSelectView:(id:StaffViewId)=>void;viewHref?:(id:StaffViewId)=>string;clinic:{href:string;label:string}|null;loading:boolean;locale:Locale;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;staff?:StaffMember[];replyCovers?:ReplyCover[];fetchJson?:<T,>(path:string)=>Promise<T>;openCase:(item:CaseView)=>void;openCaseById:(caseId:string)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
+export function Queue({views,view:current,onSelectView,loading,locale,role,cases,tasks,busy,mySubject,coordinatorLead,staff=[],replyCovers=[],fetchJson,openCase,openCaseById,mutate,queueState,changeQueue}:{views:StaffViewItem[];view:StaffViewId;onSelectView:(id:StaffViewId)=>void;loading:boolean;locale:Locale;role?:RoleKey;cases:CaseView[];tasks:Task[];busy:boolean;mySubject?:string;coordinatorLead:boolean;staff?:StaffMember[];replyCovers?:ReplyCover[];fetchJson?:<T,>(path:string)=>Promise<T>;openCase:(item:CaseView)=>void;openCaseById:(caseId:string)=>void;mutate:Mutate;queueState:QueueState;changeQueue:(value:QueueState)=>void}){
  const work=useWorkCopy();
   const staffView=role!=="patient";
   const[transferCase,setTransferCase]=useState<CaseView|null>(null);
@@ -34,7 +34,7 @@ export function Queue({views,view:current,onSelectView,viewHref,clinic,loading,l
     if(next!==view)requestAnimationFrame(()=>document.getElementById("portal-title")?.focus());
   };
   const teamWaiting=views.find(item=>item.id==="team")?.count??0;
-  return <>{staffView&&<StaffViewLinks locale={locale} label={work.nav.label} items={views} current={view as StaffViewId} clinic={clinic} onSelect={onSelectView} hrefFor={viewHref} variant="inline"/>}
+  return <>
     {/* The count line belongs to My work alone (UX 2-4): the other views are places, not a to-do. */}
     {staffView&&view==="work"&&<RoleDashboardSummary role={role??""} cases={cases} tasks={tasks} loading={loading} selected={queueState.kpi} onSelect={selectKpi}/>}
     <div id="work-panel">

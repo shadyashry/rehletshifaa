@@ -46,7 +46,7 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         {/* Finance's queue also holds its team's pool (deposits to record), not only work assigned to them (QA W-44). */}
         <p className="text-sm text-ink-500">{role === "finance" ? t.hintTeam : t.hint}</p>
-        <p role="status" className="text-sm text-ink-500">{busy ? t.loading : items.length ? plural(work.locale, items.length, work.plural.workItems) : ""}</p>
+        <p role="status" className={busy ? "text-sm text-ink-500" : "sr-only"}>{busy ? t.loading : items.length ? plural(work.locale, items.length, work.plural.workItems) : ""}</p>
       </div>
 
       {!busy && items.length === 0 ? (

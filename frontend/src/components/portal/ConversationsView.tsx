@@ -83,7 +83,7 @@ export function ConversationsView({locale,lead,staff,busy,mutate,fetchJson,label
   const thread=detail&&detail.summary.id===selected?detail:null;
   const caseFormLink=`${typeof window==="undefined"?"":window.location.origin}/${thread?.summary.language==="ar"?"ar":"en"}/send-my-case`;
   const tabId=(id:Scope)=>`${base}-tab-${id}`,panelId=`${base}-panel`,windowHint=`${base}-window`;
-  return <section className="card p-5" aria-labelledby={labelledBy} aria-label={labelledBy?undefined:t.title}>
+  return <section aria-labelledby={labelledBy} aria-label={labelledBy?undefined:t.title}>
     <p className="max-w-[65ch] text-sm text-ink-500">{t.intro}</p>
     {/* One tab style across the staff side: the case page's underline tabs. Selection follows the arrow keys. */}
     <div role="tablist" aria-label={t.title} className="mt-4 flex flex-wrap gap-x-1 border-b border-line-strong">{scopes.map((id,index)=><button key={id} type="button" role="tab" id={tabId(id)} aria-controls={panelId} aria-selected={scope===id} tabIndex={scope===id?0:-1}
@@ -111,7 +111,7 @@ export function ConversationsView({locale,lead,staff,busy,mutate,fetchJson,label
         </button></li>)}
       </ul></div>
       <div className="min-w-0">
-        {!thread?<p className="text-sm text-ink-500">{t.pick}</p>:<>
+        {!thread?<p className="text-sm text-ink-500 max-lg:hidden">{t.pick}</p>:<>
           <h2 ref={heading} id="conversation-thread-title" tabIndex={-1} className="rounded-sm text-base font-semibold text-ink-900 outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600"><bdi>{thread.summary.name||t.unknown}</bdi> <span className="font-normal text-ink-500" dir="ltr">{thread.summary.phoneHint}</span></h2>
           <p className="mt-1 text-[0.8125rem] text-ink-500">{thread.summary.ownerName?<>{t.owner}: <bdi>{thread.summary.ownerName}</bdi></>:t.unowned}</p>
           {thread.coverName&&<p role="note" className="mt-3 border-y border-line py-2.5 text-[0.875rem] leading-6 text-ink-700">{fillTemplate(t.covered,{name:isolate(thread.coverName)})}</p>}

@@ -25,7 +25,7 @@ export function ReplyCoverPanel({locale,mySubject,covers,staff,busy,mutate}:{loc
   const first=covers[0];
   const line=!first?t.none:covers.length>1?fillTemplate(t.more,{line:describe(first),more:plural(locale,covers.length-1,work.plural.moreCovers)}):`${describe(first)} · ${period(first)}`;
   // The summary's contents are flattened into one control name, so the section is named by its own (visually hidden) heading.
-  return <section className="border-t border-line" aria-labelledby="reply-cover-title">
+  return <section className="border-b border-line" aria-labelledby="reply-cover-title">
     <h2 id="reply-cover-title" className="sr-only">{t.title}</h2>
     <details className="group">
       <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-0.5 py-2 text-[0.9375rem] [&::-webkit-details-marker]:hidden">

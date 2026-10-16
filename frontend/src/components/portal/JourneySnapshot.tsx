@@ -64,13 +64,13 @@ export function FullJourneyDialog({ locale, timeline, caseNumber, onClose }: {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 id="full-journey-title" className="title">{ar ? "رحلة الحالة" : "Case journey"}</h2>
-          <p className="mt-0.5 text-[0.8rem] font-semibold text-brand-700" dir="ltr">{caseNumber}</p>
+          <p className="mt-0.5 text-[0.8125rem] font-semibold text-brand-700" dir="ltr">{caseNumber}</p>
         </div>
         <button type="button" className="icon-button" aria-label={ar ? "إغلاق" : "Close"} onClick={() => dialog.current?.close()}><X size={20}/></button>
       </div>
 
       <div className="mt-5">
-        {groups.length === 0 && <p className="text-[0.9rem] text-ink-500">{ar ? "لا يوجد سجل بعد." : "No history yet."}</p>}
+        {groups.length === 0 && <p className="text-[0.875rem] text-ink-500">{ar ? "لا يوجد سجل بعد." : "No history yet."}</p>}
         {groups.map(group => (
           <section key={group.key} className="mb-5 last:mb-0">
             <h3 className="label-micro text-ink-500">{group.label}</h3>
@@ -81,7 +81,7 @@ export function FullJourneyDialog({ locale, timeline, caseNumber, onClose }: {
                     event.current ? "bg-brand-600 text-white" : "bg-brand-100 text-brand-700"}`}>
                     {event.current ? <span className="h-1.5 w-1.5 rounded-full bg-white"/> : <Check size={9} strokeWidth={3}/>}
                   </span>
-                  <p className={`text-[0.9rem] leading-5 ${event.current ? "font-bold text-brand-900" : "font-semibold text-ink-800"}`}>
+                  <p className={`text-[0.875rem] leading-5 ${event.current ? "font-bold text-brand-900" : "font-semibold text-ink-800"}`}>
                     {stageLabel(event.status, locale)}
                   </p>
                   <p className="mt-0.5 text-[0.8125rem] leading-5 text-ink-500">

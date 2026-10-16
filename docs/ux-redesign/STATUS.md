@@ -856,3 +856,84 @@ pills still use `aria-pressed` (2-4, one tab style).
 **Next:** slice 2-4 — chrome + convergence (place as heading, role subtitle out, count line only on My work and in ink, Out of office
 as a disclosure, one tab style, ladder sizes and hairline notices in the remaining files, remaining inline staff copy), then the area's
 closing pass (re-critique ≥ 28/40, `screenshots/area-2/after/`, STATUS).
+
+## UX area 2 — slice 2-4: quieter chrome and convergence; area 2 closed (2026-10-16, worktree `angry-haibt-7f91be`, branch `claude/angry-haibt-7f91be` fast-forwarded to 2-3 @ `c5bc83d`)
+
+**Built (enhances the accepted views; Petrol & Paper unchanged, no new token).**
+- **The page is named by its place** (`Portal.tsx` `PortalFrame`): the h1 `#portal-title` is the staff view's name (My work, My cases,
+  Team queue, Conversations), not the role; on a case it is visually hidden and reads "Case RS-…" (the cover names the patient). The
+  views (`MyWork`, `CaseQueue`, `ConversationsView`) no longer repeat the name as their own h2 and are labelled by the h1
+  (`labelledBy`); row titles, the queue's empty state and the conversation thread heading are h2 under it. `focusViewHeading` and a
+  view picked from a case move the focus to the h1 (visible ring, `scroll-mt-28`). The page is paper throughout (the staff side's
+  mist-to-white gradient is gone).
+- **Role line and count line on My work only.** Every other view starts with its place and its one-line description. The count line
+  is ink; only overdue work of the viewer's own (`/work/mine`) is in the alert ink. A count opens the list it counts and its filter
+  travels as the first chip there ("Showing: Overdue", removable; "Clear all" clears it in one change), with the focus on the new
+  view's heading (the pressed count goes with the line). My work's "3 work items" stays for screen readers only (the nav carries it).
+- **Out of office is one line** (`ReplyCoverPanel.tsx`): a disclosure under My work that already says where things stand ("No cover
+  set" / "Omar Ali answers your patients · now, until …" / "+ n more"); opening it shows the covers, End cover and the form. Copy in
+  `portalWork.replyCover` (plural `moreCovers`), names isolated.
+- **One tab style.** The header navigation stays a `nav` with `aria-current="page"` (APG: places with their own URL are navigation,
+  not tabs — the notes' "`aria-pressed` pills" were already `aria-current`; the change is the convention): the current place is
+  underlined in petrol like the case tabs and Conversations' scopes (14px at md, 15px from lg so it holds one line at 768). On phones
+  the same links sit above the h1 in one scrolling row. The case tabs scroll in one row on phones (2-3's thread-tab pattern).
+- **Lists converge.** The queue is a hairline list like My work (no boxed white list); one filled "Take ownership" per list (the first
+  claimable case; the rest quiet); Open is My work's quiet text action in every list; on phones the row's checkbox sits beside it.
+  Conversations sits on paper like the other views (no card around the whole view); "Choose a conversation" only beside the list.
+- **Ladder and hairlines.** Sizes on the 13/14/15/16/17/18/20px ladder in every file of the area (the queue's 0.82/0.85/0.8rem, the
+  case page's, the journey dialog's); notices are hairlines with an icon (portal notice/alerts, the Consultant's "review sent" line,
+  missing-service and no-rate alerts, the ownership hint, the queue's selection bar); the clinical review, recommendation, proposal,
+  deposit, delivery, release checklist and final-quote blocks are hairline sections inside their panel (no card-in-card, no tints);
+  deposit, delivery and release states are `StatusBadge`s with their tone icons; glyphs (✓ ×) are drawn icons. The portal's notice is
+  one always-present status region.
+- **Copy:** the remaining inline staff copy of `StaffCaseView` and `Portal` (≈110 ternaries and the per-component en/ar tables) moved
+  to `portalWork.caseView`, `portalWork.portal`, `portalWork.queue.kpi*`, plural `stageChanges`, en + ar (Arabic per the RTL review:
+  "بانتظار قبوله حتى {date}", "مهلة القبول حتى {date}", "الحالات" for the chip, "تبقى إجراءات العرض مقفلة إلى أن تكتمل توصية
+  الاستشاري.", "جارٍ إعادة المحاولة", clearer operations/finance role lines; the rate equation isolated with U+2066/2069 and formatted
+  by locale). "consultant/doctor" → Consultant in the moved strings.
+- **2-3 / 2-1 follow-ups:** `SecondaryAction.opensDialog` → `aria-haspopup="dialog"` on the strip's "Reply to the patient"; on phones,
+  with a patient response under review, the strip's facts come after the work (DOM order too); `aria-keyshortcuts="n"` on Next in My
+  work while shortcuts are on; `Portal.openCase` focuses `#case-heading` from an effect once the lazily loaded case view has mounted
+  (a ref + request tick, dropped when another case wins) instead of one animation frame; the dim "handoff to Consultant" banner is
+  gone (the cover names the Consultant, the strip says the case waits on them; why the proposal's actions are locked is said beside
+  the lock), and Case team lists only people the cover does not (a pending offer's deadline moved to the cover's Consultant fact).
+
+**Reviews** (Impeccable + Vercel skills loaded before code; four read-only reviews; all HIGH/MEDIUM fixed): React/composition (empty
+state "Clear all" made one change; KPI chip folded into the chips; case-focus effect on the open case id, stale request dropped;
+channel fallback kept), web guidelines (HIGH: focus lost when a count switches the view → h1; visible focus on the case heading;
+`scroll-mt` on the h1; heading outline h1 → h2; persistent status region; Back with no row scrolls to the heading), RTL/i18n (name and
+case-number isolation, the offer/proposal wording, plural for "+n more", locale punctuation, rate/date formatting, role lines), Pro Max
+(HIGH: phone nav above the h1 in one row; one description slot under the h1; Conversations off its card; one filled claim per list;
+one Open style; phone queue rows; one rule under Out of office; sentence-case field labels; capitalised "Waiting on" value). Visual
+pass on the EN/AR 390/1440 shots. Impeccable detector: 0 findings.
+
+**Verify.** `pnpm typecheck` ok; eslint 0 on touched files; vitest 71 files / 559 (new `StaffChrome.test.tsx`: count-line ink vs
+alert, KPI chip, facts order, `aria-haspopup`; `ReplyCoverPanel.test.tsx` for the one-line disclosure; RoleActions/FinalAssessment
+tests render inside the work-copy provider); Playwright on :3116 (new `e2e/staff-chrome.spec.ts`: page named by its view, role and
+count lines on My work only, own-overdue alert ink, closed Out of office line, underline nav with `aria-current`, the KPI chip, the
+case heading focused after the case view mounts with chunks delayed, axe per view, the closing shots; plus staff-home, portal-ux,
+portal-p2-pass-3, portal-reliability, care-coordination, workspace-case-switch, ux8-commercial-journeys, case-cover, staff-keyboard,
+messages-conversations, a11y en + ar): 124/125 in the full run, the one failure the known `newPage` timeout before the test body
+(messages-conversations ar), 8/8 on rerun. Specs changed: the view headings are level 1 (`staff-home`, `portal-p2-pass-3`), the view
+heading locator is `#portal-title` (`portal-p2-pass-3`, `staff-keyboard`). Overwritten pass-2/pass-3, 2-1, 2-2 and 2-3 shots restored.
+
+**Closing pass — re-critique: 28/40** (dual-agent; `.impeccable/critique/2026-10-16T05-53-19Z__frontend-src-components-portal-staffcaseview-tsx.md`;
+trend 21 → 28, target ≥ 28 met). Up: flexibility 1 → 3 (keyboard loop), control, recognition, aesthetics, real-world match and help
+2 → 3; still 2: consistency (two list grammars) and error recovery (errors in the page banner, not at the control). Mechanical scan
+against the 2026-10-15 baseline: off-ladder sizes 70 → 0, tinted notices ~12 → 0, inline copy ternaries ~155 → 6 (3 punctuation-only;
+real copy left only in `JourneySnapshot`), raw colours 1 → 0, glyph icons 1 → 0, physical-direction classes 0. Detector 0 (regex-only;
+the browser overlay needs the mocked OIDC session and was skipped).
+
+**Screenshots:** `screenshots/area-2/after/` — `my-work`, `my-cases`, `team-queue`, `conversations`, `case` (full page) and
+`case-messages` (drawer) × en/ar × 390/1440, from `e2e/staff-chrome.spec.ts` on the synthetic coordinator fixture.
+
+**Area 2 follow-ups (backlog, not blocking):** one shared row grammar for My work and the queues (P1); claiming from a list row vs
+"review before claiming" — consider Open as the row action and the claim on the strip (P1, revisit GATE P2-2's accepted queue); the
+WhatsApp channel and reply window under the case composer (P1, needs the window on `patientReply`); Arabic work-copy codes for every
+work type and `lang="en"` on fallbacks, `JourneySnapshot`'s `{en, ar}` label maps to messages (P2); urgency said four times on a My
+work row (P2); keys for messages/reply/send/claim; a count-line pick does not update `?view=` (pre-existing); errors at the control;
+"awaiting you" count on Conversations; time-left wording for the reply window; mixed date styles; "Select page" for one row.
+
+**Area 2 is closed.** Next (PLAN.md order 3 → 7 → X → 6): **area 3 — Consultant portal + Virtual Clinic shells** (review, final
+assessment, milestones, discharge pack, follow-up, affiliations), started in a new session from this branch under the owner's
+standing instruction.

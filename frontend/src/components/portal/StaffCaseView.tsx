@@ -242,9 +242,9 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   <div aria-busy={busy||undefined} className="min-w-0">
    <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
     <div className="min-w-0">
-     {<div role="tablist" aria-label={t.caseWorkspaceLabel} className="mb-4 flex flex-wrap gap-1 border-b border-line-strong">
+     {<div role="tablist" aria-label={t.caseWorkspaceLabel} className="mb-4 flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-line-strong)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {caseTabs.map(item=><button key={item.id} type="button" role="tab" id={`case-tab-${item.id}`} aria-controls="case-tab-panel" aria-selected={tab===item.id}
-        className={`-mb-px min-h-11 border-b-2 px-3 py-2 text-[0.875rem] font-bold transition-colors ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
+        className={`min-h-11 flex-none whitespace-nowrap border-b-2 px-3 py-2 text-[0.875rem] font-bold transition-colors ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
         onKeyDown={event=>{const target=tabKeyTarget(event.key,caseTabs.findIndex(x=>x.id===tab),caseTabs.length,locale==="ar");if(target<0)return;event.preventDefault();const next=caseTabs[target];setTab(next.id);requestAnimationFrame(()=>document.getElementById(`case-tab-${next.id}`)?.focus());}}
         tabIndex={tab===item.id?0:-1}
         onClick={()=>setTab(item.id)}>{item.label}{item.count?<span className="ms-1.5 text-[0.8125rem] font-semibold text-ink-400">{item.count}</span>:null}</button>)}
@@ -258,10 +258,10 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
        {myPending&&isDoctor&&<section className="card p-4" aria-labelledby="assignment-preview">
         <h3 id="assignment-preview" className="label-micro text-ink-500">{cv.assignment.title}</h3>
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-4">
-         <div><dt className="label-micro text-ink-500">{t.patientLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.patientName||"—"}</dd></div>
-         {c.careCategory&&<div><dt className="label-micro text-ink-500">{t.careArea}</dt><dd className="mt-0.5 font-semibold text-ink-800">{careAreaLabel(c.careCategory,work.careAreas)}</dd></div>}
-         <div><dt className="label-micro text-ink-500">{t.coordinatorLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.coordinatorName??"—"}</dd></div>
-         <div><dt className="label-micro text-ink-500">{t.countryLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{countryName(c.country,locale)}</dd></div>
+         <div><dt className="text-[0.8125rem] font-semibold text-ink-500">{t.patientLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.patientName||"—"}</dd></div>
+         {c.careCategory&&<div><dt className="text-[0.8125rem] font-semibold text-ink-500">{t.careArea}</dt><dd className="mt-0.5 font-semibold text-ink-800">{careAreaLabel(c.careCategory,work.careAreas)}</dd></div>}
+         <div><dt className="text-[0.8125rem] font-semibold text-ink-500">{t.coordinatorLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.coordinatorName??"—"}</dd></div>
+         <div><dt className="text-[0.8125rem] font-semibold text-ink-500">{t.countryLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{countryName(c.country,locale)}</dd></div>
         </dl>
         {value.intakeSummary?.trim()&&<p className="mt-4 whitespace-pre-wrap break-words border-t border-line pt-3 text-[0.9375rem] leading-6 text-ink-700">{value.intakeSummary}</p>}
         <div className="mt-4">
@@ -361,7 +361,7 @@ function CoverFacts({waiting,actions,step,proposal}:{waiting:string|null;actions
  return <dl className="grid gap-x-6 gap-y-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-1 lg:border-s lg:border-t-0 lg:ps-6 lg:pt-0">
   {waiting&&<div>
    <dt className="label-micro text-ink-500">{work.waiting.label}</dt>
-   <dd className="mt-0.5 text-[0.9375rem] leading-6 text-ink-800">{waiting}</dd>
+   <dd className="mt-0.5 text-[0.9375rem] leading-6 text-ink-800 first-letter:uppercase">{waiting}</dd>
    {reason&&<dd dir="auto" className="text-[0.8125rem] leading-5 text-ink-500">{reason}</dd>}
   </div>}
   {step&&words&&<div>
@@ -521,7 +521,7 @@ function CoordinatorBrief({documents,preview,intakeSummary,onClinical,onDocument
  return <section className="card p-4" aria-labelledby="case-brief-title">
   <h3 id="case-brief-title" className="label-micro text-ink-500">{preview?b.intake:b.case}</h3>
   <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-3">
-   {facts.map(fact=><div key={fact.label} className="min-w-0"><dt className="label-micro text-ink-500">{fact.label}</dt><dd className="mt-0.5 truncate font-semibold text-ink-800">{fact.value}</dd></div>)}
+   {facts.map(fact=><div key={fact.label} className="min-w-0"><dt className="text-[0.8125rem] font-semibold text-ink-500">{fact.label}</dt><dd className="mt-0.5 truncate font-semibold text-ink-800">{fact.value}</dd></div>)}
   </dl>
   <div className="mt-4 border-t border-line pt-3">
    <p className="label-micro text-ink-500">{b.intakeSummary}</p>
