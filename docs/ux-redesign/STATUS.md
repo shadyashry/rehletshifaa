@@ -979,3 +979,89 @@ for P1-19** (uncompiled; not built here), G-2 final-assessment draft endpoint (b
 summaries not removed, O-2 a recommendation still needs one priced line (server rule).
 
 **Next:** slice 3-1 — the clinical decision, started in a new session from this branch.
+
+## UX area 3 — slice 3-1: the clinical decision (2026-10-16, worktree `youthful-villani-621f9f`, branch `claude/youthful-villani-621f9f` fast-forwarded to 3-0 @ `cd1fb22`)
+
+**Built (enhances the accepted layouts; Petrol & Paper unchanged, no new token).** Feature commit `e3c9a28`.
+- **One clinical-decision grammar** (`ClinicalDecision.tsx`, new): the review and the final in-person assessment are one
+  composition — "1 Recommendation" (clinical text required, risks), "2 Estimate lines" (one shared picker: approved services
+  as a hairline checkbox list, Finance-approved packages, off-list lines marked by a drawn clock and words, never a tint),
+  then a summary led by the clinical text ("Documents on file", not "reviewed"; money lines only when there is some; the
+  patient's proposal in its currency). One hook (`useClinicalDecision`) holds the fields and one validation: each refusal is
+  said at its control and the focus lands there (recommendation field; the lines; a package figure out of range). Seeds once
+  (the case view is keyed per case); seeded catalogue ids survive a late catalogue; amounts read Arabic-Indic digits; package
+  figures are checked when left or sent, not per keystroke, and announce their range.
+- **Evidence first**: intake summary (`dir="auto"`, long ones clamped with "Read the whole summary"), documents on file with
+  Preview/Download, and at arrival the preliminary recommendation (its lines, the patient's currency) open the sheet — on
+  phones above the form, on `lg` pinned in the case rail (its own keyboard-scrollable region; the rail widens to 22rem at
+  `xl`). The Consultant lands on the Clinical tab when their decision is there; the review history is hidden while composing.
+- **Final assessment**: its own step copy by stage ("Record your final assessment" for `RECORD_CLINICAL_DECISION` at
+  ARRIVAL_CONFIRMED, and a ready `RECORD_FINAL_ASSESSMENT` code — copy only, the backend decides the step); starts from the
+  Consultant's last word (a saved final assessment, else the preliminary recommendation) so they confirm or change it;
+  says the patient's currency (carried from the preliminary estimate) and what the lines come to at today's rate; "Saved on
+  {date}" beside "Save a new version"; nothing cleared on a failed save (no draft endpoint: **G-2**).
+- **Exits** (more information, return, not clinically suitable) confirm in the native `<dialog>` ConfirmDialog, worded per
+  exit in messages; no `window.confirm`.
+- **One filled action per view (all roles)**: a FOCUS step whose form is on the page shows the strip's quiet "Go to the form"
+  link (accessible name "Go to the form: {action}"); the form's submit is the filled one. The referral's "Send to the
+  coordinator" is secondary. `focusAction` lands the Consultant's step in the decision sheet (instant scroll), falls back to
+  the tab panel.
+- **Legacy Consultant forms retired** (`CaseWorkflowActions`): the treatment-episode form in treatment and "Schedule follow-up"
+  after discharge duplicated P1-16..18's panels. Checked against the backend first: `/doctor/cases/{id}/treatment-episodes` is
+  still **the only path into treatment** (ARRIVAL_CONFIRMED → ADMISSION_READY → TREATMENT_IN_PROGRESS), so that act stays as a
+  narrowed "Start treatment" (facility, start, admission number), shown only once the admission view has no blockers (quote,
+  consent, balance), confirmed in a dialog, errors at the fields, secondary. **Backend follow-up B-3-1b**: move the start of
+  treatment onto the admission (the hospital's admission number) and retire the endpoint and its episode fields.
+- **Copy**: ClinicalReview's and ConsultantRouting's inline en/ar tables moved to `portalWork.clinicalDecision` /
+  `portalWork.referrals` (+ plurals `estimateLines`, `reviewHours`, `activeCases`, `pendingOffers`; `currentAction.goToForm*`,
+  `RECORD_FINAL_ASSESSMENT`, `caseView.startTreatment`, `caseView.reviewHistory/reviewVersion`); the old
+  `caseView.finalAssessment` block removed. Keys inserted textually; en/ar parity checked. Currencies in sentences by name
+  (Intl.DisplayNames, "US Dollar (USD)"). Ladder sizes, hairlines, drawn icons in every touched file.
+- **Fixture**: the arrival case now carries the backend's real answer (no Consultant step, `none()`); the preliminary line
+  carries its `catalogServiceId`.
+
+**P1-19 merged** (owner confirmed it finished; `33671ec` = 9e4f216 backend V103, c03461c session-2 UI, 33671ec follow-ups) in
+its own merge commit after the slice. Conflicts resolved: `ProposalView` keeps UX 1c-0's patient totals **and** P1-19's
+`payeeTotals` (record field order: …, fxReapprovalStatus, payeeTotals, totalMin, totalExpected, totalMax; `withTotals` carries
+the payees), `ProposalItemView` gains `payee`; the staff workspace drops the PLATFORM payee total with the fee line;
+`ProposalSign` keeps the 1c-2 range bar and adds P1-19's payee totals; the area-2 hairline `ProposalCard` gains P1-19's payee
+note and totals; ClinicalReview/FinalAssessment keep the 3-1 redesign with P1-19's behaviour carried into the shared picker
+(an off-list line says who is paid — Consultant, hospital or other, default other — sent as `payee`, shown on the row).
+Messages merged textually: valid JSON, no duplicate keys, en/ar parity. **Gap G-1 is closed**: slice 3-3 designs
+`virtual-clinic/Affiliations.tsx` on its real contract (the Consultant fixture needs `/clinics/{id}` affiliation data for its
+shots, 3-3 adds it); area 6's Compliance screens are unblocked.
+
+**Reviews** (Impeccable + Vercel skills loaded before code; four read-only reviews; all HIGH/MEDIUM fixed): React/composition
+(HIGH seeded catalogue lines dropped when the catalogue loads late → seeds kept by id; re-seed on every draft save → seed once;
+the draft's currency kept on the control with a no-rate note; validation unified in one hook; stable off-list keys; focus after
+removal; `useId` ids), web guidelines (focus after each refusal, digits and wheel in amount fields, figure error on leave,
+scrollable evidence region, inline errors for Start treatment, `role="status"` on the completion line, wrapped file names,
+disclosure markers), RTL/i18n (bidi in the review history, version in words, range as a template with isolated figures, Arabic
+plurals in full forms, currency names, "تحويل", templates for "Requested by {name}" and the link name, phrasing fixes),
+Pro Max (HIGH no backend step at arrival → fixture honest + backend follow-up B-3-1a; HIGH Start treatment before clearance →
+gated on the admission blockers + confirm; same money on both acts; saved line by the button; wider rail; clamp long intake;
+no zero line; dropped foreign-currency lines said). Visual pass on the EN/AR 390/1440 shots (the first pass caught the rail
+clipping the journey card → evidence scrolls in its own region). Impeccable detector: 0 findings; off-ladder sizes in the
+touched files: 0.
+
+**Verify.** `pnpm typecheck` ok; eslint 0 on touched files; vitest 92 files / 737 after the merge (89 / 715 before it);
+Playwright on :3117 after the merge: consultant-shots, staff-chrome, case-cover, staff-keyboard, portal-reliability,
+portal-p2-pass-3, portal-ux, messages-conversations, a11y en+ar, arabic-proposal-decision, ux8-commercial-journeys,
+pre8c-commercial-copy 127/127, proposal-otp/responsive and status-proposal 13/13 (before the merge one staff-keyboard flake,
+6/6 on rerun); backend `mvn -o -q test` after the merge: 947 tests, 0 failures, 3 skipped (V103 included). Specs changed: portal-reliability reads the labelled
+recommendation field (ids are `useId` now). Overwritten pass-2/pass-3 and area-2 shots restored.
+
+**Screenshots:** `screenshots/area-3/3-1/` — my-work, case-review/assess (Clinical tab), case-treat/discharge/follow,
+clinic-overview/services × en/ar × 390/1440 (after the P1-19 merge).
+
+**Follow-ups (backlog, not blocking):** **B-3-1a** the backend gives the Consultant a `RECORD_FINAL_ASSESSMENT` (FOCUS) step at
+ARRIVAL_CONFIRMED until a final assessment is saved (today `none()`, so the strip says "Nothing needs you right now" beside
+"Waiting on: The Consultant"); **B-3-1b** move the start of treatment onto the admission and retire `/treatment-episodes`;
+**G-2** a final-assessment draft endpoint; server refusals of the decision (`FACILITY_PACKAGE_RANGE`, `CATALOG_SERVICE_INVALID`)
+said at the control via `refusalExplainedInPlace` (Portal.tsx, outside this slice); Operations' travel form copy still inline in
+`CaseWorkflowActions`; documents list "Show all" past ~10 files; a "N earlier lines are no longer on your list" note when a
+seeded catalogue line was deactivated; the evidence heading level in the rail (h3 before the team's h2).
+
+**Next:** slice 3-2 — after arrival (panel order by the current task, summaries for the Consultant's money facts, follow-up
+first after discharge with the complication first, the discharge stamp, work-type copy, a per-panel error boundary), started
+in a new session from this branch.

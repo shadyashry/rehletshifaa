@@ -9,8 +9,9 @@ filled-button pairs in every view, 3 inline en/ar copy tables, a `window.confirm
 
 **Data.** P1-15..P1-18 (admission, milestones/change orders, discharge pack, follow-up) were merged into the UX line as
 slice 3-0 (`7b9e195`, from `claude/trusting-lamarr-b82819` @ `b112bce`), so the shells are designed on their real
-contracts. **P1-19 (affiliations) is uncompiled WIP** (`b2656f3` on `claude/admiring-blackburn-317165`) and is not merged:
-the Virtual Clinic's affiliations section waits for it (gap G-1 below); no backend field is invented.
+contracts. **P1-19 (affiliations, compliance, separate payee lines) was merged in slice 3-1** (`33671ec`, finished and confirmed
+by the owner 2026-10-16; backend V103): gap G-1 is closed and slice 3-3 designs `virtual-clinic/Affiliations.tsx` on its real
+contract.
 
 ## Job and audience
 
@@ -69,7 +70,7 @@ in order within the permissions the Consultant gave.
 | **3-0 integration** (done) | P1-15..P1-18 merged into the UX line; synthetic Consultant fixture + shots spec; critique; this plan | merge `7b9e195`; `e2e/consultant-fixture.ts`, `e2e/consultant-shots.spec.ts` | — |
 | **3-1 the clinical decision** | Evidence-first sheet (intake + documents opening the review, rail on lg); one decision grammar shared by ClinicalReview and FinalAssessment (shared picker + summary, numbered parts); final-assessment stage copy, currency line, control-level errors, no clear-on-failure; ConfirmDialog for the exits; quiet strip button when the form is on the page (all roles); retire the Consultant's legacy episode/follow-up form and focus FinalAssessment; ClinicalReview + referral copy to messages; ladder/hairlines | `ClinicalReview.tsx`, `StaffCaseView.tsx` (FinalAssessment, clinical tab order, focusAction), `CurrentAction.tsx`, `CaseWorkflowActions.tsx`, `ConsultantRouting.tsx` (referrals copy), messages | 3-0 |
 | **3-2 after arrival** | Panel order by the current task; Admission/Running money as summaries for the Consultant; Follow-up first after discharge, complication-first wording; discharge stamp; work-type copy for the discharge/follow-up steps (en+ar) and their focus targets; per-panel error boundary; ladder/tints in the four panels and ReopenCase | `StaffCaseView.tsx`, `TreatmentPanel.tsx`, `DischargePanel.tsx`, `FollowUpPanel.tsx`, `AdmissionPanel.tsx`, `panel-parts.tsx`, `ReopenCase.tsx`, messages | 3-1 |
-| **3-3 the Virtual Clinic** | Portal shell + h1; tabs with keys; hairline sections; services list; confirmations; one filled action; wording ("Credentials reviewed"); manager permission line; dates/digits; copy to messages; affiliations left as gap G-1 | `virtual-clinic/*`, `app/[locale]/portal/virtual-clinic/page.tsx`, `Portal.tsx`/`StaffNav` (shell reuse), messages | 3-1 |
+| **3-3 the Virtual Clinic** | Portal shell + h1; tabs with keys; hairline sections; services list; confirmations; one filled action; wording ("Credentials reviewed"); manager permission line; dates/digits; copy to messages; **Affiliations (P1-19, merged in 3-1) designed on its real contract**; the Consultant fixture gains `/clinics/{id}` affiliation data for the shots | `virtual-clinic/*` (incl. `Affiliations.tsx`), `app/[locale]/portal/virtual-clinic/page.tsx`, `Portal.tsx`/`StaffNav` (shell reuse), `e2e/consultant-fixture.ts`, messages | 3-1 |
 | **3-4 closing pass** | Re-critique (target ≥ 28/40), after shots (`AREA3_SHOTS=after`), STATUS section closing the area | — | 3-1..3-3 |
 
 ## States and ranges
@@ -96,8 +97,8 @@ in order within the permissions the Consultant gave.
 
 ## Gaps and open questions (none block)
 
-- **G-1 Affiliations** (Virtual Clinic): P1-19 is uncompiled WIP; the section is designed when P1-19 session 1 is
-  compiled and merged (its session 2 ships the minimum UI). Not built here.
+- **G-1 Affiliations** — **closed in 3-1**: P1-19 (`33671ec`: backend V103 + session-2 UI) is merged into the UX line; 3-3
+  designs the section. Area 6's Compliance screens are unblocked too.
 - **G-2 Final-assessment draft**: no draft endpoint; recorded as a backend follow-up.
 - **O-1 [A]** Money facts for the Consultant shown as summaries, not removed (what a Consultant may read is the
   backend's call; raise data minimisation with P1-19's audit work if wanted).
