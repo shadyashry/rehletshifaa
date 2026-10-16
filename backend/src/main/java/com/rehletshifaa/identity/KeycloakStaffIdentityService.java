@@ -181,6 +181,12 @@ public class KeycloakStaffIdentityService implements IdentityProvisioningPort {
         try {Map<String,Object> token=http.post().uri(baseUrl+"/realms/"+encode(realm)+"/protocol/openid-connect/token").contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form).retrieve().body(new org.springframework.core.ParameterizedTypeReference<>(){});return "Bearer "+Objects.requireNonNull(token).get("access_token");}
         catch(RestClientResponseException e){throw identityFailure(e,"Staff identity service is unavailable");}
     }
+    @Override public void deleteUser(String subject){
+        requireConfigured();
+        try {http.delete().uri(admin("/users/"+encode(subject))).header("Authorization",bearer()).retrieve().toBodilessEntity();}
+        catch(RestClientResponseException e){if(e.getStatusCode().value()!=404)throw identityFailure(e,"Unable to remove the identity account");}
+    }
+
     private void deleteQuietly(String subject){try{http.delete().uri(admin("/users/"+encode(subject))).header("Authorization",bearer()).retrieve().toBodilessEntity();}catch(Exception ignored){}}
     private String admin(String path){return baseUrl+"/admin/realms/"+encode(realm)+path;}
     private void requireConfigured(){if(clientSecret.isBlank())throw new ApiException(503,"IDENTITY_ADMIN_NOT_CONFIGURED","Staff identity invitations are not configured");}

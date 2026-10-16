@@ -26,6 +26,8 @@ public class SecurityConfig {
         .requestMatchers("/api/v1/facilities/**").authenticated()
         .requestMatchers("/api/v1/tasks/**","/api/v1/work/**","/api/v1/notifications/**","/api/v1/notifications").authenticated()
         .requestMatchers("/api/v1/incidents","/api/v1/incidents/**").authenticated()
+        // P1-19 audit and P1-7 retention: decided per call by the authority core (this path had no matcher, so it fell to denyAll).
+        .requestMatchers("/api/v1/compliance/**").authenticated()
         .requestMatchers("/api/v1/admin/journeys/**","/api/v1/admin/journeys").authenticated()
         .requestMatchers(HttpMethod.GET,"/api/v1/admin/journey-cutover","/api/v1/admin/journey-cutover/**").authenticated()
         .requestMatchers("/api/v1/admin/coordination/**").authenticated()

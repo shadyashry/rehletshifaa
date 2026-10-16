@@ -118,6 +118,22 @@ public interface MedicalCaseRepository extends BaseRepository<MedicalCase, UUID>
 
     long countByPatientId(UUID patientId);
 
+    /** P1-7: the case a staff member names when an erasure is requested. */
+    Optional<MedicalCase> findByCaseNumber(String caseNumber);
+
+    /** P1-7: the patient's cases, sent or not (subject erasure looks at each). */
+    java.util.List<MedicalCase> findByPatientIdOrderByCreatedAtAsc(UUID patientId);
+
+    /** P1-7 (design §7.13): drafts started before {@code cutoff} and never sent nor purged, oldest first. */
+    @Query("""
+            select c.id from MedicalCase c where c.status = com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT
+            and c.purgedAt is null and c.createdAt < :cutoff order by c.createdAt""")
+    java.util.List<UUID> findAbandonedDrafts(@Param("cutoff") Instant cutoff, org.springframework.data.domain.Limit limit);
+
+    /** P1-7: cases of the patient other than purged drafts (a provisional patient with none left is pseudonymised with its draft). */
+    @Query("select count(c) from MedicalCase c where c.patientId = :patientId and c.purgedAt is null")
+    long countUnpurgedOfPatient(@Param("patientId") UUID patientId);
+
     /** Unsent drafts started since {@code since} for people the identity acts for (the cap on cases sent for others). */
     @Query("""
             select count(c) from MedicalCase c where c.status = com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT

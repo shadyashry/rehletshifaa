@@ -16,6 +16,20 @@ import java.util.List;
 import java.util.UUID;
 
 public interface WhatsAppInboundMessageRepository extends BaseRepository<WhatsAppInboundMessage, UUID> {
+    /** P1-7 (TRANSPORT_LOG): processed queue rows, with their plaintext sender digits, older than {@code cutoff}; in-flight rows stay. */
+    @Modifying(flushAutomatically = true)
+    @Query("delete from WhatsAppInboundMessage m where m.processedAt < :cutoff and m.status not in ('PENDING', 'RETRY', 'PROCESSING')")
+    int deleteProcessedBefore(@Param("cutoff") Instant cutoff);
+
+    /** P1-7 subject erasure: the person's processed queue rows by the cases they reached, and by the number they came from. */
+    @Modifying(flushAutomatically = true)
+    @Query("delete from WhatsAppInboundMessage m where m.status not in ('PENDING', 'RETRY', 'PROCESSING') and m.caseId in :caseIds")
+    int deleteProcessedForCases(@Param("caseIds") java.util.Collection<UUID> caseIds);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from WhatsAppInboundMessage m where m.status not in ('PENDING', 'RETRY', 'PROCESSING') and m.senderDigits = :digits")
+    int deleteProcessedFromSender(@Param("digits") String digits);
+
     boolean existsByProviderMessageId(String providerMessageId);
 
     /** Meta redelivers webhooks: the provider message id makes the second copy a no-op (atomic on PostgreSQL). */

@@ -24,4 +24,9 @@ public interface WhatsAppDeliveryEventRepository extends BaseRepository<WhatsApp
     int recordOnce(@Param("id") UUID id, @Param("provider") String provider, @Param("messageId") String messageId,
                    @Param("status") String status, @Param("eventAt") Instant eventAt, @Param("errorCode") String errorCode,
                    @Param("payloadHash") String payloadHash, @Param("receivedAt") Instant receivedAt);
+
+    /** P1-7 (TRANSPORT_LOG): receipts older than {@code cutoff}; the outbox row already carries the delivery state they reported. */
+    @Modifying(flushAutomatically = true)
+    @Query("delete from WhatsAppDeliveryEvent e where e.receivedAt < :cutoff")
+    int deleteReceivedBefore(@Param("cutoff") Instant cutoff);
 }

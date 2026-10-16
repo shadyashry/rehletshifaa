@@ -485,6 +485,70 @@ phases.
 - Files: `V91__retention.sql`, new `shared/retention/RetentionService`, `DocumentService` (S3 delete), Control
   Center audit screen.
 - Sessions: 2. Model: Fable 5.1, high.
+- **Status (2026-10-16, session 1 of 2 = backend, Opus 5.5 stood in for Fable 5.1; committed on `claude/p1-7-s1-retention-6c68c8`, cut from
+  `33671ec` = `claude/modest-dirac-4e4ffa`):** delivered; no screen. Flyway **V104** (`V104__retention.sql`; the `V91` name above was stale) is
+  now the newest; V105 is the next free. The code lives in a new `retention` module (not `shared/retention`: `shared` depends on nothing,
+  and retention reaches into casemanagement, document, directory, conversation, notification and journey; nothing depends on it). Session 2
+  does the screens and copy. The P1-15 money rule (deposit covers the platform fee first) is untouched and still awaits the owner.
+  - Decisions recorded (owner's standing rule: decide by the recommendation, do not ask). **(a) Plaintext WhatsApp sender digits**: the inbound
+    queue keeps them only as the reply address while a message is processed; processed queue rows and delivery receipts are a
+    `TRANSPORT_LOG` purged **30 days** after processing (enforced now; Meta's redelivery window is far shorter, the case or conversation holds
+    the content, the payload is already blanked on processing). An intake conversation keeps its digits as the reply address while open and
+    **90 days after it closes** (`INTAKE_CONVERSATION`, classified, purge handler not built yet); a subject erasure blanks them at once.
+    **(b) Evidence, statements and money are `LEGAL_RECORD`** and never purged: the schema refuses days or a lifted hold on that class, the
+    purge log refuses it, and the job has no handler for it. **(c) A purged draft is a tombstone, not a deleted row**: `audit_events` and
+    `consent_records` (legal records) reference the case and the patient with `ON DELETE RESTRICT`, so the case row stays with only its
+    number, country, language and dates (`medical_cases.purged_at`); description, care area, age band, files (bytes then rows), submission
+    contact and intake grant go; a provisional patient (no account) left with no other case is pseudonymised with it. **(d) Erasure
+    pseudonymises identity and keeps the clinical record**: what identifies or reaches the person goes (profile names, channels, birth date,
+    nationality, sex, time zone, sign-in binding; every submission contact on their cases, a representative's too, since it would re-identify
+    them; their conversations' reply address and profile name; their processed WhatsApp queue rows; their Keycloak account by a queued
+    `DELETE_USER` identity operation), drafts go whole, and every sent case's medical record (clinical review, documents, messages, treatment,
+    outcomes) stays under the pseudonym for the `CLINICAL_RECORD` term, which waits for counsel (medical-record law and PDPL) like the other
+    terms marked "with counsel". **(e) Who**: `RETENTION_READ` for Compliance and Care Coordination Managers; `SUBJECT_ERASE` (fresh sign-in)
+    for the Care Coordination Manager, who owns the patient relationship and its complaints; the auditor never erases (`theAuditorOnlyReads`
+    unchanged). **(f) Erasure is refused while care or a dispute is live**: a sent case not ended (ended = DECLINED, EXPIRED,
+    CLINICALLY_NOT_SUITABLE, CLOSED, CANCELLED), an unresolved incident, an open intake conversation, an account still representing someone,
+    or a hold on `PERSONAL_IDENTITY`. **(g) Policies change by migration only** (reviewed like code, the `RolePolicy` rule); there is no edit
+    screen, and a legal hold is a migration too.
+  - Delivered: **(1) `retention_policies`** (record class, days, anchor, legal hold, basis), 11 classes seeded: `DRAFT_INTAKE` 7 days,
+    `TRANSPORT_LOG` 30, `INTAKE_CONVERSATION` 90, `ACCESS_SECRET` 90, and `PERSONAL_IDENTITY`, `CLINICAL_RECORD`, `CASE_OPERATIONS`,
+    `WORKFORCE_RECORD` without a term (counsel), `LEGAL_RECORD` (held, never), `CONFIGURATION`, `SYSTEM_STATE` (nothing personal).
+    **(2) Every store classified**: `RecordCatalogue` maps every table (entities, the JDBC-only tables and the Java-migration ones);
+    `RetentionTest.everyTableIsClassified` compares it with the live schema both ways, so a new table cannot ship unclassified.
+    `notification_outbox` is `CASE_OPERATIONS` for now: its idempotency keys guard once-only messages, so the row stays (scrubbing the
+    destination and data after delivery is a follow-up). **(3) Nightly purge** (`RetentionPurgeJob`, leased, 03:15 Cairo, `app.retention.*`):
+    runs a class only when its policy has days and no hold; each draft is its own transaction under the case's row lock (a submit racing it
+    either wins or meets `CASE_NOT_DRAFT`), written with one `retention_purges` row and one `RECORD_PURGED` audit row; a failure is logged
+    (`event.code=RETENTION_PURGE_FAILED`) and retried the next night. Files go through `DocumentService.purgeDraftFiles` (drafts only; S3/MinIO
+    delete first, idempotent, then the row; conversation media pointing at them are detached). **(4) Subject erasure**
+    (`SubjectErasureService`): a preview (cases, account, blocker codes) and the erasure, one purge-log row (`PERSONAL_IDENTITY`, cause
+    `ERASURE_REQUEST`, the request reference encrypted) and one `SUBJECT_ERASED` audit row (no reference); `patient_profiles.erased_at`,
+    `profile_status = ERASED`, name "Erased"; `IdentityProvisioningPort.deleteUser` (Keycloak `DELETE /users/{id}`, 404 = already gone) behind
+    the new `DELETE_USER` identity operation. **(5) Compliance view** (read only): policies with `enforced`, the last purge and the tables per
+    class; the purge log over a period (default 30 days, at most 366) with totals per class. **API**: `GET /compliance/retention/policies`,
+    `GET /compliance/retention/purges?from&to&recordClass&limit`, `GET /compliance/retention/erasures/preview?caseNumber`,
+    `POST /compliance/retention/erasures`. **(6) Fixed on the way**: `SecurityConfig` had no matcher for `/api/v1/compliance/**`, so the P1-19
+    Compliance endpoints fell to `denyAll` behind real tokens (tests call the services, the e2e mocks the API); the path is now authenticated
+    and decided per call like every business path.
+  - Tests and numbers: new `RetentionTest` (7: the 7-day draft purge with its files, contact, grant and lone provisional patient, consent and
+    audit kept, idempotent, submit refused after; a sent case never purged, an account holder's profile kept, a legal hold stopping it; the
+    transport log at 30 days with in-flight rows kept; `LEGAL_RECORD` refused by schema, entity and job; every table classified; erasure with its
+    blockers, the auditor refused, a stale sign-in refused, the pseudonym, contacts, conversation, queue rows, `DELETE_USER`, the draft purged
+    and the sent case, consent and status history kept, the encrypted reference, once only; the Compliance view, its period and class checks,
+    Finance refused) and `IdentityOperationEraseExecutionTest` (2). Backend `mvn -o -q test`: 953 tests, 0 failures, 3 skips (944 before, 9 new; JVM in UTC). `ArchitectureRulesTest` and
+    `RolePolicyTest` green (JPA only, no native query, no new plain SQL, no module cycle). `PostgresJpaMappingTest` green on a disposable
+    PostgreSQL 17 (V104 applied, Hibernate validated, every repository query executed, the new ones included).
+  - Not done here (session 2 and later): **no screens or copy**: the Control Center "Retention" page under Reviews & Safety (policies and the
+    purge log for Compliance and Care Coordination Managers) and the erasure flow (case number, preview with blocker reasons, the reference,
+    confirm with a fresh sign-in), the words for the classes, anchors, subject types, causes and blocker codes, and how an erased patient's
+    name ("Erased", `erasedAt`) reads on staff screens. Purge handlers still to build: `INTAKE_CONVERSATION` (90 days after closing: an
+    unlinked conversation, its messages and media bytes; a linked one keeps its messages), `ACCESS_SECRET` (links, challenges, grants and
+    idempotency replays after expiry), the outbox scrub. Counsel: the terms of `PERSONAL_IDENTITY`, `CLINICAL_RECORD`, `CASE_OPERATIONS` and
+    `WORKFORCE_RECORD`, and the erasure scope against the PDPL and the patients' countries' rules. Queued notifications to an erased person are
+    not cancelled (all their cases have ended, so none is expected). Keycloak subjects stay as opaque ids in history rows (messages, audit).
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev backend so V104 runs; then P1-7 session 2 (UI
+    and copy, started in a new session; contract in the shared notes folder, `p1-7-session-1-handover.md`).
 
 ### P1-8  Metrics, alerts, scheduler leadership  (E-05, E-04)
 - Micrometer + Prometheus registry; business gauges and timers (queue depth per team, time-to-proposal, deposit
@@ -1822,7 +1886,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | 8 | ~~P1-17 Discharge pack, reconciliation, statements~~ | **done**: sessions 1 (backend, V101) and 2 (UI, copy), 2026-10-16 | Fable 5.1, high | D-F; P1-12 settlement statement |
 | 9 | ~~P1-18 Follow-up execution and outcomes~~ | **done**: sessions 1 (backend, V102) and 2 (UI, copy), 2026-10-16 | Opus 5.5; data classification by Fable | D-G; P1-13 |
 | 10 | ~~P1-19 Hospital-agreement audit~~ | **done**: sessions 1 (backend, V103) and 2 (UI, copy), 2026-10-16 | Opus 5.5; eligibility change by Fable | D-H applied as recommended |
-| 11 | P1-7 Retention, purge, erasure, draft clean-up | 2 (session 1 started 2026-10-16 from `33671ec`) | Fable 5.1, high | Decide retention of plaintext WhatsApp sender digits; evidence and statements as `LEGAL_RECORD` class |
+| 11 | **P1-7 Retention, purge, erasure, draft clean-up** | 2: session 1 (backend, V104) **done** 2026-10-16; session 2 (UI, copy) next | Fable 5.1, high (Opus 5.5 stood in) | Sender digits decided (30-day transport log, 90 days after a conversation closes); evidence and statements are `LEGAL_RECORD`; terms marked "with counsel" wait for counsel |
 | 12 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-18, so the extracted code is final |
 | 13 | ~~P1-9 Backups and restore drill~~ | **done**: 1 session (2026-10-15); local drill PASS in 135 s | Opus 5.5 | Production drill on the chosen host (managed PITR restore time, region failover) adds its row to `docs/deployment.md` before real patient data |
 | 14 | P1-14 Consultant public profiles (data and endpoint) | 1 | Opus 5.5 | The page is UX plan area 1b; photographs with consent |

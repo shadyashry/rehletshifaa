@@ -21,6 +21,10 @@ public interface IntakeConversationRepository extends BaseRepository<IntakeConve
 
     long countByOwnerSubjectAndStatus(String ownerSubject, String status);
 
+    /** P1-7 subject erasure: the person's conversations by the cases they became, and by the number they came from. */
+    List<IntakeConversation> findByLinkedCaseIdIn(Collection<UUID> caseIds);
+    List<IntakeConversation> findByWaDigits(String waDigits);
+
     /** The conversation that became this case, if any. */
     java.util.Optional<IntakeConversation> findFirstByLinkedCaseId(UUID caseId);
 

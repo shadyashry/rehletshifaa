@@ -155,4 +155,21 @@ public class DocumentService {
     private void validateQuota(UUID caseId,long requestedBytes){long count=documents.countByMedicalCaseIdAndStatusNot(caseId,DocumentStatus.REJECTED);long bytes=documents.totalBytesForCase(caseId,DocumentStatus.REJECTED);if(count>=maxFilesPerCase)throw new ApiException(409,"CASE_FILE_LIMIT_REACHED","The maximum number of documents for this case has been reached");if(bytes+requestedBytes>maxCaseBytes)throw new ApiException(409,"CASE_STORAGE_LIMIT_REACHED","The storage quota for this case has been reached");}
     private String extensionFor(String type){ return switch(type){case "application/pdf"->".pdf";case "image/png"->".png";case "image/jpeg"->".jpg";default->throw new ApiException(400,"UNSUPPORTED_FILE_TYPE","File type is not allowed");}; }
     static String sanitizeFileName(String name){ String base=name.replace('\\','/'); base=base.substring(base.lastIndexOf('/')+1).replaceAll("[\\p{Cntrl}]","").trim(); if(base.isBlank()) return "document"; return base.length()>255?base.substring(0,255):base; }
+
+    /** P1-7: what a draft purge removed. */
+    public record PurgedFiles(int files, long bytes) {}
+    /**
+     * P1-7 (design §7.13): removes every file of an abandoned draft in the caller's transaction, the bytes first (S3/MinIO; deleting a
+     * missing object succeeds, so a retry after a failed commit is safe), then the row. A storage outage throws and the caller's
+     * transaction rolls back, so no row ever outlives its purge half-done. Only a draft's files: a sent case's documents are its
+     * clinical record and are never deleted here.
+     */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public PurgedFiles purgeDraftFiles(UUID caseId){
+        if(cases.findById(caseId).getStatus()!=com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT) throw new IllegalStateException("Only a draft's files are purged");
+        int files=0; long bytes=0;
+        for(MedicalDocument d:documents.findByMedicalCaseIdOrderByCreatedAtDesc(caseId)){ storage.delete(d.getObjectKey()); documents.delete(d); files++; bytes+=d.getSizeBytes(); }
+        documents.flush();
+        return new PurgedFiles(files,bytes);
+    }
 }

@@ -51,6 +51,10 @@ public enum Permission {
     // money or workflow state; a finding on a case becomes an incident a Care Coordination Manager owns. A review is final, so it
     // needs a fresh sign-in.
     AFFILIATION_DECLARE(false), AFFILIATION_READ(false), SCORECARD_READ(false), AUDIT_SAMPLE_READ(false), COMPLIANCE_REVIEW(true),
+    // P1-7 (E-03): retention. Compliance and Care Coordination Managers read the retention policies and the purge log; a Care
+    // Coordination Manager (who owns the patient relationship and its complaints) carries out a person's erasure request, which
+    // cannot be undone, so it needs a fresh sign-in. The auditor never erases: it only reads.
+    RETENTION_READ(false), SUBJECT_ERASE(true),
     // consultants, credentials, identity
     CONSULTANT_ONBOARD(true), CREDENTIAL_READ(false), CREDENTIAL_DECIDE(true), PATIENT_IDENTITY_REVIEW(true), PATIENT_IDENTITY_READ(false),
     CLINIC_MANAGE(false), CLINIC_APPROVE(true), CAPABILITY_DECIDE(true),

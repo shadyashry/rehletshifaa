@@ -54,6 +54,8 @@ public class PatientProfile extends AssignedIdEntity implements PhoneIndexed {
     @Column(name = "account_activated_at") private Instant accountActivatedAt;
     @Column(name = "profile_completed_at") private Instant profileCompletedAt;
     @Column(name = "merged_into_patient_id") private UUID mergedIntoPatientId;
+    /** P1-7: when the person was erased on request; the row stays as their pseudonym. */
+    @Column(name = "erased_at") private Instant erasedAt;
 
     protected PatientProfile() {}
 
@@ -159,6 +161,22 @@ public class PatientProfile extends AssignedIdEntity implements PhoneIndexed {
         mergedIntoPatientId = canonical; profileStatus = "MERGED"; accountStatus = "NOT_PROVISIONED"; email = null; whatsappNumber = null;
         updatedAt = micros(at); version++;
     }
+
+    /** The pseudonym an erased person's records keep in place of their name (the UI words it from {@code erasedAt}). */
+    public static final String ERASED_NAME = "Erased";
+
+    /**
+     * P1-7 subject erasure: everything that identifies or reaches the person goes (name, channels, birth date, nationality, sex,
+     * time zone, the sign-in binding); the row stays as a pseudonym, so cases, the ledger, statements and audit still point at it.
+     * Country and language stay (coarse, needed by the records kept).
+     */
+    public void erase(Instant at) {
+        givenName = ERASED_NAME; familyName = null; preferredName = null; whatsappNumber = null; whatsappHmac = null; email = null;
+        timeZone = null; dateOfBirth = null; nationality = null; sex = null; externalSubject = null;
+        phoneVerifiedAt = null; emailVerifiedAt = null; profileStatus = "ERASED"; accountStatus = "NOT_PROVISIONED";
+        erasedAt = micros(at); updatedAt = micros(at); version++;
+    }
+    public Instant getErasedAt() { return erasedAt; }
 
     public void touch(Instant at) { updatedAt = micros(at); }
 

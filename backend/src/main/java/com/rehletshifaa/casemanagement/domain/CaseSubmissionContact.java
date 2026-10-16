@@ -44,6 +44,9 @@ public class CaseSubmissionContact extends AssignedIdEntity implements PhoneInde
         this.preferredLanguage = preferredLanguage; this.createdAt = micros(now);
     }
 
+    /** P1-7 subject erasure: who submitted stays (patient or representative, and the relationship); how to reach them goes. */
+    public void erase() { contactName = null; email = null; whatsappNumber = null; whatsappHmac = null; }
+
     public UUID getPatientId() { return patientId; }
     public String getContactRole() { return contactRole; }
     public String getWhatsappNumber() { return whatsappNumber; }

@@ -7,7 +7,7 @@ import java.util.UUID;
 public record IdentityOperationRequested(UUID id, String idempotencyKey, String targetSubject, Type type,
                                          String requestedBy, String reason, String correlationId,
                                          String targetType, UUID targetId, Map<String,String> payload) {
-    public enum Type { CREATE_STAFF, CREATE_PRACTITIONER, RESEND_INVITE, ENABLE_USER, DISABLE_USER_AND_LOGOUT, RESET_PASSWORD, RESET_MFA }
+    public enum Type { CREATE_STAFF, CREATE_PRACTITIONER, RESEND_INVITE, ENABLE_USER, DISABLE_USER_AND_LOGOUT, RESET_PASSWORD, RESET_MFA, DELETE_USER }
 
     /** SUP-02/SUP-03: a password-reset email or an MFA reset (credentials removed, sessions ended). */
     public static IdentityOperationRequested reset(UUID id, String key, String subject, Type type, String requestedBy,
@@ -22,6 +22,11 @@ public record IdentityOperationRequested(UUID id, String idempotencyKey, String 
         return new IdentityOperationRequested(id, key, subject,
                 enabled ? Type.ENABLE_USER : Type.DISABLE_USER_AND_LOGOUT, requestedBy, reason, id.toString(),
                 null, null, null);
+    }
+
+    /** P1-7: subject erasure; the provider account (name, email, credentials) is removed, sessions with it. */
+    public static IdentityOperationRequested erase(UUID id, String key, String subject, String requestedBy, String reason) {
+        return new IdentityOperationRequested(id, key, subject, Type.DELETE_USER, requestedBy, reason, id.toString(), null, null, null);
     }
 
     public static IdentityOperationRequested resend(UUID id, String key, String subject, String requestedBy,

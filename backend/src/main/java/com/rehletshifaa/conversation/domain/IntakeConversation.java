@@ -51,6 +51,9 @@ public class IntakeConversation extends AssignedIdEntity {
         revision++;
     }
 
+    /** P1-7 subject erasure: the reply address and WhatsApp profile name go; the messages stay (with the case they became). */
+    public void forgetSender() { waDigits = ""; profileName = null; revision++; }
+
     public void outbound(Instant now) { lastOutboundAt = micros(now); revision++; }
 
     /** The out-of-hours auto-reply went out; it is sent once per closed period. */

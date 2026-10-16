@@ -24,6 +24,8 @@ public interface IdentityProvisioningPort {
     default void sendPasswordReset(String subject, String locale) { throw new UnsupportedOperationException("Password reset is not supported"); }
     /** SUP-03: removes the second factors so the person must enrol again; callers end sessions separately. */
     default void resetMfa(String subject) { throw new UnsupportedOperationException("MFA reset is not supported"); }
+    /** P1-7: subject erasure removes the account (its name and email) from the provider; an account already gone counts as removed. */
+    default void deleteUser(String subject) { throw new UnsupportedOperationException("Account removal is not supported"); }
 
     record IdentityAccount(String subject, String email, String status, Instant invitedAt) {}
     record EmailIdentity(String subject, String email, boolean verified, boolean enabled) {}

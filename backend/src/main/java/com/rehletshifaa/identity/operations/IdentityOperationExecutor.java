@@ -51,6 +51,7 @@ public class IdentityOperationExecutor {
                 identities.logout(operation.subject());
                 succeed(operation);
             }
+            case DELETE_USER -> { identities.deleteUser(operation.subject()); succeed(operation); }
             case CREATE_STAFF, CREATE_PRACTITIONER -> create(operation);
         }
     }

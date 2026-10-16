@@ -39,6 +39,8 @@ public class MedicalCase extends AssignedIdEntity {
     @Enumerated(EnumType.STRING) @Column(nullable=false, length=20) private CaseUrgency urgency;
     /** P1-13 (A-05): the patient's age band as stated at intake or recorded in intake review; null = not stated. */
     @Enumerated(EnumType.STRING) @Column(name="age_band", length=20) private AgeBand ageBand;
+    /** P1-7: when an abandoned draft was purged; the row stays as a contentless tombstone. */
+    @Column(name="purged_at") private Instant purgedAt;
 
     protected MedicalCase() {}
     /**
@@ -53,7 +55,18 @@ public class MedicalCase extends AssignedIdEntity {
         this.preferredLanguage = preferredLanguage; this.status = CaseStatus.DRAFT; this.waitingOn = "STAFF"; this.urgency = CaseUrgency.ROUTINE;
         this.consentTimestamp = micros(now); this.createdAt = micros(now); this.updatedAt = micros(now);
     }
-    public void submit(Instant now) { if (status != CaseStatus.DRAFT) throw new IllegalStateException("Case is not in draft state"); status = CaseStatus.RECEIVED; submittedAt = micros(now); updatedAt = micros(now); version++; }
+    public void submit(Instant now) { if (status != CaseStatus.DRAFT || purgedAt != null) throw new IllegalStateException("Case is not in draft state"); status = CaseStatus.RECEIVED; submittedAt = micros(now); updatedAt = micros(now); version++; }
+    /**
+     * P1-7 (design §7.13): an abandoned draft keeps only its number, country, language and dates. Its audit and consent rows
+     * (LEGAL_RECORD) reference it, so the row stays and everything the person wrote goes.
+     */
+    public void purgeDraft(Instant now) {
+        if (status != CaseStatus.DRAFT) throw new IllegalStateException("Only a draft is purged");
+        conditionDescription = null; careCategory = null; ageBand = null; waitingReason = null; waitingReasonCode = null;
+        purgedAt = micros(now); updatedAt = micros(now); version++;
+    }
+    public Instant getPurgedAt() { return purgedAt; }
+    public Instant getCreatedAt() { return createdAt; }
     public UUID getPatientId() { return patientId; }
     public String getCaseNumber() { return caseNumber; }
     public String getCountry() { return country; } public String getConditionDescription() { return conditionDescription; }
