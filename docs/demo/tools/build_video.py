@@ -3,7 +3,7 @@ from PIL import Image, ImageDraw
 S=os.path.dirname(os.path.abspath(__file__)).replace(chr(92),'/')
 FF=S+'/v/Lib/site-packages/imageio_ffmpeg/binaries/ffmpeg-win-x86_64-v7.1.exe'
 A='docs/demo/assets/audio/'; HERO='docs/demo/assets/hero.mp4'; OUT=S+'/out4'; os.makedirs(OUT,exist_ok=True); os.makedirs(S+'/ov4',exist_ok=True)
-FPS=30; PRE=0.6; POST=1.0; FLASH=1.2; ANIM=[0,6,11,13]; AFPS=15
+FPS=30; PRE=0.6; POST=1.0; FLASH=1.2; ANIM=[0,6,11,13]; AFPS={0:24}
 meta=json.load(open(S+'/fr4/meta.json'))
 N=len(meta)
 def run(*a):
@@ -14,11 +14,11 @@ def dur(f):
     m=re.search(r'Duration: (\d+):(\d+):([\d.]+)',r); return int(m[1])*3600+int(m[2])*60+float(m[3])
 segs=[];wavs=[]
 for i in range(N):
-    n='%02d'%i; d=dur(A+f'ar-{n}.mp3'); L=math.ceil((PRE+d+POST)*FPS)/FPS
+    n='%02d'%i; d=dur(A+f'ar-{n}.mp3'); L=math.ceil((PRE+d+(2.4 if i==0 else POST))*FPS)/FPS
     run('-i',A+f'ar-{n}.mp3','-af',f'adelay={int(PRE*1000)}|{int(PRE*1000)},apad=whole_dur={L:.4f}','-t',f'{L:.4f}','-ar','44100','-ac','2','-c:a','pcm_s16le',f'{OUT}/a{n}.wav')
     out=f'{OUT}/v{n}.mp4'; enc=['-r',str(FPS),'-c:v','libx264','-preset','slow','-tune','stillimage','-crf','28','-pix_fmt','yuv420p','-g','90']
     if i in ANIM:
-        run('-framerate',str(AFPS),'-i',f'{S}/fr4/s{n}_%03d.png','-vf',f'tpad=stop_mode=clone:stop_duration={L:.3f},fps={FPS},format=yuv420p','-t',f'{L:.4f}',*enc,out)
+        run('-framerate',str(AFPS.get(i,15)),'-i',f'{S}/fr4/s{n}_%03d.png','-vf',f'tpad=stop_mode=clone:stop_duration={L:.3f},fps={FPS},format=yuv420p','-t',f'{L:.4f}',*enc,out)
     else:
         hs=meta[str(i)]['hs']; vid=meta[str(i)]['video']; k=len(hs)
         args=['-loop','1','-framerate',str(FPS),'-i',f'{S}/fr4/s{n}.png']; fc='[0:v]format=yuv420p[b0]'; last='b0'; idx=1
