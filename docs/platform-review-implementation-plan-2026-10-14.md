@@ -1812,17 +1812,17 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
-| 1 | P1-8 Metrics, alerts, scheduler leadership | done: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
+| 1 | ~~P1-8 Metrics, alerts, scheduler leadership~~ | **done**: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
 | 2 | ~~P1-10 Commercial truth + fee restructuring~~ (D-A) | **done**: sessions 1 and 2 (2026-10-15) | Fable 5.1 high, then Sonnet 5.5 | Owner fast-forwards `feat/review-p0` to the session-2 commit, rebuilds the frontend and walks the flow; counsel on the guarantee wording and the fee's VAT rate; native Arabic review |
 | — | UI/UX (all areas) | own plan | see `docs/ux-redesign/PLAN.md` | Runs in parallel in its own worktree; Finance and Operations areas wait for P1-15 / P1-17 |
 | 3 | ~~P1-13 Minors, guardians, incidents, reopen~~ | **done**: sessions 1 (backend) and 2 (UI, copy), 2026-10-15 | Opus 5.5; guardian consent reviewed by Fable | Owner fast-forwards `feat/review-p0` to the session-2 commit and rebuilds backend and frontend; counsel on the guardian consent, native Arabic review; My Care upload for guardian evidence done on `claude/guardian-upload` |
-| 5 | **P1-15 Admission, voucher, balance, `ADMISSION_READY`** | 2 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |
-| 6 | **P1-16 Treatment evidence: milestones, change orders** | 2 | Fable 5.1 high; forms by Opus | D-E band; P1-13 |
-| 7 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths by Fable | Owner: payer terms, partner commission |
-| 8 | **P1-17 Discharge pack, reconciliation, statements** | 2 | Fable 5.1, high | D-F; P1-12 settlement statement |
-| 9 | **P1-18 Follow-up execution and outcomes** | 1–2 | Opus 5.5; data classification by Fable | D-G; P1-13 |
+| 5 | ~~P1-15 Admission, voucher, balance, `ADMISSION_READY`~~ | **done**: sessions 1 (backend, V99) and 2 (UI, copy), 2026-10-15 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |
+| 6 | ~~P1-16 Treatment evidence: milestones, change orders~~ | **done**: sessions 1 (backend, V100) and 2 (UI, copy), 2026-10-15 | Fable 5.1 high; forms by Opus | D-E band; P1-13 |
+| 7 | P1-12 Payouts, payer organisations, partners | 3 (not started: waits for the owner's payer terms and partner commission) | Opus 5.5; settlement maths by Fable | Owner: payer terms, partner commission |
+| 8 | ~~P1-17 Discharge pack, reconciliation, statements~~ | **done**: sessions 1 (backend, V101) and 2 (UI, copy), 2026-10-16 | Fable 5.1, high | D-F; P1-12 settlement statement |
+| 9 | ~~P1-18 Follow-up execution and outcomes~~ | **done**: sessions 1 (backend, V102) and 2 (UI, copy), 2026-10-16 | Opus 5.5; data classification by Fable | D-G; P1-13 |
 | 10 | ~~P1-19 Hospital-agreement audit~~ | **done**: sessions 1 (backend, V103) and 2 (UI, copy), 2026-10-16 | Opus 5.5; eligibility change by Fable | D-H applied as recommended |
-| 11 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide retention of plaintext WhatsApp sender digits; evidence and statements as `LEGAL_RECORD` class |
+| 11 | P1-7 Retention, purge, erasure, draft clean-up | 2 (session 1 started 2026-10-16 from `33671ec`) | Fable 5.1, high | Decide retention of plaintext WhatsApp sender digits; evidence and statements as `LEGAL_RECORD` class |
 | 12 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-18, so the extracted code is final |
 | 13 | ~~P1-9 Backups and restore drill~~ | **done**: 1 session (2026-10-15); local drill PASS in 135 s | Opus 5.5 | Production drill on the chosen host (managed PITR restore time, region failover) adds its row to `docs/deployment.md` before real patient data |
 | 14 | P1-14 Consultant public profiles (data and endpoint) | 1 | Opus 5.5 | The page is UX plan area 1b; photographs with consent |
@@ -1831,7 +1831,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | 17 | P3 backlog | one each | Sonnet or Opus | — |
 
 Decision D-I (PDPL licence application; liability-fund subscription as a Consultant credential) is not a phase: start
-the licence now; the credential type is a one-line addition in P1-19.
+the licence now; the credential type is a one-line addition in P1-19 (done: `LIABILITY_FUND_SUBSCRIPTION` in `admin-labels.ts`, P1-19 session 2).
 
 ### Owner decisions still open
 
@@ -1853,7 +1853,7 @@ the licence now; the credential type is a one-line addition in P1-19.
       session 1): the lower of 10% of the facility package and EGP 15,000, cumulative over the case's change orders; Finance alone within
       it, the patient (fresh sign-in or verified secure link) above it, emergency path with a Finance review. Finance Managers can change
       the rate and cap per care area. The owner may still object.
-- [ ] D-F…D-H from `docs/post-deposit-journey-design.md` §12 (fit-to-fly window, free follow-up window, affiliations as eligibility): all three
+- [x] D-F…D-H from `docs/post-deposit-journey-design.md` §12 (fit-to-fly window, free follow-up window, affiliations as eligibility): all three
       **applied as recommended** under the owner's standing rule (D-F P1-17, D-G P1-18, D-H P1-19 session 1); the owner may still object.
 - [ ] D-I: start the PDPL licence application and the Law 13/2025 liability-fund subscription (owner action).
 - [x] P1-10: final-quote validity 14 days and FX band 3% (owner, 2026-10-15); guarantee wording ships as a placeholder.
@@ -1887,7 +1887,11 @@ the licence now; the credential type is a one-line addition in P1-19.
 
 ## Order of sessions (recommended, revised 2026-10-14)
 
-Done: 1. P0-1 → 2. P0-2 → 3. P0-3 → 4. P0-4 → 5. P0-5 → 6. P1-6.
+Done (checked 2026-10-16 against each phase's Status block and the branch history): P0-1, P0-2, P0-3, P0-4, P0-5, P1-6, P1-8,
+P1-9, P1-10, P1-13, P1-15, P1-16, P1-17, P1-18, P1-19. In progress: P1-7. Still to run: P1-11, P1-14, P2-24, P1-12 (waits for
+the owner's payer terms and partner commission), then P2 and P3.
+
+The original order, for the record:
 
 Next: 7. P1-8 (metrics + ShedLock) → 8. P1-10 (commercial truth + fee restructuring) → 9. P1-13
 (guardian/incidents) → 10. P1-15 (admission, voucher, balance) → 11. P1-16 (milestones, change orders) → 12. P1-12
