@@ -9,6 +9,7 @@ import {
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
 import { useRovingList, useShortcutsEnabled } from "@/components/portal/StaffShortcuts";
 import { StatusBadge, caseStatusTone } from "@/components/portal/StatusBadge";
+import { CareAreaMark, CaseTag, LEDGER_ASIDE, LEDGER_ROW, LEDGER_SHEET, LedgerHeader, LedgerSkeleton } from "@/components/portal/WorkLedger";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { matchesKpi, type KpiFilter } from "@/components/portal/RoleDashboardSummary";
 import { intlLocale, type Locale } from "@/lib/i18n";
@@ -67,7 +68,7 @@ function attentionChip(item: QueueCase, copy: WorkCopy["attention"], now = Date.
 /**
  * The operational case list.
  *
- * <p>One list, because staff scan and act rather than browse (the Cards view was removed at GATE P2-2). The toolbar
+ * <p>Rows sit on the shared work ledger (WorkLedger), the same sheet My work uses. One list, because staff scan and act rather than browse (the Cards view was removed at GATE P2-2). The toolbar
  * carries only search, filters and sort — everything else lives in the filter panel and surfaces as removable chips,
  * so the page shows work rather than controls. Row selection appears only where a bulk action exists for it.
  *
@@ -236,19 +237,20 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     </div>}
 
     <div id="queue-panel" role={tabs.length?"tabpanel":undefined} aria-labelledby={tabs.length?`queue-tab-${selected}`:undefined} tabIndex={tabs.length?0:undefined}>
-      <div className="mb-2.5 flex items-center justify-between gap-3">
-        {/* The empty state already says there is nothing here; the count would only repeat it. */}
-        <p role="status" className="text-[0.8125rem] text-ink-500">{busy?text.loading:list.length?plural(work.locale,list.length,work.plural.cases):""}</p>
-        {selectable&&pageItems.length>0&&<label className="flex items-center gap-2 text-[0.8125rem] font-semibold text-ink-600">
-          <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={pageSelected}
-                 onChange={event=>setSelectedIds(currentIds=>{const next=new Set(currentIds);for(const item of pageItems){if(event.target.checked)next.add(item.id);else next.delete(item.id);}return next;})}/>
-          {text.selectPage}
-        </label>}
-      </div>
-
-      {!busy&&!list.length
-        ?<div className="card px-6 py-10 text-center"><FolderOpen className="mx-auto mb-3 text-brand-600" size={26} aria-hidden/><h2 className="font-bold text-ink-900">{chips.length||state.search?text.noMatch:text.empty}</h2><p className="mt-1.5 text-[0.875rem] text-ink-500">{text.emptyHint}</p>{(chips.length>0||state.search)&&<button type="button" className="link-cta mt-4 text-[0.875rem]" onClick={()=>clearAll({search:""})}>{text.clearAll}</button>}</div>
-        :<>{roving.hint}<ul {...roving.listProps} className="divide-y divide-line border-y border-line">
+      {busy&&!list.length
+        ?<><p role="status" className="sr-only">{text.loading}</p><LedgerSkeleton/></>
+        :!list.length
+        ?<div className={`${LEDGER_SHEET} px-6 py-10 text-center`}><span aria-hidden className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-lg bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100"><FolderOpen size={20}/></span><h2 className="font-semibold text-brand-900">{chips.length||state.search?text.noMatch:text.empty}</h2><p className="mt-1.5 text-[0.875rem] text-ink-500">{text.emptyHint}</p>{(chips.length>0||state.search)&&<button type="button" className="link-cta mt-4 text-[0.875rem]" onClick={()=>clearAll({search:""})}>{text.clearAll}</button>}</div>
+        :<div className={LEDGER_SHEET}>
+          <LedgerHeader end={selectable&&pageItems.length>0?<label className="-my-1 flex min-h-11 cursor-pointer items-center gap-2 font-semibold text-ink-600">
+              <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={pageSelected}
+                     onChange={event=>setSelectedIds(currentIds=>{const next=new Set(currentIds);for(const item of pageItems){if(event.target.checked)next.add(item.id);else next.delete(item.id);}return next;})}/>
+              {text.selectPage}
+            </label>:undefined}>
+            <p role="status" className="font-semibold tabular-nums text-ink-700">{plural(work.locale,list.length,work.plural.cases)}</p>
+          </LedgerHeader>
+          {roving.hint}
+          <ul {...roving.listProps} className="divide-y divide-line">
           {pageItems.map(item=>{
             const pending=item.assignmentStatus==="PENDING"&&item.assignmentId;
             const claimable=coordinator&&!item.coordinatorSubject&&item.status==="RECEIVED";
@@ -262,17 +264,6 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             // Only the number is isolated left-to-right, so "الحالة RS-…" still reads right-to-left in Arabic.
             const [titleBefore,titleAfter=""]=text.caseTitle.split("{number}");
             const title=item.patientName?<bdi>{patientNameLabel(item.patientName,work)}</bdi>:<>{titleBefore}<bdi dir="ltr">{item.caseNumber}</bdi>{titleAfter}</>;
-            const meta=<>
-              <StatusBadge tone={caseStatusTone(item.status)}>{statusLabel(item.status)}</StatusBadge>
-              {item.waitingOn&&item.waitingOn!=="NONE"&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-600"><Hourglass size={12} className="text-brand-600" aria-hidden/>{text.waiting}: <strong className="font-semibold text-ink-800">{waitingLabel(item.waitingOn,work.waiting,{role,ownsCase:!!subject&&item.coordinatorSubject===subject})}</strong></span>}
-              {attention&&<StatusBadge tone={attention.tone}>{attention.label}</StatusBadge>}
-            </>;
-            const people=<>
-              <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ink-600"><UserRound size={13} className="text-ink-400" aria-hidden/><bdi>{coordinatorLabel(item,subject,text)}</bdi></span>
-              {item.doctorName&&<span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ink-600"><Stethoscope size={13} className="text-ink-400" aria-hidden/><bdi>{item.doctorName}</bdi></span>}
-              {(item.openTaskCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><ListTodo size={13} aria-hidden/>{plural(work.locale,item.openTaskCount??0,work.plural.openTasks)}</span>}
-              {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><Files size={13} aria-hidden/>{plural(work.locale,item.documentCount??0,work.plural.documents)}</span>}
-            </>;
             const actions=<>
               {claimable&&<button type="button" className={`${item.id===leadClaim?"btn-primary":"btn-secondary"} !min-h-11 !px-3 !text-[0.8125rem]`} disabled={busy} tabIndex={tab} aria-label={named(text.claim)} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
               {pending&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.8125rem]" disabled={busy} tabIndex={tab} aria-label={named(text.accept)} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
@@ -281,28 +272,41 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
               <button type="button" {...roving.primary(item.id)} className="inline-flex min-h-11 items-center gap-1.5 px-1 font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current aria-disabled:cursor-not-allowed aria-disabled:text-ink-500 aria-disabled:no-underline" aria-disabled={busy||undefined} aria-label={named(text.open)} onClick={()=>{if(!busy)onOpen(item);}}>{text.open}<ArrowRight size={16} aria-hidden className="rtl:rotate-180"/></button>
             </>;
 
-
-            return <li key={item.id} data-row={item.id} data-case={item.id} className={`${selectable?"grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3":"flex flex-col"} gap-y-3 px-2 py-3.5 transition hover:bg-brand-50/40 has-[[data-roving-primary]:focus-visible]:bg-brand-50 sm:flex sm:flex-row sm:items-center sm:gap-4`}>
-              {selectable&&<label className="-m-3.5 inline-grid h-11 w-11 flex-none cursor-pointer place-items-center"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={selectedIds.has(item.id)} tabIndex={tab} onChange={()=>toggle(item.id)} aria-label={fillTemplate(text.selectCase,{number:item.caseNumber})}/></label>}
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                  <p className="truncate font-bold text-ink-900">{title}</p>
-                  {item.patientName&&<span className="text-[0.8125rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>}
-                  {item.careCategory&&<span className="text-[0.8125rem] text-ink-500">{categoryLabel(item.careCategory)}</span>}
-                  <button type="button" tabIndex={tab} className="-my-3.5 inline-grid h-11 w-11 place-items-center text-ink-400 transition hover:text-brand-700" title={copied===item.id?text.copied:fillTemplate(text.copy,{number:item.caseNumber})} aria-label={fillTemplate(text.copy,{number:item.caseNumber})}
+            return <li key={item.id} data-row={item.id} data-case={item.id} className={LEDGER_ROW}>
+              <div className="flex items-center gap-1">
+                {selectable&&<label className="-ms-2.5 inline-grid h-11 w-11 flex-none cursor-pointer place-items-center"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={selectedIds.has(item.id)} tabIndex={tab} onChange={()=>toggle(item.id)} aria-label={fillTemplate(text.selectCase,{number:item.caseNumber})}/></label>}
+                <CareAreaMark careCategory={item.careCategory}/>
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {item.patientName&&<CaseTag number={item.caseNumber}/>}
+                  {item.careCategory&&<span className="text-[0.8125rem] font-semibold text-ink-500">{categoryLabel(item.careCategory)}</span>}
+                  <button type="button" tabIndex={tab} className="-my-3 inline-grid h-11 w-9 place-items-center text-ink-400 transition hover:text-brand-700" title={copied===item.id?text.copied:fillTemplate(text.copy,{number:item.caseNumber})} aria-label={fillTemplate(text.copy,{number:item.caseNumber})}
                           onClick={()=>{void navigator.clipboard?.writeText(item.caseNumber).then(()=>{setCopied(item.id);setTimeout(()=>setCopied(null),1500);}).catch(()=>{});}}>
                     {copied===item.id?<Check size={13}/>:<Copy size={13}/>}
                   </button>
                 </div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">{meta}</div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">{people}
-                  <span className="text-[0.8125rem] text-ink-400">{claimable?text.received:text.updated} {new Intl.DateTimeFormat(intlLocale(locale),{day:"numeric",month:"short"}).format(new Date(claimable?item.createdAt:item.updatedAt))}</span>
+                <p className="mt-1 truncate text-[1.0625rem] font-semibold leading-6 text-brand-900">{title}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <StatusBadge tone={caseStatusTone(item.status)}>{statusLabel(item.status)}</StatusBadge>
+                  {attention&&<StatusBadge tone={attention.tone}>{attention.label}</StatusBadge>}
+                  {item.waitingOn&&item.waitingOn!=="NONE"&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><Hourglass size={12} className="text-brand-600" aria-hidden/>{text.waiting}: <strong className="font-semibold text-ink-800">{waitingLabel(item.waitingOn,work.waiting,{role,ownsCase:!!subject&&item.coordinatorSubject===subject})}</strong></span>}
                 </div>
+                <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.8125rem] text-ink-500">
+                  <span className="inline-flex items-center gap-1.5"><UserRound size={13} aria-hidden/><bdi className="font-semibold text-ink-800">{coordinatorLabel(item,subject,text)}</bdi></span>
+                  {item.doctorName&&<span className="inline-flex items-center gap-1.5"><Stethoscope size={13} aria-hidden/><bdi className="font-semibold text-ink-800">{item.doctorName}</bdi></span>}
+                  {(item.openTaskCount??0)>0&&<span className="inline-flex items-center gap-1"><ListTodo size={13} aria-hidden/>{plural(work.locale,item.openTaskCount??0,work.plural.openTasks)}</span>}
+                  {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1"><Files size={13} aria-hidden/>{plural(work.locale,item.documentCount??0,work.plural.documents)}</span>}
+                </p>
               </div>
-              <div className="col-span-2 flex flex-none flex-wrap items-center gap-2 sm:justify-end">{actions}</div>
+              <div className={LEDGER_ASIDE}>
+                <p className="text-[0.8125rem] text-ink-500">{claimable?text.received:text.updated} <span className="font-semibold text-ink-800">{new Intl.DateTimeFormat(intlLocale(locale),{day:"numeric",month:"short"}).format(new Date(claimable?item.createdAt:item.updatedAt))}</span></p>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>
+              </div>
             </li>;
           })}
-        </ul></>}
+          </ul>
+        </div>}
 
       {pages>1&&<nav className="mt-4 flex items-center justify-between gap-3" aria-label={text.pages}>
         <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.8125rem]" disabled={page===1} onClick={()=>change({page:page-1})}>{text.previous}</button>
