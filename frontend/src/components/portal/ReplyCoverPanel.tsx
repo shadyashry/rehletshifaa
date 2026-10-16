@@ -26,7 +26,7 @@ export function ReplyCoverPanel({locale,mySubject,covers,staff,busy,mutate}:{loc
   return <section className="card mt-6 p-5" aria-labelledby="reply-cover-title">
     <h2 id="reply-cover-title" className="title">{t.title}</h2>
     <p className="mt-2 text-sm text-ink-500">{t.intro}</p>
-    {covers.length===0?<p className="mt-4 text-sm">{t.none}</p>:<ul className="mt-4 divide-y divide-brand-100">{covers.map(c=><li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+    {covers.length===0?<p className="mt-4 text-sm">{t.none}</p>:<ul className="mt-4 divide-y divide-line">{covers.map(c=><li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
       <p className="text-sm"><span className="font-semibold"><bdi>{describe(c)}</bdi></span>{" "}<span className="text-ink-500">{c.active?t.active:t.starts(when(c.startsAt))}, {t.until(when(c.endsAt))}</span></p>
       {c.canRevoke&&<button type="button" className="inline-flex min-h-11 items-center text-[0.8125rem] font-bold text-brand-700" disabled={busy} onClick={()=>void mutate(`/coordinator/reply-covers/${c.id}/revoke`)}>{t.end}</button>}
     </li>)}</ul>}
