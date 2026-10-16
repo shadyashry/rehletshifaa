@@ -574,8 +574,9 @@ class PlatformUsersDeepQaTest {
         assertThat(adminPermissions).as("SOD-07/08: administrators administer access only")
                 .doesNotContain(Permission.CASE_READ, Permission.CASE_COORDINATE, Permission.CLINICAL_REVIEW, Permission.CREDENTIAL_DECIDE,
                         Permission.FINANCE_SETTLE, Permission.PAYMENT_RECORD, Permission.JOURNEY_EDIT, Permission.JOURNEY_APPROVE, Permission.TEAM_MANAGE);
+        // P1-19: the auditor's one write is its own review record (COMPLIANCE_REVIEW; RolePolicyTest keeps it the only one).
         assertThat(permissions(Role.COMPLIANCE_AUDITOR)).as("auditor is read-only")
-                .allSatisfy(p -> assertThat(p.name()).endsWith("_READ"));
+                .allSatisfy(p -> assertThat(p.name().endsWith("_READ") || p == Permission.COMPLIANCE_REVIEW).as(p.name()).isTrue());
         assertThat(permissions(Role.SUPPORT_AGENT)).doesNotContain(Permission.CASE_READ, Permission.WORKFORCE_READ, Permission.AUDIT_READ);
         assertThat(permissions(Role.JOURNEY_MANAGER)).contains(Permission.JOURNEY_EDIT).doesNotContain(Permission.JOURNEY_APPROVE);
         assertThat(permissions(Role.JOURNEY_APPROVER)).contains(Permission.JOURNEY_APPROVE).doesNotContain(Permission.JOURNEY_EDIT);

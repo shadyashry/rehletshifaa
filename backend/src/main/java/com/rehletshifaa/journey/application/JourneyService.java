@@ -309,7 +309,10 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
             if(priceEgp==null||priceEgp.compareTo(pkg.minEgp())<0||priceEgp.compareTo(pkg.maxEgp())>0)throw new ApiException(409,"FACILITY_PACKAGE_RANGE","The expected price must be an EGP figure inside the approved package range");
             storedCost=priceEgp;storedCurrency=com.rehletshifaa.shared.currency.CurrencyService.BASE;priceEgpMin=pkg.minEgp();priceEgpMax=pkg.maxEgp();requiresFinance=false;
         }
-        costEstimates.saveAndFlush(new ClinicalReviewCostEstimate(reviewId,item.serviceDescription().trim(),storedCost,storedCurrency,order++,catalogId,priceEgp,requiresFinance,packageId,priceEgpMin,priceEgpMax));}}
+        // P1-19 (design §7.4): a catalogue line is the Consultant's, a package line the facility's; a manual line says whose it is.
+        String source=lineSource(catalogId,packageId),payee=payeeOf(source,item.payee());
+        if(item.payee()!=null&&!item.payee().equals(payee))throw new ApiException(400,"LINE_PAYEE_CONFLICT","A catalogue service is the Consultant's and a facility package is the facility's");
+        costEstimates.saveAndFlush(new ClinicalReviewCostEstimate(reviewId,item.serviceDescription().trim(),storedCost,storedCurrency,order++,catalogId,priceEgp,requiresFinance,packageId,priceEgpMin,priceEgpMax).payee(payee));}}
     @Transactional public CaseView setTravelPackage(UUID caseId,boolean requested){var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));String status=state(caseId).status();if(Set.of("PATIENT_DECISION","ACCEPTED","DECLINED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED","ADMISSION_READY","TREATMENT_IN_PROGRESS","DISCHARGED","FOLLOW_UP","CLOSED","CANCELLED").contains(status))throw new ApiException(409,"TRAVEL_PACKAGE_LOCKED","The travel package choice can only be changed before the proposal is sent to the patient");cases.requestTravelPackage(caseId,requested,micros(clock.instant()));audit("CASE_TRAVEL_PACKAGE_SET",actor,caseId,"MedicalCase",caseId.toString(),"UPDATE","SUCCESS",requested?"requested":"not-requested");work.changed(caseId);return caseView(caseId);}
     @Transactional public IdResponse acceptDoctorAssignment(UUID caseId,UUID assignmentId,AssignmentDecisionRequest request){return decideAssignment(caseId,assignmentId,request,Role.CONSULTANT);}
 
@@ -495,8 +498,8 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     @Transactional public ProposalView createProposal(UUID caseId,ProposalDraftRequest request){
         var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("CLINICAL_RECOMMENDATION_READY","REVISION_REQUESTED","EXPIRED"));
         if(!clinicalReviews.existsByIdAndCaseIdAndStatus(request.clinicalReviewId(),caseId,"APPROVED"))throw new ApiException(409,"CLINICAL_APPROVAL_REQUIRED","An approved clinical review is required");
-        record EstRow(String description,BigDecimal cost,String currency,UUID catalogServiceId,BigDecimal priceEgp,BigDecimal priceEgpMin,BigDecimal priceEgpMax,boolean requiresFinance,UUID facilityPackageId){}
-        List<EstRow> consultantItems=costEstimates.findPricedLinesOf(request.clinicalReviewId()).stream().map(e->new EstRow(e.getServiceDescription(),e.getEstimatedCost(),e.getCurrency(),e.getCatalogServiceId(),e.getPriceEgp(),e.getPriceEgpMin(),e.getPriceEgpMax(),Boolean.TRUE.equals(e.getRequiresFinanceApproval()),e.getFacilityPackageId())).toList();
+        record EstRow(String description,BigDecimal cost,String currency,UUID catalogServiceId,BigDecimal priceEgp,BigDecimal priceEgpMin,BigDecimal priceEgpMax,boolean requiresFinance,UUID facilityPackageId,String payee){}
+        List<EstRow> consultantItems=costEstimates.findPricedLinesOf(request.clinicalReviewId()).stream().map(e->new EstRow(e.getServiceDescription(),e.getEstimatedCost(),e.getCurrency(),e.getCatalogServiceId(),e.getPriceEgp(),e.getPriceEgpMin(),e.getPriceEgpMax(),Boolean.TRUE.equals(e.getRequiresFinanceApproval()),e.getFacilityPackageId(),payeeOf(lineSource(e.getCatalogServiceId(),e.getFacilityPackageId()),e.getPayee()))).toList();
         if(consultantItems.isEmpty())throw new ApiException(409,"CONSULTANT_COST_ESTIMATES_REQUIRED","The consultant must approve at least one medical service and cost before a patient proposal can be created");
         if(consultantItems.stream().anyMatch(item->item.priceEgp()==null))throw new ApiException(409,"CONSULTANT_PRICE_BASE_REQUIRED","Every consultant service must carry an EGP base price");
         boolean requiresFinance=false; // decided per line below, once the care area policy (and its manual band) is known
@@ -525,7 +528,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         proposalVersions.supersedeLive(proposalId,micros(now));
         String includedServices=consultantItems.stream().map(EstRow::description).collect(java.util.stream.Collectors.joining("; "));
         createVersion(new ProposalVersion.Document(proposalId,version,"PRELIMINARY_ESTIMATE",null,request.language()==null?"en":request.language(),request.clinicalReviewId()),versionId,new ProposalVersion.Terms(request.operationalPlan(),displayCurrency,includedServices,request.excludedServices(),request.paymentTerms(),request.refundTerms(),request.disclaimers(),request.coordinatorNotes(),request.validUntil()),new ProposalVersion.Pricing(requiresFinance,providerNet,policyId,policyVersion,marginRate,marginAmount,priced.patientMin(),priced.patientExpected(),priced.patientMax()),actor.subject(),now);
-        saveLines(versionId,consultantItems.stream().map(i->new PricedLine(i.description(),lineSource(i.catalogServiceId(),i.facilityPackageId()),i.catalogServiceId(),i.facilityPackageId())).toList(),providerLines,priced,rate);
+        saveLines(versionId,consultantItems.stream().map(i->new PricedLine(i.description(),lineSource(i.catalogServiceId(),i.facilityPackageId()),i.catalogServiceId(),i.facilityPackageId(),i.payee())).toList(),providerLines,priced,rate);
         proposalRecords.advanceTo(proposalId,version,micros(now));transitionWithoutVersion(caseId,"PROPOSAL_PREPARATION","Proposal draft created from consultant-approved services",actor);
         // The coordinator's "prepare the proposal" work is done the moment the draft exists; a revision request
         // is answered the same way. Closing it here is what stops a finished item from driving the page later.
@@ -582,7 +585,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         BigDecimal depositDueDisplay=isFinal?null:payment.depositDueDisplay(share.caseId(),share.versionId());
         BigDecimal depositPaidDisplay=isFinal?conv.apply(payment.netPaidEgp(share.caseId())):null;
         var totals=proposalQueries.displayTotals(share.versionId(),fx); // QA #12: the totals are the sum of the lines shown
-        return new PublicProposalView(m.getCaseNumber(),m.getPatientName(),m.getDocumentType(),m.getVersionNumber(),m.getCurrency(),view.items(),totals.min(),totals.expected(),totals.max(),m.getAssumptions(),m.getIncludedServices(),m.getExcludedServices(),m.getScopeChangeReason(),m.getPaymentTerms(),m.getRefundTerms(),m.getDisclaimers(),m.getValidUntil(),decided,decisionState,m.getRecommendedTreatment(),m.getRisksAndLimitations(),view.coordinatorNotes(),depositDueDisplay,depositPaidDisplay,m.getConsultantName(),m.getFxRateDate(),proposalQueries.assistance(share.versionId()),view.acceptableFrom(),view.fxReapprovalStatus(),m.getReleasedAt());}
+        return new PublicProposalView(m.getCaseNumber(),m.getPatientName(),m.getDocumentType(),m.getVersionNumber(),m.getCurrency(),view.items(),totals.min(),totals.expected(),totals.max(),m.getAssumptions(),m.getIncludedServices(),m.getExcludedServices(),m.getScopeChangeReason(),m.getPaymentTerms(),m.getRefundTerms(),m.getDisclaimers(),m.getValidUntil(),decided,decisionState,m.getRecommendedTreatment(),m.getRisksAndLimitations(),view.coordinatorNotes(),depositDueDisplay,depositPaidDisplay,m.getConsultantName(),m.getFxRateDate(),proposalQueries.assistance(share.versionId()),view.acceptableFrom(),view.fxReapprovalStatus(),m.getReleasedAt(),view.payeeTotals());}
 
     /** Records the decision against the exact released version; on ACCEPTED, sends an activation invite. */
     @Transactional(noRollbackFor=ApiException.class) public IdResponse decideProposalPublic(String token,String grant,PublicProposalDecisionRequest request){ShareToken share=requireGrant(token,grant);Instant now=clock.instant();ProposalView view=proposal(share.versionId());if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal can no longer be decided");if(view.validUntil()!=null&&!view.validUntil().isAfter(now)){expireProposal(share.caseId(),share.versionId());throw new ApiException(410,"PROPOSAL_EXPIRED","This proposal has expired");}
@@ -693,17 +696,25 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         if(facilityId==null){if(required)throw new ApiException(400,"FACILITY_REQUIRED","Choose the facility");return;}
         if(facilityDirectory.active(facilityId).isEmpty())throw new ApiException(409,"FACILITY_INVALID","This facility does not exist or is suspended");
     }
-    private record PricedLine(String description,String source,UUID catalogServiceId,UUID facilityPackageId){}
+    private record PricedLine(String description,String source,UUID catalogServiceId,UUID facilityPackageId,String payee){}
     /**
      * P1-10 (D-A): the medical lines at the provider's own price (the Consultant's and the facility's figures, unchanged), then the
      * coordination and guarantee fee as the last line, never optional. Display prices are provisional until release fixes them.
      */
     private void saveLines(UUID versionId,List<PricedLine> lines,List<ProposalPricing.ProviderLine> prices,ProposalPricing.Totals priced,BigDecimal rate){
         for(int order=0;order<lines.size();order++){PricedLine line=lines.get(order);ProposalPricing.ProviderLine price=prices.get(order);
-            proposalItems.saveAndFlush(ProposalItem.medical(versionId,line.description(),ProposalPricing.display(price.expected(),rate),order,line.source(),new ProposalItem.Prices(price.expected(),price.expected(),price.min(),price.max()),line.catalogServiceId(),line.facilityPackageId()));}
+            proposalItems.saveAndFlush(ProposalItem.medical(versionId,line.description(),ProposalPricing.display(price.expected(),rate),order,line.source(),new ProposalItem.Prices(price.expected(),price.expected(),price.min(),price.max()),line.catalogServiceId(),line.facilityPackageId()).payee(line.payee()));}
         proposalItems.saveAndFlush(ProposalItem.platformFee(versionId,ProposalPricing.FEE_DESCRIPTION,ProposalPricing.display(priced.feeExpected(),rate),lines.size(),priced.feeExpected(),priced.feeMin(),priced.feeMax()));
     }
     private static String lineSource(UUID catalogServiceId,UUID facilityPackageId){return facilityPackageId!=null?"FACILITY_PACKAGE":catalogServiceId!=null?"CATALOG":"MANUAL";}
+    /** P1-19 (design §7.4): a package line is the facility's, a catalogue line the Consultant's; a manual line keeps what it says, else OTHER. */
+    private static String payeeOf(String source,String stated){return "FACILITY_PACKAGE".equals(source)?ProposalItem.FACILITY:"CATALOG".equals(source)?ProposalItem.CONSULTANT:stated!=null?stated:ProposalItem.OTHER;}
+    /**
+     * P1-19 (design §7.4), separate lines, no blending: once the hospital is reserved, the final quote shows the hospital's charges as
+     * their own line (a facility package, or a manual line whose payee is the facility), apart from the Consultant's fee, even when
+     * the hospital collects both, so a blended "surgeon package" cannot hide a mark-up.
+     */
+    private void requireNoReservedFacility(UUID caseId){if(admissions.reservedFacility(caseId).isPresent())throw new ApiException(409,"FACILITY_LINE_REQUIRED","The hospital is reserved: the final quote needs the hospital's charges as a line of their own, apart from the Consultant's fee");}
     private boolean operationsCompleted(UUID versionId){return proposalQueries.operationsCompleted(versionId);}
     @Transactional public ProposalView releaseProposal(UUID caseId,UUID versionId){var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("PROPOSAL_PREPARATION","PROPOSAL_INTERNAL_APPROVAL"));ensureProposalBelongs(caseId,versionId);ProposalView view=proposal(versionId);if(!Set.of("CLINICALLY_APPROVED","OPERATIONS_COMPLETED","FINANCE_APPROVED").contains(view.status()))throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal is not ready for release");
         // Conditional internal gates: Operations only when a travel package was requested;
@@ -774,10 +785,11 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     @Transactional public ProposalView createFinalQuote(UUID caseId,FinalQuoteRequest request){
         var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));requireState(caseId,"ARRIVAL_CONFIRMED");
         if(!clinicalReviews.existsByIdAndCaseIdAndStatus(request.clinicalReviewId(),caseId,"APPROVED"))throw new ApiException(409,"CLINICAL_APPROVAL_REQUIRED","An approved final assessment is required");
-        record EstRow(String description,UUID catalogServiceId,BigDecimal priceEgp,BigDecimal priceEgpMin,BigDecimal priceEgpMax,boolean requiresFinance,UUID facilityPackageId){}
-        List<EstRow> items=costEstimates.findPricedLinesOf(request.clinicalReviewId()).stream().map(e->new EstRow(e.getServiceDescription(),e.getCatalogServiceId(),e.getPriceEgp(),e.getPriceEgpMin(),e.getPriceEgpMax(),Boolean.TRUE.equals(e.getRequiresFinanceApproval()),e.getFacilityPackageId())).toList();
+        record EstRow(String description,UUID catalogServiceId,BigDecimal priceEgp,BigDecimal priceEgpMin,BigDecimal priceEgpMax,boolean requiresFinance,UUID facilityPackageId,String payee){}
+        List<EstRow> items=costEstimates.findPricedLinesOf(request.clinicalReviewId()).stream().map(e->new EstRow(e.getServiceDescription(),e.getCatalogServiceId(),e.getPriceEgp(),e.getPriceEgpMin(),e.getPriceEgpMax(),Boolean.TRUE.equals(e.getRequiresFinanceApproval()),e.getFacilityPackageId(),payeeOf(lineSource(e.getCatalogServiceId(),e.getFacilityPackageId()),e.getPayee()))).toList();
         if(items.isEmpty())throw new ApiException(409,"CONSULTANT_COST_ESTIMATES_REQUIRED","The final assessment must include at least one service and cost");
         if(items.stream().anyMatch(i->i.priceEgp()==null))throw new ApiException(409,"CONSULTANT_PRICE_BASE_REQUIRED","Every service must carry an EGP base price");
+        if(items.stream().noneMatch(i->ProposalItem.FACILITY.equals(i.payee())))requireNoReservedFacility(caseId);
         boolean requiresFinance=false; // decided per line below (P0-5), after the margin source is known
         // Same rule as the preliminary estimate: the final quote inherits the currency the assessment was
         // prepared in unless the coordinator states a different one explicitly.
@@ -811,7 +823,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         proposalVersions.supersedeLiveFinalQuotes(proposalId,micros(now));
         String includedServices=items.stream().map(EstRow::description).collect(java.util.stream.Collectors.joining("; "));
         createVersion(new ProposalVersion.Document(proposalId,version,"FINAL_TREATMENT_QUOTE",scopeChangeReason,"en",request.clinicalReviewId()),versionId,new ProposalVersion.Terms(null,displayCurrency,includedServices,request.excludedServices(),request.paymentTerms(),request.refundTerms(),request.disclaimers(),request.coordinatorNotes(),request.validUntil()),new ProposalVersion.Pricing(requiresFinance,providerNet,policyId,policyVersion,marginRate,marginAmount,priced.patientMin(),priced.patientExpected(),priced.patientMax()),actor.subject(),now);
-        saveLines(versionId,items.stream().map(i->new PricedLine(i.description(),lineSource(i.catalogServiceId(),i.facilityPackageId()),i.catalogServiceId(),i.facilityPackageId())).toList(),providerLines,priced,rate);
+        saveLines(versionId,items.stream().map(i->new PricedLine(i.description(),lineSource(i.catalogServiceId(),i.facilityPackageId()),i.catalogServiceId(),i.facilityPackageId(),i.payee())).toList(),providerLines,priced,rate);
         if(aboveMaximum)proposalVersions.markAboveEstimateMaximum(versionId);
         proposalRecords.advanceTo(proposalId,version,micros(now));
         audit("FINAL_QUOTE_CREATED",actor,caseId,"ProposalVersion",versionId.toString(),"CREATE","SUCCESS",
@@ -822,6 +834,7 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
         if(!isFinalQuote(versionId))throw new ApiException(409,"NOT_A_FINAL_QUOTE","This version is not a final treatment quote");
         ProposalView view=proposal(versionId);if(!Set.of("CLINICALLY_APPROVED","FINANCE_APPROVED").contains(view.status()))throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Final quote is not ready for release");
         if(requiresFinanceApproval(versionId)&&!"FINANCE_APPROVED".equals(view.status()))throw new ApiException(409,"FINANCE_APPROVAL_REQUIRED","Finance must approve the manually-priced services before release");
+        if(view.items().stream().noneMatch(i->ProposalItem.FACILITY.equals(i.payee())))requireNoReservedFacility(caseId);
         Instant now=clock.instant();String snapCurrency=view.currency();BigDecimal fxRate;String fxSource;java.time.LocalDate fxDate=java.time.LocalDate.now(clock);
         // P1-10 (B-05): validity is fixed now: the policy's days from release, or the coordinator's earlier date; never later.
         Instant policyEnd=now.plus(Duration.ofDays(quoteValidityDays(caseId)));
@@ -1022,8 +1035,12 @@ public class JourneyService implements com.rehletshifaa.document.application.Cas
     private ProposalView proposal(UUID versionId){return proposalQueries.proposal(versionId);}
     /** The proposal's next version number, read under its row lock so concurrent drafts cannot share a number. */
     private int nextProposalVersion(UUID proposalId){return proposalRecords.lockById(proposalId).orElseThrow().getCurrentVersion()+1;}
-    private String renderProposal(ProposalView view){StringBuilder html=new StringBuilder("<article><h1>RehletShifaa Proposal v").append(view.versionNumber()).append("</h1><p>Status: released</p><ul>");for(ProposalItemView item:view.items())html.append("<li>").append(escape(item.description())).append(" — ").append(item.quantity().multiply(item.unitPrice())).append(' ').append(escape(view.currency())).append("</li>");return html.append("</ul><p>Proposal acceptance is not procedure-specific medical consent.</p></article>").toString();}
-    private String escape(String value){return value==null?"":value.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;");}
+    /** P1-19 (design §7.4): the released document names whose each line is (the fee line names itself) and, when it pays more than one party, each payee's total apart. */
+    private static final Map<String,String> PAYEE_WORDS=Map.of("CONSULTANT","the Consultant","FACILITY","the hospital","OTHER","others","PLATFORM","RehletShifaa");
+    static String renderProposal(ProposalView view){StringBuilder html=new StringBuilder("<article><h1>RehletShifaa Proposal v").append(view.versionNumber()).append("</h1><p>Status: released</p><ul>");for(ProposalItemView item:view.items()){html.append("<li>").append(escape(item.description())).append(" — ").append(item.quantity().multiply(item.unitPrice())).append(' ').append(escape(view.currency()));if(item.payee()!=null&&!"PLATFORM".equals(item.payee()))html.append(" (paid to ").append(PAYEE_WORDS.getOrDefault(item.payee(),escape(item.payee()))).append(')');html.append("</li>");}html.append("</ul>");
+        List<PayeeTotal> totals=view.payeeTotals()==null?List.of():view.payeeTotals();if(totals.stream().filter(t->!"PLATFORM".equals(t.payee())).count()>1){html.append("<h2>Who is paid</h2><ul>");for(PayeeTotal t:totals)html.append("<li>Paid to ").append(PAYEE_WORDS.getOrDefault(t.payee(),escape(t.payee()))).append(" — ").append(t.total()).append(' ').append(escape(view.currency())).append("</li>");html.append("</ul>");}
+        return html.append("<p>Proposal acceptance is not procedure-specific medical consent.</p></article>").toString();}
+    private static String escape(String value){return value==null?"":value.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;");}
     private void audit(String type,Actor actor,UUID caseId,String entity,String entityId,String action,String outcome,String reason){auditTrail.event(type).actor(actor.subject(), actor.label()).caseId(caseId).entity(entity, entityId).action(action).outcome(outcome).reason(reason).record();}
     /** The patient's own channel is proven: stamp it on the case's patient (row-locked). */
     private void markPatientChannelVerified(UUID caseId,String channel,Instant now){UUID patientId=cases.findPatientId(caseId).orElseThrow();var profile=patients.lockById(patientId).orElseThrow();profile.markChannelVerified(channel,now);patients.saveAndFlush(profile);}

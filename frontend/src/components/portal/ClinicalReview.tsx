@@ -7,7 +7,7 @@ import { fillTemplate } from "@/lib/portal-labels";
 import { CURRENCY_LABELS, type DirectoryFacility } from "@/components/portal/portal-model";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
-import { BASE, DecisionSummary, DisclosureChevron, EstimateLines, RecommendationFields, currencyName, land, useClinicalDecision, type CatalogService, type DecisionLine } from "@/components/portal/ClinicalDecision";
+import { BASE, DecisionSummary, DisclosureChevron, EstimateLines, RecommendationFields, currencyName, land, useClinicalDecision, type CatalogService, type DecisionLine, type PayeeWords } from "@/components/portal/ClinicalDecision";
 
 export type { CatalogService } from "@/components/portal/ClinicalDecision";
 export type FxRate = { currency: string; rate: number; rateDate: string; source: string };
@@ -27,9 +27,10 @@ type Outcome = (typeof OUTCOMES)[number];
  * itself; the exceptional outcomes stay behind a single disclosure and are confirmed in a dialog before they are sent.
  * The form is seeded once from the draft: the case view is mounted per case, and a saved draft is what was just typed.
  */
-export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, facilities = [], documentsOnFile, draft, mutate }: {
+export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, facilities = [], documentsOnFile, draft, mutate, payees }: {
   locale: Locale; caseId: string; busy: boolean; catalog: CatalogService[]; fxRates: FxRate[]; /** P0-5: active facilities with Finance-approved packages. */ facilities?: DirectoryFacility[];
   /** How many documents are on file (the evidence above lists them). */ documentsOnFile: number; draft?: ReviewDraft; mutate: Mutate;
+  /** P1-19: the "Paid to" words for an off-list line (`portalProposal.price.payees`). */ payees: PayeeWords;
 }) {
   const copy = useWorkCopy().clinicalDecision;
   const id = useId();
@@ -79,7 +80,7 @@ export function ClinicalReviewPanel({ locale, caseId, busy, catalog, fxRates, fa
 
       <RecommendationFields decision={decision} hint={copy.recommendation.hint}/>
 
-      <EstimateLines locale={locale} decision={decision}>
+      <EstimateLines locale={locale} decision={decision} payees={payees}>
         <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-1">
           <label className="block text-[0.875rem] font-bold text-ink-800">{copy.lines.currency}
             <select className="field mt-1 block w-auto" value={proposalCurrency} onChange={event => setProposalCurrency(event.target.value)}

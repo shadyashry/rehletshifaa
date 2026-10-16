@@ -93,10 +93,15 @@ public final class JourneyDtos {
     // quotedCost/quotedCurrency are read-side only: the same line expressed in the recommendation's proposal
     // currency at today's effective rate (null when no rate is available — never a silent base-currency stand-in).
         /** {@code facilityPackageId} (P0-5): a Finance-approved facility package as the price source; the EGP figure must sit inside its range. */
-    public record CostEstimateItem(@NotBlank @Size(max=500)String serviceDescription,@NotNull @DecimalMin("0.00")BigDecimal estimatedCost,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency,UUID catalogServiceId,BigDecimal quotedCost,String quotedCurrency,UUID facilityPackageId) {
-        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency){this(serviceDescription,estimatedCost,currency,null,null,null,null);}
-        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency,UUID catalogServiceId){this(serviceDescription,estimatedCost,currency,catalogServiceId,null,null,null);}
-        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency,UUID catalogServiceId,BigDecimal quotedCost,String quotedCurrency){this(serviceDescription,estimatedCost,currency,catalogServiceId,quotedCost,quotedCurrency,null);}
+    /**
+     * P1-19 (design §7.4): {@code payee} says who is paid for the line: CONSULTANT, FACILITY or OTHER (an implant supplier, a laboratory).
+     * A catalogue line is the Consultant's and a facility package line the facility's whatever is sent; a manual line without one is OTHER.
+     */
+    public record CostEstimateItem(@NotBlank @Size(max=500)String serviceDescription,@NotNull @DecimalMin("0.00")BigDecimal estimatedCost,@NotBlank @Pattern(regexp="[A-Z]{3}")String currency,UUID catalogServiceId,BigDecimal quotedCost,String quotedCurrency,UUID facilityPackageId,@Pattern(regexp="CONSULTANT|FACILITY|OTHER")String payee) {
+        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency){this(serviceDescription,estimatedCost,currency,null,null,null,null,null);}
+        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency,UUID catalogServiceId){this(serviceDescription,estimatedCost,currency,catalogServiceId,null,null,null,null);}
+        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency,UUID catalogServiceId,BigDecimal quotedCost,String quotedCurrency){this(serviceDescription,estimatedCost,currency,catalogServiceId,quotedCost,quotedCurrency,null,null);}
+        public CostEstimateItem(String serviceDescription,BigDecimal estimatedCost,String currency,UUID catalogServiceId,BigDecimal quotedCost,String quotedCurrency,UUID facilityPackageId){this(serviceDescription,estimatedCost,currency,catalogServiceId,quotedCost,quotedCurrency,facilityPackageId,null);}
     }
     // proposalCurrency is the currency the consultant prepares the recommendation in; it becomes the
     // patient proposal's currency downstream. Null means "unstated" and leaves the base currency in place.
@@ -105,7 +110,7 @@ public final class JourneyDtos {
     }
     // Patient-facing proposal view. Never exposes provider net cost, margin rate, or profit. fxRateDate is the day of the
     // exchange rate frozen on the version at release (null until the version is released), so the patient can be told which rate applies.
-    public record PublicProposalView(String caseNumber,String patientName,String documentType,int versionNumber,String currency,List<ProposalItemView>items,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax,String assumptions,String includedServices,String excludedServices,String scopeChangeReason,String paymentTerms,String refundTerms,String disclaimers,Instant validUntil,boolean decided,String decisionState,String recommendedTreatment,String risksAndLimitations,String notes,BigDecimal depositDueDisplay,BigDecimal depositPaidDisplay,String consultantName,java.time.LocalDate fxRateDate,ProposalAssistanceView assistance,Instant acceptableFrom,String fxReapprovalStatus,Instant releasedAt) {}
+    public record PublicProposalView(String caseNumber,String patientName,String documentType,int versionNumber,String currency,List<ProposalItemView>items,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax,String assumptions,String includedServices,String excludedServices,String scopeChangeReason,String paymentTerms,String refundTerms,String disclaimers,Instant validUntil,boolean decided,String decisionState,String recommendedTreatment,String risksAndLimitations,String notes,BigDecimal depositDueDisplay,BigDecimal depositPaidDisplay,String consultantName,java.time.LocalDate fxRateDate,ProposalAssistanceView assistance,Instant acceptableFrom,String fxReapprovalStatus,Instant releasedAt,List<PayeeTotal> payeeTotals) {}
     // channel is the currently-selected/default OTP channel; whatsappHint/emailHint are non-null only when
     // that channel is on file for the patient, so the UI can offer a switch without leaking real contacts.
     public record PublicProposalSummary(String caseNumber,String channel,String destinationHint,String whatsappHint,String emailHint) {}
@@ -135,10 +140,13 @@ public final class JourneyDtos {
     public record AssignmentHistoryEntry(String role,String assigneeName,String status,Instant assignedAt,Instant endedAt,String assignedByKind,String assignedByName,String reason) {}
     // totalMin/totalExpected/totalMax (UX 1c-0) are set only on the patient's own view: the same figures as PublicProposalView, in the
     // proposal currency at the rate frozen at release. Staff views leave them null (a Consultant's view has the fee line removed).
-    public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason,ProposalAssistanceView assistance,Instant acceptableFrom,String fxReapprovalStatus,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax) {
-        public ProposalView withTotals(BigDecimal min,BigDecimal expected,BigDecimal max){return new ProposalView(proposalId,versionId,versionNumber,status,language,currency,validUntil,operationalPlan,includedServices,excludedServices,paymentTerms,refundTerms,disclaimers,items,coordinatorNotes,documentType,scopeChangeReason,assistance,acceptableFrom,fxReapprovalStatus,min,expected,max);}
+    public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason,ProposalAssistanceView assistance,Instant acceptableFrom,String fxReapprovalStatus,List<PayeeTotal> payeeTotals,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax) {
+        public ProposalView withTotals(BigDecimal min,BigDecimal expected,BigDecimal max){return new ProposalView(proposalId,versionId,versionNumber,status,language,currency,validUntil,operationalPlan,includedServices,excludedServices,paymentTerms,refundTerms,disclaimers,items,coordinatorNotes,documentType,scopeChangeReason,assistance,acceptableFrom,fxReapprovalStatus,payeeTotals,min,expected,max);}
     }
-    public record ProposalItemView(UUID id,String category,String description,BigDecimal quantity,BigDecimal unitPrice,boolean optional) {}
+    /** P1-19 (design §7.4): who is paid for the line: CONSULTANT, FACILITY, OTHER, or PLATFORM (the fee line). */
+    public record ProposalItemView(UUID id,String category,String description,BigDecimal quantity,BigDecimal unitPrice,boolean optional,String payee) {}
+    /** The sum of one payee's mandatory lines as shown (P1-19: the Consultant and the hospital apart, never blended), payees in document order. */
+    public record PayeeTotal(String payee,BigDecimal total) {}
     /**
      * QA #19 (A4): what Finance approves, line by line — whether the price comes from the Consultant's approved list (CATALOG) or was
      * entered by them (MANUAL), the Consultant's EGP base price, the patient's EGP price (margin included) and the price in the

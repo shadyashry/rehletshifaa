@@ -24,7 +24,7 @@ import type { WorkItem } from "@/components/portal/MyWork";
 import { patientStepText } from "@/components/portal/patient-step";
 import { FinanceApproval } from "@/components/portal/FinanceApproval";
 import { FxReapproval } from "@/components/portal/FxReapproval";
-import type { PriceCopy } from "@/components/PriceTransparency";
+import { PayeeNote, PayeeTotals, payeesSplit, type PriceCopy } from "@/components/PriceTransparency";
 import { isPlatformFee, QUOTE_VALIDITY_TOO_LONG, SCOPE_CHANGE_REASON_REQUIRED } from "@/lib/price-transparency";
 import type { CareView, PatientProposalState } from "@/components/portal/MyCare";
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
@@ -155,7 +155,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  // A second-opinion consultant reads the case and gives an opinion; the clinical decision stays with the primary consultant.
  const secondOpinionOnly=isDoctor&&current.workType==="SECOND_OPINION";
  const clinicalReviewPanel=isDoctor&&c.status==="CONSULTANT_REVIEW"&&!secondOpinionOnly
-  ?<ClinicalReviewPanel locale={locale} caseId={c.id} busy={busy} catalog={catalog} fxRates={fxRates} facilities={facilities} documentsOnFile={documents.length}
+  ?<ClinicalReviewPanel locale={locale} caseId={c.id} busy={busy} catalog={catalog} fxRates={fxRates} facilities={facilities} documentsOnFile={documents.length} payees={proposalCopy.price.payees}
      draft={reviewDraft&&{id:reviewDraft.id,recommendedTreatment:reviewDraft.recommendedTreatment,risksAndLimitations:reviewDraft.risksAndLimitations,costEstimates:reviewDraft.costEstimates,proposalCurrency:reviewDraft.proposalCurrency}}
      mutate={mutate}/>
   :null;
@@ -648,7 +648,7 @@ function ProposalSendForm({estimate,onSend}:{estimate:Review;onSend:(caseId:stri
  * at today's rate; a refusal is said at its control; nothing is cleared when a save fails (there is no draft endpoint: G-2).
  */
 export function FinalAssessment({seed=null,savedAt=null,documentsOnFile=0}:{seed?:Review|null;savedAt?:string|null;documentsOnFile?:number}){
- const {locale,c:{id:caseId},busy,mutate,catalog,fxRates,facilities}=useCaseWorkspace();const copy=useWorkCopy().clinicalDecision;
+ const {locale,c:{id:caseId},busy,mutate,catalog,fxRates,facilities,price}=useCaseWorkspace();const copy=useWorkCopy().clinicalDecision;
  const decision=useClinicalDecision({seed,catalog,facilities});
  // The currency the patient's final quote is prepared in: the preliminary estimate's, carried by the backend (the coordinator may choose another).
  const currency=seed?.proposalCurrency??null;
@@ -660,7 +660,7 @@ export function FinalAssessment({seed=null,savedAt=null,documentsOnFile=0}:{seed
   <h3 id="final-assessment-title" className="text-[1.125rem] font-bold leading-7 text-brand-900">{copy.final.title}</h3>
   <p className="mt-1 max-w-[65ch] text-[0.9375rem] leading-6 text-ink-600">{copy.final.intro}</p>
   <RecommendationFields decision={decision} hint={copy.recommendation.finalHint}/>
-  <EstimateLines locale={locale} decision={decision}>
+  <EstimateLines locale={locale} decision={decision} payees={price.payees}>
    <p className="mt-2 max-w-[65ch] text-[0.875rem] leading-6 text-ink-700">{currency?fillTemplate(copy.lines.finalCurrency,{currency:currencyName(currency,locale)}):copy.lines.finalCurrencyNone}</p>
   </EstimateLines>
   <DecisionSummary locale={locale} title={copy.summary.titleFinal} decision={decision} documentsOnFile={documentsOnFile} proposal={proposal}>
@@ -765,7 +765,7 @@ export function RoleActions({role,t,c,proposal,gates,availableActions,mutate,app
  return null;
 }
 
-function ProposalCard({proposal}:{proposal:Proposal}){const work=useWorkCopy();const cv=work.caseView;const {locale,t,price}=useCaseWorkspace();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="border-y border-line py-4"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong><bdi dir="ltr">{money(total,proposal.currency,locale)}</bdi></strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{isPlatformFee(item)?price.feeLabel:item.description}{item.quantity>1?` × ${new Intl.NumberFormat(intlLocale(locale)).format(item.quantity)}`:""}{item.optional?` ${cv.optional}`:""}</span><strong className="whitespace-nowrap"><bdi dir="ltr">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</bdi></strong></li>)}</ul>{proposal.fxReapprovalStatus==="PENDING"&&<p role="status" className="mt-3 text-sm font-semibold text-status-warning-fg">{price.staff.fxPending}</p>}{proposal.acceptableFrom&&<p className="mt-3 text-sm text-ink-700">{fillTemplate(price.staff.cooling,{time:new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(proposal.acceptableFrom))})}</p>}{proposal.coordinatorNotes&&<div className="mt-3 border-t border-line pt-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{fillTemplate(cv.validUntil,{date:new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))})}</p>}</div>}
+function ProposalCard({proposal}:{proposal:Proposal}){const work=useWorkCopy();const cv=work.caseView;const {locale,t,price}=useCaseWorkspace();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="border-y border-line py-4"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong><bdi dir="ltr">{money(total,proposal.currency,locale)}</bdi></strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{isPlatformFee(item)?price.feeLabel:item.description}{item.quantity>1?` × ${new Intl.NumberFormat(intlLocale(locale)).format(item.quantity)}`:""}{item.optional?` ${cv.optional}`:""}<PayeeNote copy={price} payee={item.payee} split={payeesSplit(proposal.payeeTotals)}/></span><strong className="whitespace-nowrap"><bdi dir="ltr">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</bdi></strong></li>)}</ul><PayeeTotals copy={price} totals={proposal.payeeTotals} headingId={`payees-${proposal.versionId}`} className="mt-3" format={amount=>money(amount,proposal.currency,locale)}/>{proposal.fxReapprovalStatus==="PENDING"&&<p role="status" className="mt-3 text-sm font-semibold text-status-warning-fg">{price.staff.fxPending}</p>}{proposal.acceptableFrom&&<p className="mt-3 text-sm text-ink-700">{fillTemplate(price.staff.cooling,{time:new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(proposal.acceptableFrom))})}</p>}{proposal.coordinatorNotes&&<div className="mt-3 border-t border-line pt-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{fillTemplate(cv.validUntil,{date:new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))})}</p>}</div>}
 
 /** A business label from the messages files (`portalWork.caseView`), with the code itself as the fallback for a new one. */
 const label=(table:Record<string,string>,key:string)=>Object.hasOwn(table,key)?table[key]:key;

@@ -36,7 +36,11 @@ public final class SafetyDtos {
     // ---- incidents (A-06) ----
 
     /** The patient (or their representative) raises a concern from My Care: a complaint, or a health problem after treatment. */
-    public record ConcernRequest(@NotBlank @Pattern(regexp = "COMPLAINT|ADVERSE_EVENT") String type,
+    /**
+     * The patient's concern: a complaint about the service, a health problem after treatment, or (P1-19, design §7.9) a DISPUTE about
+     * money, such as a charge that is not on the quote or a payment asked for outside it.
+     */
+    public record ConcernRequest(@NotBlank @Pattern(regexp = "COMPLAINT|DISPUTE|ADVERSE_EVENT") String type,
                                  @NotBlank @Size(max = 2000) String summary) {}
 
     /** What the patient sees of their own concern: that it is received and where it stands, nothing internal. */

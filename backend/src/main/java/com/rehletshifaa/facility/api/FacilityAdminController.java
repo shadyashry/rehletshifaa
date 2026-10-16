@@ -1,5 +1,6 @@
 package com.rehletshifaa.facility.api;
 
+import com.rehletshifaa.facility.api.FacilityDtos.LiftSuspensionRequest;
 import com.rehletshifaa.facility.api.FacilityDtos.AccreditationRequest;
 import com.rehletshifaa.facility.api.FacilityDtos.CareAreaView;
 import com.rehletshifaa.facility.api.FacilityDtos.DecisionRequest;
@@ -38,6 +39,8 @@ public class FacilityAdminController {
     @PutMapping("/{facilityId}/status") public FacilityView status(@PathVariable UUID facilityId, @Valid @RequestBody FacilityStatusRequest request) { return catalog.setStatus(facilityId, request); }
     @PostMapping("/{facilityId}/accreditations") public FacilityView recordAccreditation(@PathVariable UUID facilityId, @Valid @RequestBody AccreditationRequest request) { return catalog.recordAccreditation(facilityId, request); }
     @PostMapping("/{facilityId}/accreditations/{accreditationId}/withdraw") public FacilityView withdrawAccreditation(@PathVariable UUID facilityId, @PathVariable UUID accreditationId) { return catalog.withdrawAccreditation(facilityId, accreditationId); }
+    /** P1-19: a Finance Manager lifts the package suspension after the review (fresh sign-in). */
+    @PostMapping("/{facilityId}/package-suspension/lift") public FacilityView liftSuspension(@PathVariable UUID facilityId, @Valid @RequestBody LiftSuspensionRequest request) { return catalog.liftPackageSuspension(facilityId, request); }
     @PostMapping("/{facilityId}/packages") public PackageView propose(@PathVariable UUID facilityId, @Valid @RequestBody PackageRequest request) { return catalog.propose(facilityId, request); }
     @PostMapping("/{facilityId}/packages/{packageId}/approve") public PackageView approve(@PathVariable UUID facilityId, @PathVariable UUID packageId, @RequestBody(required = false) @Valid DecisionRequest request) { return catalog.approve(facilityId, packageId, request); }
     @PostMapping("/{facilityId}/packages/{packageId}/reject") public PackageView reject(@PathVariable UUID facilityId, @PathVariable UUID packageId, @RequestBody(required = false) @Valid DecisionRequest request) { return catalog.reject(facilityId, packageId, request); }

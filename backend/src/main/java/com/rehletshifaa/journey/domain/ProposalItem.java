@@ -14,6 +14,8 @@ import java.util.UUID;
 public class ProposalItem extends AssignedIdEntity {
     public static final String MEDICAL = "MEDICAL";
     public static final String PLATFORM_FEE = "PLATFORM_FEE";
+    /** Payees (P1-19, design §7.4). */
+    public static final String CONSULTANT = "CONSULTANT", FACILITY = "FACILITY", OTHER = "OTHER", PLATFORM = "PLATFORM";
     @Column(name = "proposal_version_id", nullable = false) private UUID proposalVersionId;
     @Column(nullable = false, length = 40) private String category;
     @Column(nullable = false, length = 500) private String description;
@@ -30,6 +32,8 @@ public class ProposalItem extends AssignedIdEntity {
     @Column(name = "unit_price_max_egp") private BigDecimal unitPriceMaxEgp;
     @Column(name = "item_assumptions", columnDefinition = "text") private String itemAssumptions;
     @Column(nullable = false) private boolean conditional;
+    /** P1-19 (design §7.4): CONSULTANT, FACILITY, OTHER, or PLATFORM for the fee line; a facility package line is the facility's. */
+    @Column(nullable = false, length = 20) private String payee;
 
     protected ProposalItem() {}
 
@@ -50,6 +54,7 @@ public class ProposalItem extends AssignedIdEntity {
         i.unitPrice = displayUnitPrice; i.sortOrder = sortOrder; i.source = source; i.unitPriceEgp = prices.unitPriceEgp();
         i.providerPriceEgp = prices.providerPriceEgp(); i.unitPriceMinEgp = prices.unitPriceMinEgp(); i.unitPriceMaxEgp = prices.unitPriceMaxEgp();
         i.catalogServiceId = catalogServiceId; i.facilityPackageId = facilityPackageId;
+        i.payee = facilityPackageId != null ? FACILITY : catalogServiceId != null ? CONSULTANT : OTHER;
         return i;
     }
 
@@ -62,7 +67,7 @@ public class ProposalItem extends AssignedIdEntity {
         ProposalItem i = new ProposalItem(UUID.randomUUID());
         i.proposalVersionId = proposalVersionId; i.category = PLATFORM_FEE; i.description = description; i.quantity = BigDecimal.ONE;
         i.unitPrice = displayUnitPrice; i.sortOrder = sortOrder; i.source = "PLATFORM"; i.unitPriceEgp = feeEgp;
-        i.providerPriceEgp = BigDecimal.ZERO; i.unitPriceMinEgp = feeMinEgp; i.unitPriceMaxEgp = feeMaxEgp;
+        i.providerPriceEgp = BigDecimal.ZERO; i.unitPriceMinEgp = feeMinEgp; i.unitPriceMaxEgp = feeMaxEgp; i.payee = PLATFORM;
         return i;
     }
 
@@ -70,6 +75,17 @@ public class ProposalItem extends AssignedIdEntity {
     public void priceAt(BigDecimal displayPerEgp) {
         if (unitPriceEgp != null) unitPrice = unitPriceEgp.multiply(displayPerEgp).setScale(2, java.math.RoundingMode.HALF_UP);
     }
+
+    /**
+     * A manual medical line names its payee (the Consultant's own fee, a hospital charge outside a package, or someone else); a package
+     * line stays the facility's and a catalogue line the Consultant's.
+     */
+    public ProposalItem payee(String explicit) {
+        if (explicit != null && MEDICAL.equals(category) && facilityPackageId == null && catalogServiceId == null) payee = explicit;
+        return this;
+    }
+
+    public String getPayee() { return payee; }
 
     private ProposalItem(UUID id) { super(id); }
 }

@@ -44,7 +44,7 @@ class ConsultantOperationsOwnershipIntegrationTest {
                         + "VALUES(?,?,'Consultant','Consultant','UNDER_REVIEW','CONSULTANT','AVAILABLE',?,?,0)",
                 consultant, "consultant-owner-test", now, now);
         jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,'LICENSE','UNDER_REVIEW',?,?)",
-                credential, consultant, now.plusSeconds(86400), now);
+                credential, consultant, now.plusSeconds(86400), now); com.rehletshifaa.clinic.ClinicTestData.declareAll(jdbc);
         grant("operations-owner-a", Role.CONSULTANT_OPERATIONS_MANAGER, Role.CREDENTIAL_VERIFIER);
         grant("operations-owner-b", Role.CONSULTANT_OPERATIONS_MANAGER, Role.CREDENTIAL_VERIFIER);
         grant("independent-reviewer", Role.CREDENTIAL_VERIFIER);
@@ -58,6 +58,8 @@ class ConsultantOperationsOwnershipIntegrationTest {
         jdbc.update("DELETE FROM consultant_operations_ownerships WHERE practitioner_id=?", consultant);
         jdbc.update("DELETE FROM consultant_capabilities WHERE practitioner_id=?", consultant);
         jdbc.update("DELETE FROM practitioner_credentials WHERE practitioner_id=?", consultant);
+        jdbc.update("DELETE FROM consultant_affiliations WHERE practitioner_id=?", consultant);
+        jdbc.update("DELETE FROM affiliation_declarations WHERE practitioner_id=?", consultant);
         jdbc.update("DELETE FROM practitioner_profiles WHERE id=?", consultant);
     }
 

@@ -4,7 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useContext, useId, useRef, useState, type ReactNode } from "react";
 
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
-import { ACCEPTANCE_HOLD_ID, AcceptanceHold, ScopeChangeNotice } from "@/components/PriceTransparency";
+import { ACCEPTANCE_HOLD_ID, AcceptanceHold, PayeeNote, PayeeTotals, ScopeChangeNotice, payeesSplit, type PayeeTotal } from "@/components/PriceTransparency";
 import { FeedbackContext } from "@/components/portal/portal-ui";
 import { FIELD_HANDLED_CODES, finalQuoteState, isPlatformFee, useNow } from "@/lib/price-transparency";
 import { ARABIC_PENDING_NOTICE, ARABIC_TERMS_APPROVED, finalQuoteTerms } from "@/lib/commercial-terms";
@@ -15,7 +15,7 @@ import { intlLocale, type Locale } from "@/lib/i18n";
 
 export type ProposalCopy = Dictionary["portalProposal"];
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
-type Item = { id: string; category?: string; description: string; quantity: number; unitPrice: number; optional: boolean };
+type Item = { id: string; category?: string; description: string; quantity: number; unitPrice: number; optional: boolean; payee?: string | null };
 /** The assisted-decision facts the backend keeps per version (Arabic terms path); absent when there are none. */
 export type ProposalAssistance = {
   requestedAt?: string | null; decisionSource?: string | null; recordedByName?: string | null; channel?: string | null;
@@ -30,6 +30,8 @@ export type PatientProposalData = {
   acceptableFrom?: string | null;
   /** Finance is checking the exchange rate before this final quote can be accepted: null | PENDING | CONFIRMED. */
   fxReapprovalStatus?: string | null;
+  /** P1-19: each payee's total, so the Consultant's fee and the hospital's charges read apart. */
+  payeeTotals?: PayeeTotal[] | null;
 };
 
 const longDate = (iso: string, locale: Locale) => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(iso));
@@ -87,6 +89,7 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
   // Cooling period or Finance's rate check, from the version's facts or from a decision the server just refused.
   const refusedHere = feedback.errorPath?.includes(proposal.versionId) ? feedback.errorCode : null;
   const hold = finalQuoteState(proposal, useNow(proposal.acceptableFrom), refusedHere);
+  const split = payeesSplit(proposal.payeeTotals);
 
   return (
     <div className="space-y-6">
@@ -120,7 +123,7 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
           {proposal.items.map((item) => (
             <li key={item.id} className="flex items-baseline justify-between gap-4 py-3 text-[0.9375rem]">
               <span className="min-w-0 break-words text-ink-800">
-                {isPlatformFee(item) ? <><span>{price.feeLabel}</span><span className="block text-[0.875rem] leading-5 text-ink-600">{price.feeNote}</span></> : <bdi>{item.description}</bdi>}
+                {isPlatformFee(item) ? <><span>{price.feeLabel}</span><span className="block text-[0.875rem] leading-5 text-ink-600">{price.feeNote}</span></> : <><bdi>{item.description}</bdi><PayeeNote copy={price} payee={item.payee} split={split} /></>}
                 {item.quantity > 1 && <span className="text-ink-500"> {fill(copy.quantity, { count: item.quantity })}</span>}
                 {item.optional && <span className="text-ink-500"> ({copy.optional})</span>}
               </span>
@@ -131,6 +134,8 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
         {/* Priced but not in the total, and not something to tick here: say so, and who can add one. */}
         {hasOptional && <p className="mt-2 max-w-[60ch] text-[0.875rem] leading-6 text-ink-600">{copy.optionalNote}</p>}
       </section>
+
+      <PayeeTotals copy={price} totals={proposal.payeeTotals} headingId="proposal-payees-title" format={(amount) => formatMoney(amount, proposal.currency, locale)} />
 
       {/* The promise sits beside the estimate's range it protects; a final quote is already past it. */}
       {!quote && (

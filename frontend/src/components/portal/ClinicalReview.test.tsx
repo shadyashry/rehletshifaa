@@ -10,6 +10,7 @@ beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new Event("close")); };
 });
+import { getDictionary } from "@/lib/dictionary";
 
 const catalog: CatalogService[] = [
   { id: "svc-1", serviceCode: "PACE-DUAL", serviceName: "Dual-chamber pacemaker implant", category: "Procedure", priceEgp: 390000, active: true },
@@ -20,7 +21,7 @@ const fxRates: FxRate[] = [{ currency: "USD", rate: 0.0207, rateDate: "2026-09-1
 function setup(overrides: Partial<Parameters<typeof ClinicalReviewPanel>[0]> = {}) {
   const mutate = vi.fn().mockResolvedValue({ status: "SAVED" });
   renderWithWork(<ClinicalReviewPanel locale="en" caseId="case-1" busy={false} catalog={catalog} fxRates={fxRates}
-                                      documentsOnFile={2} mutate={mutate} {...overrides}/>);
+                                      documentsOnFile={2} mutate={mutate} payees={getDictionary("en").portalProposal.price.payees} {...overrides}/>);
   return { mutate };
 }
 const recommendationField = () => screen.getByLabelText("Clinical recommendation") as HTMLTextAreaElement;
@@ -113,17 +114,21 @@ describe("ClinicalReviewPanel", () => {
     fireEvent.change(recommendationField(), { target: { value: "Lead extraction" } });
     fireEvent.change(screen.getByLabelText("Service"), { target: { value: "Bespoke lead extraction" } });
     fireEvent.change(screen.getByLabelText("Estimated amount (EGP)"), { target: { value: "50000" } });
+    // P1-19: an off-list line says whose it is (default: someone else).
+    expect((screen.getByLabelText("Paid to") as HTMLSelectElement).value).toBe("OTHER");
+    fireEvent.change(screen.getByLabelText("Paid to"), { target: { value: "FACILITY" } });
     fireEvent.click(screen.getByRole("button", { name: "Add line" }));
 
     expect(screen.getByText("Needs Finance approval")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove Bespoke lead extraction" })).toBeTruthy();
+    expect(screen.getByText("Paid to: The hospital")).toBeTruthy();
     // QA #8: the summary never calls an off-list amount "approved".
     // Nothing picked from the approved list: no "EGP 0" line.
     expect(within(screen.getByRole("region", { name: "Before you send" })).queryByText("Your approved list")).toBeNull();
     expect(summaryValue("Outside your list, needs Finance")).toMatch(/50,000/);
     fireEvent.click(screen.getByRole("button", { name: "Submit recommendation" }));
     expect(mutate).toHaveBeenCalledWith("/doctor/cases/case-1/review-decision", expect.objectContaining({
-      costEstimates: [{ serviceDescription: "Bespoke lead extraction", estimatedCost: 50000, currency: "EGP" }],
+      costEstimates: [{ serviceDescription: "Bespoke lead extraction", estimatedCost: 50000, currency: "EGP", payee: "FACILITY" }],
     }));
   });
 
@@ -210,7 +215,7 @@ describe("ClinicalReviewPanel", () => {
     const mutate = vi.fn().mockResolvedValue({ status: "SAVED" });
     const draft = { id: "draft-1", recommendedTreatment: "Pacemaker implantation",
       costEstimates: [{ serviceDescription: "Dual-chamber pacemaker implant", estimatedCost: 390000, currency: "EGP", catalogServiceId: "svc-1" }] };
-    const panel = (list: CatalogService[]) => <ClinicalReviewPanel locale="en" caseId="case-1" busy={false} catalog={list} fxRates={fxRates} documentsOnFile={0} draft={draft} mutate={mutate}/>;
+    const panel = (list: CatalogService[]) => <ClinicalReviewPanel locale="en" caseId="case-1" busy={false} catalog={list} fxRates={fxRates} documentsOnFile={0} draft={draft} mutate={mutate} payees={getDictionary("en").portalProposal.price.payees}/>;
     const { rerender } = renderWithWork(panel([]));
     rerender(panel(catalog));
     expect(screen.getByRole("checkbox", { name: /Dual-chamber pacemaker implant/ })).toHaveProperty("checked", true);

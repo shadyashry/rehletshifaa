@@ -16,10 +16,10 @@ import { OneTimeCodeStep } from "@/components/OneTimeCodeStep";
 import { fillTemplate, plural } from "@/lib/portal-labels";
 import { formatMoney } from "@/lib/money";
 import { scrollIntoView } from "@/lib/scroll";
-import { ACCEPTANCE_HOLD_ID, AcceptanceHold, HowYourPriceWorks, ScopeChangeNotice } from "@/components/PriceTransparency";
+import { ACCEPTANCE_HOLD_ID, AcceptanceHold, HowYourPriceWorks, PayeeNote, PayeeTotals, ScopeChangeNotice, payeesSplit, type PayeeTotal } from "@/components/PriceTransparency";
 import { COOLING_PERIOD, FX_REAPPROVAL_REQUIRED, finalQuoteState, isPlatformFee, useNow } from "@/lib/price-transparency";
 
-type Item = { id: string; category: string; description: string; quantity: number; unitPrice: number; optional: boolean };
+type Item = { id: string; category: string; description: string; quantity: number; unitPrice: number; optional: boolean; payee?: string | null };
 type Summary = { caseNumber: string; channel: string; destinationHint: string; whatsappHint?: string | null; emailHint?: string | null };
 type Proposal = {
   caseNumber: string; patientName: string; documentType?: string; versionNumber?: number; currency?: string;
@@ -39,6 +39,8 @@ type Proposal = {
   acceptableFrom?: string | null;
   /** Finance is checking the exchange rate before this final quote can be accepted: null | PENDING | CONFIRMED. */
   fxReapprovalStatus?: string | null;
+  /** P1-19: each payee's total (the Consultant's fee and the hospital's charges apart), in document order. */
+  payeeTotals?: PayeeTotal[] | null;
 };
 type Decision = "ACCEPTED" | "ACKNOWLEDGED" | "DECLINED" | "REVISION_REQUESTED";
 /** Terminal states the patient cannot act out of; each gets its own honest explanation, never a raw error. */
@@ -463,7 +465,7 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                       <ul>
                         {group.rows.map((item) => (
                           <li key={item.id} className="flex items-baseline justify-between gap-6 border-b border-line py-3 last:border-0">
-                            <span dir="auto" className="min-w-0 text-[0.9375rem] leading-6 text-ink-800">{item.description}</span>
+                            <span className="min-w-0 text-[0.9375rem] leading-6 text-ink-800"><bdi dir="auto">{item.description}</bdi><PayeeNote copy={price} payee={item.payee} split={payeesSplit(proposal.payeeTotals)} /></span>
                             <span className="flex-none whitespace-nowrap text-[0.9375rem] font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(item.quantity * item.unitPrice)}</bdi></span>
                           </li>
                         ))}
@@ -486,6 +488,7 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                   <EstimateRangeBar className="mt-3 border-t border-line-strong pt-4" items={items} expected={expected} min={proposal.totalMin} max={proposal.totalMax}
                                     deposit={depositDue ? proposal.depositDueDisplay : null} kind={isFinal ? "quote" : "estimate"}
                                     currency={currency} locale={locale} copy={copy.estimateBar}/>
+                  <PayeeTotals copy={price} totals={proposal.payeeTotals} headingId="payees-heading" className="mt-6" format={(amount) => money(amount)} />
                 </section>
 
                 {!isFinal && <div className="mt-8"><HowYourPriceWorks copy={price} headingId="how-price-works" /></div>}

@@ -102,6 +102,8 @@ const credentialTypes: Record<string, [string, string]> = {
   // The seeded credential policy (V34) codes.
   IDENTITY_EVIDENCE: ["Identity or professional evidence", "إثبات الهوية أو الصفة المهنية"], QUALIFICATION: ["Professional qualification", "المؤهل المهني"],
   CONSULTANT_STATUS_EVIDENCE: ["Consultant status evidence", "إثبات صفة الاستشاري"],
+  // D-I (P1-19): the medical liability fund subscription, a Consultant credential.
+  LIABILITY_FUND_SUBSCRIPTION: ["Medical liability fund subscription", "الاشتراك في صندوق المسؤولية الطبية"],
 };
 export const credentialTypeLabel = (key: string, locale: Locale) => credentialTypes[key]?.[locale === "ar" ? 1 : 0] ?? readable(key);
 

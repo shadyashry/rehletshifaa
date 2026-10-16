@@ -40,7 +40,27 @@ export type Clinic = {
 };
 export type ClinicAuditEntry = { event: string; action: string; actorName?: string | null; actorRole: string; detail?: string | null; occurredAt: string };
 
-export const SERVICE_KINDS = ["INITIAL_CASE_REVIEW", "VIDEO_CONSULTATION", "IN_PERSON_CONSULTATION", "FOLLOW_UP_CONSULTATION", "PROFESSIONAL_FEE", "OTHER_PROFESSIONAL_SERVICE"] as const;
+/**
+ * P1-19 (D-H): the Consultant's yearly affiliation declaration. The review fields are null for the Consultant (only Compliance and
+ * Consultant Operations see the review); without a current declaration the Consultant receives no new case.
+ */
+export const AFFILIATION_KINDS = ["PRIVILEGES", "EMPLOYMENT", "FINANCIAL_INTEREST", "NONE_DECLARED"] as const;
+export type AffiliationKind = (typeof AFFILIATION_KINDS)[number];
+export type AffiliationLine = { facilityId: string; facilityName?: string | null; kind: string; note?: string | null };
+export type Declaration = {
+  id: string; practitionerId: string; consultantName?: string | null; declaredAt: string; validUntil: string; current: boolean; supersededAt?: string | null;
+  attestationVersion: string; reviewStatus?: string | null; reviewedAt?: string | null; reviewNote?: string | null; lines: AffiliationLine[];
+};
+export type AffiliationFlag = {
+  id: string; caseId: string; caseNumber: string; practitionerId: string; consultantName?: string | null; facilityId: string; facilityName?: string | null;
+  code: string; raisedAt: string; clearedAt?: string | null;
+};
+export type AffiliationsView = {
+  practitionerId: string; declarationCurrent: boolean; renewBy?: string | null; attestationVersion: string; current?: Declaration | null;
+  history: Declaration[]; flags: AffiliationFlag[];
+};
+
+export const SERVICE_KINDS =["INITIAL_CASE_REVIEW", "VIDEO_CONSULTATION", "IN_PERSON_CONSULTATION", "FOLLOW_UP_CONSULTATION", "PROFESSIONAL_FEE", "OTHER_PROFESSIONAL_SERVICE"] as const;
 
 export const virtualClinicHref = (locale: Locale, practitionerId?: string) =>
   `/${locale}/portal/virtual-clinic${practitionerId ? `?clinic=${encodeURIComponent(practitionerId)}` : ""}`;

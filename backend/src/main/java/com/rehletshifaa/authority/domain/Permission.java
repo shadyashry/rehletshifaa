@@ -44,6 +44,13 @@ public enum Permission {
     // (the clinical free text only with FOLLOW_UP_RECORD), never Finance or Operations (data minimisation); a reported complication
     // also reaches the incident's owner and Compliance through the incident (INCIDENT_READ).
     FOLLOW_UP_RECORD(false), CHECK_IN_RECORD(false), OUTCOME_REPORT(false), FOLLOW_UP_READ(false),
+    // P1-19 (D-H): the hospital-agreement audit. The Consultant files their yearly affiliation declaration themselves; Consultant
+    // Operations and Compliance read declarations and the undeclared-facility flags; scorecards (outcome aggregates only, never free
+    // text) are read by Compliance and Consultant Operations; Compliance reads the monthly samples. COMPLIANCE_REVIEW is the auditor's
+    // one write: recording its own review of a declaration or a sampled case (and drawing a sample), which changes no case, clinical,
+    // money or workflow state; a finding on a case becomes an incident a Care Coordination Manager owns. A review is final, so it
+    // needs a fresh sign-in.
+    AFFILIATION_DECLARE(false), AFFILIATION_READ(false), SCORECARD_READ(false), AUDIT_SAMPLE_READ(false), COMPLIANCE_REVIEW(true),
     // consultants, credentials, identity
     CONSULTANT_ONBOARD(true), CREDENTIAL_READ(false), CREDENTIAL_DECIDE(true), PATIENT_IDENTITY_REVIEW(true), PATIENT_IDENTITY_READ(false),
     CLINIC_MANAGE(false), CLINIC_APPROVE(true), CAPABILITY_DECIDE(true),

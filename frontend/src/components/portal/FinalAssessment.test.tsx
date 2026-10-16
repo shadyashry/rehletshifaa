@@ -4,6 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { CaseWorkspaceProvider, FinalAssessment } from "./StaffCaseView";
 import { renderWithWork } from "./test-copy";
 import type { CatalogService, DirectoryFacility, Review } from "./portal-model";
+import { getDictionary } from "@/lib/dictionary";
 
 const facilities: DirectoryFacility[] = [{ id: "f1", name: "Nile Heart Hospital", city: "Cairo", kind: "HOSPITAL", accreditationStatus: "CURRENT",
   packages: [{ id: "pkg-1", procedureCode: "CABG", name: "Bypass package", careCategory: "cardiology", minEgp: 150000, maxEgp: 200000 }] }];
@@ -14,7 +15,7 @@ const preliminary: Review = { id: "r1", versionNumber: 1, status: "APPROVED", re
 
 function setup({ mutate = vi.fn().mockResolvedValue({ id: "r2" }), seed = null as Review | null, savedAt = null as string | null } = {}) {
   renderWithWork(<CaseWorkspaceProvider value={{ locale: "en", t: {} as never, role: "doctor", c: { id: "c1", status: "ARRIVAL_CONFIRMED", version: 1 } as never,
-      busy: false, mutate, price: {} as never, fxRates: [{ currency: "USD", rate: 0.02, rateDate: "2026-10-15", source: "CBE" }], catalog, facilities, mySubject: "doctor-subject" }}><FinalAssessment seed={seed} savedAt={savedAt} documentsOnFile={3}/></CaseWorkspaceProvider>);
+      busy: false, mutate, price: getDictionary("en").portalProposal.price, fxRates: [{ currency: "USD", rate: 0.02, rateDate: "2026-10-15", source: "CBE" }], catalog, facilities, mySubject: "doctor-subject" }}><FinalAssessment seed={seed} savedAt={savedAt} documentsOnFile={3}/></CaseWorkspaceProvider>);
   return mutate;
 }
 const recommendation = () => screen.getByLabelText("Clinical recommendation") as HTMLTextAreaElement;
@@ -32,7 +33,7 @@ describe("FinalAssessment", () => {
     // The same money as the review: what the lines come to in the patient's currency.
     expect(within(screen.getByRole("region", { name: "Before you save" })).getByText("Patient's proposal").nextElementSibling).toHaveTextContent("$900");
     // No display-currency control: the currency is the preliminary estimate's, carried by the backend.
-    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: /currency/i })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Save final assessment" }));
     expect(mutate).toHaveBeenCalledWith("/doctor/cases/c1/final-assessment", {
       recommendedTreatment: "Angioplasty with one stent.", risksAndLimitations: "Subject to a repeat angiogram.",
@@ -92,5 +93,21 @@ describe("FinalAssessment", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Set each package's expected figure inside its approved range.");
     expect(screen.getByText("Outside the approved range")).toBeVisible();
     expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("P1-19: a manual line says whose it is, the hospital's here; it defaults to someone else", () => {
+    const mutate = setup();
+    fireEvent.change(recommendation(), { target: { value: "Angioplasty" } });
+    fireEvent.change(screen.getByLabelText("Service"), { target: { value: "Hospital stay and cath lab" } });
+    fireEvent.change(screen.getByLabelText("Estimated amount (EGP)"), { target: { value: "20000" } });
+    const payee = screen.getByRole("combobox", { name: "Paid to" });
+    expect(payee).toHaveValue("OTHER");
+    fireEvent.change(payee, { target: { value: "FACILITY" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+    expect(screen.getByText("Paid to: The hospital")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Save final assessment" }));
+    expect(mutate).toHaveBeenCalledWith("/doctor/cases/c1/final-assessment", expect.objectContaining({
+      costEstimates: [{ serviceDescription: "Hospital stay and cath lab", estimatedCost: 20000, currency: "EGP", payee: "FACILITY" }],
+    }));
   });
 });

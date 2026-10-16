@@ -206,7 +206,8 @@ public class CaseWorkspaceQueryService {
         return new ProposalView(v.proposalId(), v.versionId(), v.versionNumber(), v.status(), v.language(), v.currency(), v.validUntil(), v.operationalPlan(),
                 v.includedServices(), v.excludedServices(), v.paymentTerms(), v.refundTerms(), v.disclaimers(),
                 v.items().stream().filter(i -> !com.rehletshifaa.journey.domain.ProposalItem.PLATFORM_FEE.equals(i.category())).toList(),
-                v.coordinatorNotes(), v.documentType(), v.scopeChangeReason(), v.assistance(), v.acceptableFrom(), v.fxReapprovalStatus(), null, null, null);
+                v.coordinatorNotes(), v.documentType(), v.scopeChangeReason(), v.assistance(), v.acceptableFrom(), v.fxReapprovalStatus(),
+                v.payeeTotals().stream().filter(t -> !com.rehletshifaa.journey.domain.ProposalItem.PLATFORM.equals(t.payee())).toList(), null, null, null);
     }
 
     private CaseWorkspace paymentWorkspace(UUID caseId) {

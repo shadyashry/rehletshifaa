@@ -23,6 +23,9 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  *   <li>the account is an active consultant account (a consultant profile, linked sign-in, not disabled);</li>
  *   <li>credentialing is VERIFIED and at least one verified credential is current (the expiry check);</li>
  *   <li>the consultant is available for new cases;</li>
+ *   <li>a current affiliation declaration is on file (P1-19, decision D-H): filed within the last year and not replaced. Its content
+ *       and Compliance's review do not decide eligibility (the review is an audit after the fact; never block care on paperwork),
+ *       only that the Consultant has declared ({@link ConsultantAffiliationService});</li>
  *   <li>the care area is their primary care area, or an APPROVED structured {@code CARE_AREA} capability.</li>
  * </ul>
  * Organization membership plays no part. The one provider-side fact consulted is the credential authority:

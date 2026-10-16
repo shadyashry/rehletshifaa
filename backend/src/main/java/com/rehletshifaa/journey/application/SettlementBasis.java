@@ -133,6 +133,11 @@ public class SettlementBasis {
 
     /** The facility the patient was admitted to, for the dispute's wording; null when none is on file. */
     @Transactional(readOnly = true)
+    /** The facility the case is (or was) admitted at, unless the admission was cancelled. */
+    public java.util.Optional<UUID> facilityId(UUID caseId) {
+        return admissions.findByCaseId(caseId).filter(a -> a.getStatus() != FacilityAdmission.Status.CANCELLED).map(FacilityAdmission::getFacilityId);
+    }
+
     public String facilityName(UUID caseId) {
         return admissions.findByCaseId(caseId).filter(a -> a.getStatus() != FacilityAdmission.Status.CANCELLED)
                 .flatMap(a -> facilities.active(a.getFacilityId())).map(f -> f.getName()).orElse(null);

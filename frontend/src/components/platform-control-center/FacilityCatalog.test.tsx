@@ -4,6 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { apiFetchAs } from "@/lib/api";
 import type { Me } from "@/lib/access";
 import { fakeApi, meWith } from "./test-support";
+import { getDictionary } from "@/lib/dictionary";
 import { FacilityCatalog } from "./FacilityCatalog";
 
 const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "u1", auth_time: Math.floor(Date.now() / 1000) } }, me: null as Me | null, roles: [] as string[], loading: false, meFailed: false, refreshMe: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
@@ -34,7 +35,7 @@ describe("Commercial › Facilities & Packages", () => {
   it("Consultant Operations sees the facilities, opens one and proposes a package version", async () => {
     auth.me = meWith(OPS);
     vi.mocked(apiFetchAs).mockImplementation(fakeApi(data));
-    render(<FacilityCatalog locale="en" />);
+    render(<FacilityCatalog locale="en" suspensionCopy={getDictionary("en").portalWork.compliance.suspension} />);
     expect(await screen.findByText("Nile Heart Hospital", { selector: "strong" })).toBeVisible();
     expect(h1()).toEqual(["Facilities & Packages"]);
     expect(trail()).toEqual(["Control Center", "Commercial", "Facilities & Packages"]);
@@ -68,7 +69,7 @@ describe("Commercial › Facilities & Packages", () => {
   it("a Finance Manager approves a waiting package only after confirming its consequence, and cannot edit facilities", async () => {
     auth.me = meWith(FINANCE_MANAGER);
     vi.mocked(apiFetchAs).mockImplementation(fakeApi(data));
-    render(<FacilityCatalog locale="en" />);
+    render(<FacilityCatalog locale="en" suspensionCopy={getDictionary("en").portalWork.compliance.suspension} />);
     expect(await screen.findByText("Waiting for Finance")).toBeVisible();
     expect(screen.queryByRole("form", { name: "New facility" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retire" })).not.toBeInTheDocument();
@@ -87,7 +88,7 @@ describe("Commercial › Facilities & Packages", () => {
   it("rejecting needs a reason", async () => {
     auth.me = meWith(FINANCE_MANAGER);
     vi.mocked(apiFetchAs).mockImplementation(fakeApi(data));
-    render(<FacilityCatalog locale="en" />);
+    render(<FacilityCatalog locale="en" suspensionCopy={getDictionary("en").portalWork.compliance.suspension} />);
     await screen.findByText("Waiting for Finance");
     fireEvent.click(within(screen.getByRole("group", { name: "Actions: CABG" })).getByRole("button", { name: "Reject" }));
     const dialog = screen.getByRole("dialog", { name: "Reject this package price?" });
@@ -97,7 +98,7 @@ describe("Commercial › Facilities & Packages", () => {
   it("is read-only for Finance staff who may read but not approve", async () => {
     auth.me = meWith(["FACILITY_READ", "COMMERCIAL_POLICY_READ"]);
     vi.mocked(apiFetchAs).mockImplementation(fakeApi(data));
-    render(<FacilityCatalog locale="en" />);
+    render(<FacilityCatalog locale="en" suspensionCopy={getDictionary("en").portalWork.compliance.suspension} />);
     expect(await screen.findByText("Nile Heart Hospital", { selector: "strong" })).toBeVisible();
     expect(screen.queryByText("Waiting for Finance")).not.toBeInTheDocument();
     expect(screen.queryByRole("form")).not.toBeInTheDocument();
@@ -107,7 +108,7 @@ describe("Commercial › Facilities & Packages", () => {
 
   it("is not offered without facility access", async () => {
     auth.me = meWith(["JOURNEY_READ"]);
-    render(<FacilityCatalog locale="en" />);
+    render(<FacilityCatalog locale="en" suspensionCopy={getDictionary("en").portalWork.compliance.suspension} />);
     expect(await screen.findByText("You don't have access to facilities")).toBeVisible();
     expect(apiFetchAs).not.toHaveBeenCalled();
   });
@@ -115,9 +116,45 @@ describe("Commercial › Facilities & Packages", () => {
   it("speaks Arabic", async () => {
     auth.me = meWith(OPS);
     vi.mocked(apiFetchAs).mockImplementation(fakeApi(data));
-    render(<FacilityCatalog locale="ar" />);
+    render(<FacilityCatalog locale="ar" suspensionCopy={getDictionary("ar").portalWork.compliance.suspension} />);
     expect(await screen.findByText("Nile Heart Hospital", { selector: "strong" })).toBeVisible();
     expect(h1()).toEqual(["المنشآت والباقات"]);
     expect(screen.getByText("معتمدة")).toBeVisible();
+  });
+
+  it("P1-19: shows a package suspension and lets a Finance Manager lift it with a required note", async () => {
+    auth.me = meWith(FINANCE_MANAGER);
+    const suspension = { id: "s1", reason: "REPEATED_UNAPPROVED_EXTRAS", quarter: "2026-Q4", occurrences: 2, triggerCaseId: "c9", suspendedAt: "2026-10-12T09:00:00Z" };
+    const lifted = { ...suspension, liftedBy: "fm", liftedAt: "2026-10-14T09:00:00Z", liftNote: "Hospital credited both extras" };
+    let open = true;
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...data,
+      "/admin/facilities": () => facilities.map((f) => ({ ...f, packageSuspension: open ? suspension : null })),
+      "/admin/facilities/f1": () => ({ ...facilities[0], packageSuspension: open ? suspension : null, suspensions: [open ? suspension : lifted] }),
+      "POST /admin/facilities/f1/package-suspension/lift": () => { open = false; return { ...facilities[0], packageSuspension: null, suspensions: [lifted] }; } }));
+    render(<FacilityCatalog locale="en" suspensionCopy={getDictionary("en").portalWork.compliance.suspension} />);
+    expect(await screen.findByText("Packages suspended")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Open Nile Heart Hospital" }));
+    expect(await screen.findByText(/2 settled hospital bills in .*2026-Q4.* carried an extra nobody approved/)).toBeVisible();
+    expect(screen.getByText(/Care already reserved goes on/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Lift suspension" }));
+    const dialog = screen.getByRole("dialog", { name: "Lift the package suspension?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lift suspension" }));
+    expect(within(dialog).getByText("Write what was reviewed and agreed.")).toBeVisible();
+    expect(apiFetchAs).not.toHaveBeenCalledWith("test", "/admin/facilities/f1/package-suspension/lift", expect.anything());
+    fireEvent.change(within(dialog).getByLabelText(/What was reviewed and agreed/), { target: { value: "Hospital credited both extras" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lift suspension" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/facilities/f1/package-suspension/lift", expect.objectContaining({ method: "POST", body: JSON.stringify({ note: "Hospital credited both extras" }) })));
+    expect(await screen.findByText("The suspension is lifted.")).toBeVisible();
+    expect(await screen.findByText(/Lifted .*: Hospital credited both extras/)).toBeInTheDocument();
+  });
+
+  it("P1-19: Consultant Operations read the suspension but cannot lift it", async () => {
+    auth.me = meWith(OPS);
+    const suspension = { id: "s1", reason: "REPEATED_UNAPPROVED_EXTRAS", quarter: "2026-Q4", occurrences: 2, suspendedAt: "2026-10-12T09:00:00Z" };
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...data, "/admin/facilities/f1": { ...facilities[0], packageSuspension: suspension, suspensions: [suspension] } }));
+    render(<FacilityCatalog locale="en" suspensionCopy={getDictionary("en").portalWork.compliance.suspension} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Open Nile Heart Hospital" }));
+    expect(await screen.findByText("A Finance Manager lifts the suspension after the review.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Lift suspension" })).not.toBeInTheDocument();
   });
 });

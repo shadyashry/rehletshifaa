@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
+import { getDictionary } from "@/lib/dictionary";
 import { ClinicWorkspace } from "./VirtualClinic";
 import type { Clinic } from "./virtual-clinic-model";
 
@@ -21,7 +22,7 @@ function clinic(overrides: Partial<Clinic> = {}): Clinic {
 function setup(value: Clinic, locale: "en" | "ar" = "en") {
   const call = vi.fn().mockResolvedValue([]);
   const reload = vi.fn();
-  render(<ClinicWorkspace locale={locale} clinic={value} call={call} reload={reload}/>);
+  render(<ClinicWorkspace locale={locale} clinic={value} call={call} reload={reload} affiliationsCopy={getDictionary(locale).portalWork.affiliations}/>);
   return { call, reload };
 }
 
@@ -30,7 +31,7 @@ describe("Virtual clinic", () => {
 
   it("gives the consultant every section and the approval of prepared price changes", async () => {
     const { call } = setup(clinic());
-    for (const tab of ["Overview", "Services & prices", "Schedule", "Practice managers", "Change history"])
+    for (const tab of ["Overview", "Services & prices", "Schedule", "Practice managers", "Affiliations", "Change history"])
       expect(screen.getByRole("tab", { name: tab })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Availability for new cases" })).toBeTruthy();
     expect(screen.getByText("Eligible for new case assignments")).toBeTruthy();
@@ -47,6 +48,8 @@ describe("Virtual clinic", () => {
     expect(screen.queryByRole("tab", { name: "Schedule" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Practice managers" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Change history" })).toBeNull();
+    // P1-19: the affiliation declaration is the Consultant's personal attestation, never a practice manager's.
+    expect(screen.queryByRole("tab", { name: "Affiliations" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Availability for new cases" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Edit public profile" })).toBeNull();
 
@@ -73,6 +76,31 @@ describe("Virtual clinic", () => {
     fireEvent.click(screen.getByLabelText("Manage schedule"));
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
     expect(call).toHaveBeenCalledWith("/clinics/p1/managers", "POST", { name: "Mona PM", email: "mona@example.test", permissions: ["SCHEDULE"], locale: "en" });
+  });
+
+  it("P1-19: tells a Consultant who never declared why no case comes, and takes them to Affiliations", async () => {
+    const none = { practitionerId: "p1", declarationCurrent: false, renewBy: null, attestationVersion: "affiliation-attestation-2026-10", current: null, history: [], flags: [] };
+    const call = vi.fn().mockImplementation(async (path: string) => (path.endsWith("/affiliations") ? none : []));
+    render(<ClinicWorkspace locale="en" clinic={clinic({ professional: { ...clinic().professional, assignable: false } })} call={call} reload={vi.fn()}
+      affiliationsCopy={getDictionary("en").portalWork.affiliations}/>);
+    expect(await screen.findByText("Declare your hospital affiliations")).toBeTruthy();
+    expect(screen.getByText("Not currently eligible for new cases: no current affiliation declaration")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Go to Affiliations" }));
+    expect(screen.getByRole("tab", { name: "Affiliations" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("P1-19: reminds the Consultant a month before the declaration ends, and never asks a practice manager", async () => {
+    const soon = new Date(Date.now() + 10 * 86_400_000).toISOString();
+    const current = { id: "d1", practitionerId: "p1", declaredAt: "2025-10-26T09:00:00Z", validUntil: soon, current: true, attestationVersion: "a", lines: [] };
+    const call = vi.fn().mockImplementation(async (path: string) => (path.endsWith("/affiliations")
+      ? { practitionerId: "p1", declarationCurrent: true, renewBy: soon, attestationVersion: "a", current, history: [], flags: [] } : []));
+    render(<ClinicWorkspace locale="en" clinic={clinic()} call={call} reload={vi.fn()} affiliationsCopy={getDictionary("en").portalWork.affiliations}/>);
+    expect(await screen.findByText(/Your affiliation declaration ends on/)).toBeTruthy();
+    cleanup();
+    const managerCall = vi.fn().mockResolvedValue([]);
+    render(<ClinicWorkspace locale="en" clinic={clinic({ relation: "PRACTICE_MANAGER", permissions: ["SERVICES"] })} call={managerCall} reload={vi.fn()}
+      affiliationsCopy={getDictionary("en").portalWork.affiliations}/>);
+    expect(managerCall).not.toHaveBeenCalledWith("/clinics/p1/affiliations");
   });
 
   it("renders in Arabic", () => {

@@ -926,6 +926,22 @@
   },
   "portalProposal": {
     "price": {
+      "payees": {
+        "title": "Who is paid",
+        "note": "The Consultant's fee and the hospital's charges are separate lines. Together they make the total above.",
+        "to": {
+          "CONSULTANT": "Paid to the Consultant",
+          "FACILITY": "Paid to the hospital",
+          "OTHER": "Paid to others (implants, laboratory)",
+          "PLATFORM": "RehletShifaa's fee"
+        },
+        "choice": "Paid to",
+        "choices": {
+          "CONSULTANT": "Me (my fee)",
+          "FACILITY": "The hospital",
+          "OTHER": "Someone else (implants, laboratory)"
+        }
+      },
       "feeLabel": "Coordination and guarantee fee",
       "feeNote": "Your coordinator, the arrangement of your care and our no-surprise promise.",
       "guarantee": "Our no-surprise promise: your final quote will not be higher than the maximum shown here unless your Consultant finds, when they examine you, that your treatment needs to change. If it does, they will tell you why in writing, and you will have at least 24 hours to decide.",
@@ -1360,11 +1376,13 @@
         "typeLegend": "What is it about?",
         "types": {
           "COMPLAINT": "A complaint about our service",
-          "ADVERSE_EVENT": "A health problem after treatment"
+          "ADVERSE_EVENT": "A health problem after treatment",
+          "DISPUTE": "A charge that is not on my quote, or I was asked to pay outside it"
         },
         "typeShort": {
           "COMPLAINT": "Complaint",
-          "ADVERSE_EVENT": "Health problem after treatment"
+          "ADVERSE_EVENT": "Health problem after treatment",
+          "DISPUTE": "Money"
         },
         "summaryLabel": "What happened?",
         "summaryHelp": "Up to 2,000 characters. Only the care managers read it.",
@@ -3448,6 +3466,18 @@
         "COMPLICATION_REPORTED": {
           "title": "A complication was reported on {caseNumber}",
           "context": "The patient reported a problem in their follow-up answers. An incident is open and the Consultant is asked to review it."
+        },
+        "UNDECLARED_FACILITY": {
+          "title": "Declare your relationship with {facility}",
+          "context": "{caseNumber} was reserved at {facility}, which is not in your affiliation declaration. The reservation stands. Add the facility to your declaration on your Virtual Clinic."
+        },
+        "FACILITY_PACKAGES_SUSPENDED": {
+          "title": "Packages suspended at {facility}",
+          "context": "{caseNumber} brought the settled bills with an unapproved extra at {facility} in {quarter} to {count}. Its packages price no new proposal line until a Finance Manager lifts the suspension after a review."
+        },
+        "AFFILIATION_FINDING": {
+          "title": "Compliance finding on {consultant}'s affiliation declaration",
+          "context": "Compliance recorded a finding on the declaration. Read it in Control Center › Compliance and follow it up through the usual governance. The Consultant can still receive cases."
         }
       }
     },
@@ -3690,6 +3720,8 @@
       "OUTCOME_NOTICE_OUTDATED": "The notice above the questions has changed. Reload the page and answer again.",
       "FOLLOW_UP_NOT_COMPLETE": "The case cannot close until the follow-up is complete.",
       "FOLLOW_UP_WINDOW_INVALID": "The free follow-up must be between 7 and 90 days.",
+      "FACILITY_LINE_REQUIRED": "A hospital is reserved for this case, so the final quote needs the hospital's own line. Ask the Consultant to add the facility package, or a line paid to the hospital, to the final assessment.",
+      "LINE_PAYEE_CONFLICT": "A service from the Consultant's list is always the Consultant's, and a facility package always the hospital's. Change who is paid on that line.",
       "LINK_PURPOSE_MISMATCH": "This link cannot be used for that."
     },
     "treatment": {
@@ -4297,6 +4329,328 @@
       },
       "reopen": "A complication was reported after the case closed. Reopen the case to follow it up.",
       "reopenLink": "Go to Reopen case"
+    },
+    "affiliations": {
+      "tab": "Affiliations",
+      "overview": {
+        "firstTitle": "Declare your hospital affiliations",
+        "firstBody": "Before you can receive your first case, file this year's declaration: every hospital or centre where you treat patients and any relationship you have with each.",
+        "lapsedTitle": "No current affiliation declaration",
+        "lapsedBody": "You cannot receive new cases until you file this year's declaration. Cases you already hold go on.",
+        "renewSoon": "Your affiliation declaration ends on {date}. File the new one before then to keep receiving new cases.",
+        "action": "Go to Affiliations",
+        "reason": "no current affiliation declaration"
+      },
+      "title": "Hospital affiliations",
+      "lead": "Once a year, declare every hospital or centre where you treat RehletShifaa patients, and any relationship you have with each. Compliance reviews every declaration.",
+      "loading": "Loading your affiliations…",
+      "loadFailed": "Your affiliations could not be loaded.",
+      "retry": "Try again",
+      "current": "Current declaration",
+      "filed": "Filed {date}",
+      "holdsUntil": "Holds until {date}",
+      "renewBy": "Renew by {date}",
+      "none": "No current declaration: you cannot receive new cases.",
+      "noneBody": "Cases you already hold go on as before. File a declaration below to receive new cases again.",
+      "usesNone": "You declared that you use no facility and have no relationship with any.",
+      "kinds": {
+        "PRIVILEGES": "Admitting or practising privileges",
+        "EMPLOYMENT": "Employed or contracted by it",
+        "FINANCIAL_INTEREST": "A financial interest (ownership, shares, a fee-sharing or referral arrangement)",
+        "NONE_DECLARED": "I use it, with no relationship"
+      },
+      "kindsShort": {
+        "PRIVILEGES": "Privileges",
+        "EMPLOYMENT": "Employment",
+        "FINANCIAL_INTEREST": "Financial interest",
+        "NONE_DECLARED": "No relationship"
+      },
+      "formTitle": "File this year's declaration",
+      "renewTitle": "File a new declaration",
+      "formIntro": "Add each facility you use and say how you are connected to it. A new declaration replaces the current one and holds for a year.",
+      "facility": "Facility",
+      "chooseFacility": "Choose a facility",
+      "addFacility": "Add facility",
+      "remove": "Remove {facility}",
+      "relationship": "Your relationship with {facility}",
+      "noneHint": "“No relationship” cannot be combined with another choice.",
+      "noteLabel": "Describe the financial interest",
+      "noteHint": "Only Compliance and Consultant Operations read it. It is stored encrypted.",
+      "noLines": "No facility added: filing now declares that you use no facility and have no relationship with any.",
+      "directoryEmpty": "The facility directory is empty. Ask Consultant Operations to add your hospital.",
+      "attestation": "I declare that this list is complete and true: it names every hospital or centre where I treat RehletShifaa patients and every relationship I have with each. I will file a new declaration if anything changes.",
+      "chooseKind": "Choose at least one relationship for each facility.",
+      "noteRequired": "Describe the financial interest.",
+      "attestRequired": "Confirm the declaration to file it.",
+      "submit": "File declaration",
+      "saved": "Your declaration is filed. Compliance will review it.",
+      "history": "Earlier declarations",
+      "noHistory": "No earlier declarations.",
+      "replaced": "Replaced {date}",
+      "facilityCount": "{count} facilities",
+      "flagsTitle": "Facilities used before they were declared",
+      "flagsIntro": "A case of yours was reserved at a facility missing from your declaration. Declaring the facility clears the flag; the record stays.",
+      "flagRaised": "Flagged {date}",
+      "flagCleared": "Cleared {date}",
+      "flagOpen": "Not declared yet",
+      "errors": {
+        "AFFILIATION_ATTESTATION_REQUIRED": "Confirm the declaration to file it.",
+        "AFFILIATION_ATTESTATION_OUTDATED": "The declaration's wording has changed. Reload the page and confirm it again.",
+        "AFFILIATION_NOTE_REQUIRED": "Describe the financial interest.",
+        "AFFILIATION_DUPLICATE": "Each facility can appear only once.",
+        "AFFILIATION_KIND_CONFLICT": "“No relationship” cannot be combined with another relationship for the same facility.",
+        "FACILITY_INVALID": "That facility is not in the directory any more. Choose another one.",
+        "CONSULTANT_NOT_FOUND": "This clinic's Consultant was not found."
+      }
+    },
+    "compliance": {
+      "title": "Compliance",
+      "intro": "The hospital-agreement audit: affiliation declarations, undeclared facilities, scorecards and monthly samples. A review here changes no case, money or workflow.",
+      "readOnly": "You can read this. Only Compliance records reviews.",
+      "loading": "Loading…",
+      "back": "Back to the list",
+      "tabs": {
+        "label": "Compliance areas",
+        "declarations": "Declarations",
+        "flags": "Undeclared facilities",
+        "scorecards": "Scorecards",
+        "samples": "Audit samples"
+      },
+      "reviewStatus": {
+        "PENDING": "Waiting for review",
+        "CLEARED": "Cleared",
+        "FINDING": "Finding"
+      },
+      "declarations": {
+        "filter": "Review",
+        "any": "Any",
+        "empty": "No declarations here.",
+        "consultant": "Consultant",
+        "filedLabel": "Filed",
+        "review": "Review",
+        "open": "Open {consultant}'s declaration",
+        "view": "Open",
+        "detailTitle": "{consultant}'s declaration",
+        "filed": "Filed {date}",
+        "holdsUntil": "Holds until {date}",
+        "current": "Current",
+        "replaced": "Replaced {date}",
+        "facilities": "Facilities declared",
+        "usesNone": "Uses no facility and has no relationship with any.",
+        "reviewTitle": "Your review",
+        "outcomeLegend": "Outcome",
+        "outcomes": {
+          "CLEARED": "Cleared: nothing to follow up",
+          "FINDING": "Finding: Consultant Operations follow it up"
+        },
+        "noteLabel": "Note",
+        "noteHint": "What you found. Consultant Operations read it; the Consultant does not.",
+        "chooseOutcome": "Choose the outcome.",
+        "noteRequired": "Write what you found.",
+        "submit": "Record review",
+        "reviewed": "Reviewed {date}",
+        "eligibility": "A review never changes whether the Consultant can receive cases."
+      },
+      "flags": {
+        "intro": "A case was reserved at a facility its Consultant had not declared. The reservation stands and the Consultant is told; declaring the facility clears the flag.",
+        "openOnly": "Only open flags",
+        "empty": "No undeclared facilities.",
+        "case": "Case",
+        "consultant": "Consultant",
+        "facility": "Facility",
+        "raised": "Flagged {date}",
+        "cleared": "Cleared {date}",
+        "open": "Open"
+      },
+      "scorecards": {
+        "intro": "Counts and averages over the cases discharged in the period. No patient's answer or free text is shown.",
+        "subject": "Scorecard for",
+        "subjects": {
+          "CONSULTANT": "A Consultant",
+          "FACILITY": "A facility"
+        },
+        "consultant": "Consultant",
+        "facility": "Facility",
+        "choose": "Choose…",
+        "from": "From",
+        "to": "To",
+        "periodHint": "Up to a year. Left empty, the last 90 days.",
+        "show": "Show scorecard",
+        "heading": "{name} · {from} to {to}",
+        "cases": "Cases discharged",
+        "smallCohort": "Fewer than 5 cases: too few to compare with others.",
+        "groups": {
+          "quotes": "Final quotes",
+          "changeOrders": "Change orders",
+          "reconciliation": "Hospital bills",
+          "safety": "Safety and concerns",
+          "followUp": "Follow-up",
+          "agreement": "Hospital agreement",
+          "outcomes": "Outcomes reported by patients"
+        },
+        "facts": {
+          "finalQuotesAccepted": "Final quotes accepted",
+          "comparable": "With an accepted estimate to compare",
+          "averageFinalToEstimateMaximum": "Average final quote against the estimate's maximum",
+          "aboveEstimateMaximum": "Above the estimate's maximum",
+          "casesWithChangeOrders": "Cases with a change order",
+          "changeOrders": "Change orders",
+          "emergency": "Emergency change orders",
+          "reconciled": "Bills reconciled",
+          "withVariance": "With a difference",
+          "disputed": "Disputed",
+          "unapprovedExtraCases": "Cases with an unapproved extra",
+          "unapprovedExtraLines": "Unapproved extra lines",
+          "unapprovedExtrasEgp": "Unapproved extras (EGP)",
+          "billingErrorLines": "Billing error lines",
+          "complicationsReported": "Complications reported",
+          "adverseEventCases": "Cases with an adverse event",
+          "reopenedCases": "Cases reopened",
+          "patientConcerns": "Patient concerns",
+          "chargeDisputes": "Money disputes",
+          "contactsHeld": "Follow-up contacts held",
+          "contactsMissed": "Follow-up contacts missed",
+          "completionRate": "Contacts held",
+          "undeclaredFacilityFlags": "Undeclared-facility flags",
+          "packagesSuspended": "Packages suspended now",
+          "patientRating": "Patient rating"
+        },
+        "notCollected": "Not collected yet: the closing review is a message.",
+        "yes": "Yes",
+        "no": "No",
+        "points": {
+          "D30": "Day 30",
+          "D90": "Day 90"
+        },
+        "asked": "Asked",
+        "answered": "Answered",
+        "byRepresentative": "{count} answered by someone for the patient",
+        "complications": "Complications",
+        "pain": "Pain",
+        "function": "Daily activities",
+        "satisfaction": "Satisfaction",
+        "outOf10": "{value} out of 10",
+        "suppressed": "Averages withheld: fewer than 5 answers, too few to keep anyone anonymous.",
+        "pick": "Choose a Consultant or a facility to see its scorecard."
+      },
+      "samples": {
+        "intro": "On the first of each month five cases closed the month before are sampled. Each keeps its money record and the mismatches found.",
+        "drawTitle": "Draw a sample now",
+        "month": "Month",
+        "size": "Cases",
+        "drawHint": "Cases closed in that month that went to a facility, 1 to 50.",
+        "draw": "Draw sample",
+        "empty": "No samples yet.",
+        "kinds": {
+          "MONTHLY": "Monthly",
+          "ON_DEMAND": "On demand"
+        },
+        "summary": "{cases} of {candidates} cases · {pending} to review",
+        "open": "Open sample {month}",
+        "view": "Open",
+        "detailTitle": "Sample {month}",
+        "drawn": "Drawn {date}",
+        "noCases": "No case closed in that month went to a facility.",
+        "closed": "Closed {date}",
+        "record": "Money record",
+        "notOnFile": "Not on file",
+        "mismatches": "Mismatches found",
+        "noMismatches": "No mismatch found.",
+        "status": {
+          "PENDING": "To review",
+          "NO_FINDING": "No finding",
+          "FINDING": "Finding"
+        },
+        "reviewTitle": "Review {caseNumber}",
+        "outcomeLegend": "Outcome",
+        "outcomes": {
+          "NO_FINDING": "No finding",
+          "FINDING": "Finding: it becomes an incident for a care manager"
+        },
+        "noteLabel": "What was found",
+        "noteHint": "Amounts and references only, no clinical detail. Stored encrypted.",
+        "chooseOutcome": "Choose the outcome.",
+        "noteRequired": "Write what was found.",
+        "submit": "Record review",
+        "reviewed": "Reviewed {date}",
+        "incident": "An incident was opened for this finding.",
+        "mismatchCodes": {
+          "STATEMENT_MISSING": "No statement was issued.",
+          "FINAL_INVOICE_MISSING": "The hospital's final invoice is not on file.",
+          "RECONCILIATION_NOT_SETTLED": "The hospital bill is not settled.",
+          "CHARGED_NOT_ON_STATEMENT": "The amount charged differs from the statement.",
+          "PAID_AT_FACILITY_ABOVE_RECEIPTS": "More was paid at the hospital than the receipts show.",
+          "FINAL_QUOTE_NOT_SEPARATED": "The final quote does not separate the Consultant's and the hospital's lines.",
+          "UNAPPROVED_EXTRA": "The hospital billed an extra nobody approved.",
+          "UNDECLARED_FACILITY": "The Consultant had not declared the facility.",
+          "FACILITY_DISPUTE_OPEN": "A dispute with the hospital is still open."
+        },
+        "recordKeys": {
+          "statementNumber": "Statement",
+          "statementKind": "Statement kind",
+          "statementRevision": "Statement revision",
+          "statementMedicalChargedEgp": "Medical charges (EGP)",
+          "statementPlatformFeeEgp": "Platform fee (EGP)",
+          "statementTotalChargedEgp": "Total charged (EGP)",
+          "statementDepositPaidEgp": "Deposit paid (EGP)",
+          "statementPaidAtFacilityEgp": "Paid at the hospital (EGP)",
+          "statementRefundedEgp": "Refunded (EGP)",
+          "statementBalanceDueEgp": "Balance due (EGP)",
+          "statementCreditDueEgp": "Credit due (EGP)",
+          "finalInvoiceNumber": "Hospital's final invoice",
+          "finalInvoiceEgp": "Final invoice (EGP)",
+          "receiptsEgp": "Receipts (EGP)",
+          "finalQuoteCONSULTANTEgp": "Final quote, the Consultant (EGP)",
+          "finalQuoteFACILITYEgp": "Final quote, the hospital (EGP)",
+          "finalQuoteOTHEREgp": "Final quote, others (EGP)",
+          "finalQuotePLATFORMEgp": "Final quote, RehletShifaa (EGP)",
+          "reconciliationStatus": "Bill status",
+          "reconciliationInvoiceEgp": "Bill invoiced (EGP)",
+          "reconciliationAuthorisedEgp": "Bill authorised (EGP)",
+          "reconciliationChargedEgp": "Bill charged (EGP)",
+          "reconciliationVarianceEgp": "Bill difference (EGP)",
+          "reconciliationDisputedEgp": "Bill disputed (EGP)",
+          "reconciliationPaidAtFacilityEgp": "Bill paid at the hospital (EGP)",
+          "unapprovedExtraLines": "Unapproved extra lines",
+          "undeclaredFacilityFlags": "Undeclared-facility flags"
+        }
+      },
+      "suspension": {
+        "title": "Packages suspended",
+        "reasons": {
+          "REPEATED_UNAPPROVED_EXTRAS": "Repeated unapproved extras"
+        },
+        "body": "Suspended {date}: {count} settled hospital bills in {quarter} carried an extra nobody approved.",
+        "consequence": "Its packages price no new proposal line without Finance and are left out of the directory. Care already reserved goes on.",
+        "financeOnly": "A Finance Manager lifts the suspension after the review.",
+        "lift": "Lift suspension",
+        "liftTitle": "Lift the package suspension?",
+        "liftConsequence": "The packages price proposal lines again and return to the directory.",
+        "freshSignIn": "You may be asked to sign in again first.",
+        "noteLabel": "What was reviewed and agreed",
+        "noteHint": "Required. Kept in the facility's record.",
+        "noteRequired": "Write what was reviewed and agreed.",
+        "cancel": "Cancel",
+        "lifted": "The suspension is lifted.",
+        "history": "Suspension history",
+        "historyLine": "{quarter} · suspended {date} · {count} extras",
+        "liftedLine": "Lifted {date}: {note}",
+        "stillOpen": "Still suspended"
+      },
+      "errors": {
+        "DECLARATION_NOT_FOUND": "This declaration was not found.",
+        "DECLARATION_ALREADY_REVIEWED": "This declaration was already reviewed.",
+        "FINDING_NOTE_REQUIRED": "A finding needs a note saying what was found.",
+        "CONSULTANT_NOT_FOUND": "This Consultant was not found.",
+        "FACILITY_NOT_FOUND": "This facility was not found.",
+        "PERIOD_INVALID": "Choose a period of at most a year, with its start before its end.",
+        "SAMPLE_MONTH_INVALID": "Choose a month that has ended.",
+        "SAMPLE_NOT_FOUND": "This sample was not found.",
+        "SAMPLE_CASE_NOT_FOUND": "This case is not in the sample.",
+        "SAMPLE_CASE_ALREADY_REVIEWED": "This case was already reviewed.",
+        "PACKAGES_NOT_SUSPENDED": "This facility's packages are not suspended any more.",
+        "REVIEW_STATUS_INVALID": "That review filter is not valid."
+      }
     }
   },
   "secureLink": {

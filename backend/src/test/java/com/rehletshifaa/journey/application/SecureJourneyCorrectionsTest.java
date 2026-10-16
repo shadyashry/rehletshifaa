@@ -218,7 +218,7 @@ class SecureJourneyCorrectionsTest {
     @Test void expiredCredentialRemovesPractitionerFromAvailability() {
         UUID practitionerId=UUID.randomUUID();
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,0)",practitionerId,"expired-doctor","Expired Doctor","Expired Doctor","VERIFIED","CONSULTANT","AVAILABLE",Instant.now(),Instant.now());
-        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),practitionerId,"LICENSE","VERIFIED",Instant.now().minusSeconds(60),Instant.now().minusSeconds(3600));
+        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),practitionerId,"LICENSE","VERIFIED",Instant.now().minusSeconds(60),Instant.now().minusSeconds(3600)); com.rehletshifaa.clinic.ClinicTestData.declareAll(jdbc);
         credentialExpiry.expireCredentials();
         assertThat(jdbc.queryForObject("SELECT status FROM practitioner_credentials WHERE practitioner_id=?",String.class,practitionerId)).isEqualTo("EXPIRED");
         assertThat(jdbc.queryForObject("SELECT credentialing_status FROM practitioner_profiles WHERE id=?",String.class,practitionerId)).isEqualTo("EXPIRED");
@@ -986,7 +986,7 @@ class SecureJourneyCorrectionsTest {
 
         UUID orthopedistId=UUID.randomUUID();
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",orthopedistId,"orthopedist-subject","Orthopedist","Orthopedist","VERIFIED","CONSULTANT","AVAILABLE","orthopedics",Instant.now(),Instant.now());
-        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),orthopedistId,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());
+        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),orthopedistId,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now()); com.rehletshifaa.clinic.ClinicTestData.declareAll(jdbc);
         assertThatThrownBy(()->journey.assign(created.caseId(),new AssignmentRequest("orthopedist-subject","DOCTOR","PRIMARY",null,"Clinical review")))
             .isInstanceOf(ApiException.class).hasMessageContaining("matches the case care area");
 
@@ -1041,7 +1041,7 @@ class SecureJourneyCorrectionsTest {
         return new Ctx(created.caseId(),null,submitted.statusToken(),created.caseNumber()); // token = the case's status link
     }
 
-    private void seedDoctor(){UUID id=UUID.randomUUID();jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",id,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),id,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now());}
+    private void seedDoctor(){UUID id=UUID.randomUUID();jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",id,"doctor-subject","Doctor One","Doctor One","VERIFIED","CONSULTANT","AVAILABLE","cardiology",Instant.now(),Instant.now());jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",UUID.randomUUID(),id,"LICENSE","VERIFIED",Instant.now().plusSeconds(86400),Instant.now()); com.rehletshifaa.clinic.ClinicTestData.declareAll(jdbc);}
     private void seedStaff(){com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "operations-subject", "OPERATIONS", crypto.encrypt("Operations One"));com.rehletshifaa.workforce.WorkforceTestData.staff(jdbc, "finance-subject", "FINANCE", crypto.encrypt("Finance One"));}
     // Outbox reads are scoped to the link/share token/case that owns the row; _ROWID_ (insertion order) breaks created_at ties on coarse clocks.
     private String caseAccessCode(String token,String dest) throws Exception {String raw=payload(jdbc.queryForObject("SELECT o.template_data FROM notification_outbox o JOIN case_access_challenges ch ON o.idempotency_key='case-access:'||ch.id JOIN case_access_links l ON l.id=ch.link_id WHERE l.token_hash=? AND o.destination=? ORDER BY o.created_at DESC, o._ROWID_ DESC LIMIT 1",String.class,intakeLifecycle.hash(token),dest));return json.readValue(raw,new TypeReference<Map<String,String>>(){}).get("code");}

@@ -7,6 +7,7 @@ import com.rehletshifaa.journey.api.JourneyDtos.ProposalGates;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalCommercialLine;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalCommercialView;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalItemView;
+import com.rehletshifaa.journey.api.JourneyDtos.PayeeTotal;
 import com.rehletshifaa.journey.api.JourneyDtos.ProposalView;
 import com.rehletshifaa.journey.domain.ProposalDecision;
 import com.rehletshifaa.journey.infrastructure.ProposalAssistanceRequestRepository;
@@ -61,14 +62,14 @@ public class ProposalQueryService {
         var v = versions.findDocument(versionId).orElseThrow(() -> new ApiException(404, "PROPOSAL_NOT_FOUND", "Proposal version was not found"));
         List<ProposalItemView> lines = items.findRowsOf(versionId).stream()
                 .map(i -> new ProposalItemView(i.getId(), i.getCategory(), i.getDescription(), i.getQuantity(), i.getUnitPrice(),
-                        Boolean.TRUE.equals(i.getOptionalItem())))
+                        Boolean.TRUE.equals(i.getOptionalItem()), i.getPayee()))
                 .toList();
         return new ProposalView(v.getProposalId(), v.getId(), v.getVersionNumber(), v.getStatus(), v.getLanguage(), v.getCurrency(),
                 v.getValidUntil(), v.getOperationalPlan(), v.getIncludedServices(), v.getExcludedServices(), v.getPaymentTerms(),
                 v.getRefundTerms(), v.getDisclaimers(), lines, v.getCoordinatorNotes(), v.getDocumentType(), v.getScopeChangeReason(), assistance(versionId),
                 // P1-10 (A-08): a final quote above the accepted estimate's maximum opens for acceptance 24 hours after release.
                 Boolean.TRUE.equals(v.getAboveEstimateMaximum()) && v.getReleasedAt() != null ? v.getReleasedAt().plus(FINAL_QUOTE_COOLING_PERIOD) : null,
-                v.getFxReapprovalStatus(), null, null, null);
+                v.getFxReapprovalStatus(), payeeTotals(lines), null, null, null);
     }
 
     /**
@@ -83,6 +84,19 @@ public class ProposalQueryService {
         if (rate == null) return v;
         DisplayTotals totals = displayTotals(v.versionId(), rate);
         return v.withTotals(totals.min(), totals.expected(), totals.max());
+    }
+
+    /**
+     * P1-19 (design §7.4): each payee's mandatory lines summed as shown, payees in the order they first appear, so the Consultant's fee
+     * and the hospital's charges read as two figures, never one.
+     */
+    static List<PayeeTotal> payeeTotals(List<ProposalItemView> lines) {
+        java.util.Map<String, BigDecimal> totals = new java.util.LinkedHashMap<>();
+        for (ProposalItemView i : lines) {
+            if (i.optional() || i.unitPrice() == null || i.payee() == null) continue;
+            totals.merge(i.payee(), i.unitPrice().multiply(i.quantity()).setScale(2, java.math.RoundingMode.HALF_UP), BigDecimal::add);
+        }
+        return totals.entrySet().stream().map(e -> new PayeeTotal(e.getKey(), e.getValue())).toList();
     }
 
     /** QA #19: the version as Finance approves it — each line's source and base price, the margin and the totals. */

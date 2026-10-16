@@ -22,10 +22,16 @@ import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageE
 export type CatalogService = { id: string; serviceCode: string; serviceName: string; category?: string; priceEgp: number; active: boolean };
 export type EvidenceDocument = { documentId: string; fileName: string; status: string };
 /** A cost line as the backend stores it on a review (and as a draft or a preliminary recommendation seeds the picker). */
-export type DecisionLine = { serviceDescription: string; estimatedCost: number; currency: string; catalogServiceId?: string | null; facilityPackageId?: string | null };
+export type DecisionLine = { serviceDescription: string; estimatedCost: number; currency: string; catalogServiceId?: string | null; facilityPackageId?: string | null; payee?: string | null };
+/** P1-19: who an off-list line is paid to; a catalogue line is always the Consultant's and a facility package the hospital's. */
+export const OFF_LIST_PAYEES = ["CONSULTANT", "FACILITY", "OTHER"] as const;
+export type OffListPayee = (typeof OFF_LIST_PAYEES)[number];
+/** The "Paid to" words (`portalProposal.price.payees`). */
+export type PayeeWords = { choice: string; choices: Record<OffListPayee, string> };
+const payeeOf = (value?: string | null): OffListPayee => ((OFF_LIST_PAYEES as readonly string[]).includes(value ?? "") ? value as OffListPayee : "OTHER");
 /** What a decision starts from: a draft, a saved final assessment or the preliminary recommendation. */
 export type DecisionSeed = { recommendedTreatment?: string | null; risksAndLimitations?: string | null; costEstimates?: DecisionLine[] | null };
-type OffListLine = { key: number; description: string; amountEgp: number };
+type OffListLine = { key: number; description: string; amountEgp: number; payee: OffListPayee };
 
 export const BASE = "EGP";
 
@@ -82,7 +88,7 @@ export function useEstimateLines({ seed, catalog, facilities }: { seed: Decision
     }),
     setPackageAmount: (id: string, amount: number) => setPackagePicks(current => new Map(current).set(id, amount)),
     // A stable key per row (one past the largest so far), so removing a row never remounts the rows after it.
-    addOffList: (description: string, amountEgp: number) => setOffList(rows => [...rows, { key: rows.reduce((max, row) => Math.max(max, row.key + 1), 0), description, amountEgp: Math.round(amountEgp * 100) / 100 }]),
+    addOffList: (description: string, amountEgp: number, payee: OffListPayee) => setOffList(rows => [...rows, { key: rows.reduce((max, row) => Math.max(max, row.key + 1), 0), description, amountEgp: Math.round(amountEgp * 100) / 100, payee }]),
     removeOffList: (key: number) => setOffList(rows => rows.filter(row => row.key !== key)),
     /**
      * The lines as the backend takes them. Catalogue picks travel at their approved EGP price (the server re-reads it);
@@ -91,7 +97,7 @@ export function useEstimateLines({ seed, catalog, facilities }: { seed: Decision
     estimates: () => [
       ...picks.map(s => ({ serviceDescription: s.serviceName, estimatedCost: s.priceEgp, currency: BASE, catalogServiceId: s.id })),
       ...packageLines.map(packageEstimate),
-      ...offList.map(row => ({ serviceDescription: row.description, estimatedCost: row.amountEgp, currency: BASE })),
+      ...offList.map(row => ({ serviceDescription: row.description, estimatedCost: row.amountEgp, currency: BASE, payee: row.payee })),
     ],
   };
 }
@@ -99,7 +105,7 @@ export type EstimateLinesState = ReturnType<typeof useEstimateLines>;
 
 function seedOffList(seed: DecisionLine[]) {
   return seed.filter(e => !e.catalogServiceId && !e.facilityPackageId && e.currency === BASE)
-    .map(e => ({ description: e.serviceDescription, amountEgp: Number(e.estimatedCost) || 0 }));
+    .map(e => ({ description: e.serviceDescription, amountEgp: Number(e.estimatedCost) || 0, payee: payeeOf(e.payee) }));
 }
 
 /**
@@ -184,13 +190,14 @@ export function RecommendationFields({ decision, hint }: { decision: ClinicalDec
  * packages follow, and off-list lines are marked by a clock and words (never a tint). `children` is what the act says about
  * currency: the review's proposal-currency control, or the final assessment's line naming the patient's currency.
  */
-export function EstimateLines({ locale, decision, children }: { locale: Locale; decision: ClinicalDecisionState; children?: ReactNode }) {
+export function EstimateLines({ locale, decision, payees, children }: { locale: Locale; decision: ClinicalDecisionState; /** P1-19: the "Paid to" words. */ payees: PayeeWords; children?: ReactNode }) {
   const copy = useWorkCopy().clinicalDecision;
   const t = copy.lines;
   const { lines, linesError: error } = decision;
   const id = useId();
   const [offName, setOffName] = useState("");
   const [offAmount, setOffAmount] = useState("");
+  const [offPayee, setOffPayee] = useState<OffListPayee>("OTHER");
   const [offError, setOffError] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -202,8 +209,8 @@ export function EstimateLines({ locale, decision, children }: { locale: Locale; 
   const addOffList = () => {
     if (nameMissing || amountInvalid) { setOffError(true); (nameMissing ? nameRef : amountRef).current?.focus(); return; }
     setOffError(false);
-    lines.addOffList(offName.trim(), amount);
-    setOffName(""); setOffAmount("");
+    lines.addOffList(offName.trim(), amount, offPayee);
+    setOffName(""); setOffAmount(""); setOffPayee("OTHER");
   };
   // The removed row's button goes with it: the focus moves to the row that takes its place, else the one before, else the toggle.
   const removeOffList = (key: number, index: number) => {
@@ -251,6 +258,7 @@ export function EstimateLines({ locale, decision, children }: { locale: Locale; 
               <span className="min-w-0 flex-1">
                 <span dir="auto" className="block text-[0.9375rem] font-semibold text-ink-900">{row.description}</span>
                 <span className="mt-0.5 flex items-center gap-1 text-[0.8125rem] font-semibold text-ink-700"><Clock size={13} strokeWidth={2.25} aria-hidden className="flex-none text-status-warning-fg"/>{t.offList.needsFinance}</span>
+                <span className="mt-0.5 block text-[0.8125rem] text-ink-600">{payees.choice}: {payees.choices[row.payee]}</span>
               </span>
               <span className="flex-none whitespace-nowrap text-[0.9375rem] font-bold tabular-nums text-ink-800"><bdi dir="ltr">{formatMoney(row.amountEgp, BASE, locale)}</bdi></span>
               {/* 44px hit area around a quiet drawn icon. */}
@@ -280,6 +288,12 @@ export function EstimateLines({ locale, decision, children }: { locale: Locale; 
             <input ref={amountRef} className={`field mt-1 ${offError && amountInvalid ? "field-error" : ""}`} type="text" inputMode="decimal" dir="ltr" autoComplete="off" value={offAmount}
                    onChange={event => { setOffAmount(event.target.value); if (offError) setOffError(false); }}
                    aria-invalid={offError && amountInvalid ? true : undefined} aria-describedby={offError ? `${id}-off-error` : undefined}/>
+          </label>
+          {/* P1-19: an off-list line says whose it is (a catalogue line is the Consultant's, a package the hospital's). */}
+          <label className="block text-[0.875rem] font-bold text-ink-800">{payees.choice}
+            <select className="field mt-1" value={offPayee} onChange={event => setOffPayee(event.target.value as OffListPayee)}>
+              {OFF_LIST_PAYEES.map(payee => <option key={payee} value={payee}>{payees.choices[payee]}</option>)}
+            </select>
           </label>
           {offError && <p id={`${id}-off-error`} role="alert" className="error-text">{copy.errors.offList}</p>}
           <button type="button" className="btn-secondary" onClick={addOffList}>{t.offList.add}</button>

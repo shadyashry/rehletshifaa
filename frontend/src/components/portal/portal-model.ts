@@ -35,9 +35,11 @@ export type CostEstimate={serviceDescription:string;estimatedCost:number;currenc
 
 export type Review={id:string;versionNumber:number;status:string;suitability?:string;recommendedTreatment?:string;risksAndLimitations?:string;createdAt:string;costEstimates?:CostEstimate[];proposalCurrency?:string|null;quoteRate?:number|null;quoteRateDate?:string|null;quoteRateSource?:string|null};
 
-export type ProposalItem={id:string;category:string;description:string;quantity:number;unitPrice:number;optional:boolean};
+export type ProposalItem={id:string;category:string;description:string;quantity:number;unitPrice:number;optional:boolean;/** P1-19: who is paid for the line: CONSULTANT | FACILITY | OTHER | PLATFORM. */payee?:string|null};
+/** P1-19: one payee's mandatory lines summed as shown, payees in document order (the Consultant and the hospital apart). */
+export type PayeeTotal={payee:string;total:number};
 
-export type Proposal={proposalId:string;versionId:string;versionNumber:number;status:string;language:string;currency:string;validUntil?:string;operationalPlan?:string;items:ProposalItem[];coordinatorNotes?:string;documentType?:string;scopeChangeReason?:string;/** When a final quote above the estimate's maximum can be accepted; null otherwise. */acceptableFrom?:string|null;/** Finance's exchange-rate re-approval of a final quote: null | PENDING | CONFIRMED. */fxReapprovalStatus?:string|null};
+export type Proposal={proposalId:string;versionId:string;versionNumber:number;status:string;language:string;currency:string;validUntil?:string;operationalPlan?:string;items:ProposalItem[];coordinatorNotes?:string;documentType?:string;scopeChangeReason?:string;/** When a final quote above the estimate's maximum can be accepted; null otherwise. */acceptableFrom?:string|null;/** Finance's exchange-rate re-approval of a final quote: null | PENDING | CONFIRMED. */fxReapprovalStatus?:string|null;/** P1-19: each payee's total (the staff workspace leaves the platform out). */payeeTotals?:PayeeTotal[]|null};
 
 export type Task={id:string;caseId:string;careCategory?:string|null;coordinatorName?:string|null;documentCount?:number;title:string;description?:string;ownerSubject?:string;status:string;priority:string;blocking:boolean;overdue:boolean;version:number;caseNumber?:string;patientName?:string|null;caseStatus?:string;waitingOn?:string|null;type?:string;context?:string|null;dueAt?:string|null;createdAt?:string};
 

@@ -1117,7 +1117,7 @@ class CoordinatorCaseActionsTest {
     private UUID seedDoctorWithCatalog() {
         UUID id = UUID.randomUUID(), catalogId = UUID.randomUUID();
         raw("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", id, "doctor-subject", "Doctor One", "Doctor One", "VERIFIED", "CONSULTANT", "AVAILABLE", "cardiology", Instant.now(), Instant.now());
-        raw("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now());
+        raw("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)", UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); com.rehletshifaa.clinic.ClinicTestData.declareAll(jdbc);
         raw("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)", catalogId, id, "CARD-CONSULT", "Diagnostic cardiology consultation", "Consultation", new BigDecimal("3500.00"), true, "admin-subject", Instant.now(), Instant.now());
         return catalogId;
     }

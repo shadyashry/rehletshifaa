@@ -9,12 +9,12 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public interface ProposalItemRepository extends BaseRepository<ProposalItem, UUID> {
-    interface ItemRow { UUID getId(); String getCategory(); String getDescription(); BigDecimal getQuantity(); BigDecimal getUnitPrice(); Boolean getOptionalItem(); }
+    interface ItemRow { UUID getId(); String getCategory(); String getDescription(); BigDecimal getQuantity(); BigDecimal getUnitPrice(); Boolean getOptionalItem(); String getPayee(); }
 
     /** The lines of one proposal version, in document order. */
     @Query("""
             select i.id as id, i.category as category, i.description as description, i.quantity as quantity, i.unitPrice as unitPrice,
-                i.optional as optionalItem
+                i.optional as optionalItem, i.payee as payee
             from ProposalItem i where i.proposalVersionId = :versionId order by i.sortOrder, i.id""")
     java.util.List<ItemRow> findRowsOf(@Param("versionId") UUID versionId);
 
