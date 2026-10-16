@@ -937,3 +937,45 @@ work row (P2); keys for messages/reply/send/claim; a count-line pick does not up
 **Area 2 is closed.** Next (PLAN.md order 3 → 7 → X → 6): **area 3 — Consultant portal + Virtual Clinic shells** (review, final
 assessment, milestones, discharge pack, follow-up, affiliations), started in a new session from this branch under the owner's
 standing instruction.
+
+## UX area 3 — Consultant portal + Virtual Clinic: integration, critique, plan (slice 3-0) (2026-10-16, worktree `awesome-shamir-9f726d`, branch `claude/awesome-shamir-9f726d` fast-forwarded to 2-4 @ `71b520c`)
+
+**Integration (merge `7b9e195`).** The Consultant's treatment milestones, discharge pack and follow-up screens exist only
+on the backend chain (`claude/trusting-lamarr-b82819` @ `b112bce`: P1-13, P1-15..P1-18 with their session-2 screens, from
+`1a3ed8f`), so area 3 merged that chain into the UX line rather than drawing shells beside the real panels. P1-19
+(affiliations, `b2656f3`) is uncompiled WIP and is **not** merged. Conflicts resolved in ProposalSign (1c-2 range bar +
+P1-10 fee line/holds/price copy; groups over the medical lines), StaffCaseView (area 2's cover/copy/hairlines + P1-13/15..18
+props, panels, guardian review, the final-quote validity field and its refusal at the field, FX/cooling lines; final-quote
+copy stays in `portalWork.caseView.finalQuote`), Portal (2-4's page title + the refusal context, `send`/`reloadDocuments`,
+`canReopen`, the incidents link), MyCare (the shared `patientStepText`, now with the P1-15..18 step codes, + the guardian
+step), messages (both sides' keys; JSON valid, no duplicates, en/ar key parity apart from Arabic plural forms). Verify:
+typecheck ok; vitest 89 files / 699 (two tests adapted: the final-quote form renders inside the work-copy provider; the
+fee label is named on its line and in the range bar's legend); backend 940 tests, 0 failures, 3 skipped (123 classes).
+
+**Fixture and shots.** `e2e/consultant-fixture.ts` (synthetic only: a Consultant's My work with four items; cases at
+review, final assessment, treatment, discharge pack and follow-up with the P1-15..18 views as their own tests define
+them; catalogue, FX, a facility package; the Virtual Clinic with a manager's pending price change and profile draft).
+`e2e/consultant-shots.spec.ts` writes `screenshots/area-3/<AREA3_SHOTS|before>/` — my-work, case-review/assess (Clinical
+tab), case-treat/discharge/follow, clinic-overview/services × en/ar × 390/1440 (4/4 green).
+
+**Critique: 17/40** (dual-agent; `.impeccable/critique/2026-10-16T06-47-12Z__frontend-src-components-portal-clinicalreview-tsx.md`;
+first run for this target; the review screen alone ≈ 24). P0: the legacy Consultant branch of `CaseWorkflowActions`
+(treatment episode / schedule follow-up) duplicates P1-16..18's panels on every post-arrival case and takes the step
+button to the wrong form. P1: final assessment's framing, copy and currency; evidence after the form and "Documents
+reviewed" overclaiming; two or three filled actions per view; commerce before clinic (ledger before the countersign);
+the complication review buried and framed as admin. P2: the Virtual Clinic off-system (no portal nav, gradient,
+tracked uppercase in Arabic, "Verified", unconfirmed Retire, cramped table); Arabic parity and the ladder. Detector 0
+(regex-only); scan: 103 off-ladder sizes, 17 tinted panels, ~11 boxes in cards, 3 inline en/ar copy tables, one
+`window.confirm`, a tablist without keys. Fixture finding: a malformed panel view takes the whole case page down (no
+per-panel error boundary).
+
+**Plan** `plans/consultant-workspace.md` (no owner gate, standing instruction; assumptions marked [A]): evidence first and
+one act per sheet under the area-2 cover (the strip's step button goes quiet when its form is on the page, all roles);
+one clinical-decision grammar for the review and the final assessment; the clinical timeline after arrival (legacy
+Consultant form retired, panels ordered by the current task, money as summaries, follow-up first after discharge, the
+discharge stamp); the Virtual Clinic as the Consultant's own practice file inside the portal shell; convergence. Slices
+3-1 the clinical decision → 3-2 after arrival → 3-3 the Virtual Clinic → 3-4 closing pass. Gaps: **G-1 affiliations wait
+for P1-19** (uncompiled; not built here), G-2 final-assessment draft endpoint (backend follow-up); O-1 money shown as
+summaries not removed, O-2 a recommendation still needs one priced line (server rule).
+
+**Next:** slice 3-1 — the clinical decision, started in a new session from this branch.
