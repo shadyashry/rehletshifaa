@@ -137,6 +137,21 @@
         ],
         "createdAt": "2026-10-16T20:56:55.034Z",
         "reason": "DESIGN.md signature: 2px Petrol top edge on cards, 'like the tab of a file' (Cards / Containers)"
+      },
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "docs/demo/index.html"
+        ],
+        "createdAt": "2026-10-16T21:50:55.186Z",
+        "reason": "Petrol & Paper paper #f7f4ee is the final brand theme specified in DESIGN.md and the task brief; not a reflex choice"
+      },
+      {
+        "rule": "overused-font",
+        "value": "plus jakarta sans",
+        "createdAt": "2026-10-16T21:55:24.657Z",
+        "reason": "Plus Jakarta Sans is the body font mandated by DESIGN.md (Petrol & Paper) and the task brief; not a reflex choice"
       }
     ]
   }

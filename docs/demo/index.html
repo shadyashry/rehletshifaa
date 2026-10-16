@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RehletShifaa platform demo</title>
-<meta name="description" content="A click-through tour of one patient case on RehletShifaa, from sending the case to follow-up.">
+<meta name="description" content="A guided tour of one patient case on RehletShifaa, from the first visit to follow-up, with Arabic voice-over.">
 <style>
 :root{
   --paper:#f7f4ee;--paper-deep:#efeae0;--white:#fff;
-  --petrol-50:#eef4f3;--petrol-100:#d9e8e6;--petrol-200:#b6d3cf;--petrol-600:#0e5f66;--petrol-700:#0e4f55;--petrol-900:#13292e;
+  --petrol-50:#eef4f3;--petrol-100:#d9e8e6;--petrol-200:#b6d3cf;--petrol-300:#8cbab4;--petrol-600:#0e5f66;--petrol-700:#0e4f55;--petrol-900:#13292e;
   --ink-900:#14262b;--ink-600:#33474c;--ink-400:#5d6e72;
   --line:#e3ded4;--line-strong:#cfc8ba;--coral:#e07a5f;
   --radius:8px;
@@ -21,255 +21,300 @@ body{background:var(--paper);color:var(--ink-900);font:16px/1.55 var(--body);min
 h1,h2,h3{font-family:var(--head);color:var(--petrol-900);margin:0;line-height:1.25;font-weight:600}
 button{font:inherit;cursor:pointer}
 :focus-visible{outline:3px solid var(--petrol-600);outline-offset:2px}
-header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 24px;border-bottom:1px solid var(--line);background:var(--white)}
-.brand{font-family:var(--head);font-weight:600;color:var(--petrol-900);font-size:1.05rem;display:flex;align-items:center;gap:10px}
-.brand i{display:block;width:22px;height:3px;background:var(--coral);border-radius:2px}
-.counter{font-size:.875rem;color:var(--ink-400);font-variant-numeric:tabular-nums}
-.progress{height:4px;background:var(--line)}
-.progress div{height:100%;background:var(--petrol-600);width:0;transition:width .25s ease}
-main{flex:1;width:100%;max-width:1240px;margin:0 auto;padding:24px 24px 16px}
-.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start}
-.frame{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
-.frame .scroller{overflow-x:auto}
-.shot{position:relative;display:block;min-width:640px}
-.shot img{display:block;width:100%;height:auto}
-.hs{position:absolute;border-radius:var(--radius);border:2px solid var(--petrol-600);background:rgba(14,95,102,.06);cursor:pointer;padding:0}
-.hs::after{content:"";position:absolute;inset:-2px;border-radius:inherit;border:2px solid var(--petrol-600);animation:pulse 1.8s ease-out infinite}
-.hs span{position:absolute;top:-11px;left:-11px;width:22px;height:22px;border-radius:50%;background:var(--petrol-600);color:#fff;font:600 .75rem/22px var(--body);text-align:center}
-@keyframes pulse{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.06,1.18)}}
-@media (prefers-reduced-motion:reduce){.hs::after{animation:none;opacity:.35}.progress div{transition:none}}
-aside.cap{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:20px;position:sticky;top:16px}
-.rule{display:block;width:28px;height:3px;background:var(--coral);border-radius:2px;margin-bottom:12px}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
-.chip{display:inline-block;font-size:.75rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 10px;border-radius:999px;border:1px solid var(--petrol-200);background:var(--petrol-50);color:var(--petrol-700)}
+/* top bar */
+header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 28px;background:var(--white);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.badge{flex:none;width:32px;height:32px;border-radius:8px;background:var(--petrol-600);display:grid;place-items:center}
+.badge img{width:22px;height:22px;display:block}
+.brand b{font-family:var(--head);font-weight:600;color:var(--petrol-900);font-size:1.05rem;white-space:nowrap}
+.brand span{color:var(--ink-400);font-size:.875rem;white-space:nowrap}
+.tools{display:flex;align-items:center;gap:12px}
+.counter{font-size:.875rem;color:var(--ink-400);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* step rail */
+.rail{background:var(--white);border-bottom:1px solid var(--line);padding:10px 28px 12px}
+.rail ol{list-style:none;margin:0 auto;padding:0;display:flex;gap:6px;max-width:1320px}
+.rail li{flex:1;min-width:0}
+.rail button{display:block;width:100%;height:20px;background:none;border:0;padding:7px 0}
+.rail button i{display:block;height:6px;border-radius:3px;background:var(--line);transition:background .2s}
+.rail li.done button i{background:var(--petrol-200)}
+.rail li.now button i{background:var(--petrol-600);height:6px}
+.legend{display:flex;gap:16px;justify-content:space-between;align-items:center;max-width:1320px;margin:4px auto 0;font-size:.75rem;color:var(--ink-400)}
+.legend .keys{display:flex;gap:10px}
+/* chips */
+.chip{display:inline-block;font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 10px;border-radius:999px;border:1px solid var(--petrol-200);background:var(--petrol-50);color:var(--petrol-700);white-space:nowrap}
 .chip.coordinator{background:var(--white);border-color:var(--petrol-600)}
 .chip.consultant{background:var(--petrol-700);border-color:var(--petrol-700);color:#fff}
-.chip.ill{background:var(--paper-deep);border-color:var(--line-strong);color:var(--ink-600);text-transform:none;letter-spacing:0;font-weight:500}
-aside h2{font-size:1.25rem;margin-bottom:8px}
+main{flex:1;width:100%;max-width:1320px;margin:0 auto;padding:24px 28px 12px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
+/* browser frame */
+.frame{background:var(--white);border:1px solid var(--line-strong);border-radius:10px;overflow:hidden}
+.bar{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--paper-deep);border-bottom:1px solid var(--line)}
+.bar .dots{display:flex;gap:6px}.bar .dots i{width:10px;height:10px;border-radius:50%;background:var(--line-strong)}
+.bar .addr{flex:1;max-width:520px;margin:0 auto;background:var(--white);border:1px solid var(--line);border-radius:999px;font-size:.75rem;color:var(--ink-400);padding:3px 14px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .sp{width:46px}
+.scroller{overflow-x:auto;background:var(--paper);text-align:center}
+.shot{position:relative;display:inline-block;line-height:0;vertical-align:top;max-width:100%}
+.shot img{display:block;width:auto;height:auto;max-width:100%;max-height:calc(100vh - 250px);margin:0 auto}
+/* callouts: outline only, no fill */
+.hs{position:absolute;border-radius:8px;border:2px solid var(--petrol-600);background:transparent;padding:0;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
+.hs::after{content:"";position:absolute;inset:-3px;border-radius:10px;border:2px solid var(--petrol-600);animation:pulse 2s ease-out infinite;pointer-events:none}
+.hs b{position:absolute;top:-12px;left:-12px;width:24px;height:24px;border-radius:50%;background:var(--petrol-600);color:#fff;font:600 .78rem/24px var(--body);text-align:center;box-shadow:0 0 0 2px #fff}
+.hs em{position:absolute;left:16px;top:-14px;transform:translateY(-100%);background:var(--petrol-900);color:#fff;font:500 .72rem/1.2 var(--body);font-style:normal;padding:4px 9px;border-radius:6px;white-space:nowrap;pointer-events:none;line-height:1.3}
+.hs.below em{top:auto;bottom:-14px;transform:translateY(100%)}
+@keyframes pulse{0%{opacity:.75;transform:scale(1)}100%{opacity:0;transform:scale(1.05,1.14)}}
+@media (prefers-reduced-motion:reduce){.hs::after{animation:none;opacity:.3}.rail button i{transition:none}}
+/* caption card */
+aside.cap{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:22px;position:sticky;top:16px}
+.rule{display:block;width:28px;height:3px;background:var(--coral);border-radius:2px;margin-bottom:12px}
+.meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.meta small{color:var(--ink-400);font-size:.8rem}
+aside h2{font-size:1.3rem;margin-bottom:8px}
 aside p{margin:0 0 12px;color:var(--ink-600);font-size:.95rem}
-aside .why{border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
-aside ol{margin:0 0 12px;padding-left:0;list-style:none;font-size:.875rem;color:var(--ink-600)}
-aside li{display:flex;gap:8px;margin-bottom:6px}
+aside ol{margin:0 0 14px;padding:0;list-style:none;font-size:.875rem;color:var(--ink-600)}
+aside li{display:flex;gap:10px;margin-bottom:6px}
 aside li b{flex:none;width:20px;height:20px;border-radius:50%;background:var(--petrol-600);color:#fff;font-size:.7rem;line-height:20px;text-align:center}
-.nav{display:flex;gap:12px;margin-top:16px}
+.why{border-top:1px solid var(--line);padding-top:12px;margin:0 0 4px}
+.why strong{display:block;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--petrol-600);margin-bottom:2px}
+details.ar{border-top:1px solid var(--line);margin-top:10px;padding-top:8px;font-size:.85rem;color:var(--ink-600)}
+details.ar summary{cursor:pointer;color:var(--petrol-700);font-weight:600}
+details.ar p{direction:rtl;text-align:right;font-size:.95rem;line-height:1.9;margin:8px 0 0;font-family:"Segoe UI",Tahoma,system-ui,sans-serif}
+.nav{display:flex;gap:10px;margin-top:14px}
 .btn{border-radius:var(--radius);padding:10px 18px;font-weight:600;border:1px solid var(--petrol-600);background:var(--petrol-600);color:#fff}
 .btn:hover{background:var(--petrol-700)}
 .btn.ghost{background:var(--white);color:var(--petrol-700)}
 .btn.ghost:hover{background:var(--petrol-50)}
+.btn.sm{padding:7px 14px;font-size:.85rem}
 .btn[disabled]{opacity:.45;cursor:default}
-.hint{font-size:.8rem;color:var(--ink-400);margin-top:10px}
-.panel{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:40px 32px;max-width:760px;margin:24px auto}
-.panel h1{font-size:clamp(1.6rem,4vw,2.2rem);margin-bottom:14px}
-.panel p{color:var(--ink-600);margin:0 0 14px}
-.pts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:20px 0}
-.pts div{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;background:var(--paper);font-size:.9rem;color:var(--ink-600)}
-.pts b{display:block;font-family:var(--head);font-weight:600;color:var(--petrol-900);margin-bottom:2px;font-size:.95rem}
-.tl{list-style:none;margin:20px 0;padding:0;border-left:2px solid var(--petrol-200)}
-.tl li{position:relative;padding:0 0 10px 18px}
-.tl li::before{content:"";position:absolute;left:-6px;top:9px;width:10px;height:10px;border-radius:50%;background:var(--petrol-600)}
-.tl button{background:none;border:0;padding:2px 0;text-align:left;color:var(--ink-900);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.tl button:hover span.t{text-decoration:underline}
-.tl .n{font-variant-numeric:tabular-nums;color:var(--ink-400);width:1.6em}
-.notshown{border-top:1px solid var(--line);margin-top:20px;padding-top:16px}
+.hint{font-size:.78rem;color:var(--ink-400);margin:10px 0 0}
+.voice{display:flex;gap:8px;align-items:center}
+.voice .btn svg{width:14px;height:14px;vertical-align:-2px;margin-inline-end:6px;fill:currentColor}
+/* intro + closing */
+.panel{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:44px 40px;max-width:900px;margin:12px auto}
+.panel h1{font-size:clamp(1.6rem,4vw,2.3rem);margin-bottom:14px}
+.panel p{color:var(--ink-600);margin:0 0 14px;max-width:62ch}
+.pts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:24px 0}
+.pts div{border:1px solid var(--line);border-top:3px solid var(--petrol-600);border-radius:var(--radius);padding:14px 16px;background:var(--paper);font-size:.9rem;color:var(--ink-600)}
+.pts b{display:block;font-family:var(--head);font-weight:600;color:var(--petrol-900);margin-bottom:4px;font-size:.98rem}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.lanes{overflow-x:auto;margin:22px 0 8px}
+.grid{display:grid;grid-template-columns:104px repeat(14,minmax(38px,1fr));align-items:center;min-width:700px;row-gap:0}
+.grid .h{font-size:.72rem;color:var(--ink-400);text-align:center;padding:2px 0}
+.grid .lane{font-size:.75rem;font-weight:600;color:var(--petrol-700);text-transform:uppercase;letter-spacing:.05em;padding-right:8px}
+.grid .c{height:44px;display:grid;place-items:center;border-top:1px solid var(--line);position:relative}
+.grid .lane{height:44px;display:flex;align-items:center;border-top:1px solid var(--line)}
+.grid .c button{width:26px;height:26px;border-radius:50%;border:2px solid var(--petrol-600);background:var(--petrol-600);color:#fff;font-size:.7rem;font-weight:600;padding:0}
+.grid .c button:hover{background:var(--petrol-700)}
+.list{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:4px 28px;margin:18px 0}
+.list button{background:none;border:0;padding:4px 0;text-align:left;color:var(--ink-900);display:flex;gap:10px;align-items:baseline;width:100%}
+.list button:hover span.t{text-decoration:underline}
+.list .n{font-variant-numeric:tabular-nums;color:var(--ink-400);width:1.6em;flex:none}
+.notshown{border-top:1px solid var(--line);margin-top:18px;padding-top:16px}
 .notshown h2{font-size:1.05rem;margin-bottom:6px}
 .notshown ul{margin:0;padding-left:20px;color:var(--ink-600);font-size:.9rem}
-footer{padding:12px 24px 20px;text-align:center;font-size:.8rem;color:var(--ink-400)}
-/* illustrative mock of the intake form (copy from en.json "Send your medical case") */
-.mock{padding:28px;background:var(--paper)}
-.mock .sheet{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:28px;max-width:720px;margin:0 auto}
-.mock .eyebrow{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--petrol-600);display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.mock .eyebrow i{width:16px;height:2px;background:var(--coral)}
-.mock h3{font-size:1.5rem;margin-bottom:8px}
-.mock .intro{color:var(--ink-600);font-size:.9rem;margin:0 0 18px}
-.mock .row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-.mock label{display:block;font-size:.8rem;font-weight:600;color:var(--ink-900);margin-bottom:4px}
-.mock .f{border:1px solid var(--line-strong);border-radius:var(--radius);height:38px;background:var(--white);padding:0 10px;font-size:.85rem;color:var(--ink-400);display:flex;align-items:center}
-.mock .f.ta{height:78px;align-items:flex-start;padding-top:9px}
-.mock .help{font-size:.75rem;color:var(--ink-400);margin:4px 0 0}
-.mock .field{margin-bottom:14px;position:relative}
-.mock .chk{display:flex;gap:10px;font-size:.8rem;color:var(--ink-600);margin-bottom:10px}
-.mock .chk i{flex:none;width:16px;height:16px;border:1px solid var(--line-strong);border-radius:4px;margin-top:2px;background:var(--white)}
-.mock .send{position:relative;display:inline-block;margin-top:6px}
-.mock .send .b{background:var(--petrol-600);color:#fff;border-radius:var(--radius);padding:10px 20px;font-weight:600;font-size:.9rem}
-.mock .upl{position:relative}
-.mock .hs{inset:-6px}
-.mock .send .hs{inset:-6px}
+footer{padding:12px 28px 20px;text-align:center;font-size:.78rem;color:var(--ink-400)}
+/* film mode (used to record the video): fixed 16:9, no controls, Arabic subtitles */
+.sub{display:none}
+body.film{height:100vh;overflow:hidden}
+body.film footer,body.film .tools,body.film .nav,body.film .hint,body.film details.ar,body.film .legend{display:none}
+body.film header.top{padding:14px 40px}
+body.film .rail{padding:6px 40px}
+body.film main{max-width:1840px;padding:20px 40px 0;flex:none}
+body.film .layout{grid-template-columns:minmax(0,1fr) 430px}
+body.film .shot img{max-height:calc(100vh - 330px)}
+body.film aside.cap{position:static}
+body.film aside h2{font-size:1.5rem}body.film aside p,body.film aside ol{font-size:1.02rem}
+body.film .sub{display:flex;position:fixed;left:0;right:0;bottom:0;height:140px;background:var(--petrol-900);color:#fff;align-items:center;justify-content:center;padding:0 120px;text-align:center;direction:rtl;font:500 30px/1.7 "Segoe UI",Tahoma,system-ui,sans-serif}
+body.film .panel{max-width:1280px;margin-top:24px;font-size:20px}body.film .panel h1{font-size:2.8rem}body.film .pts div{font-size:1.1rem}body.film .panel p{max-width:80ch}body.film .sub.long{font-size:24px;line-height:1.6}body.film .notshown ul{font-size:1.05rem}
 @media (max-width:960px){
   .layout{grid-template-columns:1fr}
   aside.cap{position:static}
+  .shot{min-width:640px}.shot img{max-height:none}
+  .rail{padding:8px 16px}.legend{display:none}
 }
 @media (max-width:520px){
   main{padding:16px}
-  header.top{padding:12px 16px}
-  .panel{padding:24px 18px}
-  .mock{padding:12px}.mock .sheet{padding:16px}.mock .row{grid-template-columns:1fr}
+  header.top{padding:10px 16px}.brand span{display:none}
+  .panel{padding:26px 18px}
   .nav .btn{flex:1}
+  .tools .counter{display:none}
 }
 </style>
 </head>
 <body>
 <header class="top">
-  <div class="brand"><i aria-hidden="true"></i>RehletShifaa <span style="font-weight:400;color:var(--ink-400);font-size:.9rem">platform demo</span></div>
-  <div style="display:flex;align-items:center;gap:16px">
-    <button class="btn ghost" id="narr" type="button" aria-pressed="false" style="padding:6px 12px;font-size:.85rem">Narration: off</button>
+  <div class="brand"><span class="badge"><img src="assets/mark.svg" alt=""></span><b>RehletShifaa</b><span>Platform walkthrough</span></div>
+  <div class="tools">
+    <div class="voice"><button class="btn sm" id="play" type="button" aria-pressed="false"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z"/></svg><span>Play with Arabic voice-over</span></button></div>
     <div class="counter" id="counter" aria-live="polite"></div>
   </div>
 </header>
-<div class="progress" role="progressbar" aria-label="Demo progress" aria-valuemin="0" aria-valuemax="100" id="pb"><div id="bar"></div></div>
+<nav class="rail" aria-label="Journey steps">
+  <ol id="rail"></ol>
+  <div class="legend"><span>Click a segment to jump to a step</span><span class="keys"><span class="chip">Patient</span><span class="chip coordinator">Coordinator</span><span class="chip consultant">Consultant</span></span></div>
+</nav>
 <main id="stage"></main>
-<footer>Screens show demo data and committed UI screenshots. Costs are estimates, not prices. Not medical advice. Use ← → keys, or click the pulsing rings.</footer>
+<footer>Demo data only. Costs shown are estimates, not prices. Use the ← → keys, or click a ringed element, to move on.</footer>
+<div class="sub" id="sub" lang="ar"></div>
 
 <script>
-const IMG='assets/';
+const IMG='assets/',AUD='assets/audio/';
+const AR=["مرحبًا بكم في عرض منصّة رحلة شفاء. تنسّق المنصّة الرعاية الطبية التخصصية في مصر للمرضى القادمين من الخارج. يراجع استشاري الحالة قبل أن يسافر المريض أو يدفع أو يقرّر. ويبقى منسّق واحد، يتحدّث العربية والإنجليزية، مع المريض من أول رسالة حتى المتابعة. وتنتقل التكلفة بوضوح من تقدير أولي إلى عرض نهائي. سنتابع معًا حالة تجريبية خلال أربع عشرة خطوة.", "الخطوة الأولى: الصفحة الرئيسية. يبدأ المريض من الموقع العام، ويرى بوضوح كيف تعمل الخدمة: يرسل حالته، ثم يراجعها استشاري، ثم تصله خطة وتكلفة تقديرية. والقرار يبقى دائمًا بيد المريض.", "الخطوة الثانية: إرسال الحالة. يملأ المريض، أو من ينوب عنه، نموذجًا قصيرًا من ثلاث خطوات: بيانات المريض، ثم وصف الحالة والتقارير، ثم الموافقة والمراجعة. ولا يحتاج المريض أن يعرف التخصص المناسب، ولا أن تكون كل التقارير معه.", "الخطوة الثالثة: استلام الحالة. فور الإرسال يحصل المريض على رقم للحالة وصفحة متابعة آمنة. تقول الصفحة بوضوح إن المنسّق يراجع الحالة، وإنه لا يُطلب من المريض أي إجراء الآن، وتعرض مراحل الرحلة السبع.", "الخطوة الرابعة: مهامي، من جهة المنسّق. يبدأ المنسّق يومه من قائمة واحدة مرتّبة بحسب الأهمية. كل بند يوضّح الخطوة التالية ومن ننتظر. وتظهر الحالة الجديدة تحت عنوان: عيّن استشاريًا.", "الخطوة الخامسة: مساحة عمل الحالة. يؤكّد المنسّق مجال الرعاية، ويستكمل أي نقص، ثم يختار استشاريًا محدّدًا بالاسم. ولا يظهر في الاختيار إلا الاستشاريون أصحاب الاعتماد السارِي في هذا المجال. وفي هذه البيانات التجريبية لا يوجد استشاري مؤهّل بعد.", "الخطوة السادسة: مراجعة الاستشاري. يطّلع الاستشاري على ملف المريض ومستنداته، ويسجّل توصيته السريرية، وأي مخاطر أو قيود ينبغي أن يعرفها المريض قبل المضي. وهنا يُتّخذ القرار الطبي، قبل أي التزام مالي.", "الخطوة السابعة: التقدير الأولي. بعد توصية الاستشاري يُعدّ المنسّق التقدير الأولي، ويراه المريض في صفحته. هذا التقدير غير مُلزِم، وليس سعرًا نهائيًا. ولا يحدث شيء حتى يقرّر المريض.", "الخطوة الثامنة: التحقّق برمز لمرة واحدة. لقراءة العرض يفتح المريض الرابط الآمن، ويدخل رمزًا من ستة أرقام يصله على هاتفه أو بريده. الرمز لا يُعرض هنا أبدًا، لأن العرض يحتوي معلومات خاصة.", "الخطوة التاسعة: وديعة التنسيق. بعد القبول يدفع المريض وديعة التنسيق بتحويل بنكي، أو عبر وكيل، ثم يُدخل رقم مرجع التحويل. وتتحقق الإدارة المالية من المرجع. والبيانات البنكية في هذه الشاشة بيانات تجريبية.", "الخطوة العاشرة: تأكيد الوديعة. عند التأكّد من الدفع يرى المريض ختم الاستلام، ثم يبدأ المنسّق ترتيب العلاج. وتُخصم الوديعة من السعر النهائي لخطة العلاج.", "الخطوة الحادية عشرة: الدخول والقسيمة. عند تأكيد الدخول تعرض الحالة خطاب القبول وقسيمة المستشفى: ما أُضيف إلى حساب المستشفى، وما يدفعه المريض عند الكاشير، وما تبقّى. المبالغ بالجنيه المصري، مع سعر الصرف المثبّت.", "الخطوة الثانية عشرة: مراحل العلاج. تُسجَّل المراحل أثناء العلاج، ويصادق عليها الاستشاري. وإذا لزم علاج إضافي يُقترح أمر تغيير بسبب سريري واضح، وتسعّره الإدارة المالية قبل أن يُحتسب.", "الخطوة الثالثة عشرة: ملف الخروج. الخروج ليس زرًّا. تعرض الحالة ما ينقص، ومجموعة المستندات التي يحملها المريض معه: ملخّص الخروج، وقائمة الأدوية، وتقرير العملية، وغيرها.", "الخطوة الرابعة عشرة: المتابعة. بعد الخروج تُجدوَل مكالمات متابعة، وتصل أسئلة عن الحالة عبر رابط آمن. وإذا احتاجت إجابة إلى انتباه فهي ترجع إلى الاستشاري، ولا تُغلق الحالة قبل أن ينتهي كل شيء معلّق.", "هذه هي الرحلة كاملة. الشاشات المعروضة تعتمد على بيانات تجريبية، والتكاليف المعروضة تقديرات وليست أسعارًا. شكرًا لكم."];
 const steps=[
-/* 1: illustrative mock */
-{role:'Patient',ill:true,title:'Send my case',
- mock:`<div class="mock"><div class="sheet">
-  <div class="eyebrow"><i></i>A secure first step</div>
-  <h3>Send your medical case</h3>
-  <p class="intro">No need to know which specialty you need. Send what you already have: your coordinator prepares the file and a Consultant in the right specialty reviews it.</p>
-  <div class="row"><div><label>Given name(s)</label><div class="f">Maya</div></div><div><label>Family name / surname</label><div class="f">Example</div></div></div>
-  <div class="row"><div><label>Country</label><div class="f">Kenya</div></div><div><label>WhatsApp / mobile number</label><div class="f">+000 0000 0000</div></div></div>
-  <div class="field"><label>Tell us briefly about your condition</label><div class="f ta">For example: what your doctors found, the treatment they suggested, and your main question.</div></div>
-  <div class="field upl"><label>Upload medical reports or images</label><div class="f">Choose files</div><p class="help">Don't have all your reports? That's okay. Send what you have and your coordinator will help with the rest.</p><button class="hs" data-n="1" aria-label="Upload what you have"><span>1</span></button></div>
-  <div class="chk"><i></i>I consent to RehletShifaa processing the information I submit for the purpose of coordinating my medical case.</div>
-  <div class="send"><div class="b">Send my case</div><button class="hs" data-n="2" aria-label="Send my case"><span>2</span></button></div>
- </div></div>`,
- alt:'',
- cap:'The patient fills in one short form: who the patient is, a few lines about the condition, and whatever reports they already have.',
- notes:['No need to know which specialty: send what you have.','One button sends the case securely.'],
- why:'The first step is deliberately light. The coordinator checks what is missing afterwards, so the patient is not blocked.'},
-{role:'Patient',title:'Case received, secure status link',img:'02-received.webp',w:1040,h:900,
- alt:'Case received page showing case number RS-2026-000417, the message "We have your case", a Received stamp and a seven-stage care journey.',
- hs:[{x:17,y:19,w:66,h:20,t:'Case number and received stamp'},{x:17,y:70,w:66,h:15,t:'The seven-stage care journey'}],
- cap:'The patient gets a case number and a secure status page right away. It says plainly that nothing is needed from them now.',
- notes:['The case number identifies this case.','The journey shows where the case stands, step by step.'],
- why:'Patients are not left guessing. They always see the stage and what happens next.'},
-{role:'Coordinator',title:'My work: a case needs action',img:'03-my-work.webp',w:1440,h:900,
+{role:'Patient',view:'Public website',title:'The home page',img:'01-home.webp',w:1440,h:960,
+ alt:'RehletShifaa home page: "Understand your treatment options before you travel", a Send my case button and a strip showing the five stages from sending the case to treatment and follow-up.',
+ hs:[{x:8,y:52,w:12.5,h:6,t:'Send my case'},{x:55,y:16,w:34,h:9,t:'The journey at a glance'},{x:8,y:64,w:44,h:9,t:'The decision stays yours'}],
+ cap:'A patient starts on the public site. It explains the service plainly and offers one clear first action: send the case.',
+ notes:['One primary action: Send my case.','The page says up front that recommendations and cost estimates are preliminary.'],
+ why:'Patients see the whole picture first, before they share anything.'},
+{role:'Patient',view:'Send my case',title:'Sending the case',img:'02-intake.webp',w:1220,h:1260,
+ alt:'Send your medical case form, step 1 of 3: who the case is for (Myself or Someone else), the patient\'s name, country, age band and contact details, with a What happens next panel.',
+ hs:[{x:3,y:28,w:63,h:8.5,t:'Myself or someone else'},{x:3,y:19,w:63,h:3.5,t:'Three short steps'},{x:71,y:18,w:28,h:45,t:'What happens next'}],
+ cap:'A short three-step form: patient and contact details, the case and documents, then consent. A family member can send it for the patient.',
+ notes:['No need to know which specialty: the coordinator routes it.','The side panel tells the patient what happens after sending.'],
+ why:'Sending a case takes about five minutes and does not require every report to hand.'},
+{role:'Patient',view:'Secure status page',title:'Case received',img:'03-received.webp',w:1040,h:830,
+ alt:'Case received page with case number RS-2026-000417, a Received stamp, the message that a coordinator is reviewing the case, no action required, and a seven-stage care journey.',
+ hs:[{x:20,y:10,w:59,h:19,t:'Case number'},{x:20,y:77,w:59,h:16,t:'Seven-stage journey'}],
+ cap:'The patient gets a case number and a secure status page straight away. It says plainly that nothing is needed from them now.',
+ notes:['The page shows who is working on the case.','The journey shows where the case stands, step by step.'],
+ why:'Patients are never left guessing what happens next.'},
+{role:'Coordinator',view:'Coordinator · My work',title:'My work',img:'04-my-work.webp',w:1440,h:780,
  alt:'Coordinator My work page listing cases in priority order, including "Review the patient\'s reply" and "Assign a Consultant", each with an Open button.',
- hs:[{x:8,y:35,w:84,h:16,t:'Most urgent item'},{x:8,y:56,w:84,h:12,t:'Assign a Consultant'}],
+ hs:[{x:8.6,y:41.5,w:83,h:15.5,t:'Most urgent first'},{x:8.6,y:62,w:83,h:15,t:'Assign a Consultant'}],
  cap:'The coordinator starts from one list, most urgent first. Each row says what the next step is and who it is waiting on.',
  notes:['Urgent and overdue work rises to the top.','The new case appears as "Assign a Consultant".'],
- why:'One bilingual coordinator stays with the patient, so their daily list is built around the next step in each case.'},
-{role:'Coordinator',title:'Case workspace: prepare and assign',img:'04-case-prepare.webp',w:1220,h:640,
- alt:'Coordinator case workspace titled "Prepare the case for a Consultant" with a care area selector set to Cardiology.',
- hs:[{x:3,y:52,w:55,h:14,t:'Your step'},{x:3,y:80,w:34,h:17,t:'Care area'}],
- cap:'The coordinator confirms the care area, completes anything missing, then chooses a named Consultant. Only Consultants with current credentials who match the care area can be chosen.',
- notes:['The workspace shows one current step.','The care area decides which Consultants are eligible.'],
- why:'The case reaches a person qualified to review it, not a general queue. In this demo data no Consultant is listed for the area yet.'},
-{role:'Consultant',title:'Consultant reviews the case',img:'05-consultant-review.webp',w:1220,h:1000,
+ why:'One bilingual coordinator stays with the patient, so their day is built around the next step of each case.'},
+{role:'Coordinator',view:'Coordinator · Case workspace',title:'Preparing the case',img:'05-case-prepare.webp',w:1220,h:720,
+ alt:'Coordinator case workspace titled "Prepare the case for a Consultant", with a care area selector set to Cardiology.',
+ hs:[{x:1.5,y:44.5,w:71,h:13,t:'Your step'},{x:1.5,y:74,w:42,h:16,t:'Care area decides who can review'}],
+ cap:'The coordinator confirms the care area, completes anything missing, then chooses a named Consultant. Only Consultants with current credentials in that area can be chosen. In this demo data none is listed yet.',
+ notes:['The workspace shows one current step.','In this demo data no eligible Consultant is listed for the area yet.'],
+ why:'The case reaches someone qualified to review it, not a general queue.'},
+{role:'Consultant',view:'Consultant · Clinical review',title:'Consultant review',img:'06-consultant-review.webp',w:1220,h:1000,
  alt:'Consultant view of a case under review with the step "Record your clinical decision", a clinical recommendation field and the patient\'s file with documents.',
  hs:[{x:2,y:24,w:60,h:12,t:'Your step'},{x:2.5,y:64,w:62,h:17,t:'Clinical recommendation'}],
  cap:'The Consultant reads the patient\'s file and records a clinical recommendation, with any risks the patient should know before going ahead.',
  notes:['The intake summary and documents sit beside the form.','The recommendation is required; risks are optional.'],
  why:'A Consultant reviews before the patient travels, pays or decides.'},
-{role:'Consultant',title:'Preliminary estimate ready',img:'06-estimate-ready.webp',w:1220,h:970,
- alt:'Patient My Care page saying "Your estimate is ready to review", with an Estimate ready stamp, a Review estimate button and a preliminary estimate of $4,850 described as non-binding.',
- hs:[{x:2.5,y:55.5,w:15,h:6.5,t:'Review estimate'},{x:52,y:40,w:11,h:11,t:'Estimate ready stamp'}],
- cap:'After the Consultant\'s recommendation, the coordinator prepares the preliminary estimate. The patient sees it as an estimate, not a final price, and nothing happens until they decide.',
- notes:['"Take the time you need — nothing happens until you decide."','The estimate is non-binding; a final quote comes after in-person assessment.'],
+{role:'Patient',view:'Patient · My Care',title:'Preliminary estimate',img:'07-estimate-ready.webp',w:1220,h:1230,
+ alt:'Patient My Care page: "Your estimate is ready to review", an Estimate ready stamp, a Review estimate button, and a preliminary estimate of $4,850 shown with a range bar and described as non-binding.',
+ hs:[{x:3,y:41.5,w:13.5,h:5,t:'Review estimate'},{x:1,y:75.5,w:64,h:22,t:'Estimate, not a price'}],
+ cap:'After the Consultant\'s recommendation the coordinator prepares a preliminary estimate. The patient sees it as an estimate, not a final price, and nothing happens until they decide.',
+ notes:['"Nothing happens until you decide."','The estimate is non-binding; a final quote follows the in-person assessment.'],
  why:'Honest cost staging: a preliminary estimate first, a final quote later, each labelled as such.'},
-{role:'Patient',title:'Patient reviews the proposal, one-time code',img:'07-verify.webp',w:1040,h:540,
- alt:'"Verify it\'s you" screen asking for a six-digit code sent to a masked phone number ending 7898, with an empty code field.',
- hs:[{x:24.5,y:69,w:27,h:13,t:'Six-digit code field'},{x:24.5,y:86,w:11,h:9,t:'Verify'}],
- cap:'The patient opens the secure link and confirms it is them with a six-digit code sent to their phone or email. Then they can read the proposal and accept or decline.',
- notes:['The code goes only to the patient and is never shown here.','Verifying opens the proposal.'],
- why:'The proposal is private medical and cost information, so the link alone is not enough.'},
-{role:'Patient',title:'Deposit: bank transfer and reference',img:'08-deposit.webp',w:1220,h:1090,
- alt:'Pay your coordination deposit screen showing the amount to pay, bank transfer and cash through an agent options, test bank details and a field for the transaction reference.',
- hs:[{x:2.5,y:37.5,w:31,h:9.5,t:'Bank transfer'},{x:2.5,y:90,w:31,h:9,t:'Bank reference'}],
- cap:'After accepting, the patient pays a coordination deposit by bank transfer, or through an agent, and enters the reference they were given. The screen shows $500 with dummy bank details.',
- notes:['The deposit is based on the preliminary estimate and is deducted from the final treatment price.','Finance checks the reference before the coordinator starts arranging care.'],
+{role:'Patient',view:'Patient · Secure link',title:'One-time code',img:'08-verify.webp',w:1040,h:560,
+ alt:'"Verify it\'s you" screen asking for a six-digit code sent to a masked number, with an empty code field and a Verify button.',
+ hs:[{x:25,y:62.5,w:25.5,h:13,t:'Six-digit code'},{x:25,y:78.5,w:9,h:9.5,t:'Verify'}],
+ cap:'To read the proposal the patient opens the secure link and enters a six-digit code sent to their phone or email. The code is never shown here.',
+ notes:['The code goes only to the patient.','Verifying opens the proposal.'],
+ why:'The proposal holds private medical and cost information, so the link alone is not enough.'},
+{role:'Patient',view:'Patient · My Care',title:'Coordination deposit',img:'09-deposit.webp',w:1620,h:810,
+ alt:'Pay your coordination deposit screen: amount to pay, a three-stage track, bank transfer or cash through an agent, dummy bank details and a field for the transfer reference.',
+ hs:[{x:2.3,y:58.6,w:45,h:7.9,t:'Pay, check, receive'},{x:2.3,y:74,w:45,h:12,t:'Bank transfer or agent'},{x:52.5,y:49,w:40,h:36,t:'Bank reference'}],
+ cap:'After accepting, the patient pays a coordination deposit by bank transfer or through an agent, then enters the reference they were given. The bank details shown are dummy values.',
+ notes:['The deposit is deducted from the final treatment price.','Finance checks the reference before the coordinator starts arranging care.'],
  why:'Care is arranged only once the deposit is confirmed. Online payment is shown as coming soon.'},
-{role:'Coordinator',title:'Admission and voucher',img:'09-admission.webp',w:930,h:530,
+{role:'Patient',view:'Patient · My Care',title:'Deposit confirmed',img:'10-deposit-paid.webp',w:1220,h:900,
+ alt:'My Care page saying "We are arranging your treatment", with the care journey at the Treatment stage.',
+ hs:[{x:1,y:28,w:64,h:37,t:'Arranging your treatment'},{x:1,y:71.5,w:64,h:14,t:'Journey: treatment'}],
+ cap:'Once Finance confirms the payment, the page moves on: the coordinator is arranging appointments and travel details, and the journey advances.',
+ notes:['The page always names the current step.','The deposit is shown as received on the same page.'],
+ why:'The patient sees progress at every stage, in the same place.'},
+{role:'Consultant',view:'Consultant · Case file',title:'Admission and voucher',img:'11-admission.webp',w:930,h:530,
  alt:'Admission and money panel marked Admitted, showing planned admission, admission letter checked, and a hospital voucher with package, platform fee and balance lines in Egyptian pounds.',
- hs:[{x:2,y:36,w:94,h:26,t:'Voucher'},{x:85,y:5,w:12,h:7,t:'Admitted status'}],
- cap:'Once admission is confirmed, the case shows the admission letter check and the hospital voucher: what is credited, what the patient pays at the cashier and what is still owed.',
- notes:['"Before admission" lists anything still blocking.','Amounts are shown in EGP, with the frozen exchange rate.'],
- why:'Everyone, including finance and the Consultant, works from the same voucher.'},
-{role:'Consultant',title:'Treatment milestones',img:'10-treatment.webp',w:930,h:625,
+ hs:[{x:2,y:36,w:94,h:26,t:'Hospital voucher'},{x:85,y:5,w:12,h:7,t:'Admitted'}],
+ cap:'Once admission is confirmed, the file shows the admission letter check and the hospital voucher: what is credited, what the patient pays at the cashier and what is still owed.',
+ notes:['"Before admission" lists anything still blocking.','Amounts are in EGP, with the frozen exchange rate.'],
+ why:'Everyone works from the same voucher.'},
+{role:'Consultant',view:'Consultant · Case file',title:'Treatment milestones',img:'12-treatment.webp',w:930,h:625,
  alt:'Treatment panel listing milestones Admitted and Procedure started, a Countersign button, and a change order for a second stent that is with Finance for pricing.',
  hs:[{x:82,y:25,w:16,h:10,t:'Countersign'},{x:2,y:47,w:50,h:15,t:'Change order'}],
- cap:'Milestones are recorded as treatment progresses. Operations records them and the Consultant countersigns. If more care is needed, a change order is proposed and priced by Finance.',
+ cap:'Milestones are recorded as treatment progresses and the Consultant countersigns. If more care is needed, a change order is proposed and priced by Finance.',
  notes:['The Consultant countersigns clinical milestones.','A change order needs a clinical reason and a price before it counts.'],
  why:'Nothing is added to the plan without a clinical reason and a visible price.'},
-{role:'Coordinator',title:'Discharge pack',img:'11-discharge.webp',w:930,h:1020,
+{role:'Consultant',view:'Consultant · Case file',title:'Discharge pack',img:'13-discharge.webp',w:930,h:1020,
  alt:'Discharge panel with a "Before discharge" list of blockers and a discharge pack checklist: discharge summary recorded, medication list missing, operative note recorded.',
- hs:[{x:2,y:6,w:95,h:15,t:'Before discharge'},{x:2,y:23,w:95,h:29,t:'Discharge pack'}],
- cap:'Discharge is not a button. The case shows what is still missing, and the pack of documents the patient takes home: summary, medication list, operative note and more.',
+ hs:[{x:2,y:6,w:95,h:15,t:'What still blocks discharge'},{x:2,y:23,w:95,h:29,t:'Discharge pack'}],
+ cap:'Discharge is not a button. The file shows what is still missing, and the documents the patient takes home: summary, medication list, operative note and more.',
  notes:['Blockers are listed in plain words.','Each document is Recorded, Missing or Not needed.'],
  why:'The patient leaves with a complete set of documents.'},
-{role:'Coordinator',title:'Follow-up and outcome questions',img:'12-follow-up.webp',w:930,h:440,
+{role:'Consultant',view:'Consultant · Case file',title:'Follow-up',img:'14-follow-up.webp',w:930,h:440,
  alt:'Follow-up panel with check-ins at day 3, 14 and 30, and an outcomes section with a day 30 questionnaire answered by secure link.',
- hs:[{x:2,y:2,w:95,h:44,t:'Check-ins'},{x:2,y:50,w:95,h:46,t:'Outcomes'}],
- cap:'After discharge, scheduled check-ins keep the patient in contact with the team. Outcome questions arrive by secure link; an answer that needs attention goes back to the Consultant.',
- notes:['Check-ins are scheduled and recorded.','A reported complication is reviewed by the Consultant before the case can close.'],
+ hs:[{x:2,y:2,w:95,h:44,t:'Scheduled check-ins'},{x:2,y:50,w:95,h:46,t:'Outcomes by secure link'}],
+ cap:'After discharge, scheduled check-ins keep the patient in touch with the team. Outcome questions arrive by secure link; an answer that needs attention goes back to the Consultant.',
+ notes:['Check-ins are scheduled and recorded.','A reported complication is reviewed before the case can close.'],
  why:'Care does not end at discharge, and the case closes only once nothing is outstanding.'}
 ];
 const total=steps.length;
-const stage=document.getElementById('stage'),bar=document.getElementById('bar'),counter=document.getElementById('counter'),pb=document.getElementById('pb');
-let cur=0; /* 0 = intro, 1..total = steps, total+1 = closing */
+const stage=document.getElementById('stage'),counter=document.getElementById('counter'),rail=document.getElementById('rail'),sub=document.getElementById('sub'),playBtn=document.getElementById('play');
+const film=/[?&]film=1/.test(location.search);if(film)document.body.classList.add('film');
+let cur=0,tour=false,audio=null,timer=null;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function intro(){return `<section class="panel"><span class="rule"></span><h1>One case, from first message to follow-up</h1>
-<p>RehletShifaa coordinates specialist medical care in Egypt for international patients. This tour follows one demo case through twelve steps, as the patient, the coordinator and the Consultant see it.</p>
+const chip=r=>`<span class="chip ${r.toLowerCase()}">${r}</span>`;
+function intro(){return `<section class="panel"><span class="rule"></span><h1>One case, from first visit to follow-up</h1>
+<p>RehletShifaa coordinates specialist medical care in Egypt for international patients. This tour follows one demo case through ${total} steps, as the patient, the coordinator and the Consultant see it.</p>
 <div class="pts"><div><b>Consultant review first</b>A Consultant reviews the case before the patient travels, pays or decides.</div><div><b>One bilingual coordinator</b>One person stays with the patient from the first message to follow-up.</div><div><b>Honest cost staging</b>A preliminary estimate first, a final quote later, each labelled as such.</div></div>
-<div class="nav"><button class="btn" data-go="1">Start the tour</button></div><p class="hint">Takes about two minutes. English only in this version.</p></section>`}
+<div class="cta"><button class="btn" data-go="1">Start the tour</button><button class="btn ghost" id="introPlay" type="button">Play with Arabic voice-over</button></div><p class="hint">About 5 minutes with the voice-over. Screens are in English; the voice-over is in Arabic.</p></section>`}
 function closing(){
+ const lanes=['Patient','Coordinator','Consultant'];
+ const grid=`<div class="grid"><div></div>${steps.map((s,i)=>`<div class="h">${i+1}</div>`).join('')}`+lanes.map(l=>`<div class="lane">${l}</div>`+steps.map((s,i)=>`<div class="c">${s.role===l?`<button data-go="${i+1}" aria-label="Step ${i+1}: ${esc(s.title)}">${i+1}</button>`:''}</div>`).join('')).join('')+`</div>`;
  return `<section class="panel"><span class="rule"></span><h1>The journey at a glance</h1>
-<ol class="tl">${steps.map((s,i)=>`<li><button data-go="${i+1}"><span class="n">${i+1}</span><span class="t">${esc(s.title)}</span><span class="chip ${s.role.toLowerCase()}">${s.role}</span>${s.ill?'<span class="chip ill">illustrative</span>':''}</button></li>`).join('')}</ol>
+<p>Who sees what, at each of the ${total} steps. Select a step to revisit it.</p>
+<div class="lanes">${grid}</div>
+<div class="list">${steps.map((s,i)=>`<button data-go="${i+1}"><span class="n">${i+1}</span><span class="t">${esc(s.title)}</span></button>`).join('')}</div>
 <div class="notshown"><h2>Not shown yet</h2><ul>
-<li>Step 1 is an illustrative mock built from the product copy: no screenshot of the intake form exists yet.</li>
-<li>Arabic screens: they exist for most steps but are not wired into this demo. Intake, discharge and follow-up have no Arabic screenshots yet.</li>
-<li>The final quote and the patient-side outcome questionnaire: steps 6 and 12 show the preliminary estimate and the coordinator's view.</li>
+<li>The final quote, and the patient's own outcome questionnaire (step 14 shows the team's view of follow-up).</li>
+<li>An Arabic interface: the voice-over is Arabic, the screens are English.</li>
+<li>Steps 11 to 14 show the Consultant's view of the case file.</li>
 </ul></div>
-<div class="nav"><button class="btn ghost" data-go="${total}">Back</button><button class="btn" data-go="0">Restart</button></div></section>`}
+<div class="cta"><button class="btn ghost" data-go="${total}">Back</button><button class="btn" data-go="0">Restart</button></div></section>`}
 function step(i){
  const s=steps[i-1];
- let body,hs='';
- if(s.mock){body=`<div class="shot">${s.mock}</div>`}
- else{
-  hs=s.hs.map((h,k)=>`<button class="hs" data-n="${k+1}" aria-label="${esc(h.t)}" style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%"><span>${k+1}</span></button>`).join('');
-  body=`<div class="shot"><img src="${IMG}${s.img}" width="${s.w}" height="${s.h}" alt="${esc(s.alt)}">${hs}</div>`}
- return `<div class="layout"><div class="frame"><div class="scroller">${body}</div></div>
+ const hs=s.hs.map((h,k)=>`<button class="hs${h.y<8?' below':''}" data-n="${k+1}" aria-label="${esc(h.t)}" style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%"><b>${k+1}</b></button>`).join('');
+ return `<div class="layout"><div class="frame"><div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="addr">${esc(s.view)}</span><span class="sp"></span></div>
+ <div class="scroller"><div class="shot"><img src="${IMG}${s.img}" width="${s.w}" height="${s.h}" alt="${esc(s.alt)}">${hs}</div></div></div>
  <aside class="cap" aria-live="polite"><span class="rule"></span>
- <div class="chips"><span class="chip ${s.role.toLowerCase()}">${s.role}</span>${s.ill?'<span class="chip ill">Illustrative</span>':''}</div>
- <h2>${i}. ${esc(s.title)}</h2><p>${esc(s.cap)}</p>
- <ol>${s.notes.map((n,k)=>`<li><b>${k+1}</b><span>${esc(n)}</span></li>`).join('')}</ol>
- <p class="why">${esc(s.why)}</p>
- <div class="nav"><button class="btn ghost" data-go="${i-1}">Back</button><button class="btn" data-go="${i+1}">${i===total?'Finish':'Next'}</button></div>
- <p class="hint">Click a pulsing ring or press → to continue.</p></aside></div>`}
+ <div class="meta">${chip(s.role)}<small>Step ${i} of ${total}</small></div>
+ <h2>${esc(s.title)}</h2><p>${esc(s.cap)}</p>
+ <ol>${s.hs.map((h,k)=>`<li><b>${k+1}</b><span>${esc(h.t)}</span></li>`).join('')}</ol>
+ <div class="why"><strong>Why it matters</strong>${esc(s.why)}</div>
+ <details class="ar"><summary>Arabic voice-over text</summary><p lang="ar" dir="rtl">${esc(AR[i]||'')}</p></details>
+ <div class="nav"><button class="btn ghost" data-go="${i-1}">Back</button><button class="btn" data-go="${i+1}">${i===total?'Summary':'Next'}</button></div>
+ <p class="hint">Click a ringed element or press → to continue.</p></aside></div>`}
+function stopAudio(){clearTimeout(timer);if(audio){audio.onended=null;audio.pause();audio=null}}
+function playAudio(){
+ stopAudio();if(!tour)return;
+ const n=String(cur).padStart(2,'0');audio=new Audio(AUD+'ar-'+n+'.mp3');
+ audio.onended=()=>{timer=setTimeout(()=>{if(cur>total){setTour(false)}else go(cur+1)},900)};
+ audio.play().catch(()=>setTour(false));
+}
+function setTour(on){
+ tour=on;playBtn.setAttribute('aria-pressed',on);
+ playBtn.querySelector('span').textContent=on?'Pause voice-over':'Play with Arabic voice-over';
+ playBtn.querySelector('svg').innerHTML=on?'<path d="M2.5 1.5h3v11h-3zM8.5 1.5h3v11h-3z"/>':'<path d="M3 1.5v11l9-5.5z"/>';
+ if(on)playAudio();else stopAudio();
+}
 function render(){
  stage.innerHTML=cur===0?intro():cur>total?closing():step(cur);
- const done=Math.min(cur,total+1)/(total+1)*100;
- bar.style.width=done+'%';pb.setAttribute('aria-valuenow',Math.round(done));
+ rail.innerHTML=steps.map((s,i)=>`<li class="${i+1<cur?'done':i+1===cur?'now':''}"><button data-go="${i+1}" aria-label="Step ${i+1}: ${esc(s.title)}" ${i+1===cur?'aria-current="step"':''}><i></i></button></li>`).join('');
  counter.textContent=cur===0?'Introduction':cur>total?'Summary':`Step ${cur} of ${total}`;
+ sub.textContent=AR[cur]||'';sub.classList.toggle('long',(AR[cur]||'').length>230);
  document.title=(cur&&cur<=total?`${cur}. ${steps[cur-1].title} – `:'')+'RehletShifaa platform demo';
- window.scrollTo(0,0);
+ const ip=document.getElementById('introPlay');if(ip)ip.onclick=()=>{go(1);setTour(true)};
+ if(!film)window.scrollTo(0,0);
+ playAudio();
 }
 function go(n){cur=Math.max(0,Math.min(total+1,n));render()}
-stage.addEventListener('click',e=>{
+window.go=go;
+document.addEventListener('click',e=>{
  const b=e.target.closest('[data-go]');if(b){go(+b.dataset.go);return}
- if(e.target.closest('.hs')){go(cur+1)}
+ if(e.target.closest('.hs'))go(cur+1);
 });
+playBtn.addEventListener('click',()=>{if(cur===0)go(1);setTour(!tour)});
 document.addEventListener('keydown',e=>{
  if(e.altKey||e.ctrlKey||e.metaKey)return;
  if(e.key==='ArrowRight')go(cur+1);else if(e.key==='ArrowLeft')go(cur-1);
 });
-/* Narration: browser speech synthesis reads each slide aloud (off by default, no audio files) */
-const narrBtn=document.getElementById('narr'),synth=window.speechSynthesis;let narrOn=false;
-function script(){
- if(cur===0)return 'RehletShifaa coordinates specialist medical care in Egypt for international patients. This tour follows one demo case through twelve steps. A Consultant reviews the case before the patient travels, pays or decides. One bilingual coordinator stays with the patient. Costs move from a preliminary estimate to a final quote.';
- if(cur>total)return 'That is the journey at a glance. Step one is an illustrative mock. Arabic screens, the final quote and the patient questionnaire are not shown yet.';
- const s=steps[cur-1];return `Step ${cur}. ${s.role}. ${s.title}. ${s.cap} ${s.why}`;
-}
-function speak(){
- if(!synth)return;synth.cancel();
- if(!narrOn)return;
- const u=new SpeechSynthesisUtterance(script());u.lang='en-US';u.rate=.95;synth.speak(u);
-}
-if(!synth){narrBtn.hidden=true}
-narrBtn.addEventListener('click',()=>{narrOn=!narrOn;narrBtn.setAttribute('aria-pressed',narrOn);narrBtn.textContent='Narration: '+(narrOn?'on':'off');speak()});
-const _render=render;render=function(){_render();speak()};
 render();
 </script>
 </body>
