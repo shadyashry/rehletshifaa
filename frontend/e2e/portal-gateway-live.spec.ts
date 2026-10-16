@@ -131,7 +131,7 @@ test("coordinator: reads right-to-left in Arabic at desktop and phone widths", a
   await signIn(page, USERNAME, "ar");
   await openCase(page, CASE!, "ar");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  await expect(page.locator("#current-action").getByText("الإجراء الحالي")).toBeVisible();
+  await expect(page.locator("#current-action").getByText("خطوتك", { exact: true })).toBeVisible();
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.waitForTimeout(250);
@@ -190,7 +190,7 @@ test("patient: dashboard, case and the public proposal route through the gateway
   const open = page.getByRole("button", { name: /^Open(:| RS-)/ }).first();
   if (await open.count()) {
     await open.click();
-    await expect(page.getByRole("button", { name: /My dashboard/ })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("button", { name: /^Back to / })).toBeVisible({ timeout: 20000 });
   }
   await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toHaveCount(0);
   // The public proposal route is served by the backend through the gateway's public zone; an unknown

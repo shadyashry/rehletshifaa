@@ -12,7 +12,7 @@ test("a consultant's clinical draft survives switching tabs", async ({ page }) =
   await page.goto("/en/portal");
   await page.getByRole("button", { name: /^Open(:| RS-)/ }).first().click();
   await page.getByRole("tab", { name: /Clinical/ }).click();
-  const draft = page.locator("#clinical-recommendation");
+  const draft = page.getByLabel("Clinical recommendation", { exact: true });
   await draft.fill("Dual-chamber pacemaker; synthetic draft text");
   await page.getByRole("tab", { name: /Overview/ }).click();
   await expect(draft).toBeHidden();

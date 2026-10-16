@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CaseWorkflowActions } from "./CaseWorkflowActions";
 import { refreshAfterRejectedAction } from "./portal-model";
 import { RoleActions } from "./StaffCaseView";
+import { renderWithWork } from "./test-copy";
 
 const t = { operationsComplete: "Complete operational plan", financeApprove: "Approve commercial terms" } as never;
 const c = { id: "case-1", caseNumber: "RS-1", status: "PROPOSAL_PREPARATION", patientName: "Patient", country: "AE", preferredLanguage: "en", createdAt: "2026-01-01", updatedAt: "2026-01-01", version: 1 };
@@ -14,22 +15,22 @@ describe("server-authoritative proposal actions", () => {
   afterEach(cleanup);
 
   it("does not reconstruct Finance authority from gate booleans", () => {
-    render(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={{ ...gates, operationsRequired: false }} availableActions={[]} locale="en" mutate={vi.fn()}/>);
+    renderWithWork(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={{ ...gates, operationsRequired: false }} availableActions={[]} mutate={vi.fn()}/>);
     expect(screen.queryByRole("button", { name: /approve commercial terms/i })).toBeNull();
     cleanup();
-    render(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={{ ...gates, financeRequired: false }} availableActions={["APPROVE_COMMERCIAL_TERMS"]} locale="en" mutate={vi.fn()}/>);
+    renderWithWork(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={{ ...gates, financeRequired: false }} availableActions={["APPROVE_COMMERCIAL_TERMS"]} mutate={vi.fn()}/>);
     expect(screen.getByRole("button", { name: /approve commercial terms/i })).toBeTruthy();
     // QA #20: when the action card carries the approval, there is no second button here.
     cleanup();
-    render(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={gates} availableActions={["APPROVE_COMMERCIAL_TERMS"]} locale="en" mutate={vi.fn()} approvalInCard/>);
+    renderWithWork(<RoleActions role="finance" t={t} c={c} proposal={proposal} gates={gates} availableActions={["APPROVE_COMMERCIAL_TERMS"]} mutate={vi.fn()} approvalInCard/>);
     expect(screen.queryByRole("button", { name: /approve commercial terms/i })).toBeNull();
   });
 
   it("does not reconstruct Operations authority from proposal status or gates", () => {
-    render(<RoleActions role="operations" t={t} c={c} proposal={proposal} gates={gates} availableActions={[]} locale="en" mutate={vi.fn()}/>);
+    renderWithWork(<RoleActions role="operations" t={t} c={c} proposal={proposal} gates={gates} availableActions={[]} mutate={vi.fn()}/>);
     expect(screen.queryByRole("button", { name: /complete operational plan/i })).toBeNull();
     cleanup();
-    render(<RoleActions role="operations" t={t} c={c} proposal={proposal} gates={{ ...gates, operationsRequired: false }} availableActions={["UPDATE_TRAVEL_PLAN"]} locale="en" mutate={vi.fn()}/>);
+    renderWithWork(<RoleActions role="operations" t={t} c={c} proposal={proposal} gates={{ ...gates, operationsRequired: false }} availableActions={["UPDATE_TRAVEL_PLAN"]} mutate={vi.fn()}/>);
     expect(screen.getByRole("button", { name: /complete operational plan/i })).toBeTruthy();
   });
 
@@ -42,9 +43,11 @@ describe("server-authoritative proposal actions", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
   });
 
-  it("leaves deferred downstream consultant actions unchanged", () => {
-    render(<CaseWorkflowActions locale="en" role="doctor" caseSummary={{ id: "case-1", status: "DISCHARGED", version: 1 }} availableActions={[]} mutate={vi.fn()}/>);
-    expect(screen.getByText("Schedule follow-up")).toBeTruthy();
+  // UX 3-1: the follow-up plan is recorded in the discharge panel (P1-17); the legacy duplicate form is retired.
+  it("offers no legacy follow-up form to a Consultant after discharge", () => {
+    const { container } = render(<CaseWorkflowActions locale="en" role="doctor" caseSummary={{ id: "case-1", status: "DISCHARGED", version: 1 }} availableActions={[]} mutate={vi.fn()}/>);
+    expect(container.innerHTML).toBe("");
+    expect(screen.queryByText("Schedule follow-up")).toBeNull();
   });
 
   it("refreshes queue and workspace after a stale/direct API rejection", async () => {

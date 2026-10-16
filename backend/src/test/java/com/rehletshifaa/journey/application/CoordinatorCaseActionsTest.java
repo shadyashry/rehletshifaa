@@ -66,6 +66,27 @@ class CoordinatorCaseActionsTest {
         assertThat(journey.workspace(ctx.caseId).actions().currentAction().code()).isEqualTo("RELEASE_PROPOSAL");
     }
 
+    /** UX area 2 (D-06): the coordinator's page mirrors the patient's current step, from the patient's own rule, without its free text. */
+    @Test void theCoordinatorSeesThePatientsCurrentStepAndNoOtherStaffDoes() throws Exception {
+        var ctx = recommended();
+        authenticate("coordinator-subject", Role.COORDINATOR);
+        CurrentActionView waiting = journey.workspace(ctx.caseId()).actions().patientStep();
+        assertThat(waiting.code()).isEqualTo("WAIT_CONSULTANT_REVIEW");
+        assertThat(waiting.kind()).isEqualTo("WAIT");
+        assertThat(waiting.expectedWorkingDays()).isNotNull();
+
+        var proposal = createProposal(ctx);
+        journey.releaseProposal(ctx.caseId(), proposal.versionId()); em.flush();
+        CurrentActionView deciding = journey.workspace(ctx.caseId()).actions().patientStep();
+        assertThat(deciding.code()).isEqualTo("REVIEW_PROPOSAL");
+        assertThat(deciding.kind()).isEqualTo("FOCUS");
+        assertThat(deciding.title()).isNull();
+        assertThat(deciding.context()).isNull();
+
+        authenticate("doctor-subject", Role.CONSULTANT);
+        assertThat(journey.workspace(ctx.caseId()).actions().patientStep()).as("Consultants do not get the patient's page").isNull();
+    }
+
     @Test void beforeReleaseTheMissingInternalSignOffIsTheCurrentAction() throws Exception {
         var ctx = recommended();
         // A manually priced service on the recommendation: Finance must approve before release.

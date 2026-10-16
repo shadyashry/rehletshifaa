@@ -40,6 +40,19 @@ export function workCopyText(copy: WorkItemCopy | null | undefined, messages: Wo
 }
 
 /**
+ * A My work item in this locale: from its wording code when the copy knows it; otherwise the backend's English, titled by
+ * its work type in Arabic. Shared by My work and the case cover's "Also open on this case".
+ */
+export function workItemText(item: { copy?: WorkItemCopy | null; type: string; title: string; context: string | null },
+                             locale: Locale, work: Pick<WorkCopy, "workCopy" | "workTitles">) {
+  const known = workCopyText(item.copy, work.workCopy);
+  if (known) return known;
+  const titles: Record<string, string> = work.workTitles;
+  const localized = Object.hasOwn(titles, item.type) ? titles[item.type] : undefined;
+  return { title: (locale === "ar" ? localized : undefined) ?? (item.title || localized || ""), context: item.context };
+}
+
+/**
  * Why the case waits, in this locale: a fixed reason, the title of the work item the team owes (`WORK:<code>`), or a
  * patient step named by its blocker (`PATIENT_STEP:<code>`, labelled from the case's own blockers). Unknown codes and
  * reasons without a code keep the backend's English.

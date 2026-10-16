@@ -31,7 +31,7 @@ export type CareCategory={slug:string;nameEn:string;nameAr:string};
 
 export type StaffMember={subject:string;name:string;role:string};
 
-export type CostEstimate={serviceDescription:string;estimatedCost:number;currency:string;catalogServiceId?:string|null;quotedCost?:number|null;quotedCurrency?:string|null};
+export type CostEstimate={serviceDescription:string;estimatedCost:number;currency:string;catalogServiceId?:string|null;facilityPackageId?:string|null;quotedCost?:number|null;quotedCurrency?:string|null};
 
 export type Review={id:string;versionNumber:number;status:string;suitability?:string;recommendedTreatment?:string;risksAndLimitations?:string;createdAt:string;costEstimates?:CostEstimate[];proposalCurrency?:string|null;quoteRate?:number|null;quoteRateDate?:string|null;quoteRateSource?:string|null};
 

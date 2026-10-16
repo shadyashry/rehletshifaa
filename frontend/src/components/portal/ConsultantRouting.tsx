@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import { useWorkCopy } from "@/components/portal/portal-copy";
-import { careAreaLabel } from "@/lib/portal-labels";
+import { careAreaLabel, fillTemplate, plural } from "@/lib/portal-labels";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
 
 /**
@@ -26,36 +26,17 @@ export type Referral = {
   opinion?: string | null; opinionSubmittedAt?: string | null; createdAt: string; updatedAt: string; version: number; viewerRelation: string;
 };
 
-const L = {
-  en: {
-    noneEligible: "No eligible Consultant is available for this care area right now.", loading: "Loading eligible Consultants…",
-    reviewTime: (h: number) => `Usual review time ${h} h`, workload: (a: number, p: number) => `${a} active case${a === 1 ? "" : "s"}${p ? ` · ${p} offer${p === 1 ? "" : "s"} pending` : ""}`,
-    viaCapability: "Eligible through an approved capability", choose: "Eligible Consultants", chooseHint: "Care area is only the first filter. Compare subspecialty, capabilities and workload, then choose.",
-    transfer: "Transfer", secondOpinion: "Second opinion", referralFrom: "Requested by", reason: "Clinical reason", suggested: "Suggested",
-    declinedBy: "The previous Consultant declined", careArea: "Care area", note: "Note to the Consultant (optional)", confirm: "Confirm handover",
-    decline: "Decline referral", declineNote: "Why this referral is not confirmed", sendDecline: "Decline", cancel: "Cancel", noOpen: "There is no referral waiting for you on this case.",
-    refer: "Refer this case", referHint: "Nothing is shared until the coordinator confirms and the receiving Consultant accepts. A transfer ends your assignment only once it is accepted.",
-    type: "Referral type", transferHint: "Hand the case to another Consultant.", secondHint: "Ask another Consultant for a limited opinion; you stay the case's Consultant.",
-    clinicalReason: "Clinical reason for the referral", suggestArea: "Suggested care area (optional)", sameArea: "Same care area", suggestCapability: "Suggested capability or subspecialty (optional)",
-    suggestConsultant: "Suggested Consultant (optional)", noSuggestion: "No specific Consultant", send: "Send to the coordinator",
-    referrals: "Referrals", status: { AWAITING_COORDINATOR: "Waiting for the coordinator", AWAITING_CONSULTANT: "Offered to the receiving Consultant", IN_PROGRESS: "Second opinion in progress", COMPLETED: "Completed", DECLINED_BY_COORDINATOR: "Not confirmed by the coordinator", WITHDRAWN: "Withdrawn" } as Record<string, string>,
-    to: "to", opinion: "Second opinion", yourOpinion: "Your second opinion", opinionHint: "Submitting ends your access to this case.", submitOpinion: "Submit second opinion", coordinatorNote: "Coordinator note",
-  },
-  ar: {
-    noneEligible: "لا يوجد حاليًا استشاري مؤهل متاح لهذا المجال.", loading: "جارٍ تحميل الاستشاريين المؤهلين…",
-    reviewTime: (h: number) => `مدة المراجعة المعتادة ${h} ساعة`, workload: (a: number, p: number) => `حالات نشطة: ${a}${p ? ` · عروض بانتظار الرد: ${p}` : ""}`,
-    viaCapability: "مؤهل عبر قدرة معتمدة", choose: "الاستشاريون المؤهلون", chooseHint: "مجال الرعاية هو الفرز الأول فقط. قارن التخصص الدقيق والقدرات وحجم العمل ثم اختر.",
-    transfer: "نقل", secondOpinion: "رأي ثانٍ", referralFrom: "طلبه", reason: "السبب السريري", suggested: "مقترح",
-    declinedBy: "اعتذر الاستشاري السابق", careArea: "مجال الرعاية", note: "ملاحظة للاستشاري (اختياري)", confirm: "تأكيد التسليم",
-    decline: "رفض الإحالة", declineNote: "سبب عدم تأكيد الإحالة", sendDecline: "رفض", cancel: "إلغاء", noOpen: "لا توجد إحالة بانتظارك في هذه الحالة.",
-    refer: "إحالة هذه الحالة", referHint: "لا يُشارك شيء حتى يؤكد المنسق ويقبل الاستشاري المستلم. لا ينتهي إسنادك في النقل إلا بعد قبوله.",
-    type: "نوع الإحالة", transferHint: "تسليم الحالة إلى استشاري آخر.", secondHint: "طلب رأي محدود من استشاري آخر؛ تبقى أنت استشاري الحالة.",
-    clinicalReason: "السبب السريري للإحالة", suggestArea: "مجال رعاية مقترح (اختياري)", sameArea: "نفس مجال الرعاية", suggestCapability: "قدرة أو تخصص دقيق مقترح (اختياري)",
-    suggestConsultant: "استشاري مقترح (اختياري)", noSuggestion: "دون استشاري محدد", send: "إرسال إلى المنسق",
-    referrals: "الإحالات", status: { AWAITING_COORDINATOR: "بانتظار المنسق", AWAITING_CONSULTANT: "معروضة على الاستشاري المستلم", IN_PROGRESS: "الرأي الثاني قيد الإعداد", COMPLETED: "مكتملة", DECLINED_BY_COORDINATOR: "لم يؤكدها المنسق", WITHDRAWN: "سُحبت" } as Record<string, string>,
-    to: "إلى", opinion: "الرأي الثاني", yourOpinion: "رأيك الثاني", opinionHint: "بإرسال رأيك ينتهي وصولك إلى هذه الحالة.", submitOpinion: "إرسال الرأي الثاني", coordinatorNote: "ملاحظة المنسق",
-  },
-};
+/** The referral wording, from the staff work copy (`portalWork.referrals`), with the counted phrases in the locale's plural forms. */
+function useReferralCopy() {
+  const work = useWorkCopy();
+  const t = work.referrals;
+  return {
+    ...t,
+    reviewTime: (hours: number) => fillTemplate(t.reviewTime, { hours: plural(work.locale, hours, work.plural.reviewHours) }),
+    workload: (active: number, pending: number) => [plural(work.locale, active, work.plural.activeCases), pending ? plural(work.locale, pending, work.plural.pendingOffers) : null].filter(Boolean).join(" · "),
+    statusText: (status: string) => (Object.hasOwn(t.status, status) ? t.status[status as keyof typeof t.status] : status),
+  };
+}
 
 function areaName(slug: string | null | undefined, categories: CareCategory[], locale: Locale) {
   const c = categories.find(x => x.slug === slug);
@@ -63,14 +44,14 @@ function areaName(slug: string | null | undefined, categories: CareCategory[], l
 }
 
 /** Eligible consultants for a care area, as choosable cards. Loads from the case-scoped coordinator endpoint. */
-export function EligibleConsultantPicker({ locale, caseId, careArea, value, onChange, load, empty, footer }: {
+export function EligibleConsultantPicker({ caseId, careArea, value, onChange, load, empty, footer }: {
   locale: Locale; caseId: string; careArea: string; value: string; onChange: (practitionerId: string) => void; load: Load;
   /** What the caller can do next when nobody is eligible; without it the message stands alone. */
   empty?: React.ReactNode;
   /** Shown under the list only when someone is eligible (the caller's submit): nothing to submit, no button. */
   footer?: React.ReactNode;
 }) {
-  const t = L[locale];
+  const t = useReferralCopy();
   // The answer belongs to one case + care area: until THAT read answers, the list is loading.
   const key = careArea ? `${caseId}|${careArea}` : null;
   const [result, setResult] = useState<{ key: string; rows: EligibleConsultant[] } | null>(null);
@@ -83,10 +64,10 @@ export function EligibleConsultantPicker({ locale, caseId, careArea, value, onCh
   }, [key, caseId, careArea, load]);
   const rows = !key ? [] : result?.key === key ? result.rows : null;
   if (rows === null) return <p role="status" className="text-sm text-ink-500">{t.loading}</p>;
-  if (!rows.length) return <div><p role="status" className="text-[0.9rem] font-semibold text-ink-800">{t.noneEligible}</p>{empty}</div>;
+  if (!rows.length) return <div><p role="status" className="text-[0.9375rem] font-semibold text-ink-800">{t.noneEligible}</p>{empty}</div>;
   return <><fieldset>
     <legend className="text-sm font-bold">{t.choose}</legend>
-    <p className="text-[0.8rem] text-ink-500">{t.chooseHint}</p>
+    <p className="text-[0.8125rem] text-ink-500">{t.chooseHint}</p>
     <div className="mt-2 grid gap-2 md:grid-cols-2">{rows.map(c => <label key={c.practitionerId} className={`flex cursor-pointer gap-3 rounded-lg border p-3 text-sm ${value === c.practitionerId ? "border-brand-500 bg-brand-50" : "border-line"}`}>
       <input type="radio" name={`consultant-${caseId}`} className="mt-1" checked={value === c.practitionerId} onChange={() => onChange(c.practitionerId)}/>
       <span className="min-w-0">
@@ -104,7 +85,7 @@ export function EligibleConsultantPicker({ locale, caseId, careArea, value, onCh
 export function ReferralConfirmation({ locale, caseId, careCategory, categories, busy, load, mutate }: {
   locale: Locale; caseId: string; careCategory?: string; categories: CareCategory[]; busy: boolean; load: Load; mutate: Mutate;
 }) {
-  const t = L[locale];
+  const t = useReferralCopy();
   const [referral, setReferral] = useState<Referral | null | undefined>(undefined);
   const [area, setArea] = useState("");
   const [chosen, setChosen] = useState("");
@@ -127,9 +108,9 @@ export function ReferralConfirmation({ locale, caseId, careCategory, categories,
   if (referral === undefined) return <p role="status" className="text-sm text-ink-500">{t.loading}</p>;
   if (!referral) return <p className="text-sm text-ink-500">{t.noOpen}</p>;
   return <div className="space-y-3">
-    <div className="rounded-lg border border-line bg-mist p-3 text-sm">
-      <p className="font-bold text-ink-900">{referral.type === "TRANSFER" ? t.transfer : t.secondOpinion} · {t.referralFrom} {referral.fromConsultantName}</p>
-      <p className="mt-1 whitespace-pre-wrap text-ink-700"><span className="font-semibold">{t.reason}:</span> {referral.clinicalReason}</p>
+    <div className="border-y border-line py-3 text-sm">
+      <p className="font-bold text-ink-900">{referral.type === "TRANSFER" ? t.transfer : t.secondOpinion} · {fillTemplate(t.requestedBy, { name: `⁨${referral.fromConsultantName ?? ""}⁩` })}</p>
+      <p className="mt-1 whitespace-pre-wrap text-ink-700"><span className="font-semibold">{t.reason}:</span> <bdi dir="auto">{referral.clinicalReason}</bdi></p>
       {(referral.suggestedCareArea || referral.suggestedCapability || referral.suggestedConsultantName) && <p className="mt-1 text-ink-600"><span className="font-semibold">{t.suggested}:</span> {[areaName(referral.suggestedCareArea, categories, locale), referral.suggestedCapability, referral.suggestedConsultantName].filter(Boolean).join(" · ")}</p>}
       {referral.receiverReason && <p className="mt-1 text-alert-800"><span className="font-semibold">{t.declinedBy}:</span> {referral.receiverReason}</p>}
     </div>
@@ -159,7 +140,7 @@ export function ReferralConfirmation({ locale, caseId, careCategory, categories,
 export function ConsultantReferrals({ locale, caseId, careCategory, categories, canRefer, busy, load, mutate }: {
   locale: Locale; caseId: string; careCategory?: string; categories: CareCategory[]; canRefer: boolean; busy: boolean; load: Load; mutate: Mutate;
 }) {
-  const t = L[locale];
+  const t = useReferralCopy();
   const [rows, setRows] = useState<Referral[]>([]);
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<"TRANSFER" | "SECOND_OPINION">("SECOND_OPINION");
@@ -187,12 +168,12 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
   const secondOpinion = rows.find(r => r.viewerRelation === "RECEIVER" && r.type === "SECOND_OPINION" && r.status === "IN_PROGRESS");
   const openOfType = (kind: string) => rows.some(r => r.viewerRelation === "REFERRER" && r.type === kind && ["AWAITING_COORDINATOR", "AWAITING_CONSULTANT", "IN_PROGRESS"].includes(r.status));
   if (!rows.length && !canRefer && !secondOpinion) return null;
-  return <section ref={section} tabIndex={-1} className="card space-y-4 p-4 outline-none sm:p-5" aria-label={t.referrals}>
+  return <section ref={section} tabIndex={-1} className="space-y-4 border-t border-line pt-4 outline-none" aria-label={t.referrals}>
     {secondOpinion && <form id="case-actions" className="space-y-2" onSubmit={e => { e.preventDefault(); const opinion = String(new FormData(e.currentTarget).get("opinion") ?? "").trim(); if (opinion) setPendingOpinion(opinion); }}>
-      <h3 className="font-bold text-brand-900">{t.yourOpinion}</h3>
-      <p className="whitespace-pre-wrap rounded-lg bg-mist p-3 text-sm text-ink-700"><span className="font-semibold">{t.reason}:</span> {secondOpinion.clinicalReason} ({t.referralFrom} {secondOpinion.fromConsultantName})</p>
-      <textarea name="opinion" required maxLength={20000} className="field min-h-32" aria-label={t.yourOpinion}/>
-      <p className="text-[0.8rem] text-ink-500">{t.opinionHint}</p>
+      <h3 className="text-[1.0625rem] font-bold text-brand-900">{t.yourOpinion}</h3>
+      <p className="whitespace-pre-wrap border-y border-line py-3 text-sm text-ink-700"><span className="font-semibold">{t.reason}:</span> <bdi dir="auto">{secondOpinion.clinicalReason}</bdi> ({fillTemplate(t.requestedBy, { name: `⁨${secondOpinion.fromConsultantName ?? ""}⁩` })})</p>
+      <textarea name="opinion" required maxLength={20000} dir="auto" className="field min-h-32" aria-label={t.yourOpinion} aria-describedby="second-opinion-hint"/>
+      <p id="second-opinion-hint" className="text-[0.8125rem] text-ink-500">{t.opinionHint}</p>
       <button className="btn-primary" disabled={busy}>{t.submitOpinion}</button>
     </form>}
     {secondOpinion && pendingOpinion !== null && <ConfirmDialog title={confirmCopy.opinionTitle} body={confirmCopy.opinionBody} confirm={confirmCopy.opinion} cancel={confirmCopy.keepEditing}
@@ -200,11 +181,11 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
       onConfirm={() => { const opinion = pendingOpinion; setPendingOpinion(null); void mutate(`/doctor/cases/${caseId}/referrals/${secondOpinion.id}/opinion`, { opinion }).then(result => { reloadRows(); if (result) section.current?.focus(); }); }}/>}
 
     {rows.filter(r => r !== secondOpinion).length > 0 && <div>
-      <h3 className="font-bold text-brand-900">{t.referrals}</h3>
+      <h3 className="text-[1.0625rem] font-bold text-brand-900">{t.referrals}</h3>
       <ul className="mt-2 divide-y divide-line text-sm">{rows.filter(r => r !== secondOpinion).map(r => <li key={r.id} className="py-2">
-        <p><strong>{r.type === "TRANSFER" ? t.transfer : t.secondOpinion}</strong>{r.targetConsultantName ? ` ${t.to} ${r.targetConsultantName}` : ""} · {t.status[r.status] ?? r.status}</p>
-        {r.coordinatorNote && <p className="text-ink-600">{t.coordinatorNote}: {r.coordinatorNote}</p>}
-        {r.opinion && r.viewerRelation === "REFERRER" && <p className="mt-1 whitespace-pre-wrap rounded-lg bg-brand-50 p-2 text-ink-800"><span className="font-semibold">{t.opinion}:</span> {r.opinion}</p>}
+        <p><strong>{r.type === "TRANSFER" ? t.transfer : t.secondOpinion}</strong>{r.targetConsultantName ? <> <bdi>{fillTemplate(t.to, { name: r.targetConsultantName })}</bdi></> : null} · {t.statusText(r.status)}</p>
+        {r.coordinatorNote && <p className="text-ink-600">{t.coordinatorNote}: <bdi dir="auto">{r.coordinatorNote}</bdi></p>}
+        {r.opinion && r.viewerRelation === "REFERRER" && <p className="mt-1 whitespace-pre-wrap text-ink-800"><span className="font-semibold">{t.opinion}:</span> <bdi dir="auto">{r.opinion}</bdi></p>}
       </li>)}</ul>
     </div>}
 
@@ -215,15 +196,15 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
       void mutate(`/doctor/cases/${caseId}/referrals`, { type, clinicalReason: text("clinicalReason"), suggestedCareArea: area || null, suggestedCapability: text("suggestedCapability"), suggestedPractitionerId: text("suggestedPractitionerId") })
         .then(r => { if (r) { setOpen(false); reloadRows(); } });
     }}>
-      <h3 className="font-bold text-brand-900">{t.refer}</h3>
-      <p className="text-[0.8rem] text-ink-500">{t.referHint}</p>
+      <h3 className="text-[1.0625rem] font-bold text-brand-900">{t.refer}</h3>
+      <p className="text-[0.8125rem] text-ink-500">{t.referHint}</p>
       <fieldset className="grid gap-2 sm:grid-cols-2"><legend className="text-sm font-bold">{t.type}</legend>
-        {(["SECOND_OPINION", "TRANSFER"] as const).map(k => <label key={k} className={`flex gap-2 rounded-lg border p-3 text-sm ${type === k ? "border-brand-500 bg-brand-50" : "border-line"} ${openOfType(k) ? "opacity-50" : ""}`}>
+        {(["SECOND_OPINION", "TRANSFER"] as const).map(k => <label key={k} className={`flex gap-2 rounded-lg border p-3 text-sm ${type === k ? "border-brand-600" : "border-line"} ${openOfType(k) ? "text-ink-500" : ""}`}>
           <input type="radio" name="type" checked={type === k} disabled={openOfType(k)} onChange={() => setType(k)}/>
           <span><strong className="block">{k === "TRANSFER" ? t.transfer : t.secondOpinion}</strong>{k === "TRANSFER" ? t.transferHint : t.secondHint}</span>
         </label>)}
       </fieldset>
-      <label className="block text-sm font-bold">{t.clinicalReason}<textarea name="clinicalReason" required maxLength={4000} className="field mt-1.5 min-h-24"/></label>
+      <label className="block text-sm font-bold">{t.clinicalReason}<textarea name="clinicalReason" required maxLength={4000} dir="auto" className="field mt-1.5 min-h-24"/></label>
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block text-sm font-bold">{t.suggestArea}<select className="field mt-1.5" value={area} onChange={e => setArea(e.target.value)}>
           <option value="">{t.sameArea}</option>{categories.map(c => <option key={c.slug} value={c.slug}>{locale === "ar" ? c.nameAr : c.nameEn}</option>)}</select></label>
@@ -231,7 +212,8 @@ export function ConsultantReferrals({ locale, caseId, careCategory, categories, 
         <label className="block text-sm font-bold">{t.suggestConsultant}<select name="suggestedPractitionerId" className="field mt-1.5" defaultValue="">
           <option value="">{t.noSuggestion}</option>{candidates.map(c => <option key={c.practitionerId} value={c.practitionerId}>{c.displayName}{c.subspecialty ? ` · ${c.subspecialty}` : ""}</option>)}</select></label>
       </div>
-      <div className="flex flex-wrap gap-2"><button className="btn-primary" disabled={busy || openOfType(type)}>{t.send}</button><button type="button" className="btn-secondary" onClick={() => setOpen(false)}>{t.cancel}</button></div>
-    </form> : <button type="button" className="btn-secondary" onClick={() => setOpen(true)}>{t.refer}</button>)}
+      {/* Secondary: the review's Submit recommendation stays the view's one filled action while the referral form is open. */}
+      <div className="flex flex-wrap gap-2"><button className="btn-secondary" disabled={busy || openOfType(type)}>{t.send}</button><button type="button" className="btn-secondary" onClick={() => setOpen(false)}>{t.cancel}</button></div>
+    </form> : <button type="button" className="link-cta text-[0.9375rem]" onClick={() => setOpen(true)}>{t.refer}</button>)}
   </section>;
 }

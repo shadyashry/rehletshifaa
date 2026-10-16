@@ -138,7 +138,11 @@ public final class JourneyDtos {
     public record StaffDirectoryView(String subject,String name,String role) {}
     /** One responsibility record on a case (UX-7 Assignment history). assignedByKind: PERSON, ROUTING or SYSTEM; names only, never account identifiers. */
     public record AssignmentHistoryEntry(String role,String assigneeName,String status,Instant assignedAt,Instant endedAt,String assignedByKind,String assignedByName,String reason) {}
-    public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason,ProposalAssistanceView assistance,Instant acceptableFrom,String fxReapprovalStatus,List<PayeeTotal> payeeTotals) {}
+    // totalMin/totalExpected/totalMax (UX 1c-0) are set only on the patient's own view: the same figures as PublicProposalView, in the
+    // proposal currency at the rate frozen at release. Staff views leave them null (a Consultant's view has the fee line removed).
+    public record ProposalView(UUID proposalId,UUID versionId,int versionNumber,String status,String language,String currency,Instant validUntil,String operationalPlan,String includedServices,String excludedServices,String paymentTerms,String refundTerms,String disclaimers,List<ProposalItemView>items,String coordinatorNotes,String documentType,String scopeChangeReason,ProposalAssistanceView assistance,Instant acceptableFrom,String fxReapprovalStatus,List<PayeeTotal> payeeTotals,BigDecimal totalMin,BigDecimal totalExpected,BigDecimal totalMax) {
+        public ProposalView withTotals(BigDecimal min,BigDecimal expected,BigDecimal max){return new ProposalView(proposalId,versionId,versionNumber,status,language,currency,validUntil,operationalPlan,includedServices,excludedServices,paymentTerms,refundTerms,disclaimers,items,coordinatorNotes,documentType,scopeChangeReason,assistance,acceptableFrom,fxReapprovalStatus,payeeTotals,min,expected,max);}
+    }
     /** P1-19 (design §7.4): who is paid for the line: CONSULTANT, FACILITY, OTHER, or PLATFORM (the fee line). */
     public record ProposalItemView(UUID id,String category,String description,BigDecimal quantity,BigDecimal unitPrice,boolean optional,String payee) {}
     /** The sum of one payee's mandatory lines as shown (P1-19: the Consultant and the hospital apart, never blended), payees in document order. */
@@ -226,8 +230,15 @@ public final class JourneyDtos {
     /**
      * {@code viewer}: who is looking at this case — SELF (the patient), REPRESENTATIVE (acting for them) or STAFF.
      * {@code waitingReasonCode}: the code the portal words {@code waitingReason} from (see {@link WorkDtos.WaitingReason}).
+     * {@code patientStep}: UX area 2 (D-06), coordinators only — the step the patient's own page shows now, from the same
+     * rule that answers the patient (code, kind, due, exit word, usual window; never the request's free text). Null for
+     * every other viewer.
      */
-    public record CaseActionsView(String journeyStage,String waitingOn,String waitingReason,CurrentActionView currentAction,List<BlockerView>blockers,List<String>availableActions,String viewer,String waitingReasonCode) {}
+    public record CaseActionsView(String journeyStage,String waitingOn,String waitingReason,CurrentActionView currentAction,List<BlockerView>blockers,List<String>availableActions,String viewer,String waitingReasonCode,CurrentActionView patientStep) {
+        public CaseActionsView(String journeyStage,String waitingOn,String waitingReason,CurrentActionView currentAction,List<BlockerView>blockers,List<String>availableActions,String viewer,String waitingReasonCode){
+            this(journeyStage,waitingOn,waitingReason,currentAction,blockers,availableActions,viewer,waitingReasonCode,null);
+        }
+    }
     public record IdResponse(UUID id,String status) {}
     // --- Consultant price catalog, specialty templates, and FX (Phase 2) ---
     public record CatalogServiceView(UUID id,String serviceCode,String serviceName,String category,BigDecimal priceEgp,boolean active,LocalDate validUntil) {}

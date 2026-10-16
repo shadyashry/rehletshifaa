@@ -4,8 +4,9 @@ import { ArrowRight, CalendarClock, CheckCheck, Clock3, FileText } from "lucide-
 
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge } from "@/components/portal/StatusBadge";
+import { useRovingList } from "@/components/portal/StaffShortcuts";
 import { intlLocale, type Locale } from "@/lib/i18n";
-import { careAreaLabel, coordinatorLabel, patientNameLabel, plural, priorityLabel, waitingLabel, workCopyText, type WorkItemCopy } from "@/lib/portal-labels";
+import { careAreaLabel, coordinatorLabel, patientNameLabel, plural, priorityLabel, waitingLabel, workItemText, type WorkItemCopy } from "@/lib/portal-labels";
 
 export type WorkItem = {
   id: string; caseId: string; caseNumber: string; patientName: string | null; caseStatus: string;
@@ -22,39 +23,41 @@ export type WorkItem = {
  * <p>Each row is a real work item, independent of case status: it stays open until the work is done, and
  * reading the matching notification does not clear it.
  *
- * <p>Rows are a hairline list on one white sheet, with one quiet action each. Only an overdue or urgent first item earns the filled
- * button, so the page never shows a column of identical primaries. An empty list points to the next useful place.
+ * <p>Rows are a hairline list with one quiet action each. Only an overdue or urgent first item earns the filled
+ * button, so the page never shows a column of identical primaries. When it is due and how long it has waited sit with the
+ * action on wide screens, so the eye goes date, then action. An empty list points to the next useful place; the first load
+ * shows the list's shape so the page does not jump.
+ *
+ * <p>The list is one tab stop (UX 2-2): ↑/↓, Home/End and `j`/`k` move between rows, Enter opens the row's case.
  */
-export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting = 0, onTeamQueue }: {
+export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting = 0, onTeamQueue, labelledBy }: {
   locale: Locale; role?: string; items: WorkItem[]; busy: boolean; onOpen: (caseId: string) => void;
   /** The viewer, so their own case reads "You" as it does in the queue. */
   subject?: string;
   /** New cases nobody owns yet (coordinators), offered as the next place to look when nothing is assigned. */
   teamWaiting?: number; onTeamQueue?: () => void;
+  /** The page's heading that names this view (UX 2-4: the view's name is the page's place, said once). */
+  labelledBy?: string;
 }) {
   const work = useWorkCopy();
   const t = work.myWork;
+  const roving = useRovingList(items.map(item => item.id));
 
   return (
-    <section aria-labelledby="my-work-title" aria-busy={busy} className="mb-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 id="my-work-title" className="title">{t.title}</h2>
-          {/* Finance's queue also holds its team's pool (deposits to record), not only work assigned to them (QA W-44). */}
-          <p className="mt-1 text-sm text-ink-500">{role === "finance" ? t.hintTeam : t.hint}</p>
-        </div>
-        <p role="status" className="text-sm font-semibold tabular-nums text-ink-500">{busy ? t.loading : items.length ? plural(work.locale, items.length, work.plural.workItems) : ""}</p>
+    <section aria-labelledby={labelledBy} aria-busy={busy} className="mb-8">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        {/* Finance's queue also holds its team's pool (deposits to record), not only work assigned to them (QA W-44). */}
+        <p className="text-sm text-ink-500">{role === "finance" ? t.hintTeam : t.hint}</p>
+        <p role="status" className={busy ? "text-sm text-ink-500" : "sr-only"}>{busy ? t.loading : items.length ? plural(work.locale, items.length, work.plural.workItems) : ""}</p>
       </div>
 
       {busy && items.length === 0 ? (
         <WorkSkeleton/>
       ) : items.length === 0 ? (
-        <div className="mt-4 flex items-start gap-4 rounded-lg border border-line bg-white px-5 py-6 text-[0.9375rem]">
-          <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100">
-            <CheckCheck size={18}/>
-          </span>
+        <div className="mt-4 flex items-start gap-4 border-y border-line py-5 text-[0.9375rem]">
+          <span aria-hidden className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-mist-deep text-brand-700"><CheckCheck size={18}/></span>
           <div className="min-w-0 pt-1.5">
-            <p className="font-semibold text-brand-900">{t.empty}</p>
+            <p className="font-semibold text-ink-900">{t.empty}</p>
             {teamWaiting > 0 && onTeamQueue
               ? <button type="button" className="mt-1 inline-flex min-h-11 items-center gap-1.5 font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current" onClick={onTeamQueue}>
                   {plural(work.locale, teamWaiting, work.plural.teamWaiting)}<ArrowRight size={16} className="rtl:rotate-180" aria-hidden/>
@@ -63,48 +66,44 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
           </div>
         </div>
       ) : (
-        /* One sheet of the file on the paper desk: the petrol tab on its top edge marks the work that is yours now. */
-        <ul className="mt-4 divide-y divide-line overflow-hidden rounded-lg border border-line-strong border-t-2 border-t-brand-600 bg-white">
+        <>{roving.hint}<ul {...roving.listProps} className="mt-4 divide-y divide-line border-y border-line">
           {items.map((item, index) => {
             const lead = index === 0 && (item.overdue || item.priority === "URGENT");
             const titleId = `work-item-${item.id}`;
-            const text = worded(item, locale, work);
-            const rail = item.overdue || item.priority === "URGENT" ? "bg-alert-600" : item.priority === "HIGH" ? "bg-status-warning-fg" : null;
+            const text = workItemText(item, locale, work);
             return (
-            <li key={item.id} className="relative transition-colors hover:bg-brand-50/60">
-              {/* Urgency also reads as a rail on the row's start edge; the badge keeps the word, so colour is never the only cue. */}
-              {rail && <span aria-hidden className={`absolute inset-y-0 start-0 w-[3px] ${rail}`}/>}
-              <article aria-labelledby={titleId} className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-8 sm:px-5">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                    <span className="rounded border border-line bg-mist px-1.5 py-px text-[0.8125rem] font-semibold tabular-nums text-brand-700" dir="ltr">{item.caseNumber}</span>
-                    {item.patientName && <bdi className="truncate text-[0.875rem] font-semibold text-ink-900">{patientNameLabel(item.patientName, work)}</bdi>}
+            <li key={item.id} data-row={item.id} data-case={item.caseId}>
+              <article aria-labelledby={titleId} className="flex flex-col gap-3 py-4 transition-colors has-[[data-roving-primary]:focus-visible]:bg-brand-50 sm:flex-row sm:items-center sm:gap-6">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <PriorityChip priority={item.priority} label={priorityLabel(item.priority, work.priority)}/>
                     {item.overdue && <StatusBadge tone="danger">{t.overdue}</StatusBadge>}
                     {item.blocking && <StatusBadge tone="info">{t.blocking}</StatusBadge>}
+                    <span className="text-[0.8125rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>
+                    {item.patientName && <bdi className="truncate text-[0.8125rem] font-semibold text-ink-700">{patientNameLabel(item.patientName, work)}</bdi>}
                   </div>
                   {/* The backend titles work in English; Arabic shows the work type in Arabic, English keeps the specific title. */}
-                  <h3 id={titleId} dir="auto" className="mt-2 text-[1.0625rem] font-semibold leading-6 text-brand-900">{text.title}</h3>
-                  {text.context && <p dir="auto" className="mt-1 line-clamp-2 text-sm leading-6 text-ink-600">{text.context}</p>}
+                  <h2 id={titleId} dir="auto" className="mt-2 font-bold leading-6 text-ink-900">{text.title}</h2>
                   {/* Enough case identity to act without opening it first. */}
-                  <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.8125rem] text-ink-500">
+                  <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-ink-600">
                     {item.careCategory && <span>{t.care}: <strong className="font-semibold text-ink-800">{careAreaLabel(item.careCategory, work.careAreas)}</strong></span>}
                     {(item.coordinatorSubject || item.coordinatorName) && <span>{t.coordinator}: <strong className="font-semibold text-ink-800"><bdi>{coordinatorLabel(item, subject, work.queue)}</bdi></strong></span>}
-                    {item.waitingOn && item.waitingOn !== "NONE" && <span>{work.waiting.label}: <strong className="font-semibold text-ink-800">{waitingLabel(item.waitingOn, work.waiting, { role, holdsWork: true })}</strong></span>}
-                    {!!item.documentCount && <span className="inline-flex items-center gap-1"><FileText size={13} aria-hidden/>{plural(work.locale, item.documentCount, work.plural.documents)}</span>}
+                    {!!item.documentCount && <span className="inline-flex items-center gap-1"><FileText size={12} aria-hidden/>{plural(work.locale, item.documentCount, work.plural.documents)}</span>}
                   </p>
+                  {text.context && <p dir="auto" className="mt-1 line-clamp-2 text-sm leading-6 text-ink-600">{text.context}</p>}
+                  {item.waitingOn && item.waitingOn !== "NONE" && <p className="mt-2 text-[0.8125rem] text-ink-500">{work.waiting.label}: {waitingLabel(item.waitingOn, work.waiting, { role, holdsWork: true })}</p>}
                 </div>
                 {/* When it is due and how long it has waited sit with the action, so the eye goes date, then action. */}
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line pt-3 sm:flex-col sm:flex-nowrap sm:items-end sm:justify-center sm:gap-1.5 sm:border-t-0 sm:pt-0 sm:text-end">
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:flex-none sm:flex-col sm:items-end sm:gap-1.5 sm:text-end">
                   <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[0.8125rem] text-ink-500 sm:flex-col sm:items-end">
                     {item.dueAt && (
-                      <span className={`inline-flex items-center gap-1 font-semibold ${item.overdue ? "text-alert-700" : "text-ink-800"}`}>
-                        <CalendarClock size={14} aria-hidden/>{t.due}: {new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short" }).format(new Date(item.dueAt))}
+                      <span className={`inline-flex items-center gap-1 ${item.overdue ? "font-semibold text-alert-700" : "font-semibold text-ink-800"}`}>
+                        <CalendarClock size={13} aria-hidden/>{t.due}: {new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short" }).format(new Date(item.dueAt))}
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1"><Clock3 size={13} aria-hidden/>{age(item.createdAt, locale)}</span>
                   </p>
-                  <button type="button"
+                  <button type="button" {...roving.primary(item.id)}
                           className={lead ? "btn-primary shrink-0" : "inline-flex min-h-11 shrink-0 items-center gap-1.5 font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current"}
                           onClick={() => onOpen(item.caseId)}>
                     {item.type==="CONSULTANT_ASSIGNMENT"?t.reviewAssignment:t.open}
@@ -116,19 +115,19 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
             </li>
             );
           })}
-        </ul>
+        </ul></>
       )}
     </section>
   );
 }
 
-/** While the first load runs, the sheet's shape stands in for it, so the page does not jump when the work arrives. */
+/** While the first load runs, the list's shape stands in for it (hairline rows), so the page does not jump when the work arrives. */
 function WorkSkeleton() {
   return (
-    <ul aria-hidden className="mt-4 divide-y divide-line overflow-hidden rounded-lg border border-line-strong border-t-2 border-t-brand-600 bg-white">
+    <ul aria-hidden className="mt-4 divide-y divide-line border-y border-line">
       {[0, 1, 2].map(row => (
-        <li key={row} className="grid gap-3 px-4 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-8 sm:px-5">
-          <div className="space-y-2.5 motion-safe:animate-pulse">
+        <li key={row} className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:gap-6">
+          <div className="min-w-0 flex-1 space-y-2.5 motion-safe:animate-pulse">
             <div className="h-4 w-40 rounded bg-mist-deep"/>
             <div className="h-5 w-3/4 max-w-md rounded bg-mist-deep"/>
             <div className="h-3.5 w-1/2 max-w-xs rounded bg-mist-deep"/>
@@ -152,13 +151,6 @@ function PriorityChip({ priority, label }: { priority: string; label: string }) 
   return <span className="text-[0.8125rem] font-semibold text-ink-600">{label}</span>;
 }
 
-/** From the wording code when this page knows it; otherwise the backend's English, titled by type in Arabic. */
-function worded(item: WorkItem, locale: Locale, work: ReturnType<typeof useWorkCopy>) {
-  const known = workCopyText(item.copy, work.workCopy);
-  if (known) return known;
-  const localized = Object.hasOwn(work.workTitles, item.type) ? work.workTitles[item.type as keyof typeof work.workTitles] : undefined;
-  return { title: (locale === "ar" ? localized : undefined) ?? (item.title || localized || ""), context: item.context };
-}
 
 function age(iso: string, locale: Locale) {
   const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);

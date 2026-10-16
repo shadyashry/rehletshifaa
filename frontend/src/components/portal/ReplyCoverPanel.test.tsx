@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 
 import { ReplyCoverPanel, type ReplyCover } from "./ReplyCoverPanel";
+import { renderWithWork } from "./test-copy";
 
 afterEach(cleanup);
+const strip = (text: string | null | undefined) => (text ?? "").replace(/[⁨⁩]/g, "");
 
 const staff = [
   { subject: "me", name: "Sara Ahmed", role: "COORDINATOR" },
@@ -16,17 +18,23 @@ const cover: ReplyCover = { id: "c1", ownerSubject: "me", ownerName: "Sara Ahmed
 describe("ReplyCoverPanel", () => {
   it("says who answers my patients and lets me end the cover", () => {
     const mutate = vi.fn().mockResolvedValue({ status: "SAVED" });
-    render(<ReplyCoverPanel locale="en" mySubject="me" covers={[cover]} staff={staff} busy={false} mutate={mutate}/>);
+    renderWithWork(<ReplyCoverPanel locale="en" mySubject="me" covers={[cover]} staff={staff} busy={false} mutate={mutate}/>);
 
-    expect(screen.getByText("Omar Ali answers your patients")).toBeTruthy();
+    // UX 2-4: one line, a disclosure; the line already says who covers and until when.
+    const summary = document.querySelector("summary")!;
+    expect(summary.textContent).toContain("Out of office");
+    expect(strip(summary.textContent)).toMatch(/Omar Ali answers your patients · now, until /);
+    expect(document.querySelector("details")!.open).toBe(false);
+    expect(screen.getAllByText((_, el) => el?.tagName === "SPAN" && strip(el.textContent) === "Omar Ali answers your patients").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "End cover" }));
     expect(mutate).toHaveBeenCalledWith("/coordinator/reply-covers/c1/revoke");
   });
 
   it("offers only other coordinators and saves the period", async () => {
     const mutate = vi.fn().mockResolvedValue({ status: "SAVED" });
-    render(<ReplyCoverPanel locale="en" mySubject="me" covers={[]} staff={staff} busy={false} mutate={mutate}/>);
+    renderWithWork(<ReplyCoverPanel locale="en" mySubject="me" covers={[]} staff={staff} busy={false} mutate={mutate}/>);
 
+    expect(document.querySelector("summary")!.textContent).toContain("No cover set");
     const select = screen.getByLabelText("Who answers your patients") as HTMLSelectElement;
     expect(Array.from(select.options).map(o => o.textContent)).toEqual(["Choose a coordinator", "Omar Ali"]);
     fireEvent.change(select, { target: { value: "omar" } });
@@ -39,7 +47,7 @@ describe("ReplyCoverPanel", () => {
   });
 
   it("speaks Arabic", () => {
-    render(<ReplyCoverPanel locale="ar" mySubject="omar" covers={[cover]} staff={staff} busy={false} mutate={vi.fn()}/>);
-    expect(screen.getByText("أنت تردّ على مرضى Sara Ahmed")).toBeTruthy();
+    renderWithWork(<ReplyCoverPanel locale="ar" mySubject="omar" covers={[cover]} staff={staff} busy={false} mutate={vi.fn()}/>, "ar");
+    expect(screen.getAllByText((_, el) => el?.tagName === "SPAN" && strip(el.textContent) === "أنت تردّ على مرضى Sara Ahmed").length).toBeGreaterThan(0);
   });
 });

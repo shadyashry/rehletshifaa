@@ -1,7 +1,9 @@
 "use client";
 
+import { Fragment, useId, useState, type ReactNode } from "react";
+
 import type { Locale } from "@/lib/i18n";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, parseAmount } from "@/lib/money";
 import type { DirectoryFacility, DirectoryPackage } from "@/components/portal/portal-model";
 
 const BASE = "EGP";
@@ -30,45 +32,66 @@ export function packageEstimate(line: PackageLine) {
   return { serviceDescription: `${line.name} — ${line.facilityName}`, estimatedCost: line.amountEgp, currency: BASE, facilityPackageId: line.id };
 }
 
-export type PackagePickerLabels = { title: string; hint: string; expected: string; outOfRange: string };
+export type PackagePickerLabels = { title: string; hint: string; expected: string; outOfRange: string; /** "{min} – {max}"; each figure is isolated. */ range: string };
+
+/** A template with React nodes for its placeholders (amounts stay isolated runs inside an Arabic sentence). */
+function fillNodes(template: string, values: Record<string, ReactNode>) {
+  return template.split(/(\{\w+\})/).map((part, index) => {
+    const key = /^\{(\w+)\}$/.exec(part)?.[1];
+    return key && key in values ? <Fragment key={index}>{values[key]}</Fragment> : part;
+  });
+}
 
 /**
  * P0-5 (B-02): the consultant picks Finance-approved facility packages (hospital, theatre, ICU, implants) and sets the expected
- * EGP figure inside each approved range. Shared by the clinical review and the final in-person assessment, so the range rule
- * lives once. Renders nothing when no facility offers a priceable package.
+ * EGP figure inside each approved range. Shared by the clinical review and the final in-person assessment (one picker, UX 3-1),
+ * so the range rule lives once. The figure is typed as text (Western or Arabic-Indic digits) and kept as typed; it is checked
+ * when the field is left or when the decision is sent (`showErrors`), not at every keystroke. Renders nothing without packages.
  */
-export function FacilityPackagePicker({ locale, packages, picks, onToggle, onAmount, labels }: {
+export function FacilityPackagePicker({ locale, packages, picks, onToggle, onAmount, labels, showErrors = false }: {
   locale: Locale; packages: PackageOption[]; picks: Map<string, number>;
   onToggle: (id: string, minEgp: number) => void; onAmount: (id: string, amount: number) => void; labels: PackagePickerLabels;
+  /** The decision was sent with a figure outside its range: say it at every such figure. */ showErrors?: boolean;
 }) {
+  const id = useId();
+  const [typed, setTyped] = useState<Map<string, string>>(new Map());
+  const [left, setLeft] = useState<Set<string>>(new Set());
   if (packages.length === 0) return null;
+  const egp = (amount: number) => <bdi dir="ltr">{formatMoney(amount, BASE, locale)}</bdi>;
+  // The same hairline list as the approved services (UX 3-1): a checked box says "picked"; no tinted card per row.
   return (
     <div className="mt-4">
-      <h4 className="label-micro text-brand-700">{labels.title}</h4>
-      <p className="mt-1 text-[0.8rem] leading-6 text-ink-600">{labels.hint}</p>
-      <ul className="mt-2 space-y-1">
+      <h5 id={`${id}-title`} className="text-[0.875rem] font-bold text-ink-800">{labels.title}</h5>
+      <p className="mt-0.5 max-w-[65ch] text-[0.875rem] leading-6 text-ink-600">{labels.hint}</p>
+      <ul aria-labelledby={`${id}-title`} className="mt-1 divide-y divide-line border-y border-line">
         {packages.map(pkg => {
           const on = picks.has(pkg.id);
           const amount = picks.get(pkg.id) ?? pkg.minEgp;
           const inRange = amount >= pkg.minEgp && amount <= pkg.maxEgp;
+          const said = !inRange && (showErrors || left.has(pkg.id));
+          const field = `${id}-${pkg.id}`;
           return (
-            <li key={pkg.id} className={`rounded-lg border p-2.5 transition ${on ? "border-brand-500 bg-brand-50" : "border-line"}`}>
-              <label className="flex cursor-pointer items-center gap-3">
+            <li key={pkg.id} className="py-2">
+              <label className="flex min-h-11 cursor-pointer items-center gap-3">
                 <input type="checkbox" className="h-4 w-4 flex-none accent-brand-600" checked={on} onChange={() => onToggle(pkg.id, pkg.minEgp)}/>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[0.9rem] font-semibold text-ink-900">{pkg.name}</span>
-                  <span className="block text-[0.8125rem] text-ink-500">{pkg.facilityName} · <bdi dir="ltr">{pkg.procedureCode}</bdi></span>
+                  <span dir="auto" className="block text-[0.9375rem] font-semibold text-ink-900">{pkg.name}</span>
+                  <span className="block text-[0.8125rem] text-ink-500"><bdi>{pkg.facilityName}</bdi></span>
                 </span>
-                <span className="flex-none whitespace-nowrap text-end text-[0.8125rem] text-ink-600">
-                  <bdi dir="ltr">{formatMoney(pkg.minEgp, BASE, locale)} – {formatMoney(pkg.maxEgp, BASE, locale)}</bdi>
+                <span id={`${field}-range`} className="flex-none whitespace-nowrap text-end text-[0.8125rem] tabular-nums text-ink-600">
+                  {fillNodes(labels.range, { min: egp(pkg.minEgp), max: egp(pkg.maxEgp) })}
                 </span>
               </label>
               {on && (
-                <label className="mt-2 block text-[0.8rem] font-bold text-ink-700">{labels.expected}
-                  <input className="field mt-1" type="number" min={pkg.minEgp} max={pkg.maxEgp} step="1" value={amount} aria-invalid={!inRange}
-                         onChange={event => onAmount(pkg.id, Number(event.target.value) || 0)}/>
-                  {!inRange && <span className="mt-1 block font-semibold text-alert-700">{labels.outOfRange}</span>}
-                </label>
+                <div className="mt-1 ps-7">
+                  <label htmlFor={field} className="block text-[0.875rem] font-bold text-ink-800">{labels.expected}</label>
+                  <input id={field} className={`field mt-1 w-full max-w-60 ${said ? "field-error" : ""}`} type="text" inputMode="numeric" dir="ltr" autoComplete="off"
+                         data-out-of-range={inRange ? undefined : ""} value={typed.get(pkg.id) ?? String(amount)} aria-invalid={said || undefined}
+                         aria-describedby={said ? `${field}-range ${field}-error` : `${field}-range`}
+                         onChange={event => { const raw = event.target.value; setTyped(map => new Map(map).set(pkg.id, raw)); const value = parseAmount(raw); onAmount(pkg.id, Number.isFinite(value) ? value : 0); }}
+                         onBlur={() => setLeft(set => new Set(set).add(pkg.id))}/>
+                  {said && <p id={`${field}-error`} className="error-text mt-1">{labels.outOfRange}</p>}
+                </div>
               )}
             </li>
           );

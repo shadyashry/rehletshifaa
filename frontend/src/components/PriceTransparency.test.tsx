@@ -47,7 +47,7 @@ async function openDocument(doc: Record<string, unknown>, locale: "en" | "ar" = 
   vi.stubGlobal("fetch", fetchMock);
   sessionStorage.setItem("rs-proposal-grant:tok-1", JSON.stringify({ grant: "g", expiresAt: "2099-01-01T00:00:00Z" }));
   const d = getDictionary(locale);
-  render(<ProposalSign locale={locale} token="tok-1" copy={{ ...d.secureLink.proposal, assisted: d.portalProposal.assisted, services: d.portalWork.plural.services, stampEstimateReady: d.portalWork.myCare.stamp.estimateReady, price: d.portalProposal.price }} />);
+  render(<ProposalSign locale={locale} token="tok-1" copy={{ ...d.secureLink.proposal, assisted: d.portalProposal.assisted, services: d.portalWork.plural.services, stampEstimateReady: d.portalWork.myCare.stamp.estimateReady, estimateBar: d.portalWork.myCare.estimate.bar, price: d.portalProposal.price }} />);
   await screen.findByRole("heading", { level: 1 });
   return fetchMock;
 }
@@ -57,14 +57,16 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); sessionStorage.clear(); });
 describe("the platform fee line", () => {
   it("is worded in English from one key, with what it covers, never from the stored text", async () => {
     await openDocument(estimate);
-    expect(screen.getByText(en.portalProposal.price.feeLabel)).toBeInTheDocument();
+    // The fee is named on its line and again in the estimate bar's legend (UX 1c-2).
+    expect(screen.getAllByText(en.portalProposal.price.feeLabel).length).toBeGreaterThan(0);
     expect(screen.getByText(en.portalProposal.price.feeNote)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(STORED_FEE_TEXT);
   });
 
   it("is worded in Arabic from its own key", async () => {
     await openDocument(estimate, "ar");
-    expect(screen.getByText(ar.portalProposal.price.feeLabel)).toBeInTheDocument();
+    // The fee is named on its line and again in the estimate bar's legend (UX 1c-2).
+    expect(screen.getAllByText(ar.portalProposal.price.feeLabel).length).toBeGreaterThan(0);
     expect(screen.getByText(ar.portalProposal.price.feeNote)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(STORED_FEE_TEXT);
   });
@@ -79,11 +81,13 @@ describe("the platform fee line", () => {
     const items = estimate.items.map(({ id, category, description, quantity, unitPrice, optional }) => ({ id, category, description, quantity, unitPrice, optional }));
     const data = { versionId: "v1", status: "RELEASED", currency: "EGP", documentType: "PRELIMINARY_ESTIMATE", items };
     const first = render(<PatientProposal locale="en" copy={en.portalProposal} proposal={data} />);
-    expect(screen.getByText(en.portalProposal.price.feeLabel)).toBeInTheDocument();
+    // The fee is named on its line and again in the estimate bar's legend (UX 1c-2).
+    expect(screen.getAllByText(en.portalProposal.price.feeLabel).length).toBeGreaterThan(0);
     expect(first.container.textContent).not.toContain(STORED_FEE_TEXT);
     first.unmount();
     const second = render(<PatientProposal locale="ar" copy={ar.portalProposal} proposal={data} />);
-    expect(screen.getByText(ar.portalProposal.price.feeLabel)).toBeInTheDocument();
+    // The fee is named on its line and again in the estimate bar's legend (UX 1c-2).
+    expect(screen.getAllByText(ar.portalProposal.price.feeLabel).length).toBeGreaterThan(0);
     expect(second.container.textContent).not.toContain(STORED_FEE_TEXT);
   });
 });

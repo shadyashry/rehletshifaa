@@ -90,7 +90,7 @@ describe("MyCare", () => {
     expect(within(deposit).queryByRole("button")).toBeNull();
     // Proposal: amount, status, exactly one action.
     const proposalBlock = screen.getByRole("region", { name: "Your proposal" });
-    expect(within(proposalBlock).getByText("$4,850")).toBeTruthy();
+    expect(proposalBlock.querySelector(".statement")?.textContent).toBe("$4,850");
     expect(within(proposalBlock).getByText(/Acknowledged/)).toBeTruthy();
     const viewButtons = screen.getAllByRole("button", { name: /view proposal/i });
     expect(viewButtons).toHaveLength(1);
@@ -154,7 +154,7 @@ describe("MyCare", () => {
       proposal: { ...proposal, status: "RELEASED", documentType: "FINAL_TREATMENT_QUOTE" }, deposit: null });
     expect(screen.getByRole("heading", { name: "Your final quote is ready to review" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Review final quote" })).toBeTruthy();
-    expect(document.querySelector(".case-stamp")).toBeNull();
+    expect(document.querySelector(".case-stamp")).toBeNull(); // no page stamp, and the quote's release is no estimate sheet
   });
 
   it("a released proposal is the one primary action, and the summary does not repeat it", () => {
@@ -221,7 +221,7 @@ describe("MyCare", () => {
     const headings = screen.getAllByRole("heading").map(h => h.textContent);
     expect(headings[0]).toBe("RS-2026-000081");
     expect(headings[1]).toBe("We're checking your payment");
-    const journey = screen.getByRole("list");
+    const journey = within(screen.getByRole("region", { name: "Your care journey" })).getByRole("list");
     expect(within(journey).queryByRole("button")).toBeNull();
     const steps = within(journey).getAllByRole("listitem").map(li => li.getAttribute("aria-current"));
     expect(steps).toEqual([null, null, null, null, "step", null, null]);
@@ -375,7 +375,8 @@ describe("MyCare", () => {
   it("stamps the three moments with the backend's dates, and nothing else", () => {
     const thisYear = new Date().getFullYear();
     const milestones = { receivedAt: `${thisYear}-09-01T09:00:00Z`, consultantReviewAt: `${thisYear}-09-04T09:00:00Z`, estimateReadyAt: `${thisYear}-09-12T09:00:00Z` };
-    const stampOf = () => document.querySelector(".case-stamp")?.textContent ?? null;
+    // The current page's own stamp; earlier pages of the file carry theirs on their sheets.
+    const stampOf = () => document.querySelector(".dossier-page-stamp .case-stamp")?.textContent ?? null;
     renderCare({ actions: wait("WAIT_COORDINATOR_REVIEW"), caseSummary: { ...base, status: "RECEIVED" }, deposit: null, milestones });
     expect(stampOf()).toContain("Received, Sep 1");
     cleanup();
@@ -404,4 +405,79 @@ describe("MyCare", () => {
     fireEvent.click(within(nav).getByRole("link", { name: "Messages" }), { ctrlKey: true });
     expect(onView).toHaveBeenCalledTimes(1);
   });
+  // UX 1c-1: the file grows — each dated moment the journey reached is a stamped sheet behind the current page, and its
+  // date sits under its journey step. No date, no sheet, no date line.
+  it("draws the earlier pages of the file and the journey's dates only from the backend's dates", () => {
+    const thisYear = new Date().getFullYear();
+    const milestones = { receivedAt: `${thisYear}-09-01T09:00:00Z`, consultantReviewAt: `${thisYear}-09-04T09:00:00Z`, estimateReadyAt: `${thisYear}-09-12T09:00:00Z` };
+    renderCare({ milestones });
+    const sheets = screen.getByRole("list", { name: "Earlier in your file" });
+    expect(within(sheets).getAllByRole("listitem").map(li => li.textContent)).toEqual([
+      expect.stringContaining("Case received"), expect.stringContaining("Consultant review"), expect.stringContaining("Your proposal")]);
+    expect(within(sheets).getAllByRole("listitem")[1].textContent).toContain("In review, Sep 4");
+    expect(screen.getByText("Your file · 4 pages")).toBeTruthy();
+    const journey = within(screen.getByRole("region", { name: "Your care journey" })).getByRole("list");
+    expect(Array.from(journey.querySelectorAll("time")).map(time => time.getAttribute("datetime"))).toEqual(
+      [milestones.receivedAt, milestones.consultantReviewAt, milestones.estimateReadyAt]);
+    cleanup();
+    // The moment the current page is stamped with is the page itself, not a sheet behind it; a step not reached has none.
+    renderCare({ actions: wait("WAIT_CONSULTANT_REVIEW"), caseSummary: { ...base, status: "IN_REVIEW" }, deposit: null, patientProposal: null, proposal: null, milestones: { receivedAt: milestones.receivedAt, consultantReviewAt: milestones.consultantReviewAt } });
+    expect(within(screen.getByRole("list", { name: "Earlier in your file" })).getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByText("Your file · 2 pages")).toBeTruthy();
+    cleanup();
+    // Nothing dated: the page stands alone and the journey prints no date.
+    renderCare({ milestones: { receivedAt: null } });
+    expect(screen.queryByRole("list", { name: "Earlier in your file" })).toBeNull();
+    expect(document.querySelector(".care-journey time")).toBeNull();
+  });
+
+  it("draws the estimate on one scale: the workspace's range bracketed, the fee line split out, the deposit left to its own facts", () => {
+    renderCare({ proposal: { ...proposal, documentType: "PRELIMINARY_ESTIMATE", totalMin: 4500, totalExpected: 4850, totalMax: 5600,
+      items: [{ quantity: 1, unitPrice: 4250, optional: false, category: "MEDICAL" }, { quantity: 1, unitPrice: 600, optional: false, category: "PLATFORM_FEE" }] } });
+    const estimate = screen.getByRole("region", { name: "Preliminary care estimate" });
+    expect(within(estimate).getByRole("img").getAttribute("aria-label")).toBe(
+      "Estimated range $4,500 to $5,600, expected $4,850. Made up of Medical care $4,250 and Coordination and guarantee fee $600.");
+    expect(estimate.querySelector(".est-range")).toBeTruthy();
+    // The deposit is stated once, in its own facts; the bar does not repeat it.
+    expect(estimate.querySelector(".est-deposit")).toBeNull();
+    cleanup();
+    // Before 1c-0's totals reach a workspace: no range, no bracket; a final quote's total is its price.
+    renderCare({ proposal: { ...proposal, documentType: "FINAL_TREATMENT_QUOTE" }, patientProposal: { state: "ACCEPTED", action: "VIEW_PROPOSAL", documentType: "FINAL_TREATMENT_QUOTE" } });
+    const quote = screen.getByRole("region", { name: "Final treatment plan and quote" });
+    expect(within(quote).getByRole("img").getAttribute("aria-label")).toBe("Final package price $4,850.");
+    expect(quote.querySelector(".est-range, .est-deposit")).toBeNull();
+  });
+
+  it("tracks the deposit: checking with a Sent stamp, then received with Finance's date, and a bar only for a part payment", () => {
+    const thisYear = new Date().getFullYear();
+    renderCare({ deposit: { status: "REQUESTED", currency: "USD", totalDisplay: 500, transfer: { reference: "FT123456", status: "SUBMITTED", submittedAt: `${thisYear}-09-12T08:30:00Z` } } });
+    const track = screen.getByRole("list", { name: "Payment steps" });
+    expect(within(track).getAllByRole("listitem").map(li => li.getAttribute("aria-current"))).toEqual([null, "step", null]);
+    expect(document.querySelector(".pay-receipt")?.textContent).toContain("Sent, Sep 12");
+    expect(screen.getByText("FT123456")).toBeTruthy();
+    // A sent reference has no amount: nothing fills a bar while it is checked.
+    expect(screen.queryByRole("img", { name: /deposit received/ })).toBeNull();
+    cleanup();
+    renderCare({ actions: wait("WAIT_COORDINATION"), deposit: { status: "PAID", currency: "USD", totalDisplay: 500, paidDisplay: 500,
+      transfer: { reference: "FT123456", status: "CONFIRMED", submittedAt: `${thisYear}-09-12T08:30:00Z`, decidedAt: `${thisYear}-09-14T10:00:00Z` } } });
+    expect(within(screen.getByRole("list", { name: "Payment steps" })).getAllByRole("listitem").every(li => li.textContent?.includes("(completed)"))).toBe(true);
+    expect(document.querySelector(".pay-receipt")?.textContent).toContain("Received, Sep 14");
+    expect(document.querySelector(".pay-receipt")?.textContent).not.toContain("Sent");
+    cleanup();
+    // Confirmed without a recorded decision date: the receipt stays, unstamped.
+    renderCare({ actions: wait("WAIT_COORDINATION"), deposit: { status: "PAID", currency: "USD", totalDisplay: 500, transfer: { reference: "FT123456", status: "CONFIRMED" } } });
+    expect(document.querySelector(".pay-receipt .case-stamp")).toBeNull();
+    cleanup();
+    renderCare({ actions: wait("WAIT_COORDINATION"), deposit: { status: "PARTIALLY_PAID", currency: "USD", totalDisplay: 500, paidDisplay: 200, balanceDisplay: 300 } });
+    expect(screen.getByRole("img", { name: "$200 of the $500 deposit received. $300 remaining." })).toBeTruthy();
+  });
+
+  it("draws the payment track and receipt in Arabic with the reference left-to-right", () => {
+    renderWithWork(<MyCare locale="ar" caseSummary={base} actions={wait("WAIT_PAYMENT_CHECK")} patientProposal={accepted} proposal={proposal}
+                   deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500, transfer: { reference: "FT123456", status: "SUBMITTED", submittedAt: "2026-09-12T08:30:00Z" } }} documents={[]} unreadMessages={0} cases={[base]}
+                   view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={vi.fn()} messagesPanel={null}/>, "ar");
+    expect(screen.getByRole("list", { name: "خطوات الدفع" })).toBeTruthy();
+    expect(screen.getByText("FT123456").closest("bdi")?.getAttribute("dir")).toBe("ltr");
+  });
+
 });

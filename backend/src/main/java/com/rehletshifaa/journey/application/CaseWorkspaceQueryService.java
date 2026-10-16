@@ -162,6 +162,8 @@ public class CaseWorkspaceQueryService {
         List<ClinicalReviewView> reviewViews = clinicalReviews(caseId);
         if (patientActor) reviewViews = reviewViews.stream().filter(r -> "APPROVED".equals(r.status())).map(CaseWorkspaceQueryService::forPatient).toList();
         ProposalView latest = proposals.latest(caseId, patientActor);
+        // UX 1c-0: the patient's own proposal carries the totals the proposal link shows them, so My Care can draw the range.
+        if (latest != null && patientActor) latest = proposals.withPatientTotals(latest);
         // P1-10 (D-A): the fee is the platform's charge to the patient; a Consultant (or their practice manager) sees their own prices only.
         if (latest != null && (actor.role() == Role.CONSULTANT || actor.role() == Role.PRACTICE_MANAGER)) latest = withoutPlatformFee(latest);
         DeliveryStatus delivery = latest != null && DELIVERED_STATUSES.contains(latest.status()) ? proposals.deliveryStatus(latest.versionId()) : null;
@@ -205,7 +207,7 @@ public class CaseWorkspaceQueryService {
                 v.includedServices(), v.excludedServices(), v.paymentTerms(), v.refundTerms(), v.disclaimers(),
                 v.items().stream().filter(i -> !com.rehletshifaa.journey.domain.ProposalItem.PLATFORM_FEE.equals(i.category())).toList(),
                 v.coordinatorNotes(), v.documentType(), v.scopeChangeReason(), v.assistance(), v.acceptableFrom(), v.fxReapprovalStatus(),
-                v.payeeTotals().stream().filter(t -> !com.rehletshifaa.journey.domain.ProposalItem.PLATFORM.equals(t.payee())).toList());
+                v.payeeTotals().stream().filter(t -> !com.rehletshifaa.journey.domain.ProposalItem.PLATFORM.equals(t.payee())).toList(), null, null, null);
     }
 
     private CaseWorkspace paymentWorkspace(UUID caseId) {

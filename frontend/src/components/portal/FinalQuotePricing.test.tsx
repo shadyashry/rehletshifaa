@@ -7,6 +7,7 @@ import { getDictionary } from "@/lib/dictionary";
 import { FeedbackContext } from "./portal-ui";
 import { FxReapproval } from "./FxReapproval";
 import { CaseWorkspaceProvider, FinalQuoteActions } from "./StaffCaseView";
+import { renderWithWork } from "./test-copy";
 
 // jsdom implements <dialog> only partially.
 beforeAll(() => {
@@ -72,7 +73,7 @@ describe("Finance's exchange-rate re-approval", () => {
 describe("The coordinator's final-quote form", () => {
   const setup = (feedback: Record<string, unknown> = {}) => {
     const mutate = vi.fn().mockResolvedValue({ id: "r1" });
-    render(
+    renderWithWork(
       <FeedbackContext.Provider value={{ notice: "", error: "", clear: () => {}, clearNotice: () => {}, ...feedback }}>
         <CaseWorkspaceProvider value={{ locale: "en", t: {} as never, role: "coordinator", c: { id: "c1", status: "ARRIVAL_CONFIRMED", version: 1 } as never,
           busy: false, mutate, price, fxRates: [], catalog: [], facilities: [], mySubject: "coord" }}>

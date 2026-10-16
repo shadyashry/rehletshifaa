@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 
 import { PatientDepositPayment } from "./PatientDepositPayment";
 import { renderWithWork } from "./test-copy";
@@ -162,4 +162,15 @@ describe("PatientDepositPayment — the payment slip (slice E)", () => {
     expect(alert.className).not.toMatch(/bg-/);
     expect(alert.textContent).toContain("FT1");
   });
+  // UX 1c-1: on the payment step the track is always on the patient's turn; a part payment draws received-of-total.
+  it("shows where the payment is, and what part is already received as a bar with its figures", () => {
+    renderPayment({ amountDue: 300, totalDue: 500, received: 200 });
+    const track = screen.getByRole("list", { name: "Payment steps" });
+    expect(within(track).getAllByRole("listitem").map(li => li.getAttribute("aria-current"))).toEqual(["step", null, null]);
+    expect(screen.getByRole("img", { name: "$200 of the $500 deposit received." })).toBeTruthy();
+    cleanup();
+    renderPayment();
+    expect(screen.queryByRole("img")).toBeNull();
+  });
+
 });

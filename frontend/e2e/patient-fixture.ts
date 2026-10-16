@@ -18,6 +18,8 @@ const deposit = { id: "dep-1", status: "REQUESTED", currency: "USD", totalEgp: 2
 const transfer = { id: "tr-1", method: "BANK_TRANSFER", reference: "FT26091200481", status: "SUBMITTED", submittedAt: "2026-09-12T08:30:00Z" };
 /** `pay-deposit`: the deposit is the patient's step (PAY_DEPOSIT) with the platform account (dummy details); `pay-deposit-rejected`: part was received and the last reference was not confirmed. */
 const bankTransfer = { accountName: "RehletShifaa Test Account", bankName: "Test Bank (dummy details)", accountNumber: "0000000000000", iban: "EG000000000000000000000000000", swift: "TESTEGCXXXX", paymentReference: "RS-2026-000081" };
+/** `deposit-paid`: Finance confirmed the reference the patient sent (UX 1c-1: the receipt is stamped Received on that date). */
+const confirmed = { ...transfer, status: "CONFIRMED", decidedAt: "2026-09-13T11:00:00Z" };
 const rejected = { id: "tr-2", method: "BANK_TRANSFER", reference: "FT0000", status: "REJECTED", submittedAt: "2026-09-12T08:30:00Z", reason: "No transfer with this reference reached the account." };
 
 /** `proposal-recorded`: the coordinator recorded the patient's acknowledgement after an Arabic call (assisted path). */
@@ -33,6 +35,8 @@ const received = "2026-09-01T09:00:00Z", consultantReview = "2026-09-04T09:00:00
 export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: string[]; identity?: { status: string; rejectionReason?: string } | null; multipleCases?: boolean;
   /** The server refuses a new case with this error code (e.g. a limit on cases sent for others). */
   newCaseRefusal?: { status: number; code: string };
+  /** UX 1c-2: the proposal's lines and totals as the workspace sends them since 1c-0 (range, categories, fee line). */
+  estimate?: { items: unknown[]; totalMin?: number; totalExpected?: number; totalMax?: number };
   /** With "proposal-ready": the proposal is a final quote in this state, and a decision on it may be refused with this code (P1-10). */
   finalQuote?: { scopeChangeReason?: string; acceptableFrom?: string; fxReapprovalStatus?: string; decisionRefusal?: { status: number; code: string } };
   /** P1-13: the case's current step is this guardian blocker (the patient is a minor; the account acts as their guardian). */
@@ -51,7 +55,7 @@ export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: strin
    *  follow-up API answers `view`, the statements API `statements`, and sending the answers answers `reported` (then read back). */
   followUp?: { code: "FOLLOW_UP" | "REPORT_OUTCOME" | "COMPLETED"; view: Record<string, unknown>; statements?: Record<string, unknown>[]; reported?: Record<string, unknown> } };
 
-export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, finalQuote, guardian, concerns = [], admission, treatment, discharge, followUp,
+export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, estimate, finalQuote, guardian, concerns = [], admission, treatment, discharge, followUp,
   documents = [{ documentId: "d1", fileName: "Echo_Report.pdf", status: "CLEAN", createdAt: "2026-09-01T09:00:00Z" }] }: PatientOptions = {}) {
   await page.addInitScript(({ authority }) => {
     sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({ access_token: "synthetic", token_type: "Bearer", scope: "openid",
@@ -85,10 +89,10 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     caseSummary, timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: "2026-09-01T09:00:00Z" }, { type: "STATUS", label: caseSummary.status, status: caseSummary.status, occurredAt: stamp }],
     tasks: [], messages: [{ id: "m1", threadType: "PATIENT_COORDINATOR", senderRole: "COORDINATOR", senderName: "Sara Ahmed", direction: "INBOUND", body: "Welcome — I will send the deposit details shortly.", createdAt: stamp, internalOnly: false, read: false }],
     assignments: [], clinicalReviews: [], gates: null, delivery: null,
-    proposal: early ? null : { ...proposal, status: ready ? "RELEASED" : "ACCEPTED", assistance: scenario === "proposal-recorded"
+    proposal: early ? null : { ...proposal, ...estimate, status: ready ? "RELEASED" : "ACCEPTED", assistance: scenario === "proposal-recorded"
       ? { requestedAt: "2026-09-10T09:00:00Z", decisionSource: "RECORDED_ON_BEHALF", recordedByName: "Sara Ahmed", channel: "WHATSAPP_CALL", confirmedBy: "PATIENT", conversationAt: "2026-09-11T09:00:00Z", decidedAt: "2026-09-11T09:05:00Z" }
       : null as null | Record<string, string> },
-    deposit: ready || early ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0 }
+    deposit: ready || early ? null : paid ? { ...deposit, status: "PAID", paidDisplay: 500, balanceDisplay: 0, transfer: confirmed }
       : scenario === "pay-deposit" ? { ...deposit, bankTransfer, transfer: null }
       : scenario === "pay-deposit-rejected" ? { ...deposit, status: "PARTIALLY_PAID", paidDisplay: 200, balanceDisplay: 300, bankTransfer, transfer: rejected }
       : { ...deposit, transfer },

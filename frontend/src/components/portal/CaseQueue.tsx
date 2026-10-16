@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
+import { useRovingList, useShortcutsEnabled } from "@/components/portal/StaffShortcuts";
 import { StatusBadge, caseStatusTone } from "@/components/portal/StatusBadge";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { matchesKpi, type KpiFilter } from "@/components/portal/RoleDashboardSummary";
@@ -69,11 +70,14 @@ function attentionChip(item: QueueCase, copy: WorkCopy["attention"], now = Date.
  * <p>One list, because staff scan and act rather than browse (the Cards view was removed at GATE P2-2). The toolbar
  * carries only search, filters and sort — everything else lives in the filter panel and surfaces as removable chips,
  * so the page shows work rather than controls. Row selection appears only where a bulk action exists for it.
+ *
+ * <p>The rows are one tab stop (UX 2-2): Tab lands on the current row's Open, ↑/↓, Home/End and `j`/`k` move between
+ * rows, Enter opens; Shift+Tab from Open reaches that row's other controls.
  */
-export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,busy,state,scope="all",title,onChange,onOpen,onMutate,onTransfer,statusLabel,categoryLabel}: {
+export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,busy,state,scope="all",labelledBy,onChange,onOpen,onMutate,onTransfer,statusLabel,categoryLabel}: {
   locale:Locale; role:string; cases:T[]; subject?:string; lead:boolean; busy:boolean; state:QueueState; scope?:"mine"|"team"|"all";
-  /** The view's visible heading (the staff navigation names the place; the page repeats it where the work is). */
-  title?:string;
+  /** The page's heading that names this view (UX 2-4: the view's name is the page's place; the list does not repeat it). */
+  labelledBy?:string;
   /** Transfer case ownership (coordinator leads). Offered only on cases a teammate owns — never a recommendation. */
   onTransfer?:(item:T)=>void;
   onChange:(value:QueueState)=>void; onOpen:(item:T)=>void; onMutate:(path:string,body?:unknown,method?:string)=>Promise<unknown>; statusLabel:(value:string)=>string; categoryLabel:(value:string)=>string;
@@ -107,6 +111,10 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   const selectedCases=list.filter(item=>selectedIds.has(item.id));
   const pages=Math.max(1,Math.ceil(list.length/12)), page=Math.min(current.page,pages);
   const pageItems=list.slice((page-1)*12,page*12);
+  // One filled action per list (as in My work): only the first case that can be taken is filled; the rest are quiet.
+  const leadClaim=coordinator?pageItems.find(item=>!item.coordinatorSubject&&item.status==="RECEIVED")?.id:undefined;
+  const roving=useRovingList(pageItems.map(item=>item.id),{rowActions:true});
+  const shortcuts=useShortcutsEnabled();
   const pageSelected=pageItems.length>0&&pageItems.every(item=>selectedIds.has(item.id));
   const canBulkClaim=coordinator&&selectedCases.length>0&&selectedCases.every(item=>!item.coordinatorSubject&&item.status==="RECEIVED");
   // Bulk work exists only for unowned requests (take ownership) and my own cases (request information).
@@ -133,19 +141,21 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
   if(current.updatedFrom)chips.push({key:"updatedFrom",label:text.updatedFrom,value:current.updatedFrom});
   if(current.updatedTo)chips.push({key:"updatedTo",label:text.updatedTo,value:current.updatedTo});
   const clearChip=(key:keyof QueueState)=>change({[key]:key==="status"?"active":""} as Partial<QueueState>);
-  const clearAll=()=>change({status:"active",country:"",careArea:"",consultant:"",coordinator:"",createdFrom:"",createdTo:"",updatedFrom:"",updatedTo:""});
+  // The count line's filter (My work's quick counts) travels with the view it opened: said here as a chip, so it can be seen and removed.
+  const kpiValue=current.kpi==="action"||current.kpi==="overdue"?text.kpi[current.kpi]:current.kpi==="unowned"?text.unowned:null;
+  if(kpiValue)chips.unshift({key:"kpi",label:text.kpiLabel,value:kpiValue});
+  // One change: two `change` calls in one event would each start from this render's state, and the second would undo the first.
+  const clearAll=(extra:Partial<QueueState>={})=>change({kpi:"",status:"active",country:"",careArea:"",consultant:"",coordinator:"",createdFrom:"",createdTo:"",updatedFrom:"",updatedTo:"",...extra});
 
-  const headingId=`queue-heading-${scope}`;
-  return <section aria-label={title?undefined:text.title} aria-labelledby={title?headingId:undefined} className="space-y-4" aria-busy={busy}>
-    {title&&<h2 id={headingId} className="title">{title}</h2>}
+  return <section aria-label={labelledBy?undefined:text.title} aria-labelledby={labelledBy} className="space-y-4" aria-busy={busy}>
     {infoDialog&&<RequestInformationDialog locale={locale} caseIds={selectedCases.map(item=>item.id)} busy={busy} mutate={onMutate as (path:string,body?:unknown,method?:string)=>Promise<unknown>} onClose={()=>setInfoDialog(false)} onDone={clearSelection}
       onPartial={failed=>{setSelectedIds(new Set(failed));}}/>}
 
-    {scope!=="all"&&<p className="-mt-2 text-[0.85rem] text-ink-600">{scope==="team"?(selected==="team"?text.teamHint:text.unownedHint):coordinator?text.mineHint:role==="finance"?text.assignedHintFinance:text.assignedHint}</p>}
+    {scope!=="all"&&<p className="text-[0.875rem] text-ink-600">{scope==="team"?(selected==="team"?text.teamHint:text.unownedHint):coordinator?text.mineHint:role==="finance"?text.assignedHintFinance:text.assignedHint}</p>}
     {tabs.length>0&&<div role="tablist" aria-label={text.title} className="flex flex-wrap gap-1 border-b border-line-strong">
       {tabs.map((tab,index)=><button key={tab.id} id={`queue-tab-${tab.id}`} role="tab" aria-controls="queue-panel" aria-selected={selected===tab.id}
         tabIndex={(focused??selected)===tab.id?0:-1} type="button"
-        className={`-mb-px min-h-11 border-b-2 px-3.5 py-2 text-[0.85rem] font-bold transition ${selected===tab.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
+        className={`-mb-px min-h-11 border-b-2 px-3.5 py-2 text-[0.875rem] font-bold transition ${selected===tab.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
         onFocus={()=>setFocused(tab.id)}
         onKeyDown={event=>{const target=tabKeyTarget(event.key,index,tabs.length,rtl);if(target<0)return;event.preventDefault();const next=tabs[target];setFocused(next.id);document.getElementById(`queue-tab-${next.id}`)?.focus();}}
         onClick={()=>change({tab:tab.id})}>{tab.label}</button>)}
@@ -157,12 +167,12 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
       <label className="relative min-w-0 flex-1 basis-56">
         <span className="sr-only">{text.search}</span>
         <Search aria-hidden size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-ink-400"/>
-        <input type="search" className="field ps-9" placeholder={text.search} value={state.search} onChange={event=>change({search:event.target.value})}/>
+        <input type="search" aria-keyshortcuts={shortcuts?"/":undefined} className="field ps-9" placeholder={text.search} value={state.search} onChange={event=>change({search:event.target.value})}/>
       </label>
 
       <div className="relative">
         <button ref={filterButton} type="button" aria-expanded={filtersOpen} aria-controls="queue-filters"
-                className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-[0.85rem] font-semibold transition ${chips.length?"border-brand-600 bg-brand-50 text-brand-800":"border-line-strong bg-white text-ink-700 hover:border-brand-300"}`}
+                className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-[0.875rem] font-semibold transition ${chips.length?"border-brand-600 bg-brand-50 text-brand-800":"border-line-strong bg-white text-ink-700 hover:border-brand-300"}`}
                 onClick={()=>setFiltersOpen(value=>!value)}>
           <SlidersHorizontal size={16} aria-hidden/>{text.filters}
           {chips.length>0&&<span className="rounded-full bg-brand-600 px-1.5 text-[0.8125rem] font-bold text-white">{chips.length}</span>}
@@ -181,15 +191,15 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             <DateFilter label={text.updatedTo} value={current.updatedTo} onChange={value=>change({updatedTo:value})}/>
           </div>
           <div className="mt-4 flex justify-between gap-2 border-t border-line pt-3">
-            <button type="button" className="inline-flex min-h-11 items-center px-1 text-[0.85rem] font-semibold text-ink-500 hover:text-brand-700" onClick={clearAll}>{text.clearAll}</button>
-            <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.85rem]" onClick={()=>{setFiltersOpen(false);filterButton.current?.focus();}}>{text.done}</button>
+            <button type="button" className="inline-flex min-h-11 items-center px-1 text-[0.875rem] font-semibold text-ink-500 hover:text-brand-700" onClick={()=>clearAll()}>{text.clearAll}</button>
+            <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.875rem]" onClick={()=>{setFiltersOpen(false);filterButton.current?.focus();}}>{text.done}</button>
           </div>
         </div>}
       </div>
 
       <label className="min-w-0">
         <span className="sr-only">{text.sort}</span>
-        <select className="field !min-h-11 !w-auto !py-0 !text-[0.85rem]" value={current.sort} onChange={event=>change({sort:event.target.value})}>
+        <select className="field !min-h-11 !w-auto !py-0 !text-[0.875rem]" value={current.sort} onChange={event=>change({sort:event.target.value})}>
           <option value="attention">{text.sortAttention}</option>
           <option value="updated-desc">{text.sortUpdatedDesc}</option>
           <option value="updated-asc">{text.sortUpdatedAsc}</option>
@@ -205,17 +215,17 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
         <span className="text-ink-500">{chip.label}:</span>{chip.value}
         <button type="button" className="-my-3 -me-2.5 inline-grid h-11 w-11 place-items-center rounded-full text-ink-500 hover:text-alert-700" aria-label={fillTemplate(text.remove,{label:chip.label,value:chip.value})} onClick={()=>clearChip(chip.key)}><X size={13}/></button>
       </span>)}
-      <button type="button" className="inline-flex min-h-11 items-center px-1 text-[0.8125rem] font-semibold text-brand-700 underline-offset-4 hover:underline" onClick={clearAll}>{text.clearAll}</button>
+      <button type="button" className="inline-flex min-h-11 items-center px-1 text-[0.8125rem] font-semibold text-brand-700 underline-offset-4 hover:underline" onClick={()=>clearAll()}>{text.clearAll}</button>
     </div>}
 
     {/* Bulk actions exist only once something is selected. */}
-    {selectedCases.length>0&&<div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2">
-      <p className="text-[0.85rem] font-bold text-brand-900">{plural(work.locale,selectedCases.length,work.plural.selected)}</p>
+    {selectedCases.length>0&&<div className="flex flex-wrap items-center gap-2 border-y border-line py-2">
+      <p className="text-[0.875rem] font-bold text-brand-900">{plural(work.locale,selectedCases.length,work.plural.selected)}</p>
       <div className="ms-auto flex flex-wrap gap-2">
-        {canBulkClaim&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={async()=>{const failed:string[]=[];for(const item of selectedCases){const result=await onMutate(`/coordinator/cases/${item.id}/claim`);if(!result)failed.push(item.id);}
+        {canBulkClaim&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.8125rem]" disabled={busy} onClick={async()=>{const failed:string[]=[];for(const item of selectedCases){const result=await onMutate(`/coordinator/cases/${item.id}/claim`);if(!result)failed.push(item.id);}
           setSelectedIds(new Set(failed));setBulkResult(failed.length?fillTemplate(text.bulkClaimResult,{done:count(selectedCases.length-failed.length),total:count(selectedCases.length)}):"");}}><Check size={14}/>{text.claim}</button>}
-        {canBulkRequestInfo&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} onClick={()=>setInfoDialog(true)}>{text.requestInfo}</button>}
-        <button type="button" className="text-[0.82rem] font-semibold text-ink-600 hover:text-brand-700" onClick={clearSelection}>{text.clearSelection}</button>
+        {canBulkRequestInfo&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.8125rem]" disabled={busy} onClick={()=>setInfoDialog(true)}>{text.requestInfo}</button>}
+        <button type="button" className="text-[0.8125rem] font-semibold text-ink-600 hover:text-brand-700" onClick={clearSelection}>{text.clearSelection}</button>
       </div>
     </div>}
 
@@ -228,8 +238,8 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
     <div id="queue-panel" role={tabs.length?"tabpanel":undefined} aria-labelledby={tabs.length?`queue-tab-${selected}`:undefined} tabIndex={tabs.length?0:undefined}>
       <div className="mb-2.5 flex items-center justify-between gap-3">
         {/* The empty state already says there is nothing here; the count would only repeat it. */}
-        <p role="status" className="text-[0.82rem] text-ink-500">{busy?text.loading:list.length?plural(work.locale,list.length,work.plural.cases):""}</p>
-        {selectable&&pageItems.length>0&&<label className="flex items-center gap-2 text-[0.8rem] font-semibold text-ink-600">
+        <p role="status" className="text-[0.8125rem] text-ink-500">{busy?text.loading:list.length?plural(work.locale,list.length,work.plural.cases):""}</p>
+        {selectable&&pageItems.length>0&&<label className="flex items-center gap-2 text-[0.8125rem] font-semibold text-ink-600">
           <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={pageSelected}
                  onChange={event=>setSelectedIds(currentIds=>{const next=new Set(currentIds);for(const item of pageItems){if(event.target.checked)next.add(item.id);else next.delete(item.id);}return next;})}/>
           {text.selectPage}
@@ -237,8 +247,8 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
       </div>
 
       {!busy&&!list.length
-        ?<div className="card px-6 py-10 text-center"><FolderOpen className="mx-auto mb-3 text-brand-600" size={26} aria-hidden/><h3 className="font-bold text-ink-900">{chips.length||state.search?text.noMatch:text.empty}</h3><p className="mt-1.5 text-[0.85rem] text-ink-500">{text.emptyHint}</p>{(chips.length>0||state.search)&&<button type="button" className="link-cta mt-4 text-[0.85rem]" onClick={()=>{clearAll();change({search:""});}}>{text.clearAll}</button>}</div>
-        :<ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-white">
+        ?<div className="card px-6 py-10 text-center"><FolderOpen className="mx-auto mb-3 text-brand-600" size={26} aria-hidden/><h2 className="font-bold text-ink-900">{chips.length||state.search?text.noMatch:text.empty}</h2><p className="mt-1.5 text-[0.875rem] text-ink-500">{text.emptyHint}</p>{(chips.length>0||state.search)&&<button type="button" className="link-cta mt-4 text-[0.875rem]" onClick={()=>clearAll({search:""})}>{text.clearAll}</button>}</div>
+        :<>{roving.hint}<ul {...roving.listProps} className="divide-y divide-line border-y border-line">
           {pageItems.map(item=>{
             const pending=item.assignmentStatus==="PENDING"&&item.assignmentId;
             const claimable=coordinator&&!item.coordinatorSubject&&item.status==="RECEIVED";
@@ -248,6 +258,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             // Every row repeats the same action words, so each button is also named by its case ("Open RS-…"); the
             // visible word comes first, so the name still contains what is on screen.
             const named=(action:string)=>`${action} ${item.caseNumber}`;
+            const tab=roving.secondary(item.id);
             // Only the number is isolated left-to-right, so "الحالة RS-…" still reads right-to-left in Arabic.
             const [titleBefore,titleAfter=""]=text.caseTitle.split("{number}");
             const title=item.patientName?<bdi>{patientNameLabel(item.patientName,work)}</bdi>:<>{titleBefore}<bdi dir="ltr">{item.caseNumber}</bdi>{titleAfter}</>;
@@ -263,22 +274,22 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
               {(item.documentCount??0)>0&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-500"><Files size={13} aria-hidden/>{plural(work.locale,item.documentCount??0,work.plural.documents)}</span>}
             </>;
             const actions=<>
-              {claimable&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-label={named(text.claim)} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
-              {pending&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-label={named(text.accept)} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
-              {transferable&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-haspopup="dialog" aria-label={named(text.transfer)} onClick={()=>onTransfer?.(item)}>{text.transfer}</button>}
+              {claimable&&<button type="button" className={`${item.id===leadClaim?"btn-primary":"btn-secondary"} !min-h-11 !px-3 !text-[0.8125rem]`} disabled={busy} tabIndex={tab} aria-label={named(text.claim)} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
+              {pending&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.8125rem]" disabled={busy} tabIndex={tab} aria-label={named(text.accept)} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}
+              {transferable&&<button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.8125rem]" disabled={busy} aria-haspopup="dialog" tabIndex={tab} aria-label={named(text.transfer)} onClick={()=>onTransfer?.(item)}>{text.transfer}</button>}
               {/* Opening is the row's quiet default; only a business action (take ownership, accept) is filled. */}
-              <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={busy} aria-label={named(text.open)} onClick={()=>onOpen(item)}>{text.open}<ArrowRight size={14} aria-hidden className="rtl:rotate-180"/></button>
+              <button type="button" {...roving.primary(item.id)} className="inline-flex min-h-11 items-center gap-1.5 px-1 font-semibold text-brand-700 underline decoration-line-strong underline-offset-4 hover:decoration-current aria-disabled:cursor-not-allowed aria-disabled:text-ink-500 aria-disabled:no-underline" aria-disabled={busy||undefined} aria-label={named(text.open)} onClick={()=>{if(!busy)onOpen(item);}}>{text.open}<ArrowRight size={16} aria-hidden className="rtl:rotate-180"/></button>
             </>;
 
 
-            return <li key={item.id} className="flex flex-col gap-3 p-3.5 transition hover:bg-brand-50/40 sm:flex-row sm:items-center sm:gap-4">
-              {selectable&&<label className="-m-3.5 inline-grid h-11 w-11 flex-none cursor-pointer place-items-center"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={selectedIds.has(item.id)} onChange={()=>toggle(item.id)} aria-label={fillTemplate(text.selectCase,{number:item.caseNumber})}/></label>}
+            return <li key={item.id} data-row={item.id} data-case={item.id} className={`${selectable?"grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3":"flex flex-col"} gap-y-3 px-2 py-3.5 transition hover:bg-brand-50/40 has-[[data-roving-primary]:focus-visible]:bg-brand-50 sm:flex sm:flex-row sm:items-center sm:gap-4`}>
+              {selectable&&<label className="-m-3.5 inline-grid h-11 w-11 flex-none cursor-pointer place-items-center"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={selectedIds.has(item.id)} tabIndex={tab} onChange={()=>toggle(item.id)} aria-label={fillTemplate(text.selectCase,{number:item.caseNumber})}/></label>}
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                   <p className="truncate font-bold text-ink-900">{title}</p>
                   {item.patientName&&<span className="text-[0.8125rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>}
                   {item.careCategory&&<span className="text-[0.8125rem] text-ink-500">{categoryLabel(item.careCategory)}</span>}
-                  <button type="button" className="-my-3.5 inline-grid h-11 w-11 place-items-center text-ink-400 transition hover:text-brand-700" title={copied===item.id?text.copied:fillTemplate(text.copy,{number:item.caseNumber})} aria-label={fillTemplate(text.copy,{number:item.caseNumber})}
+                  <button type="button" tabIndex={tab} className="-my-3.5 inline-grid h-11 w-11 place-items-center text-ink-400 transition hover:text-brand-700" title={copied===item.id?text.copied:fillTemplate(text.copy,{number:item.caseNumber})} aria-label={fillTemplate(text.copy,{number:item.caseNumber})}
                           onClick={()=>{void navigator.clipboard?.writeText(item.caseNumber).then(()=>{setCopied(item.id);setTimeout(()=>setCopied(null),1500);}).catch(()=>{});}}>
                     {copied===item.id?<Check size={13}/>:<Copy size={13}/>}
                   </button>
@@ -288,23 +299,23 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
                   <span className="text-[0.8125rem] text-ink-400">{claimable?text.received:text.updated} {new Intl.DateTimeFormat(intlLocale(locale),{day:"numeric",month:"short"}).format(new Date(claimable?item.createdAt:item.updatedAt))}</span>
                 </div>
               </div>
-              <div className="flex flex-none flex-wrap gap-2 sm:justify-end">{actions}</div>
+              <div className="col-span-2 flex flex-none flex-wrap items-center gap-2 sm:justify-end">{actions}</div>
             </li>;
           })}
-        </ul>}
+        </ul></>}
 
       {pages>1&&<nav className="mt-4 flex items-center justify-between gap-3" aria-label={text.pages}>
-        <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={page===1} onClick={()=>change({page:page-1})}>{text.previous}</button>
-        <span className="text-[0.82rem] text-ink-500">{fillTemplate(text.pageOf,{page:new Intl.NumberFormat(intlLocale(locale)).format(page),pages:new Intl.NumberFormat(intlLocale(locale)).format(pages)})}</span>
-        <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.82rem]" disabled={page===pages} onClick={()=>change({page:page+1})}>{text.next}</button>
+        <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.8125rem]" disabled={page===1} onClick={()=>change({page:page-1})}>{text.previous}</button>
+        <span className="text-[0.8125rem] text-ink-500">{fillTemplate(text.pageOf,{page:new Intl.NumberFormat(intlLocale(locale)).format(page),pages:new Intl.NumberFormat(intlLocale(locale)).format(pages)})}</span>
+        <button type="button" className="btn-secondary !min-h-11 !px-3 !text-[0.8125rem]" disabled={page===pages} onClick={()=>change({page:page+1})}>{text.next}</button>
       </nav>}
     </div>
   </section>;
 }
 
 function FilterSelect({label,value,options,render,onChange,allLabel="All",baseLabel,baseValue}:{label:string;value:string;options:string[];render?:(value:string)=>string;onChange:(value:string)=>void;allLabel?:string;baseLabel?:string;baseValue?:string}){
-  return <label className="text-[0.8rem] font-semibold text-ink-700">{label}
-    <select className="field mt-1.5 !min-h-10 !text-[0.85rem]" value={value} onChange={event=>onChange(event.target.value)}>
+  return <label className="text-[0.8125rem] font-semibold text-ink-700">{label}
+    <select className="field mt-1.5 !min-h-10 !text-[0.875rem]" value={value} onChange={event=>onChange(event.target.value)}>
       {baseValue!==undefined&&<option value={baseValue}>{baseLabel}</option>}
       <option value={baseValue!==undefined?"all":""}>{allLabel}</option>
       {options.filter(option=>option!==baseValue).sort().map(option=><option key={option} value={option}>{render?render(option):option}</option>)}
@@ -313,7 +324,7 @@ function FilterSelect({label,value,options,render,onChange,allLabel="All",baseLa
 }
 
 function DateFilter({label,value,onChange}:{label:string;value:string;onChange:(value:string)=>void}){
-  return <label className="text-[0.8rem] font-semibold text-ink-700">{label}
-    <input className="field mt-1.5 !min-h-10 !text-[0.85rem]" type="date" value={value} onChange={event=>onChange(event.target.value)}/>
+  return <label className="text-[0.8125rem] font-semibold text-ink-700">{label}
+    <input className="field mt-1.5 !min-h-10 !text-[0.875rem]" type="date" value={value} onChange={event=>onChange(event.target.value)}/>
   </label>;
 }

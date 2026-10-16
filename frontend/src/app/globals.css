@@ -880,11 +880,12 @@
   }
   :is(.portal-shell, .account-dialog, .portal-account) button:disabled:not(:root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline)) { opacity: var(--button-disabled-opacity); cursor: not-allowed; }
   /* Filled and edged buttons go inert by colour, so the label stays legible; after the hover rules so hover cannot wake them. */
-  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):disabled, :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):disabled:hover {
+  /* `aria-disabled` is the same state on a control that must stay focusable (a list's roving Open while the portal is busy). */
+  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):is(:disabled, [aria-disabled="true"]), :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):is(:disabled, [aria-disabled="true"]):hover {
     opacity: 1; cursor: not-allowed; transform: none; box-shadow: none;
     background: var(--button-disabled-bg); color: var(--button-disabled-fg); border-color: var(--button-disabled-border);
   }
-  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):disabled::after { display: none; }
+  :root[data-brand-theme="petrol"] :is(.btn-primary, .btn-secondary, .btn-outline):is(:disabled, [aria-disabled="true"])::after { display: none; }
   .portal-shell .card { box-shadow: var(--shadow-card); }
   .portal-shell fieldset:disabled { opacity: .65; }
   .portal-shell h2, .portal-shell h3 { scroll-margin-top: 7rem; }
@@ -902,6 +903,8 @@
   .portal-account summary::-webkit-details-marker { display: none; }
   .account-dialog { margin: auto; padding: var(--dialog-padding); width: min(var(--dialog-max-width), calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--dialog-border); border-radius: var(--dialog-radius); background: var(--dialog-bg); color: var(--dialog-fg); box-shadow: var(--dialog-shadow); }
   .account-dialog::backdrop { background: var(--dialog-backdrop); }
+  /* The drawer's header stays pinned while its content scrolls: a control reached by keyboard lands below it (WCAG 2.4.11). */
+  .case-drawer { scroll-padding-block-start: 5.5rem; }
   .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: .5rem; }
   .icon-button:hover { background: var(--color-brand-50); }
   /* My Care: the file's tab — a petrol top edge on the one card that matters now, and on the open case in the switcher. */
@@ -929,6 +932,11 @@
     .care-journey .journey-step > span:last-child { padding-block-start: 0; }
     .care-journey .journey-link { inset-block: calc(1rem - 1px) auto; inset-inline: calc(50% + 1.375rem) calc(-50% + 1.375rem); width: auto; height: 2px; }
   }
+  /* The staff case rail: the same markers, always down a narrow column and set tighter for working use. */
+  .care-journey.journey-rail .journey-step { flex-direction: row; align-items: center; gap: .75rem; padding-block-end: .625rem; padding-inline: 0; text-align: start; }
+  .care-journey.journey-rail .journey-step:last-child { padding-block-end: 0; }
+  .care-journey.journey-rail .journey-step > span:last-child { padding-block-start: 0; }
+  .care-journey.journey-rail .journey-link { inset-block: 2rem 0; inset-inline: calc(1rem - 1px) auto; width: 2px; height: auto; }
 }
 @media (max-width: 640px) {
   .portal-shell { padding-top: 1.5rem; }

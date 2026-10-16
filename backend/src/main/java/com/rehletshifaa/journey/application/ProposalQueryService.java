@@ -69,7 +69,21 @@ public class ProposalQueryService {
                 v.getRefundTerms(), v.getDisclaimers(), lines, v.getCoordinatorNotes(), v.getDocumentType(), v.getScopeChangeReason(), assistance(versionId),
                 // P1-10 (A-08): a final quote above the accepted estimate's maximum opens for acceptance 24 hours after release.
                 Boolean.TRUE.equals(v.getAboveEstimateMaximum()) && v.getReleasedAt() != null ? v.getReleasedAt().plus(FINAL_QUOTE_COOLING_PERIOD) : null,
-                v.getFxReapprovalStatus(), payeeTotals(lines));
+                v.getFxReapprovalStatus(), payeeTotals(lines), null, null, null);
+    }
+
+    /**
+     * UX 1c-0: the patient's workspace proposal with the totals the proposal link shows them (PublicProposalView) — the same
+     * displayTotals at the rate frozen at release (1 for the base currency). A foreign-currency version without its snapshot gets no
+     * totals rather than EGP figures under a foreign-currency label; the link refuses such a version outright.
+     */
+    ProposalView withPatientTotals(ProposalView v) {
+        BigDecimal frozen = versions.findFxSnapshot(v.versionId()).map(ProposalVersionRepository.FxSnapshot::getFxRate).orElse(null);
+        boolean base = v.currency() == null || com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(v.currency());
+        BigDecimal rate = frozen != null ? frozen : base ? BigDecimal.ONE : null;
+        if (rate == null) return v;
+        DisplayTotals totals = displayTotals(v.versionId(), rate);
+        return v.withTotals(totals.min(), totals.expected(), totals.max());
     }
 
     /**

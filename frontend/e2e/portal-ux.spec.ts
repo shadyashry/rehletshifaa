@@ -19,7 +19,7 @@ test("an unowned case can be reviewed before it is claimed, and claiming it upda
 
   await claim.click();
   await expect(page.getByRole("heading",{name:"New Patient",exact:true})).toBeVisible();
-  await page.getByRole("button",{name:/My dashboard/}).click();
+  await page.getByRole("button",{name:/^Back to /}).click();
   // The claimed case is now the coordinator's own work, which is what the queue move has to show.
   await staffView(page,/My cases/).click();
   await expect(page.getByText("RS-2026-000001")).toBeVisible();
@@ -59,7 +59,7 @@ test("search survives opening and returning from a case",async({page})=>{
   await staffView(page,/My cases/).click();
   const search=page.getByRole("searchbox").first();await search.fill("Maya");
   await page.getByRole("button",{name:/^Open(:| RS-)/}).first().click();
-  await page.getByRole("button",{name:/My dashboard/}).click();
+  await page.getByRole("button",{name:/^Back to /}).click();
   await expect(search).toHaveValue("Maya");
 });
 

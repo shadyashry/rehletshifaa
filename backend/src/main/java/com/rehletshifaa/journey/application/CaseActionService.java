@@ -139,7 +139,9 @@ public class CaseActionService {
         List<String> available = new ArrayList<>(owned ? availableActions(f, proposal, patientAction, blockers)
                 : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of());
         available.addAll(sends);
-        return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), withWindow(current), blockers, available, "STAFF", waitingReason.code());
+        // D-06: the coordinator, the patient's one voice, sees the step the patient's page shows (the patient's own rule).
+        CurrentActionView patientStep = coordinator ? patientStepForStaff(caseId, f.status(), patientAction, blockers) : null;
+        return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), withWindow(current), blockers, available, "STAFF", waitingReason.code(), patientStep);
     }
 
     // ---------------- the patient's own answer ----------------
@@ -172,6 +174,18 @@ public class CaseActionService {
         if (CaseTransitionPolicy.patientMayWithdraw(f.status(), () -> travelPlans.findStatusByCaseId(caseId).orElse(null))) available.add("WITHDRAW");
         CurrentActionView current = patientCurrentAction(caseId, f.status(), patientAction, mine);
         return new CaseActionsView(f.status(), waitingOn, waitingReason.text(), withWindow(current), mine, available, viewer, waitingReason.code());
+    }
+
+    /**
+     * The patient's current step as staff may see it: the code, kind, due date, readiness step and exit word the patient's
+     * page is worded from, with its usual window — not the information request's title or message (staff read those in
+     * the case itself).
+     */
+    private CurrentActionView patientStepForStaff(UUID caseId, String status, PatientActionView patientAction, List<BlockerView> blockers) {
+        List<BlockerView> theirs = blockers.stream().filter(b -> "PATIENT".equals(b.owner())).toList();
+        CurrentActionView step = withWindow(patientCurrentAction(caseId, status, patientAction, theirs));
+        return new CurrentActionView(step.code(), step.kind(), null, null, null, null, step.workType(), step.dueAt(), step.overdue(), step.blockerCode(),
+                null, step.exit(), step.expectedWorkingDays());
     }
 
     private CurrentActionView patientCurrentAction(UUID caseId, String status, PatientActionView patientAction, List<BlockerView> mine) {

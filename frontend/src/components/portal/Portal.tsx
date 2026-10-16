@@ -12,12 +12,14 @@ import type { ProposalCopy } from "@/components/portal/PatientProposal";
 import { PortalAccount, type Preferences } from "@/components/portal/PortalAccount";
 import { matchesKpi } from "@/components/portal/RoleDashboardSummary";
 import { initialQueue, ownershipTab, type QueueState } from "@/components/portal/CaseQueue";
-import { StaffNav, isStaffViewId, type StaffViewId, type StaffViewItem } from "@/components/portal/StaffNav";
+import { StaffNav, StaffViewLinks, isStaffViewId, type StaffViewId, type StaffViewItem } from "@/components/portal/StaffNav";
 import { LeaveCaseDialog, useDraftWatch } from "@/components/portal/LeaveCaseGuard";
+import { StaffShortcuts, focusReturnRow } from "@/components/portal/StaffShortcuts";
 import type { CareView } from "@/components/portal/MyCare";
 import { PatientNav } from "@/components/portal/PatientNav";
 import { WorkCopyProvider, useWorkCopy } from "@/components/portal/portal-copy";
-import type { WorkCopy } from "@/lib/portal-labels";
+import { fillTemplate, type WorkCopy } from "@/lib/portal-labels";
+import type { WorkItem } from "@/components/portal/MyWork";
 import type { AssignmentHistoryEntry } from "@/components/portal/AssignmentHistory";
 import { NotificationBell } from "@/components/portal/NotificationBell";
 import { ccHref } from "@/components/platform-control-center/control-center-nav";
@@ -30,6 +32,7 @@ import type { ReplyCover } from "@/components/portal/ReplyCoverPanel";
 import type { ConversationDetail } from "@/components/portal/ConversationsView";
 import { type CaseView, type StaffCaseResponse, type CatalogService, type DirectoryFacility, type FxRate, type CaseDocument, type VerifiedDoctor, type DoctorProfile, type StaffProfile, type CareCategory, type StaffMember, type Task, type Workspace, type MutationResult, refreshAfterRejectedAction, normalizeCases, STAFF_ROLES, terminalStatuses, roleLabel } from "@/components/portal/portal-model";
 import { copy, FeedbackContext } from "@/components/portal/portal-ui";
+import { Check, CircleAlert } from "lucide-react";
 import { refusalExplainedInPlace } from "@/lib/price-transparency";
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
@@ -44,8 +47,8 @@ export function Portal({workCopy,...props}:{locale:Locale;proposalCopy:ProposalC
 }
 
 /** The queue state for an explicitly chosen staff view (a pick, a deep link or a history step). */
-/** The open staff view's own (visible) heading takes the focus when the control that was focused goes away. */
-function focusViewHeading(options?:FocusOptions){const heading=document.querySelector<HTMLElement>("#staff-view h2.title");if(heading){heading.tabIndex=-1;heading.focus(options);}}
+/** The page's heading — the open staff view's name (UX 2-4) — takes the focus when the control that was focused goes away. */
+function focusViewHeading(options?:FocusOptions){document.getElementById("portal-title")?.focus(options);}
 
 /**
  * The role's case page, fetched as soon as the role is known (patients never download the staff workspace, and staff
@@ -109,7 +112,10 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const[chosenRole,setActive]=useState<RoleKey|undefined>();const[cases,setCases]=useState<CaseView[]>([]);const[myTasks,setMyTasks]=useState<Task[]>([]);const[workspace,setWorkspace]=useState<Workspace|null>(null);const[documents,setDocuments]=useState<CaseDocument[]>([]);const[facilities,setFacilities]=useState<DirectoryFacility[]>([]);const[doctors,setDoctors]=useState<VerifiedDoctor[]>([]);const[categories,setCategories]=useState<CareCategory[]>([]);const[staff,setStaff]=useState<StaffMember[]|null>([]);const[doctorProfile,setDoctorProfile]=useState<DoctorProfile|null>(null);const[coordinatorProfile,setCoordinatorProfile]=useState<StaffProfile|null>(null);const[catalog,setCatalog]=useState<CatalogService[]>([]);const[fxRates,setFxRates]=useState<FxRate[]>([]);const[busyCount,setBusyCount]=useState(0);const busy=busyCount>0;const[notice,setNotice]=useState("");const[error,setError]=useState("");
   const [preferences,setPreferences]=useState<Preferences>({displayName:null,locale:null});
   const [queueState,setQueueState]=useState<QueueState>(initialQueue);
-  const queuePosition=useRef(0);const opening=useRef(0);const mutationPending=useRef(false);
+  const queuePosition=useRef(0);const returnToRow=useRef<string|null>(null);const opening=useRef(0);const mutationPending=useRef(false);
+  // A case just opened takes the focus on its heading once its page has mounted (the case view is a chunk that can arrive
+  // after the case itself): the request is kept here and met by the effect below, not by one animation frame.
+  const caseFocus=useRef<{id:string;scroll:boolean}|null>(null);const[caseFocusRequest,setCaseFocusRequest]=useState(0);
   const [documentError,setDocumentError]=useState(false);const [queueLoading,setQueueLoading]=useState(true);const [queueFor,setQueueFor]=useState<string|null>(null);const [landedRole,setLandedRole]=useState<string|null>(null);
   // A role named in the URL (a deep link, or a switch kept there) holds until the person switches; read once, not synced.
   const [roleParam]=useState(()=>typeof window==="undefined"?null:new URLSearchParams(window.location.search).get("role") as RoleKey|null);
@@ -175,7 +181,8 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     // While /me reloads there is no role yet; a role-scoped URL would read /undefined/cases/….
     if(!currentRole)return;
     const request=++opening.current;if(!managedBusy)setBusyCount(n=>n+1);setError("");setDocumentError(false);
-    if(!workspace)queuePosition.current=window.scrollY;
+    // Leaving the list for a case: keep where the page was, and whether a row of a list opened it (UX 2-2: Back returns there).
+    if(!workspace){queuePosition.current=window.scrollY;returnToRow.current=document.activeElement?.closest<HTMLElement>("#staff-view [data-roving-list] [data-row]")?.dataset.row??null;}
     try{
       if(currentRole==="coordinator"&&!item.coordinatorSubject){
         const preview=await api<{caseSummary:CaseView;intakeSummary?:string}>(`/coordinator/cases/${item.id}/intake-preview`);
@@ -186,7 +193,10 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
         if(request!==opening.current)return;setWorkspace(ws);setDocuments([]);
         const docs=await pending;if(request===opening.current){setDocuments(docs.rows);if(docs.failed&&!ws.paymentOnly)setDocumentError(true);}
       }
-      if(request===opening.current){const url=new URL(window.location.href);url.searchParams.set("case",item.id);if(url.search!==window.location.search)window.history.pushState({},"",url);if(!workspace)requestAnimationFrame(()=>document.getElementById("case-heading")?.focus());}
+      if(request===opening.current){const url=new URL(window.location.href);url.searchParams.set("case",item.id);if(url.search!==window.location.search)window.history.pushState({},"",url);
+        // Arriving on a case — from a list, or from another case (Next in My work, a notification) — starts at its top, on its heading.
+        const switched=!!workspace&&workspace.caseSummary.id!==item.id;
+        if(!workspace||switched){caseFocus.current={id:item.id,scroll:switched};setCaseFocusRequest(n=>n+1);}}
     }catch(e){if(request===opening.current){setWorkspace(null);setError(e instanceof Error?e.message:t.error);void refresh();}}
     finally{if(!managedBusy)setBusyCount(n=>n-1);}
   }
@@ -203,9 +213,10 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     try{const ws=await api<Workspace>(`/${currentRole}/cases/${caseId}`);await openCase(ws.caseSummary,ws);}
     catch(e){setError(e instanceof Error?e.message:t.error);}
   }
-  function backToQueue(){opening.current++;setWorkspace(null);setError("");setNotice("");const url=new URL(window.location.href);url.searchParams.delete("case");window.history.replaceState({},"",url);
-    // The control that closed the case is gone with it: hand the focus to the view's heading, keeping the scroll position.
-    requestAnimationFrame(()=>{window.scrollTo({top:queuePosition.current,behavior:"instant"});focusViewHeading({preventScroll:true});});}
+  function backToQueue(toRow=true){const closing=workspace?.caseSummary.id??"";opening.current++;caseFocus.current=null;setWorkspace(null);setError("");setNotice("");const url=new URL(window.location.href);url.searchParams.delete("case");window.history.replaceState({},"",url);
+    // The control that closed the case is gone with it: the focus goes back to the row the case was opened from, else to the
+    // view's heading, keeping the scroll position either way.
+    requestAnimationFrame(()=>{window.scrollTo({top:queuePosition.current,behavior:"instant"});if(!(toRow&&returnToRow.current!==null&&focusReturnRow(returnToRow.current,closing))){window.scrollTo({top:0,behavior:"instant"});focusViewHeading({preventScroll:true});}});}
   // Keep only navigation preferences in this browser session, scoped to the signed-in account.
   // Keyed by the subject, not the User object: a silent token renew hands over a new User and must not reset the view.
   const userSubject=user?.profile.sub;
@@ -274,7 +285,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   useEffect(()=>{if(!caseOpen)return;const onUnload=(event:BeforeUnloadEvent)=>{if(hasDraft()){event.preventDefault();event.returnValue="";}};window.addEventListener("beforeunload",onUnload);return()=>window.removeEventListener("beforeunload",onUnload);},[caseOpen,hasDraft]);
   /** Staff views live in the URL (`?view=`), so Back/Forward, deep links and new tabs reach them. */
   function showStaffView(id:StaffViewId,fromCase:boolean,push=true){
-    if(fromCase)backToQueue();
+    if(fromCase)backToQueue(false);
     changeQueue(withView(queueState,id));
     const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.set("view",id);
     if(push&&staffView&&!new URLSearchParams(window.location.search).has("view")){const here=new URL(window.location.href);here.searchParams.delete("case");here.searchParams.set("view",staffView);window.history.replaceState({},"",here);}
@@ -308,25 +319,39 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     }
     apply();
   };});
+  // The opened case's heading takes the focus once the case page is on screen (its chunk may arrive after the case).
+  const openCaseId=workspace?.caseSummary.id;
+  useEffect(()=>{const pending=caseFocus.current;if(!pending||!openCaseId||!CaseViewFor)return;
+    // Another case is open now (a later pick won): this request is stale and must never pull the focus later.
+    if(openCaseId!==pending.id){caseFocus.current=null;return;}
+    const heading=document.getElementById("case-heading");caseFocus.current=null;if(!heading)return;
+    if(pending.scroll)window.scrollTo({top:0,behavior:"instant"});heading.focus();},[caseFocusRequest,openCaseId,CaseViewFor]);
   useEffect(()=>{const listener=()=>onHistory.current();window.addEventListener("popstate",listener);return()=>window.removeEventListener("popstate",listener);},[]);
   function changeRole(role:RoleKey){setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.delete("view");url.searchParams.set("role",role);window.history.replaceState({},"",url);}
   function switchRole(role:RoleKey){guardLeave(()=>changeRole(role));}
   const clinicLink=hasClinic?{href:virtualClinicHref(locale),label:work.nav.clinic}:null;
   const clearFeedback=useCallback(()=>{setNotice("");setError("");setRefusal(null);},[]);const clearNotice=useCallback(()=>setNotice(""),[]);
   if(loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
-  if(controlCenterOnly)return <PortalFrame title={t.title} subtitle={locale==="ar"?"جارٍ فتح مركز التحكم…":"Opening the Control Center…"}/>;
+  if(controlCenterOnly)return <PortalFrame title={t.title} subtitle={work.portal.openingControlCenter}/>;
   if(user&&!workforce&&!careEntry&&clinicAccess.loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
-  if(!user)return <PortalFrame title={t.title} subtitle={t.subtitle}><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]"><div className="card p-6 sm:p-8"><p className="eyebrow">{locale==="ar"?"مساحة خاصة ومحمية":"Private, protected space"}</p><h2 className="title mt-3">{locale==="ar"?"سجّل الدخول للوصول إلى حالتك":"Sign in to open your case"}</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-ink-600">{locale==="ar"?"للمرضى الذين أكملوا ملفهم وفعّلوا حسابهم، وللفريق الطبي والتنسيقي. بعد الدخول تصل مباشرة إلى حالتك الحالية وخطوتها التالية.":"For patients who completed their profile and set up their account, and for the care team. After signing in you land directly on your current case and its next step."}</p><div className="mt-6 flex flex-col gap-3 sm:flex-row"><button className="btn-primary" onClick={()=>void signIn()}>{t.signIn}</button><a className="btn-secondary" href={locale==="ar"?"/en/portal":"/ar/portal"} lang={locale==="ar"?"en":"ar"}>{locale==="ar"?"English":"العربية"}</a></div><p className="mt-5 border-t border-line pt-4 text-sm leading-6 text-ink-500">{locale==="ar"?"أرسلت حالتك ولم تفعّل حسابك بعد؟ ":"Sent a case but haven't set up your account yet? "}<a className="font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/track-case`}>{locale==="ar"?"تابع حالتك عبر الرابط الآمن":"Check your case status with your secure link"}</a>{locale==="ar"?" — أما الحساب فتُنشئه عند إكمال ملفك بعد قبول العرض.":" — your account is created when you complete your profile after accepting a proposal."}</p></div><aside className="surface-muted p-6"><h2 className="font-bold text-brand-900">{locale==="ar"?"حماية الوصول":"Secure access"}</h2><ul className="mt-4 space-y-3 text-sm leading-6 text-ink-600"><li>✓ {locale==="ar"?"تسجيل دخول موحّد وآمن":"Secure single sign-on"}</li><li>✓ {locale==="ar"?"صلاحيات منفصلة لكل دور":"Role-specific access"}</li><li>✓ {locale==="ar"?"المستندات الطبية ليست عامة":"Medical files are never public"}</li></ul><p className="mt-5 border-t border-line pt-4 text-[0.8125rem] leading-5 text-ink-500">{locale==="ar"?"إذا لم تتمكن من الدخول، تواصل مع منسقك أو مسؤول النظام دون مشاركة كلمة المرور.":"If you cannot sign in, contact your coordinator or system administrator without sharing your password."}</p></aside></div></PortalFrame>;
+  const signedOut=work.portal.signedOut;
+  if(!user)return <PortalFrame title={t.title} subtitle={t.subtitle}><div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]"><div className="card p-6 sm:p-8"><p className="eyebrow">{signedOut.eyebrow}</p><h2 className="title mt-3">{signedOut.title}</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-ink-600">{signedOut.body}</p><div className="mt-6 flex flex-col gap-3 sm:flex-row"><button className="btn-primary" onClick={()=>void signIn()}>{t.signIn}</button><a className="btn-secondary" href={`/${signedOut.otherLanguageCode}/portal`} lang={signedOut.otherLanguageCode}>{signedOut.otherLanguage}</a></div><p className="mt-5 border-t border-line pt-4 text-sm leading-6 text-ink-500">{signedOut.noAccount}<a className="font-semibold text-brand-700 underline underline-offset-4" href={`/${locale}/track-case`}>{signedOut.trackLink}</a>{signedOut.noAccountTail}</p></div><aside className="surface-muted p-6"><h2 className="font-bold text-brand-900">{signedOut.secureTitle}</h2><ul className="mt-4 space-y-3 text-sm leading-6 text-ink-600">{signedOut.secure.map(line=><li key={line} className="flex items-start gap-2"><Check size={16} aria-hidden className="mt-1 flex-none text-brand-600"/>{line}</li>)}</ul><p className="mt-5 border-t border-line pt-4 text-[0.8125rem] leading-5 text-ink-500">{signedOut.help}</p></aside></div></PortalFrame>;
   const profile=user.profile as {name?:string;preferred_username?:string;email?:string;sub?:string};
   const accountName=profile.name??profile.preferred_username??profile.email??profile.sub??"";
   const isDoctorRole=currentRole==="doctor";
   const profileName=isDoctorRole?doctorProfile?.displayName:currentRole==="coordinator"?coordinatorProfile?.displayName:undefined;
   const baseName=preferences.displayName||profileName||accountName;
   const displayName=isDoctorRole&&profileName&&!/^d(r|octor)\b/i.test(baseName)?`Dr. ${baseName}`:baseName;
-  const descriptions:Record<RoleKey,string>=locale==="ar"?{coordinator:"راجع الحالات ونسّق الخطوة التالية للرعاية.",doctor:"راجع الحالات المسندة إليك وسجّل قراراتك السريرية.",operations:"تابع الترتيبات والإجراءات المطلوبة منك.",finance:"راجع المدفوعات والموافقات المطلوبة.",patient:"تابع رعايتك وتعرّف على الخطوة التالية."}:{coordinator:"Review cases and coordinate the next step in care.",doctor:"Review assigned cases and record your clinical decisions.",operations:"Manage your assigned care and travel arrangements.",finance:"Review payments and commercial approvals that need your attention.",patient:"Follow your care and see what happens next."};
+  const descriptions:Partial<Record<RoleKey,string>>=work.portal.roles;
   const inWorkspace=!!workspace&&!!caseRole;
   const isPatientRole=currentRole==="patient";
-  return <FeedbackContext.Provider value={{notice,error,errorCode:refusal?.code,errorPath:refusal?.path,clear:clearFeedback,clearNotice}}><PortalFrame paper={isPatientRole} title={isPatientRole?work.myCare.nav.care:currentRole?roleLabel(currentRole,locale):t.title} subtitle={inWorkspace||isPatientRole?"":currentRole?descriptions[currentRole]:t.subtitle}>
+  // The page's heading is the place (UX 2-4): the staff view's name, not the role; on a case, the case (the cover names the
+  // patient, so the page heading is for assistive technology only). The role's line stays on My work alone, where a person
+  // with several roles starts their day; every other view is a place, not a greeting.
+  const viewName=staffViews?.items.find(item=>item.id===staffView)?.label;
+  const pageTitle=isPatientRole?work.myCare.nav.care:inWorkspace&&staffViews?fillTemplate(work.portal.title.case,{caseNumber:`\u2066${workspace.caseSummary.caseNumber}\u2069`}):viewName??(currentRole?roleLabel(currentRole,locale):t.title);
+  const pageSubtitle=inWorkspace||isPatientRole||(staffViews&&staffView!=="work")?"":currentRole?descriptions[currentRole]??"":t.subtitle;
+  return <FeedbackContext.Provider value={{notice,error,errorCode:refusal?.code,errorPath:refusal?.path,clear:clearFeedback,clearNotice}}><PortalFrame title={pageTitle} titleHidden={inWorkspace&&!!staffViews} subtitle={pageSubtitle} nav={staffViews?<StaffViewLinks locale={locale} label={work.nav.label} items={staffViews.items} current={workspace?null:staffView} clinic={clinicLink} onSelect={selectStaffView} hrefFor={viewHref} variant="inline"/>:null}>
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>workspace&&workspace.caseSummary.id!==caseId?guardLeave(()=>void openCaseById(caseId)):void openCaseById(caseId)}/>}
     {staffViews&&<StaffNav locale={locale} label={work.nav.label} items={staffViews.items} current={workspace?null:staffView} clinic={clinicLink} onSelect={selectStaffView} hrefFor={viewHref}/>}
     {isPatientRole&&workspace&&<PatientNav caseId={workspace.caseSummary.id} view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}
@@ -334,44 +359,53 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
       roles={available.length>1?{label:work.nav.workingAs,current:currentRole,options:available.map(role=>({key:role,label:roleLabel(role,locale)})),onSelect:key=>switchRole(key as RoleKey)}:null}/>
     {/* A patient-side account that also manages a clinic keeps its one way in; staff reach it from the navigation. */}
     {isPatientRole&&clinicLink&&<p className="mb-6"><a className="btn-secondary" href={clinicLink.href}>{clinicLink.label}</a></p>}
-    {passkeyNeeded&&<PortalPasskeyNotice locale={locale} pending={passkeyNeeded.pending} className="mb-4 rounded-lg bg-brand-50 p-4 text-brand-800" onClose={()=>setPasskeyNeeded(null)}/>}
-    {reauthReturn&&<PortalReauthenticationNotice locale={locale} pending={reauthReturn.pending} abandoned={reauthReturn.abandoned} busy={busy} className="mb-4 rounded-lg bg-brand-50 p-4 text-brand-800"
+    {passkeyNeeded&&<PortalPasskeyNotice locale={locale} pending={passkeyNeeded.pending} className={NOTICE} onClose={()=>setPasskeyNeeded(null)}/>}
+    {reauthReturn&&<PortalReauthenticationNotice locale={locale} pending={reauthReturn.pending} abandoned={reauthReturn.abandoned} busy={busy} className={NOTICE}
       onClose={()=>setReauthReturn(null)} onResend={change=>{void mutate(change.path,change.body===undefined?undefined:JSON.parse(change.body),change.method);}}/>}
     {!available.length&&<NoPortalWorkspace locale={locale}/>}
     {linkToken&&currentRole==="patient"&&<AccountLinkRequest locale={locale} token={linkToken} api={api} onResolved={()=>{setLinkToken(null);restored.current=false;void refresh();}}/>}
-    {meFailed&&<div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-alert-50 p-4 text-alert-800"><span>{work.accessUnavailable.message}</span><button type="button" className="btn-secondary !px-3 !text-[0.82rem]" onClick={refreshMe}>{work.accessUnavailable.retry}</button></div>}
-    {notice&&<p role="status" className="mb-4 rounded-lg bg-brand-50 p-4 text-brand-800">{notice}</p>}{error&&<div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-alert-50 p-4 text-alert-800"><span>{error}</span><button type="button" className="btn-secondary !px-3 !text-[0.82rem]" onClick={()=>{setError("");void refresh();}}>{locale==="ar"?"إعادة المحاولة":"Retry"}</button></div>}
+    {meFailed&&<div role="alert" className={ALERT}><span className="flex items-start gap-2"><CircleAlert size={16} aria-hidden className="mt-1 flex-none"/>{work.accessUnavailable.message}</span><button type="button" className="btn-secondary" onClick={refreshMe}>{work.accessUnavailable.retry}</button></div>}
+    <div role="status">{notice&&<p className={`${NOTICE} flex items-start gap-2`}><Check size={16} aria-hidden className="mt-1 flex-none"/>{notice}</p>}</div>{error&&<div role="alert" className={ALERT}><span className="flex items-start gap-2"><CircleAlert size={16} aria-hidden className="mt-1 flex-none"/>{error}</span><button type="button" className="btn-secondary" onClick={()=>{setError("");void refresh();}}>{work.portal.retry}</button></div>}
     {leaveTo&&<LeaveCaseDialog onStay={()=>setLeaveTo(null)} onLeave={()=>{const go=leaveTo;setLeaveTo(null);go();}}/>}
     {busy&&workspace&&<p role="status" className="mb-3 text-sm text-ink-500">{t.loading}</p>}
-    {documentError&&workspace&&<p role="alert" className="mb-4 rounded-lg bg-alert-50 p-4 text-sm text-alert-800">{locale==="ar"?"تعذّر تحميل المستندات.":"Documents could not be loaded."} <button className="link-cta" onClick={()=>void openCase(workspace.caseSummary)}>{locale==="ar"?"إعادة المحاولة":"Retry"}</button></p>}
+    {documentError&&workspace&&<div role="alert" className={ALERT}><span className="flex items-start gap-2"><CircleAlert size={16} aria-hidden className="mt-1 flex-none"/>{work.portal.documentsFailed}</span><button type="button" className="link-cta" onClick={()=>void openCase(workspace.caseSummary)}>{work.portal.retry}</button></div>}
     {workspace
         // Keyed by case: opening another case straight from a notification or My Work must not carry this case's
         // drafts, tab or open dialogs into it (or let them be submitted against the wrong patient's case).
-        ? !caseRole||!CaseViewFor ? (meFailed?null:<p role="status" className="text-sm text-ink-500">{t.loading}</p>) : <div ref={workspaceRoot}><RoleCaseView view={CaseViewFor} key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={caseRole} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} facilities={facilities} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} loadIntakeHistory={loadIntakeHistory} load={api} send={api} reloadDocuments={reloadDocuments} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} sendProposal={sendProposal} busy={busy} back={()=>guardLeave(backToQueue)} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={id=>id!==workspace.caseSummary.id?guardLeave(()=>void openCaseById(id)):undefined} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null} canReopen={holds(me,"CASE_REOPEN")}/></div>
+        ? !caseRole||!CaseViewFor ? (meFailed?null:<p role="status" className="text-sm text-ink-500">{t.loading}</p>) : <div ref={workspaceRoot}><RoleCaseView view={CaseViewFor} key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={caseRole} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} facilities={facilities} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} loadIntakeHistory={loadIntakeHistory} load={api} send={api} reloadDocuments={reloadDocuments} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} sendProposal={sendProposal} busy={busy} back={()=>guardLeave(backToQueue)} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={id=>id!==workspace.caseSummary.id?guardLeave(()=>void openCaseById(id)):undefined} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null} canReopen={holds(me,"CASE_REOPEN")} workItems={myTasks as unknown as WorkItem[]} backLabel={fillTemplate(work.caseCover.backTo,{view:staffViews?.items.find(item=>item.id===staffView)?.label??work.nav.work})}/></div>
         : isPatientRole ? (queueLoading||(!landed&&patientView)||(cases.length>0&&!error)
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)
         : null}
-    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div id="staff-view" hidden={!!workspace}><Queue viewHref={viewHref} views={staffViews?.items??[]} view={staffView??"work"} onSelectView={selectStaffView} clinic={clinicLink} loading={queueLoading||queueFor!==currentRole} queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff??[]} replyCovers={replyCovers} openCase={openCase} mutate={mutate} fetchJson={api}/></div>}
+    {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div id="staff-view" hidden={!!workspace}><Queue views={staffViews?.items??[]} view={staffView??"work"} onSelectView={selectStaffView} loading={queueLoading||queueFor!==currentRole} queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff??[]} replyCovers={replyCovers} openCase={openCase} mutate={mutate} fetchJson={api}/></div>}
 
     {/* P1-13: a Care Coordination Manager works incidents in the Control Center; one quiet way there from the work list. */}
     {currentRole==="coordinator"&&!workspace&&holds(me,"INCIDENT_MANAGE")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/incidents")}>{work.safety.incidents.title}</a> — {work.safety.incidents.inControlCenter}</p>}
-    {currentRole==="finance"&&!workspace&&holds(me,"COMMERCIAL_POLICY_READ")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{locale==="ar"?"سياسات الهامش والدفعة المقدمة":"Margin & deposit policies"}</a>{locale==="ar"?" — في مركز التحكم":" — in the Control Center"}</p>}
+    {currentRole==="finance"&&!workspace&&holds(me,"COMMERCIAL_POLICY_READ")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{work.portal.financePolicies}</a>{work.portal.inControlCenter}</p>}
+    {staffViews&&<StaffShortcuts views={staffViews.items} caseOpen={!!workspace} onView={selectStaffView}/>}
   </PortalFrame></FeedbackContext.Provider>;
 }
 
 /** A signed-in patient with no case yet: one calm sentence and the one thing they can do. */
 function PatientNoCase({locale}:{locale:Locale}){
- const ar=locale==="ar";
+ const t=useWorkCopy().portal.noCase;
  return <section className="card mx-auto max-w-2xl p-6 sm:p-8" aria-labelledby="no-case-title">
-  <h2 id="no-case-title" className="text-[1.15rem] font-bold text-brand-900">{ar?"لا توجد حالة نشطة بعد":"No active case yet"}</h2>
-  <p className="mt-2 text-[0.95rem] leading-7 text-ink-600">{ar?"عندما ترسل حالة، تظهر رحلة رعايتك هنا: ما يحدث الآن، وما إذا كان مطلوبًا منك شيء، وما الخطوة التالية.":"When you send a case, your care journey appears here: what is happening now, whether we need anything from you, and what happens next."}</p>
-  <a className="btn-primary mt-5 inline-flex" href={`/${locale}/send-my-case`}>{ar?"إرسال حالتي":"Send my case"}</a>
+  <h2 id="no-case-title" className="text-[1.125rem] font-bold text-brand-900">{t.title}</h2>
+  <p className="mt-2 text-[0.9375rem] leading-7 text-ink-600">{t.body}</p>
+  <a className="btn-primary mt-5 inline-flex" href={`/${locale}/send-my-case`}>{t.send}</a>
  </section>;
 }
 
-/** `paper`: the patient's file sits on paper throughout, so its white cards read as cards (the Two Surfaces rule). */
-function PortalFrame({title,subtitle,paper=false,children}:{title:string;subtitle:string;paper?:boolean;children?:React.ReactNode}){return <section className={`portal-shell ${paper?"bg-mist":"bg-[linear-gradient(180deg,var(--color-mist)_0%,#fff_32rem)]"}`}><div className="container-site"><h1 className="headline">{title}</h1>{subtitle&&<p className="mt-2 max-w-3xl text-sm text-ink-600">{subtitle}</p>}<div className="mt-6">{children}</div></div></section>}
+/**
+ * The portal page: paper throughout, so white cards read as cards (the Two Surfaces rule; no wash behind the staff side
+ * either, UX 2-4). The h1 is the page's place and takes the focus from code when a view changes under the person;
+ * `titleHidden` keeps it for assistive technology where the page names itself visibly (a case's cover).
+ */
+function PortalFrame({title,subtitle,titleHidden=false,nav,children}:{title:string;subtitle:string;titleHidden?:boolean;/** The phone copy of the staff navigation: above the heading, where the place is chosen before it is named. */nav?:React.ReactNode;children?:React.ReactNode}){return <section className="portal-shell bg-mist"><div className="container-site">{nav}<h1 id="portal-title" tabIndex={-1} className={titleHidden?"sr-only":"headline scroll-mt-28 rounded-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600"}>{title}</h1>{subtitle&&<p className="mt-2 max-w-3xl text-sm text-ink-600">{subtitle}</p>}<div className={titleHidden?undefined:subtitle?"mt-6":"mt-2"}>{children}</div></div></section>}
+
+/** Notices are hairline lines, not tinted panels (UX 2-4): the icon and the words carry the tone, the ink colours it. */
+const NOTICE="mb-4 border-y border-line py-3 text-[0.9375rem] leading-6 text-brand-800";
+const ALERT="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-y border-alert-200 py-3 text-[0.9375rem] leading-6 text-alert-800";
 
 /** The staff views in order with the counts that decide where the home lands. My cases shows no count: it is accountability, not a to-do. */
 function staffViewItems(role:string,cases:CaseView[],tasks:Task[],subject:string|undefined,nav:WorkCopy["nav"]){
