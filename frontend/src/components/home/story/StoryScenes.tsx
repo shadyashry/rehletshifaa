@@ -83,15 +83,20 @@ function Bubble({ dir, place, start, name, children }: { dir: Dir; place: CSSPro
 
 function SceneCaption({ title, body }: { title: string; body: string }) {
   return (
-    <div className="s-rise mt-auto border-t border-line px-4 pb-4 pt-3.5 sm:px-5" style={at(0.2)}>
+    <div className="s-rise border-t border-line px-4 pb-4 pt-3.5 sm:px-5" style={at(0.2)}>
       <p className="font-[family-name:var(--font-brand-latin)] text-[1.0625rem] font-semibold leading-6 text-brand-900 rtl:font-[family-name:var(--font-brand-arabic)] sm:text-[1.125rem]">{title}</p>
       <p className="mt-0.5 text-[0.875rem] leading-6 text-ink-500">{body}</p>
     </div>
   );
 }
 
+/** The scene's middle: centred in the space the tallest scene sets, so a shorter scene has no gap above its caption. */
 function SceneBody({ className = "", children }: { className?: string; children: ReactNode }) {
-  return <div className={`px-4 py-4 sm:px-5 ${className}`}>{children}</div>;
+  return (
+    <div className="flex flex-1 flex-col justify-center px-4 py-4 sm:px-5">
+      <div className={className}>{children}</div>
+    </div>
+  );
 }
 
 function Tick({ start, size = 20 }: { start: number; size?: number }) {
@@ -277,7 +282,8 @@ export function RecommendationScene({ s, step, dir, validUntil }: { s: Story; st
               <span key={index} className={`s-seg ${segment.className}`} style={at(2.1 + index * 0.15, { flex: `${segment.flex} 1 0` })} />
             ))}
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] font-semibold text-ink-600">
+          {/* Phones keep the bar and drop its legend: the legend would make this the tallest scene by far. */}
+          <ul className="mt-1.5 hidden flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] font-semibold text-ink-600 sm:flex">
             {t.includes.map((item, index) => (
               <li key={item} className="flex items-center gap-1.5">
                 <span aria-hidden className={`h-2 w-2 rounded-[2px] ${segments[index].className}`} />

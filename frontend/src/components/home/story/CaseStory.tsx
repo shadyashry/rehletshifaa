@@ -21,8 +21,7 @@ export function CaseStory({ locale, d }: { locale: Locale; d: Dictionary }) {
   const [send, review, recommendation, decide, care] = s.steps;
 
   return (
-    <figure className="m-0 w-full min-w-0">
-      <div className="case-story-card">
+    <figure className="case-story-card m-0 flex w-full min-w-0 flex-col">
         <CaseStoryTabs
           label={s.label}
           steps={s.steps.map(({ label }) => ({ label }))}
@@ -36,10 +35,10 @@ export function CaseStory({ locale, d }: { locale: Locale; d: Dictionary }) {
             <CareScene key="care" s={s} step={care} dir={dir} />,
           ]}
         />
-      </div>
-      <figcaption className="mt-2.5 flex flex-wrap justify-between gap-x-4 gap-y-1 text-[0.8125rem] leading-5 text-ink-500">
+      {/* Inside the card, so the card and the text column end on one line. */}
+      <figcaption className="mt-auto flex flex-wrap justify-between gap-x-4 gap-y-0.5 border-t border-line bg-surface-pearl px-4 py-2.5 text-[0.75rem] leading-5 text-ink-500 sm:px-5">
+        {/* The preliminary notice already sits beside the headline; the card only says this case is an example. */}
         <span>{s.example}</span>
-        <span>{s.preliminary}</span>
       </figcaption>
     </figure>
   );

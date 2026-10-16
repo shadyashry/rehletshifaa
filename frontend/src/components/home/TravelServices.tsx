@@ -15,7 +15,7 @@ export function TravelServices({ d }: { d: Dictionary }) {
   const last = t.items.length - 1;
 
   return (
-    <section className="canvas-hospitality py-[clamp(2.25rem,1.6rem+1.6vw,3.25rem)]">
+    <section className="home-section canvas-hospitality">
       <div className="container-site">
         <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-16">
           <div>
