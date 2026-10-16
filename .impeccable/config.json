@@ -128,6 +128,15 @@
         ],
         "createdAt": "2026-10-14T23:41:33.219Z",
         "reason": "world A is the incumbent rendered as built (DESIGN.md body face); the page proposes replacing it"
+      },
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "frontend/src/components/portal/WorkLedger.tsx"
+        ],
+        "createdAt": "2026-10-16T20:56:55.034Z",
+        "reason": "DESIGN.md signature: 2px Petrol top edge on cards, 'like the tab of a file' (Cards / Containers)"
       }
     ]
   }
