@@ -3,6 +3,42 @@ import { intlLocale, type Locale } from "@/lib/i18n";
 import type { FinalQuoteState } from "@/lib/price-transparency";
 
 export type PriceCopy = Dictionary["portalProposal"]["price"];
+export type PayeeTotal = { payee: string; total: number };
+
+/** P1-19 (design §7.4): a quote pays more than one party when two payees besides the platform have lines; then each line says whose it is. */
+export const payeesSplit = (totals?: PayeeTotal[] | null) => (totals ?? []).filter((t) => t.payee !== "PLATFORM").length > 1;
+
+/** "Paid to the hospital": whose line it is, or nothing when the quote pays one party only (the fee line has its own words). */
+export function PayeeNote({ copy, payee, split, className = "block text-[0.8125rem] leading-5 text-ink-600" }: { copy: PriceCopy; payee?: string | null; split: boolean; className?: string }) {
+  const to = copy.payees.to as Record<string, string>;
+  if (!split || !payee || payee === "PLATFORM" || !Object.hasOwn(to, payee)) return null;
+  return <span className={className}>{to[payee]}</span>;
+}
+
+/**
+ * Who is paid (P1-19, design §7.4): the Consultant's fee and the hospital's charges apart, never blended, each as the backend summed it
+ * (mandatory lines, the display currency). Shown only when the quote pays more than one party.
+ */
+export function PayeeTotals({ copy, totals, format, headingId, className = "" }: {
+  copy: PriceCopy; totals?: PayeeTotal[] | null; format: (amount: number) => string; headingId: string; className?: string;
+}) {
+  if (!payeesSplit(totals)) return null;
+  const to = copy.payees.to as Record<string, string>;
+  return (
+    <section aria-labelledby={headingId} className={className}>
+      <h3 id={headingId} className="text-[0.9375rem] font-semibold text-brand-900">{copy.payees.title}</h3>
+      <dl className="mt-2 divide-y divide-line border-y border-line">
+        {(totals ?? []).map((t) => (
+          <div key={t.payee} className="flex items-baseline justify-between gap-4 py-2.5 text-[0.9375rem]">
+            <dt className="min-w-0 text-ink-800">{to[t.payee] ?? t.payee}</dt>
+            <dd className="shrink-0 font-semibold tabular-nums text-ink-900"><bdi dir="ltr">{format(t.total)}</bdi></dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 max-w-[60ch] text-[0.875rem] leading-6 text-ink-600">{copy.payees.note}</p>
+    </section>
+  );
+}
 
 /** Id of the note that explains why accepting is unavailable; the disabled action points at it. */
 export const ACCEPTANCE_HOLD_ID = "acceptance-hold";

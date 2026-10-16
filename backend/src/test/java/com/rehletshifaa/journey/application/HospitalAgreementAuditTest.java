@@ -178,6 +178,9 @@ class HospitalAgreementAuditTest extends DischargeFixture {
         assertThat(fq.items()).extracting(ProposalItemView::payee).containsExactly("CONSULTANT", "FACILITY", "PLATFORM");
         assertThat(fq.payeeTotals()).extracting(PayeeTotal::payee).containsExactly("CONSULTANT", "FACILITY", "PLATFORM");
         assertThat(fq.payeeTotals().get(1).total()).isEqualByComparingTo("20000");
+        assertThat(JourneyService.renderProposal(fq)).as("the released document names the payees and their totals apart")
+                .contains("Hospital stay and cath lab — ").contains("(paid to the hospital)").contains("(paid to the Consultant)")
+                .contains("<h2>Who is paid</h2>").contains("<li>Paid to the hospital — 20000");
         assertThatThrownBy(() -> jdbc.update("UPDATE proposal_items SET payee='CONSULTANT' WHERE category='PLATFORM_FEE' AND proposal_version_id=?", fq.versionId()))
                 .as("the fee line is the platform's in the schema").isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }

@@ -39,7 +39,7 @@ const proposal = {
 };
 
 /** Every network call the page makes, in the order the flow makes them. */
-function mockApi({ decisionStatus = 200 }: { decisionStatus?: number } = {}) {
+function mockApi({ decisionStatus = 200, view = proposal as object }: { decisionStatus?: number; view?: object } = {}) {
   const decisionBody = vi.fn();
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const path = String(url);
@@ -49,7 +49,7 @@ function mockApi({ decisionStatus = 200 }: { decisionStatus?: number } = {}) {
     }
     if (path.endsWith("/request-access")) return { ok: true, status: 200, json: async () => summary } as Response;
     if (path.endsWith("/verify")) return { ok: true, status: 200, json: async () => ({ grant: "grant-1" }) } as Response;
-    if (path.endsWith("/view")) return { ok: true, status: 200, json: async () => proposal } as Response;
+    if (path.endsWith("/view")) return { ok: true, status: 200, json: async () => view } as Response;
     return { ok: true, status: 200, json: async () => summary } as Response;
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -77,6 +77,23 @@ describe("ProposalSign", () => {
     expect(screen.getByText("Included in this estimate")).toBeTruthy();
     expect(screen.getByText("What happens next")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Acknowledge & continue" })).toBeTruthy();
+  });
+
+  it("P1-19: keeps the Consultant's fee and the hospital's charges apart, each line saying whose it is", async () => {
+    mockApi({ view: { ...proposal, documentType: "FINAL_TREATMENT_QUOTE", items: [
+      { id: "i1", category: "MEDICAL", description: "Consultant's fee", quantity: 1, unitPrice: 1600, optional: false, payee: "CONSULTANT" },
+      { id: "i2", category: "MEDICAL", description: "Hospital stay and cath lab", quantity: 1, unitPrice: 400, optional: false, payee: "FACILITY" },
+    ], totalExpected: 2000, payeeTotals: [{ payee: "CONSULTANT", total: 1600 }, { payee: "FACILITY", total: 400 }] } });
+    render(<ProposalSign locale="en" token="tok-1" copy={proposalCopy("en")} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Send code" }));
+    fireEvent.change(await screen.findByLabelText("Enter the 6-digit code"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify" }));
+    const payees = within(await screen.findByRole("region", { name: "Who is paid" }));
+    expect(payees.getByText("Paid to the Consultant")).toBeTruthy();
+    expect(payees.getByText("$1,600")).toBeTruthy();
+    expect(payees.getByText("Paid to the hospital")).toBeTruthy();
+    expect(payees.getByText("$400")).toBeTruthy();
+    expect(screen.getAllByText("Paid to the hospital")).toHaveLength(2);
   });
 
   it("shows the proposal in the currency the backend issued it in, never a local re-conversion", async () => {

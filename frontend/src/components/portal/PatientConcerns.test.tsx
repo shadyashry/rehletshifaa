@@ -40,6 +40,16 @@ describe("PatientConcerns", () => {
     expect(screen.getByRole("button", { name: "Raise a concern" })).toBeTruthy();
   });
 
+  it("P1-19: offers the money option, a charge that is not on the quote, as a DISPUTE", async () => {
+    const { mutate } = setup();
+    fireEvent.click(await screen.findByRole("button", { name: "Raise a concern" }));
+    expect(screen.getAllByRole("radio").map((r) => r.getAttribute("value"))).toEqual(["COMPLAINT", "DISPUTE", "ADVERSE_EVENT"]);
+    fireEvent.click(screen.getByRole("radio", { name: "A charge that is not on my quote, or I was asked to pay outside it" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "What happened?" }), { target: { value: "The hospital asked for EGP 3,000 in cash" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send concern" }));
+    await waitFor(() => expect(mutate).toHaveBeenCalledWith("/patient/cases/c1/concerns", { type: "DISPUTE", summary: "The hospital asked for EGP 3,000 in cash" }));
+  });
+
   it("lists the patient's own concerns with their status in words", async () => {
     setup([received]);
     expect(await screen.findByRole("heading", { name: "Your concerns" })).toBeTruthy();

@@ -1683,6 +1683,71 @@ phases.
   - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `b112bce`) and rebuilds the dev backend for V103 (every
     existing dev consultant needs a declaration before new assignments: the local seeder adds one); then P1-19 session 2 (UI and copy, started in a new
     session; contract in the shared notes folder, `p1-19-session-1-handover.md`).
+- **Status (2026-10-16, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/modest-dirac-4e4ffa`, cut from `9e4f216`):** delivered,
+  frontend plus one backend touch the task named (the released proposal document); Flyway still at V103. Figures are shown as the API
+  returns them; nothing is computed in the browser. The P1-15 money rule (deposit covers the platform fee first) is untouched and still
+  awaits the owner.
+  - **Virtual Clinic › Affiliations** (new tab, the Consultant only — never a practice manager; `Affiliations.tsx`): the current
+    declaration (filed, renew by, each facility with its relationships in words) or "No current declaration: you cannot receive new cases"
+    with "cases you already hold go on"; the yearly form, starting from the current declaration: a facility from `/facilities/directory`,
+    the four relationships as checkboxes ("No relationship" stands alone), the note for a financial interest ("only Compliance and
+    Consultant Operations read it, stored encrypted"), the attestation, sent with the view's `attestationVersion`; inline errors with focus
+    on the first, server refusals worded by code (`ClinicCall` errors now carry the backend `code`); the facilities used before they were
+    declared (case, facility, flagged / cleared); earlier declarations. One primary action, "File declaration".
+  - **Control Center › Reviews & Safety › Compliance** (new page `/portal/control-center/compliance`, nav on `SCORECARD_READ` or
+    `AUDIT_SAMPLE_READ`; `CompliancePage.tsx`), tabs by permission. **Declarations** (Compliance and Consultant Operations): waiting ones
+    first, a review-status filter, the declaration with its facilities, relationships and interest note, "a review never changes whether
+    the Consultant can receive cases", and Compliance's review (cleared, or a finding with a required note; once; the review and its note
+    shown afterwards). **Undeclared facilities**: open flags by default, all on demand. **Scorecards**: a Consultant (`/admin/practitioners`)
+    or a facility (`/admin/facilities`) and an optional period; counts by group, ratios as percentages, unapproved extras in EGP, "fewer than
+    5 cases: too few to compare", outcomes per day 30/90 with "N answered by someone for the patient" and "averages withheld: fewer than 5
+    answers, too few to keep anyone anonymous" (no averages shown then), patient rating "not collected yet". **Audit samples** (Compliance
+    only): the list, "Draw a sample now" (month, 1-50 cases), a sample's cases with the mismatches in words, the money record (known keys
+    only, EGP amounts formatted, references as written) and the review per case (no finding, or a finding with a required note that
+    "becomes an incident for a care manager"). Consultant Operations read without a control ("Only Compliance records reviews").
+    Refusals with a compliance code are worded, with the support code.
+  - **Control Center › Facilities**: a "Packages suspended" badge in the list; on the facility, the banner (reason, "{count} settled
+    hospital bills in {quarter} carried an extra nobody approved", what it means, "care already reserved goes on"), the history (quarter,
+    suspended, lifted with its note) and the Finance Manager's "Lift suspension" (`FACILITY_PACKAGE_APPROVE`) in a dialog with the required
+    note and the fresh-sign-in line; Consultant Operations read "A Finance Manager lifts the suspension after the review".
+  - **Final quote payees**: `PayeeTotals` and `PayeeNote` (`PriceTransparency.tsx`) in My Care (`PatientProposal`), the secure link
+    (`ProposalSign`) and the staff proposal card: each line says whose it is and "Who is paid" lists each payee's total (the backend's
+    `payeeTotals`), shown only when two payees besides the platform have lines; the fee line keeps its own words. The Consultant's final
+    assessment gives each manual line "Paid to" (me, the hospital, someone else; default someone else). The released document
+    (`JourneyService.renderProposal`, now static and package-visible) names each line's payee (not the fee line) and adds the totals when
+    more than one party is paid. `FACILITY_LINE_REQUIRED` and `LINE_PAYEE_CONFLICT` are worded in the portal's error codes.
+  - **My Care › Raise a concern**: the money option `DISPUTE` ("A charge that is not on my quote, or I was asked to pay outside it"),
+    between the complaint and the health problem.
+  - **Copy** (en + ar, inserted textually; **Arabic is a draft** pending native review; **the attestation needs counsel's review**):
+    `portalWork.affiliations`, `portalWork.compliance` (tabs, declarations, flags, scorecards, samples with the nine mismatches and 27
+    record keys, suspension, 12 error codes), `portalProposal.price.payees`, `safety.concerns.types/typeShort.DISPUTE`, the two error codes,
+    the work items `UNDECLARED_FACILITY`, `FACILITY_PACKAGES_SUSPENDED` and `AFFILIATION_FINDING`; the D-I credential label
+    `LIABILITY_FUND_SUBSCRIPTION` in `admin-labels.ts`; the nav line in `control-center-nav.ts` (inline pairs, as the rest of that file).
+  - Tests: new `Affiliations.test.tsx` (4: no declaration said plainly, then filed with the attestation and "No relationship" alone; the
+    interest note required and a refusal worded by code; the current declaration as the renewal's start, with flags and history; Arabic),
+    `CompliancePage.test.tsx` (7: queue first and a finding with a required note; Consultant Operations read-only without samples; flags
+    open by default; a scorecard with the small cohort, a ratio, the representative answers and withheld averages; a sample drawn and a
+    finding recorded with mismatches in words; a compliance refusal with the support code; Arabic), `PatientProposalPayees.test.tsx` (3),
+    +2 `FacilityCatalog` (suspension lifted with a required note; read-only for Consultant Operations), +1 `ProposalSign` (payees apart),
+    +1 `PatientConcerns` (DISPUTE), +1 `FinalAssessment` (a manual line's payee), `VirtualClinic` (the tab for the owner, never a practice
+    manager). Backend `HospitalAgreementAuditTest` asserts the released document's payees and totals (`FinalQuoteRulesTest` keeps the fee
+    line unchanged). Playwright `e2e/hospital-agreement-audit.spec.ts` (12: en/ar × 390/1440 × a Compliance declaration review and a
+    sample, Affiliations filed with 44px targets and one primary action, secure-link payees; no page side scroll), green on a dev server.
+    `pnpm typecheck` clean, eslint clean on the touched files, vitest 89 files / 685 tests green; backend `mvn -o -q test` 944 tests, 0
+    failures, 3 skips. Reviewed with react-best-practices (no manual memo the compiler cannot keep, effects only for reads),
+    composition-patterns (one review form with an outcome map, the sampled case takes its review as a slot rather than a flag),
+    web-design-guidelines (labels, inline errors with focus, Intl dates and numbers, 44px targets, long text wraps) and Impeccable
+    (detector: no findings; screenshots checked at 390 and 1440 in both languages; the mismatch list now shows its bullets).
+  - Not done (later or owner): the final UX design of these screens (UX plan); tab and filter state in the URL (as the other Control
+    Center review pages); the preliminary estimate's manual lines have no payee choice yet (the backend defaults them to OTHER); a prompt
+    for a Consultant who has never declared, and the reason on the Virtual Clinic's "not eligible" line (from session 1);
+    `e2e/me-fixture.ts` still lacks the P1-19 grants (the new spec adds them locally); not walked live — needs the dev stack rebuilt at V103
+    with this frontend; counsel on the attestation wording; native Arabic review.
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/modest-dirac-4e4ffa` (it contains `9e4f216`), rebuilds backend and
+    frontend, and walks it live (Consultant files a declaration → Compliance reviews it → a reservation at an undeclared facility raises
+    the flag → a final quote with the hospital's line apart → a second unapproved extra in the quarter suspends the packages → a Finance
+    Manager lifts it → the monthly sample reviewed); then P1-7 (retention, purge, erasure), the next row of "Phases still to run", started
+    in a new session.
 
 ### UI/UX work is planned separately (decided 2026-10-15)
 - Every user-interface slice (the public-site trust pass, Consultant public profile rendering, signature moments,
@@ -1747,7 +1812,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | 7 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths by Fable | Owner: payer terms, partner commission |
 | 8 | **P1-17 Discharge pack, reconciliation, statements** | 2 | Fable 5.1, high | D-F; P1-12 settlement statement |
 | 9 | **P1-18 Follow-up execution and outcomes** | 1–2 | Opus 5.5; data classification by Fable | D-G; P1-13 |
-| 10 | **P1-19 Hospital-agreement audit** | 1–2 (session 1 done 2026-10-16, V103) | Opus 5.5; eligibility change by Fable | D-H applied as recommended |
+| 10 | ~~P1-19 Hospital-agreement audit~~ | **done**: sessions 1 (backend, V103) and 2 (UI, copy), 2026-10-16 | Opus 5.5; eligibility change by Fable | D-H applied as recommended |
 | 11 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide retention of plaintext WhatsApp sender digits; evidence and statements as `LEGAL_RECORD` class |
 | 12 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-18, so the extracted code is final |
 | 13 | ~~P1-9 Backups and restore drill~~ | **done**: 1 session (2026-10-15); local drill PASS in 135 s | Opus 5.5 | Production drill on the chosen host (managed PITR restore time, region failover) adds its row to `docs/deployment.md` before real patient data |

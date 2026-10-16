@@ -10,12 +10,15 @@ import type { Tone } from "./admin-labels";
 import { EmptyState, ErrorNotice, Facts, Field, Section, StatusBadge, SuccessNotice } from "./cc-ui";
 import { FocusTrapDialog } from "./FocusTrapDialog";
 import { facilityText, type FacilityCopy } from "./facility-copy";
+import { FacilitySuspension, type Suspension, type SuspensionCopy } from "./FacilitySuspension";
 
 type Accreditation = { id: string; body: string; referenceNumber?: string | null; issuedOn?: string | null; expiresOn: string; status: string; recordedBy: string };
 type Package = { id: string; facilityId: string; facilityName?: string | null; procedureCode: string; name: string; careCategory: string; minEgp: number; maxEgp: number;
   inclusions: string; exclusions?: string | null; validFrom: string; validTo?: string | null; version: number; approvalStatus: string; proposedBy: string; decidedBy?: string | null; decisionNote?: string | null };
 type Facility = { id: string; name: string; city: string; kind: string; status: string; accreditationStatus: string; contactName?: string | null; contactEmail?: string | null;
-  contactPhone?: string | null; settlementTerms: string; settlementNotes?: string | null; accreditations: Accreditation[]; packages: Package[] };
+  contactPhone?: string | null; settlementTerms: string; settlementNotes?: string | null; accreditations: Accreditation[]; packages: Package[];
+  /** P1-19: the open package suspension, if any (the list carries only this one; the facility's own record has the history). */
+  packageSuspension?: Suspension | null };
 type CareArea = { slug: string; nameEn: string; nameAr: string };
 type Decision = { kind: "approve" | "reject" | "retire"; pkg: Package };
 
@@ -30,7 +33,7 @@ const DAY_MS = 86_400_000;
  * refuses the proposer approving their own version and asks for a recent sign-in). Facilities are a price source and a
  * destination, never users: nothing here invites anyone or grants a role.
  */
-export function FacilityCatalog({ locale }: { locale: Locale }) {
+export function FacilityCatalog({ locale, suspensionCopy }: { locale: Locale; suspensionCopy: SuspensionCopy }) {
   const ar = locale === "ar";
   const t: FacilityCopy = facilityText(locale);
   const { user, loading: authLoading, signIn } = useAuth();
@@ -138,7 +141,7 @@ export function FacilityCatalog({ locale }: { locale: Locale }) {
         : <ul className="cc-list">{facilities.map((f) => <li key={f.id}>
           <span><strong>{f.name}</strong><br /><span className="cc-meta">{f.city} · {label(t.kinds, f.kind)} · {label(t.settlement, f.settlementTerms)}</span></span>
           <span><StatusBadge tone={ACCREDITATION_TONE[f.accreditationStatus] ?? "neutral"}>{label(t.accreditation, f.accreditationStatus)}</StatusBadge></span>
-          <span><StatusBadge tone={f.status === "ACTIVE" ? "success" : "danger"}>{label(t.status, f.status)}</StatusBadge></span>
+          <span><StatusBadge tone={f.status === "ACTIVE" ? "success" : "danger"}>{label(t.status, f.status)}</StatusBadge>{f.packageSuspension ? <> <StatusBadge tone="warning">{suspensionCopy.title}</StatusBadge></> : null}</span>
           <span className="cc-row-actions"><button type="button" className="cc-secondary" onClick={() => { setSelectedId(f.id); setEditing(false); }} aria-label={t.openFacility(f.name)}>{t.openFacility(f.name)}</button></span>
         </li>)}</ul>}
       {canManage && <form className="cc-form-grid" onSubmit={createFacility} aria-label={t.newFacilityForm}>
@@ -155,6 +158,7 @@ export function FacilityCatalog({ locale }: { locale: Locale }) {
             ? <button type="button" className="cc-secondary" disabled={busy} onClick={() => setStatus(selected.id, "SUSPENDED")}>{t.suspend}</button>
             : <button type="button" disabled={busy} onClick={() => setStatus(selected.id, "ACTIVE")}>{t.reactivate}</button>)}
         </>}>
+        <FacilitySuspension locale={locale} copy={suspensionCopy} api={api} facilityId={selected.id} canLift={canApprove} onLifted={() => void load()} />
         <p><StatusBadge tone={selected.status === "ACTIVE" ? "success" : "danger"}>{label(t.status, selected.status)}</StatusBadge> <StatusBadge tone={ACCREDITATION_TONE[selected.accreditationStatus] ?? "neutral"}>{label(t.accreditation, selected.accreditationStatus)}</StatusBadge></p>
         {editing ? <form className="cc-form-grid" onSubmit={updateFacility(selected.id)} aria-label={t.editFacility}>
           {facilityFields(selected)}

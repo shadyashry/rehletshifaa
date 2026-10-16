@@ -8,7 +8,8 @@ import { useWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import type { Mutate } from "@/components/portal/portal-model";
 
-const CONCERN_TYPES = ["COMPLAINT", "ADVERSE_EVENT"] as const;
+// P1-19: DISPUTE is the money option (a charge not on the quote, a payment asked for outside it); Compliance reads every concern.
+const CONCERN_TYPES = ["COMPLAINT", "DISPUTE", "ADVERSE_EVENT"] as const;
 type ConcernType = (typeof CONCERN_TYPES)[number];
 /** What the patient sees of a concern: that it was received and where it stands — never the owner or the notes. */
 export type Concern = { id: string; type: string; status: string; raisedAt: string; resolvedAt?: string | null };

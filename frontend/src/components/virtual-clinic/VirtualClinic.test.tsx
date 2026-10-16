@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
+import { getDictionary } from "@/lib/dictionary";
 import { ClinicWorkspace } from "./VirtualClinic";
 import type { Clinic } from "./virtual-clinic-model";
 
@@ -21,7 +22,7 @@ function clinic(overrides: Partial<Clinic> = {}): Clinic {
 function setup(value: Clinic, locale: "en" | "ar" = "en") {
   const call = vi.fn().mockResolvedValue([]);
   const reload = vi.fn();
-  render(<ClinicWorkspace locale={locale} clinic={value} call={call} reload={reload}/>);
+  render(<ClinicWorkspace locale={locale} clinic={value} call={call} reload={reload} affiliationsCopy={getDictionary(locale).portalWork.affiliations}/>);
   return { call, reload };
 }
 
@@ -30,7 +31,7 @@ describe("Virtual clinic", () => {
 
   it("gives the consultant every section and the approval of prepared price changes", async () => {
     const { call } = setup(clinic());
-    for (const tab of ["Overview", "Services & prices", "Schedule", "Practice managers", "Change history"])
+    for (const tab of ["Overview", "Services & prices", "Schedule", "Practice managers", "Affiliations", "Change history"])
       expect(screen.getByRole("tab", { name: tab })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Availability for new cases" })).toBeTruthy();
     expect(screen.getByText("Eligible for new case assignments")).toBeTruthy();
@@ -47,6 +48,8 @@ describe("Virtual clinic", () => {
     expect(screen.queryByRole("tab", { name: "Schedule" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Practice managers" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Change history" })).toBeNull();
+    // P1-19: the affiliation declaration is the Consultant's personal attestation, never a practice manager's.
+    expect(screen.queryByRole("tab", { name: "Affiliations" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Availability for new cases" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Edit public profile" })).toBeNull();
 
