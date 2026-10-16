@@ -1313,6 +1313,10 @@
       "patientResponded": "Patient responded"
     },
     "plural": {
+      "retentionDays": {
+        "one": "{count} day",
+        "other": "{count} days"
+      },
       "workingDays": {
         "one": "{count} working day",
         "other": "{count} working days"
@@ -4007,6 +4011,196 @@
         "SAMPLE_CASE_ALREADY_REVIEWED": "This case was already reviewed.",
         "PACKAGES_NOT_SUSPENDED": "This facility's packages are not suspended any more.",
         "REVIEW_STATUS_INVALID": "That review filter is not valid."
+      }
+    },
+    "retention": {
+      "title": "Retention",
+      "intro": "How long each kind of record is kept, what the nightly clean-up removed, and erasing a person on their request. Policies change only through a reviewed release.",
+      "loading": "Loading…",
+      "tabs": {
+        "label": "Retention areas",
+        "policies": "Policies",
+        "purges": "Purge log",
+        "erase": "Erase a person"
+      },
+      "classes": {
+        "DRAFT_INTAKE": "Unsent case drafts",
+        "TRANSPORT_LOG": "WhatsApp transport log",
+        "INTAKE_CONVERSATION": "WhatsApp intake conversations",
+        "ACCESS_SECRET": "Links, codes and sign-in checks",
+        "PERSONAL_IDENTITY": "Personal identity",
+        "CLINICAL_RECORD": "Medical records",
+        "CASE_OPERATIONS": "Case work and routing",
+        "WORKFORCE_RECORD": "Staff and Consultant records",
+        "LEGAL_RECORD": "Legal and financial records",
+        "CONFIGURATION": "Settings and reference data",
+        "SYSTEM_STATE": "System state"
+      },
+      "classMeaning": {
+        "DRAFT_INTAKE": "A case started and never sent, with its files and the contact given for it.",
+        "TRANSPORT_LOG": "Copies of incoming WhatsApp messages, held only while they are processed.",
+        "INTAKE_CONVERSATION": "A WhatsApp conversation before it became a case: reply address, messages and media.",
+        "ACCESS_SECRET": "Secure links, one-time codes, sign-in challenges and access grants.",
+        "PERSONAL_IDENTITY": "Who the patient is and how to reach them. Erasing a person removes it.",
+        "CLINICAL_RECORD": "A sent case's medical record: documents, clinical review, treatment, outcomes and follow-up.",
+        "CASE_OPERATIONS": "Work items, routing and journey progress that follow a case.",
+        "WORKFORCE_RECORD": "Staff, Consultants, clinics, credentials and access administration.",
+        "LEGAL_RECORD": "Evidence, statements, payments, consent, decisions, the audit trail and this purge log.",
+        "CONFIGURATION": "Prices, policies and other reference data. Nothing personal.",
+        "SYSTEM_STATE": "Locks, schedules and pointers the platform runs on. Nothing personal."
+      },
+      "anchors": {
+        "CREATED": "from when it was started",
+        "PROCESSED": "from when it was processed",
+        "CLOSED": "from when it closed",
+        "EXPIRED": "from when it expired",
+        "CASE_CLOSED": "from when the case closed",
+        "RELATIONSHIP_ENDED": "from when the working relationship ended",
+        "NONE": "no start point"
+      },
+      "policies": {
+        "class": "Record",
+        "keptFor": "Kept for",
+        "state": "Clean-up",
+        "lastPurge": "Last removed",
+        "noTerm": "No end date set",
+        "never": "Never removed",
+        "states": {
+          "NIGHTLY": "Removed nightly",
+          "NOT_YET": "Not removed yet",
+          "HOLD": "On legal hold",
+          "KEPT": "Kept"
+        },
+        "notYetNote": "The period is set; the nightly removal for this record is not built yet.",
+        "holdNote": "Nothing in this record is removed while the hold stands.",
+        "neverPurged": "Not yet",
+        "tables": "Where it is stored ({count})",
+        "basis": "Recorded basis (internal note, in English)",
+        "empty": "No policies were returned."
+      },
+      "purges": {
+        "intro": "Everything the nightly clean-up and erasure requests removed. Newest first.",
+        "filters": "Filter the purge log",
+        "from": "From",
+        "to": "To",
+        "periodHint": "Leave both empty for the last 30 days. A period can be at most a year.",
+        "class": "Record",
+        "anyClass": "Any record",
+        "totals": "Totals for the period",
+        "totalsEmpty": "Nothing was removed in this period.",
+        "purgesCount": "Removals",
+        "rows": "Records",
+        "files": "Files",
+        "size": "File size",
+        "last": "Latest",
+        "empty": "Nothing was removed in this period.",
+        "truncated": "Showing the newest {count}. Narrow the period or choose a record to see the rest.",
+        "when": "When",
+        "what": "What was removed",
+        "cause": "Why",
+        "by": "By",
+        "subjects": {
+          "DRAFT_CASE": "Unsent draft {caseNumber}",
+          "TRANSPORT_BATCH": "A batch of WhatsApp transport copies",
+          "PATIENT": "A person, on their request"
+        },
+        "causes": {
+          "SCHEDULE": "Nightly clean-up",
+          "ERASURE_REQUEST": "Erasure request"
+        },
+        "counts": "{rows} records · {files} files · {size}",
+        "afterDays": "after {days}",
+        "system": "The platform",
+        "staff": "Care Coordination Manager",
+        "reference": "Request: {reference}"
+      },
+      "erase": {
+        "intro": "Erasing removes who the person is and how to reach them. Their sent cases stay under a pseudonym, because the medical, legal and financial records must be kept. It cannot be undone.",
+        "caseNumber": "Case number",
+        "caseNumberHint": "Any case of the person, sent or not, for example RS-2026-000123.",
+        "caseNumberRequired": "Enter a case number.",
+        "find": "Show what would be erased",
+        "previewTitle": "The person behind {caseNumber}",
+        "casesTitle": "Their cases",
+        "caseDraft": "Unsent draft: removed completely",
+        "caseKept": "Sent case: kept under a pseudonym; the medical record stays",
+        "casePurged": "Unsent draft: already removed",
+        "accountTitle": "Sign-in account",
+        "accountRemoved": "Their sign-in account will be removed.",
+        "noAccount": "They have no sign-in account.",
+        "removedTitle": "What is removed",
+        "removed": [
+          "Names, birth date, nationality, sex and time zone",
+          "Email, WhatsApp number and every contact given on their cases, a representative's too",
+          "The reply address and profile name of their WhatsApp conversations",
+          "Their unsent drafts, with the files"
+        ],
+        "keptTitle": "What stays",
+        "kept": [
+          "Each sent case's medical record, under the pseudonym",
+          "Consent, payments, statements, decisions and the audit trail"
+        ],
+        "blockedTitle": "This person cannot be erased yet",
+        "blockedLead": "Do this first, then look them up again:",
+        "blockers": {
+          "ERASURE_ALREADY_DONE": "This person was already erased. There is nothing more to do.",
+          "ERASURE_PATIENT_MERGED": "This record was merged into another one. Look up a case of the person's current record instead.",
+          "ERASURE_CASE_ACTIVE": "A case is still in care. Close or cancel it with the coordinator first.",
+          "ERASURE_INCIDENT_OPEN": "An incident on one of their cases is not resolved. Resolve it in Incidents first.",
+          "ERASURE_CONVERSATION_OPEN": "A WhatsApp intake conversation with them is still open. Close it first.",
+          "ERASURE_REPRESENTS_OTHERS": "Their account still acts for someone else. End that representation first.",
+          "ERASURE_ON_HOLD": "Personal identity records are on legal hold. Nobody can be erased while it stands; ask Compliance."
+        },
+        "erasedOn": "Erased {date}.",
+        "reference": "Request reference",
+        "referenceHint": "Where and when the person asked, for example “Email to support, 14 October 2026”. Never write health details.",
+        "referenceRequired": "Write where and when the person asked.",
+        "continue": "Erase this person…",
+        "lookUpAnother": "Look up another case",
+        "confirmTitle": "Erase this person?",
+        "confirmLead": "This cannot be undone.",
+        "freshSignIn": "This needs a recent sign-in. If yours is older, you will be asked to sign in again; then erase again.",
+        "confirm": "Erase permanently",
+        "cancel": "Cancel",
+        "doneTitle": "The person is erased",
+        "done": "Their identity was removed {date}. The request is in the purge log.",
+        "casesKept": "Cases kept under the pseudonym",
+        "draftsPurged": "Drafts removed",
+        "rowsAffected": "Records changed",
+        "filesDeleted": "Files removed",
+        "account": "Sign-in account",
+        "accountQueued": "Removal queued",
+        "accountNone": "None",
+        "seeLog": "See it in the purge log"
+      },
+      "erasedPerson": "Erased person",
+      "auditActions": {
+        "RECORD_PURGED": "Record removed by the retention clean-up",
+        "SUBJECT_ERASED": "Person erased on request"
+      },
+      "identityOperations": {
+        "CREATE_STAFF": "Create staff sign-in",
+        "CREATE_PRACTITIONER": "Create Consultant sign-in",
+        "RESOLVE_PRACTICE_MANAGER": "Link practice manager sign-in",
+        "RESEND_INVITE": "Resend invitation",
+        "ENABLE_USER": "Enable sign-in",
+        "DISABLE_USER_AND_LOGOUT": "Disable sign-in and sign out",
+        "RESET_PASSWORD": "Send password reset",
+        "RESET_MFA": "Reset second step",
+        "DELETE_USER": "Remove sign-in account (erasure)"
+      },
+      "errors": {
+        "PERIOD_INVALID": "Choose a period of at most a year, with its start before its end.",
+        "RECORD_CLASS_INVALID": "That record type is not known. Choose one from the list.",
+        "CASE_NOT_FOUND": "No case has this number. Check it and try again.",
+        "PATIENT_NOT_FOUND": "This case has no patient record to erase.",
+        "ERASURE_ALREADY_DONE": "This person was already erased. Nothing was changed.",
+        "ERASURE_PATIENT_MERGED": "This record was merged into another one. Nothing was changed.",
+        "ERASURE_CASE_ACTIVE": "A case is still in care, so nothing was changed. Close or cancel it first.",
+        "ERASURE_INCIDENT_OPEN": "An incident on their cases is not resolved, so nothing was changed.",
+        "ERASURE_CONVERSATION_OPEN": "A WhatsApp intake conversation is still open, so nothing was changed.",
+        "ERASURE_REPRESENTS_OTHERS": "Their account still acts for someone else, so nothing was changed.",
+        "ERASURE_ON_HOLD": "Personal identity records are on legal hold, so nothing was changed."
       }
     }
   },

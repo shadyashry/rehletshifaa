@@ -65,6 +65,15 @@ export function ErrorNotice({ error, locale, action = "save", onRetry }: { error
     </div>
   );
 }
+/** A refusal the page can word (its code is a key of `words`) in the page's own sentence, with the support code; anything else as usual. */
+export function WordedErrorNotice({ error, locale, words, action, onRetry }: { error: unknown; locale: Locale; words: Record<string, string>; action?: "load" | "save"; onRetry?: () => void }) {
+  const code = error instanceof ControlCenterError ? error.code : undefined;
+  if (!code || !Object.hasOwn(words, code)) return <ErrorNotice error={error} locale={locale} action={action} onRetry={onRetry} />;
+  return <div role="alert" className="cc-notice cc-notice-error">
+    <AlertTriangle size={18} aria-hidden />
+    <div><p>{words[code]}</p><p className="cc-notice-code">{locale === "ar" ? "رمز الدعم" : "Support code"}: <code dir="ltr">{code}</code></p></div>
+  </div>;
+}
 export function SuccessNotice({ children }: { children: ReactNode }) {
   return children ? <p role="status" className="cc-notice cc-notice-success"><Check size={18} aria-hidden />{children}</p> : null;
 }

@@ -27,7 +27,7 @@ import { isPlatformFee, QUOTE_VALIDITY_TOO_LONG, SCOPE_CHANGE_REASON_REQUIRED } 
 import type { CareView } from "@/components/portal/MyCare";
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
 import { useWorkCopy } from "@/components/portal/portal-copy";
-import { careAreaLabel, coordinatorLabel, fillTemplate, plural, tabKeyTarget, waitingLabel, waitingReasonText } from "@/lib/portal-labels";
+import { careAreaLabel, coordinatorLabel, fillTemplate, patientNameLabel, plural, tabKeyTarget, waitingLabel, waitingReasonText } from "@/lib/portal-labels";
 import { AssignmentHistory, type AssignmentHistoryEntry } from "@/components/portal/AssignmentHistory";
 import { StatusBadge } from "@/components/portal/StatusBadge";
 import { intlLocale, type Locale } from "@/lib/i18n";
@@ -202,7 +202,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
       <span className="text-[0.8125rem] text-ink-500">{countryName(c.country,locale)}</span>
       <span className="text-[0.8125rem] text-ink-500">{c.preferredLanguage==="ar"?(locale==="ar"?"العربية":"Arabic"):(locale==="ar"?"الإنجليزية":"English")}</span>
      </div>
-     <h2 id="case-heading" tabIndex={-1} className="mt-0.5 text-[1.35rem] font-bold leading-7 text-brand-900 outline-none">{c.patientName||(locale==="ar"?"مراجعة طلب الرعاية":"Review care request")}</h2>
+     <h2 id="case-heading" tabIndex={-1} className="mt-0.5 text-[1.35rem] font-bold leading-7 text-brand-900 outline-none">{patientNameLabel(c.patientName,work)||(locale==="ar"?"مراجعة طلب الرعاية":"Review care request")}</h2>
      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[0.8rem]">
       <Status value={c.status} locale={locale}/>
       {/* P0-3: the coordinator's urgency, for staff only; routine says nothing. */}
@@ -256,7 +256,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
        {myPending&&isDoctor&&<section className="card p-4" aria-labelledby="assignment-preview">
         <h3 id="assignment-preview" className="label-micro text-ink-500">{locale==="ar"?"ملف التعيين":"Assignment brief"}</h3>
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-2 lg:grid-cols-4">
-         <div><dt className="label-micro text-ink-500">{t.patientLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.patientName||"—"}</dd></div>
+         <div><dt className="label-micro text-ink-500">{t.patientLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{patientNameLabel(c.patientName,work)||"—"}</dd></div>
          {c.careCategory&&<div><dt className="label-micro text-ink-500">{t.careArea}</dt><dd className="mt-0.5 font-semibold text-ink-800">{careAreaLabel(c.careCategory,work.careAreas)}</dd></div>}
          <div><dt className="label-micro text-ink-500">{t.coordinatorLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{c.coordinatorName??"—"}</dd></div>
          <div><dt className="label-micro text-ink-500">{t.countryLabel}</dt><dd className="mt-0.5 font-semibold text-ink-800">{countryName(c.country,locale)}</dd></div>

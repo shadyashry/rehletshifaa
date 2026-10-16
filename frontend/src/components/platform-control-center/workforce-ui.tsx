@@ -77,3 +77,11 @@ export function ActionDialog({ locale, title, confirm, danger, children, onSubmi
 }
 
 export const json = (method: string, body: unknown) => ({ method, body });
+
+/** Keeps a page's deep-linkable state (`?tab=…`) in step with the viewer's choices without a navigation; null removes a key. */
+export function syncQuery(changes: Record<string, string | null>) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  for (const [key, value] of Object.entries(changes)) { if (value) url.searchParams.set(key, value); else url.searchParams.delete(key); }
+  window.history.replaceState(window.history.state, "", url);
+}

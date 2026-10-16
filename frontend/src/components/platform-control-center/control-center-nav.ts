@@ -13,7 +13,7 @@ import type { ControlCenterAccess } from "./control-center-access";
  */
 export type NavKey =
   | "overview" | "consultants"
-  | "identity" | "incidents" | "compliance"
+  | "identity" | "incidents" | "compliance" | "retention"
   | "pricing" | "exchangeRates" | "marginDeposit" | "facilities"
   | "coordination"
   | "journeys"
@@ -45,6 +45,8 @@ export const NAV_GROUPS: NavGroup[] = [
     { key: "incidents", path: "/incidents", label: ["Incidents", "الحوادث"], summary: ["Complaints, disputes and clinical incidents raised on cases.", "الشكاوى والنزاعات والحوادث السريرية المسجّلة على الحالات."], visible: (a) => a.can("INCIDENT_READ") },
     // P1-19 (design §7): the hospital-agreement audit. Compliance reviews and samples; Consultant Operations read declarations and scorecards.
     { key: "compliance", path: "/compliance", label: ["Compliance", "الامتثال"], summary: ["Affiliation declarations, undeclared facilities, scorecards and monthly samples.", "تصريحات الارتباط والمنشآت غير المصرّح بها وبطاقات الأداء والعينات الشهرية."], visible: (a) => a.canAny(["SCORECARD_READ", "AUDIT_SAMPLE_READ"]) },
+    // P1-7 (E-03): how long records are kept and the purge log, for Compliance and Care Coordination Managers; the manager also erases a person on request.
+    { key: "retention", path: "/retention", label: ["Retention", "الاحتفاظ بالسجلات"], summary: ["How long each record is kept, what the nightly clean-up removed, and erasing a person on request.", "مدة الاحتفاظ بكل سجل، وما أزاله التنظيف الليلي، ومحو بيانات شخص بناءً على طلبه."], visible: (a) => a.can("RETENTION_READ") },
   ] },
   { key: "commercial", label: ["Commercial", "الشؤون التجارية"], icon: Tags, items: [
     { key: "pricing", path: "/commercial/prices", label: ["Price Lists", "قوائم الأسعار"], summary: ["Consultant price lists and care-area service templates.", "قوائم أسعار الاستشاريين وقوالب الخدمات لكل مجال رعاية."], visible: (a) => a.can("CONSULTANT_CATALOG_MANAGE") },

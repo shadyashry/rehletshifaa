@@ -549,6 +549,74 @@ phases.
     not cancelled (all their cases have ended, so none is expected). Keycloak subjects stay as opaque ids in history rows (messages, audit).
   - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the dev backend so V104 runs; then P1-7 session 2 (UI
     and copy, started in a new session; contract in the shared notes folder, `p1-7-session-1-handover.md`).
+- **Status (2026-10-16, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/practical-jackson-febac4`, cut from `43c31e1`):** delivered,
+  frontend only; no backend file touched, Flyway still at **V104**. The P1-15 money rule (deposit covers the platform fee first) is untouched
+  and still awaits the owner.
+  - **Control Center › Reviews & Safety › Retention** (new page `/portal/control-center/retention`, nav on `RETENTION_READ`;
+    `RetentionPage.tsx`), tabs kept in the link (`?tab=policies|purges|erase&class=…&case=…`; the request reference never goes in the
+    link). **Policies**: each record class in words with what it holds, "kept for" in the locale's plural forms ("7 days", "7 أيام") and
+    from what ("from when the case closed"), the clean-up state as a badge — *Removed nightly* (days and a running handler), *Not removed
+    yet* ("the period is set; the nightly removal for this record is not built yet"), *On legal hold* ("Never removed"), *Kept* ("No end
+    date set") — and the last removal; the tables and the migration's `basis` sit in a disclosure, the basis marked as an internal note in
+    English (`lang="en"`), so Arabic readers are told why it is English. No edit control: policies change by migration only.
+    **Purge log**: from/to dates (the viewer's days; the end day counts whole), a record filter; totals per class for classes with removals
+    (a real table, tabular figures, sizes via `Intl` units); rows newest first as sent: when, the class, what (an unsent draft with its
+    case number as text, never a link — drafts do not open; a batch of WhatsApp transport copies; "a person, on their request" with the
+    request reference), records / files / size, why (Nightly clean-up "after 7 days", or Erasure request), by (the platform, or a Care
+    Coordination Manager); "Showing the newest N" when truncated.
+  - **Erase a person** (tab only with `SUBJECT_ERASE`): case number (trimmed, upper-cased) → "The person behind RS-…": each case and what
+    happens to it (unsent draft removed completely / sent case kept under a pseudonym with its medical record / already removed), the
+    sign-in account, what is removed and what stays → blockers worded as what to do first (all 7 codes; an already erased person shows
+    the date and "nothing more to do"), and then no erasure control → the request reference (required, ≤200, "where and when the person
+    asked… Never write health details") → "Erase this person…" opens the irreversible confirmation (counts, the account, "this needs a
+    recent sign-in; if yours is older you will be asked to sign in again, then erase again") with *Erase permanently* → the result
+    (cases kept, drafts removed, records changed, files removed, account removal queued) and "See it in the purge log" (opens the log on
+    Personal identity). One primary action per step; looking up again turns secondary once a case is shown. A stale sign-in shows the
+    app's re-authentication prompt in the dialog (`ErrorNotice`); a blocker that arose since the preview is worded in the dialog and
+    closing it reloads the preview.
+  - **Decisions** (owner's standing rule: decide by the recommendation). **(a) An erased person's name**: the backend's literal `Erased`
+    (`PatientProfile.ERASED_NAME`) reads "Erased person" / "شخص مُحيت بياناته" on the staff screens that show a patient name — the case
+    queue (title), My Work and the staff case view (heading and patient fact) — through `patientNameLabel` in `portal-labels.ts`; the
+    patient-side case switcher is not touched (an erased person cannot sign in). A profile-status flag on the staff DTOs would be firmer
+    than the literal; follow-up below. **(b) Error words** live in `portalWork.retention.errors` (worded on the page with the support
+    code, the P1-19 `compliance.errors` pattern), not in `portalWork.errorCodes`, which the portal's own calls use; the 7 blocker codes are
+    worded twice — as "what to do first" in the preview and as "nothing was changed" for a POST refusal. **(c) The actor** of an erasure
+    is shown by role ("Care Coordination Manager", the only role holding `SUBJECT_ERASE`), not by the opaque Keycloak subject; naming the
+    person needs a staff lookup (follow-up). **(d) Audit labels**: the Audit page shows "Record removed by the retention clean-up" /
+    "Person erased on request" with the code beside it for `RECORD_PURGED` / `SUBJECT_ERASED` (labels passed from the route page; other
+    actions keep their code). **(e) Identity operations**: labels for all nine types (with `DELETE_USER` "Remove sign-in account
+    (erasure)") are in `portalWork.retention.identityOperations`, ready for a screen; no screen lists identity operations yet.
+  - Shared on the way: `syncQuery` moved from `CompliancePage` to `workforce-ui.tsx`, and `WordedErrorNotice` (a refusal worded by its
+    code, with the support code) to `cc-ui.tsx`; `CompliancePage` uses both, behaviour unchanged.
+  - **Copy** (en + ar, inserted textually, CRLF kept; **Arabic is a draft** pending native review): `portalWork.retention` — 11 classes
+    with their meanings, 7 anchors, policy states, purge log (subjects, causes), the erasure flow, the 7 blockers, the error
+    codes `PERIOD_INVALID`, `RECORD_CLASS_INVALID`, `CASE_NOT_FOUND`, `PATIENT_NOT_FOUND` and the 7 erasure codes, `erasedPerson`, the two
+    audit actions, the nine identity operations; the day counts as `portalWork.plural.retentionDays` (the parity test keeps plural forms there); the nav line in `control-center-nav.ts` (inline pairs, as the rest of that file).
+    `e2e/me-fixture.ts`: Care Coordination Manager `RETENTION_READ` + `SUBJECT_ERASE`, Compliance auditor `RETENTION_READ`,
+    `SUBJECT_ERASE` in the step-up set.
+  - Tests: new `RetentionPage.test.tsx` (7: the four policy states in words with the tables disclosure and the English basis; the purge
+    log with totals, rows, the draft number, the reference, the cap, the class filter and the whole end day; blockers worded with no
+    erasure offered; the erasure from preview through a required reference and the confirmation to the result and the log; refusals by
+    code (unknown case, a blocker since the preview); Arabic with its plural; the policy state rule and the erased name). Playwright
+    `e2e/retention.spec.ts` (8: en/ar × 390/1440 × Compliance reading policies and the log with no erasure tab and the class in the link;
+    a Care Coordination Manager erasing with one primary action of at least 44px and the exact body sent; no page side scroll),
+    green on a production build (4.6 min; the dev server's cold start exceeded the 120 s budget). `pnpm typecheck` clean, eslint clean on
+    the touched files, vitest 90 files / 695 tests green. Reviewed with react-best-practices (each look-up its own keyed mount, so no stale preview and
+    no state-syncing effect; formatters memoised per locale; reads only in effects), composition-patterns (the flow is three step
+    components with callbacks, no mode flags; one worded-error notice shared with Compliance), web-design-guidelines (labels and inline
+    errors with focus on the first, a confirmation for the destructive action, `Intl` dates, numbers and sizes, tabular figures,
+    `translate="no"` on table names, curly quotes, 44px targets) and Impeccable (detector: no finding in the new code — its four
+    side-tab warnings are pre-existing legacy Control Center rules; screenshots checked at 390 and 1440 in both languages, which moved
+    the case list off the list grid, gave the look-up its own row and let Arabic sizes read in Arabic order).
+  - Not done (owner or outside): not walked live — needs the dev stack at V104 with this frontend; the Control Center still renders the
+    legacy base tokens (the page uses the shared `cc-*` classes, as P1-19 did; converging the Control Center to Petrol & Paper is UX-plan
+    work); native Arabic review; counsel on the terms marked "with counsel" and on the erasure scope (PDPL); follow-ups: a profile-status
+    flag on staff case DTOs instead of the literal name, the erasing staff member's name in the log, an identity-operations screen.
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/practical-jackson-febac4` (it contains `43c31e1`), rebuilds backend
+    and frontend, and walks it live (Compliance reads the policies and the log → a draft left 7 days is purged that night → a Care
+    Coordination Manager erases a person whose cases have ended → the log shows the request → the queue reads "Erased person"); then
+    P1-11 (split `JourneyService`), the next row of "Phases still to run", started in a new session (hand-over in the shared notes folder,
+    `p1-7-session-2-handover-to-p1-11.md`).
 
 ### P1-8  Metrics, alerts, scheduler leadership  (E-05, E-04)
 - Micrometer + Prometheus registry; business gauges and timers (queue depth per team, time-to-proposal, deposit
@@ -1886,7 +1954,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | 8 | ~~P1-17 Discharge pack, reconciliation, statements~~ | **done**: sessions 1 (backend, V101) and 2 (UI, copy), 2026-10-16 | Fable 5.1, high | D-F; P1-12 settlement statement |
 | 9 | ~~P1-18 Follow-up execution and outcomes~~ | **done**: sessions 1 (backend, V102) and 2 (UI, copy), 2026-10-16 | Opus 5.5; data classification by Fable | D-G; P1-13 |
 | 10 | ~~P1-19 Hospital-agreement audit~~ | **done**: sessions 1 (backend, V103) and 2 (UI, copy), 2026-10-16 | Opus 5.5; eligibility change by Fable | D-H applied as recommended |
-| 11 | **P1-7 Retention, purge, erasure, draft clean-up** | 2: session 1 (backend, V104) **done** 2026-10-16; session 2 (UI, copy) next | Fable 5.1, high (Opus 5.5 stood in) | Sender digits decided (30-day transport log, 90 days after a conversation closes); evidence and statements are `LEGAL_RECORD`; terms marked "with counsel" wait for counsel |
+| 11 | ~~P1-7 Retention, purge, erasure, draft clean-up~~ | **done**: sessions 1 (backend, V104) and 2 (UI, copy), 2026-10-16 | Fable 5.1, high (Opus 5.5 stood in) | Sender digits decided (30-day transport log, 90 days after a conversation closes); evidence and statements are `LEGAL_RECORD`; terms marked "with counsel" wait for counsel |
 | 12 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-18, so the extracted code is final |
 | 13 | ~~P1-9 Backups and restore drill~~ | **done**: 1 session (2026-10-15); local drill PASS in 135 s | Opus 5.5 | Production drill on the chosen host (managed PITR restore time, region failover) adds its row to `docs/deployment.md` before real patient data |
 | 14 | P1-14 Consultant public profiles (data and endpoint) | 1 | Opus 5.5 | The page is UX plan area 1b; photographs with consent |
@@ -1952,7 +2020,7 @@ the licence now; the credential type is a one-line addition in P1-19 (done: `LIA
 ## Order of sessions (recommended, revised 2026-10-14)
 
 Done (checked 2026-10-16 against each phase's Status block and the branch history): P0-1, P0-2, P0-3, P0-4, P0-5, P1-6, P1-8,
-P1-9, P1-10, P1-13, P1-15, P1-16, P1-17, P1-18, P1-19. In progress: P1-7. Still to run: P1-11, P1-14, P2-24, P1-12 (waits for
+P1-7, P1-9, P1-10, P1-13, P1-15, P1-16, P1-17, P1-18, P1-19. Still to run: P1-11, P1-14, P2-24, P1-12 (waits for
 the owner's payer terms and partner commission), then P2 and P3.
 
 The original order, for the record:

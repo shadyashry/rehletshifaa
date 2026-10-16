@@ -1,6 +1,5 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import type { Dictionary } from "@/lib/dictionary";
@@ -8,8 +7,8 @@ import { intlLocale, type Locale } from "@/lib/i18n";
 import { fillTemplate } from "@/lib/portal-labels";
 import type { AffiliationFlag, Declaration } from "@/components/virtual-clinic/virtual-clinic-model";
 import type { AdminApi } from "./admin-api";
-import { ControlCenterError, EmptyState, ErrorNotice, Facts, SectionTabs, StatusBadge, TabPanel } from "./cc-ui";
-import { WorkforcePage, json, useRead } from "./workforce-ui";
+import { EmptyState, ErrorNotice, Facts, SectionTabs, StatusBadge, TabPanel, WordedErrorNotice } from "./cc-ui";
+import { WorkforcePage, json, syncQuery, useRead } from "./workforce-ui";
 
 /** The page's words, plus the relationship words the Consultant's own page uses (`portalWork.affiliations.kindsShort`). */
 export type ComplianceCopy = Dictionary["portalWork"]["compliance"] & { kinds: Record<string, string> };
@@ -38,12 +37,6 @@ export type SampleView = { sample: SampleSummary; cases: SampleCase[] };
 export type ComplianceQuery = { tab?: string; review?: string; flags?: string };
 const TABS = ["declarations", "flags", "scorecards", "samples"] as const;
 const REVIEW_STATUSES = ["PENDING", "CLEARED", "FINDING"] as const;
-function syncQuery(changes: Record<string, string | null>) {
-  if (typeof window === "undefined") return;
-  const url = new URL(window.location.href);
-  for (const [key, value] of Object.entries(changes)) { if (value) url.searchParams.set(key, value); else url.searchParams.delete(key); }
-  window.history.replaceState(window.history.state, "", url);
-}
 
 const REVIEW_TONE: Record<string, Tone> = { PENDING: "warning", CLEARED: "success", FINDING: "danger", NO_FINDING: "success" };
 const word = (map: Record<string, string>, code?: string | null) => (code ? map[code] ?? code : "—");
@@ -85,12 +78,7 @@ export function Compliance({ locale, copy, api, can, query = {} }: { locale: Loc
 
 /** A refusal this page can word (a known compliance code) in its own words, with the support code; anything else as usual. */
 function ComplianceError({ error, locale, copy, action, onRetry }: { error: unknown; locale: Locale; copy: ComplianceCopy; action?: "load" | "save"; onRetry?: () => void }) {
-  const code = error instanceof ControlCenterError ? error.code : undefined;
-  if (!code || !Object.hasOwn(copy.errors, code)) return <ErrorNotice error={error} locale={locale} action={action} onRetry={onRetry} />;
-  return <div role="alert" className="cc-notice cc-notice-error">
-    <AlertTriangle size={18} aria-hidden />
-    <div><p>{copy.errors[code as keyof typeof copy.errors]}</p><p className="cc-notice-code">{locale === "ar" ? "رمز الدعم" : "Support code"}: <code dir="ltr">{code}</code></p></div>
-  </div>;
+  return <WordedErrorNotice error={error} locale={locale} words={copy.errors} action={action} onRetry={onRetry} />;
 }
 
 function useDates(locale: Locale) {

@@ -351,15 +351,16 @@ function ServiceAccounts({ locale, access, api }: { locale: Locale; access: Cont
 // ---------------- Audit ----------------
 
 /** Access › Audit (AUDIT_READ): the governance audit trail — access, workforce and journey governance changes. */
-export function AuditPage({ locale }: { locale: Locale }) {
+export function AuditPage({ locale, actionLabels = {} }: { locale: Locale; actionLabels?: Record<string, string> }) {
   return <WorkforcePage locale={locale} active="audit" title={t(locale, "Audit", "سجل التدقيق")}
     intro={t(locale, "Every access, workforce and journey governance change, newest first.", "كل تغيير في الصلاحيات وفريق العمل وحوكمة الرحلات، الأحدث أولًا.")}
     allowed={(a) => a.can("AUDIT_READ")}>
-    {({ api }) => <Audit locale={locale} api={api} />}
+    {({ api }) => <Audit locale={locale} api={api} actionLabels={actionLabels} />}
   </WorkforcePage>;
 }
 
-function Audit({ locale, api }: { locale: Locale; api: AdminApi }) {
+/** `actionLabels`: words for the actions a page has worded (P1-7: RECORD_PURGED, SUBJECT_ERASED); others show their code. */
+function Audit({ locale, api, actionLabels }: { locale: Locale; api: AdminApi; actionLabels: Record<string, string> }) {
   const [filters, setFilters] = useState({ action: "", offset: 0 });
   const query = new URLSearchParams({ offset: String(filters.offset), ...(filters.action ? { action: filters.action } : {}) });
   const { data, error, reload } = useRead<AuditEntry[]>(api, `${ADMIN}/audit?${query}`);
@@ -368,7 +369,9 @@ function Audit({ locale, api }: { locale: Locale; api: AdminApi }) {
     <ErrorNotice error={error} locale={locale} action="load" onRetry={reload} />
     {!data ? <p role="status">{t(locale, "Loading…", "جارٍ التحميل…")}</p> : !data.length ? <EmptyState title={t(locale, "No audit entries match.", "لا توجد سجلات مطابقة.")} /> : <>
       <ul className="cc-list">{data.map((e, i) => <li key={`${e.occurredAt}-${i}`}>
-        <span><strong dir="ltr">{e.action}</strong><span className="cc-row-sub">{when(e.occurredAt, locale)}</span></span>
+        <span>{Object.hasOwn(actionLabels, e.action)
+          ? <><strong>{actionLabels[e.action]}</strong><span className="cc-row-sub"><code dir="ltr">{e.action}</code> · {when(e.occurredAt, locale)}</span></>
+          : <><strong dir="ltr">{e.action}</strong><span className="cc-row-sub">{when(e.occurredAt, locale)}</span></>}</span>
         <span><StatusBadge tone={e.outcome === "SUCCESS" ? "success" : e.outcome === "DENY" ? "danger" : "neutral"}>{e.outcome}</StatusBadge></span>
         <span className="cc-meta"><bdi dir="ltr">{e.actor}</bdi>{e.reason ? ` · ${e.reason}` : ""}</span>
       </li>)}</ul>

@@ -433,3 +433,16 @@
 .cc-journey-steps>li{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--cc-line);border-radius:10px;padding:10px 12px;background:#fff}
 @media (max-width:720px){.cc-fx-list>li{grid-template-columns:1fr}}
 .cc-journey-facts{display:grid;gap:4px;margin:8px 0 0}.cc-journey-facts>div{display:flex;flex-wrap:wrap;gap:6px}.cc-journey-facts dt{color:var(--cc-muted);font-size:13px}.cc-journey-facts dt::after{content:":"}.cc-journey-facts dd{margin:0;font-size:13.5px}
+/* P1-7 Retention: the tables behind a record class (a disclosure inside the row), tabular counts, what an erasure removes and keeps side by side. */
+.cc-retention-tables{margin-top:4px}
+.cc-retention-tables summary{cursor:pointer;min-height:44px;display:inline-flex;align-items:center;color:var(--cc-brand-dark);font-size:13.5px;font-weight:600}
+.cc-retention-tables ul{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--cc-ink)}
+.cc-retention-tables code{overflow-wrap:anywhere}
+.cc-retention-basis{margin:2px 0 0;font-size:13.5px;max-width:70ch;overflow-wrap:anywhere}
+.cc-num{font-variant-numeric:tabular-nums;text-align:end}
+.cc-retention-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:0 32px}
+.cc-retention-cases{list-style:none;margin:8px 0 0;padding:0;border:1px solid var(--cc-line);border-radius:12px;background:#fff}
+.cc-retention-cases>li{padding:12px 18px;border-top:1px solid var(--cc-line-soft)}
+.cc-retention-cases>li:first-child{border-top:0}
+.cc-retention-find{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin:12px 0 16px}
+.cc-retention-find>.cc-field{flex:1 1 18rem;max-width:28rem;margin:0!important}

@@ -5,7 +5,7 @@ import { ArrowRight, CalendarClock, Clock3, FileText } from "lucide-react";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge } from "@/components/portal/StatusBadge";
 import { intlLocale, type Locale } from "@/lib/i18n";
-import { careAreaLabel, coordinatorLabel, plural, priorityLabel, waitingLabel, workCopyText, type WorkItemCopy } from "@/lib/portal-labels";
+import { careAreaLabel, coordinatorLabel, patientNameLabel, plural, priorityLabel, waitingLabel, workCopyText, type WorkItemCopy } from "@/lib/portal-labels";
 
 export type WorkItem = {
   id: string; caseId: string; caseNumber: string; patientName: string | null; caseStatus: string;
@@ -70,7 +70,7 @@ export function MyWork({ locale, role, subject, items, busy, onOpen, teamWaiting
                     {item.overdue && <StatusBadge tone="danger">{t.overdue}</StatusBadge>}
                     {item.blocking && <StatusBadge tone="info">{t.blocking}</StatusBadge>}
                     <span className="text-[0.8125rem] font-semibold text-brand-700" dir="ltr">{item.caseNumber}</span>
-                    {item.patientName && <bdi className="truncate text-[0.8125rem] font-semibold text-ink-700">{item.patientName}</bdi>}
+                    {item.patientName && <bdi className="truncate text-[0.8125rem] font-semibold text-ink-700">{patientNameLabel(item.patientName, work)}</bdi>}
                   </div>
                   {/* The backend titles work in English; Arabic shows the work type in Arabic, English keeps the specific title. */}
                   <h3 id={titleId} dir="auto" className="mt-2 font-bold leading-6 text-ink-900">{text.title}</h3>

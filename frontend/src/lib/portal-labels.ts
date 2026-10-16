@@ -9,6 +9,11 @@ type PluralForms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: strin
 export const fillTemplate = (template: string, values: Record<string, string | number>) =>
   template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
 
+/** P1-7: an erased person's profile keeps the literal name "Erased" (backend `PatientProfile.ERASED_NAME`); staff screens word it in their language. */
+export const ERASED_NAME = "Erased";
+export const patientNameLabel = (name: string | null | undefined, work: { retention: { erasedPerson: string } }) =>
+  name?.trim() === ERASED_NAME ? work.retention.erasedPerson : name;
+
 /** A counted phrase in the locale's own plural category (Arabic has six); the number is formatted with Intl. */
 /** A work item's wording from the backend: a message code plus parameters (names, the patient's own words). */
 export type WorkItemCopy = { code: string; params?: Record<string, string> | null };

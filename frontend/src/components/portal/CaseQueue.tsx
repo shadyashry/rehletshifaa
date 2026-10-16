@@ -11,7 +11,7 @@ import { StatusBadge, caseStatusTone } from "@/components/portal/StatusBadge";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { matchesKpi, type KpiFilter } from "@/components/portal/RoleDashboardSummary";
 import { intlLocale, type Locale } from "@/lib/i18n";
-import { coordinatorLabel, fillTemplate, plural, tabKeyTarget, waitingLabel, type WorkCopy } from "@/lib/portal-labels";
+import { coordinatorLabel, fillTemplate, patientNameLabel, plural, tabKeyTarget, waitingLabel, type WorkCopy } from "@/lib/portal-labels";
 
 export type QueueCase = { id:string; caseNumber:string; patientName?:string|null; status:string; waitingOn?:string|null; waitingReason?:string|null; country:string; preferredLanguage?:string; careCategory?:string; coordinatorSubject?:string; coordinatorName?:string; doctorName?:string; travelPackageRequested?:boolean; createdAt:string; updatedAt:string; assignmentId?:string; assignmentStatus?:string; openTaskCount?:number; overdueTaskCount?:number; documentCount?:number; blockingOverdueCount?:number; highPriorityCount?:number; nextDueAt?:string|null; patientResponsePending?:boolean; myWorkCount?:number };
 /** `viewChosen` marks a view the person picked; until then the home lands on the first view that has work. */
@@ -250,7 +250,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             const named=(action:string)=>`${action} ${item.caseNumber}`;
             // Only the number is isolated left-to-right, so "الحالة RS-…" still reads right-to-left in Arabic.
             const [titleBefore,titleAfter=""]=text.caseTitle.split("{number}");
-            const title=item.patientName?<bdi>{item.patientName}</bdi>:<>{titleBefore}<bdi dir="ltr">{item.caseNumber}</bdi>{titleAfter}</>;
+            const title=item.patientName?<bdi>{patientNameLabel(item.patientName,work)}</bdi>:<>{titleBefore}<bdi dir="ltr">{item.caseNumber}</bdi>{titleAfter}</>;
             const meta=<>
               <StatusBadge tone={caseStatusTone(item.status)}>{statusLabel(item.status)}</StatusBadge>
               {item.waitingOn&&item.waitingOn!=="NONE"&&<span className="inline-flex items-center gap-1 text-[0.8125rem] text-ink-600"><Hourglass size={12} className="text-brand-600" aria-hidden/>{text.waiting}: <strong className="font-semibold text-ink-800">{waitingLabel(item.waitingOn,work.waiting,{role,ownsCase:!!subject&&item.coordinatorSubject===subject})}</strong></span>}
