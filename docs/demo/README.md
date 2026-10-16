@@ -37,3 +37,6 @@ Staff names that were not obvious demo data (coordinator, Consultant and hospita
 Narration: the "Narration" button in the header reads each slide aloud with the browser's built-in speech (off by default, English, voice varies by device). No audio files are included; a recorded voice-over is not done.
 
 Fonts: the page asks for Alexandria and Plus Jakarta Sans and falls back to system fonts offline. Colours follow the Petrol & Paper tokens in `DESIGN.md`.
+
+## Video
+`journey.mp4` (1080p, about 6.5 min, 5 MB): the same slides with narration recorded using the offline Windows voice "Microsoft Zira". It reads each slide caption aloud, so it is a synthetic voice, not a human recording.
