@@ -36,9 +36,27 @@ export type PatientOptions = { viewer?: "SELF" | "REPRESENTATIVE"; roles?: strin
   /** The server refuses a new case with this error code (e.g. a limit on cases sent for others). */
   newCaseRefusal?: { status: number; code: string };
   /** UX 1c-2: the proposal's lines and totals as the workspace sends them since 1c-0 (range, categories, fee line). */
-  estimate?: { items: unknown[]; totalMin?: number; totalExpected?: number; totalMax?: number } };
+  estimate?: { items: unknown[]; totalMin?: number; totalExpected?: number; totalMax?: number };
+  /** With "proposal-ready": the proposal is a final quote in this state, and a decision on it may be refused with this code (P1-10). */
+  finalQuote?: { scopeChangeReason?: string; acceptableFrom?: string; fxReapprovalStatus?: string; decisionRefusal?: { status: number; code: string } };
+  /** P1-13: the case's current step is this guardian blocker (the patient is a minor; the account acts as their guardian). */
+  guardian?: "MINOR_REQUIRES_GUARDIAN" | "GUARDIAN_AUTH_MISSING" | "GUARDIAN_EVIDENCE_MISSING";
+  /** P1-13: concerns the patient already raised on the case. */
+  concerns?: { id: string; type: string; status: string; raisedAt: string; resolvedAt?: string | null }[];
+  /** The case's documents (default: one scanned echo report). Uploads from My Care (presign, put, confirm) add to it, clean. */
+  documents?: { documentId: string; fileName: string; status: string; createdAt: string }[];
+  /** P1-15: with "deposit-paid", the case is at an admission step (the stage follows it) and the patient admission API answers this view. */
+  admission?: { code: "CONFIRM_ARRIVAL" | "PAY_BALANCE" | "WAIT_BALANCE_CHECK" | "CLEARED_FOR_ADMISSION"; view: Record<string, unknown> };
+  /** P1-16: with "deposit-paid", the case is in treatment at this step; the patient treatment API answers `view`, and a decision answers `decided` (then read back). */
+  treatment?: { code: "IN_TREATMENT" | "REVIEW_CHANGE_ORDER"; view: Record<string, unknown>; decided?: Record<string, unknown> };
+  /** P1-17: with "deposit-paid", the case is discharged (GOING_HOME) or in follow-up; the patient discharge and statements APIs answer these. */
+  discharge?: { code: "GOING_HOME" | "FOLLOW_UP"; view: Record<string, unknown>; statements: Record<string, unknown>[] };
+  /** P1-18: with "deposit-paid", the case is in follow-up (FOLLOW_UP, REPORT_OUTCOME) or closed and completed (COMPLETED); the patient
+   *  follow-up API answers `view`, the statements API `statements`, and sending the answers answers `reported` (then read back). */
+  followUp?: { code: "FOLLOW_UP" | "REPORT_OUTCOME" | "COMPLETED"; view: Record<string, unknown>; statements?: Record<string, unknown>[]; reported?: Record<string, unknown> } };
 
-export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, estimate }: PatientOptions = {}) {
+export async function setupPatient(page: Page, scenario: Scenario, { viewer = "SELF", roles = ["PATIENT"], identity, multipleCases = false, newCaseRefusal, estimate, finalQuote, guardian, concerns = [], admission, treatment, discharge, followUp,
+  documents = [{ documentId: "d1", fileName: "Echo_Report.pdf", status: "CLEAN", createdAt: "2026-09-01T09:00:00Z" }] }: PatientOptions = {}) {
   await page.addInitScript(({ authority }) => {
     sessionStorage.setItem(`oidc.user:${authority}:rehletshifaa-web`, JSON.stringify({ access_token: "synthetic", token_type: "Bearer", scope: "openid",
       profile: { sub: "patient-1", name: "Maya Example", email: "maya@example.test", roles: ["PATIENT"] }, expires_at: Math.floor(Date.now() / 1000) + 3600 }));
@@ -49,7 +67,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
   // Before an estimate exists: no proposal, no deposit, and only the milestones reached so far.
   const early = scenario === "case-received" ? "RECEIVED" : scenario === "consultant-review" ? "CONSULTANT_REVIEW" : null;
   const caseSummary = early ? { ...summary, status: early, doctorName: early === "RECEIVED" ? null : summary.doctorName }
-    : ready ? { ...summary, status: "PATIENT_DECISION", waitingOn: "PATIENT" } : paid ? { ...summary, status: "TRAVEL_COORDINATION" } : summary;
+    : ready ? { ...summary, status: "PATIENT_DECISION", waitingOn: "PATIENT" } : paid ? { ...summary, status: followUp ? (followUp.code === "COMPLETED" ? "CLOSED" : "FOLLOW_UP") : discharge ? (discharge.code === "GOING_HOME" ? "DISCHARGED" : "FOLLOW_UP") : treatment ? "TREATMENT_IN_PROGRESS" : admissionStage(admission?.code) } : summary;
   const milestones = { receivedAt: received, consultantReviewAt: early === "RECEIVED" ? null : consultantReview, estimateReadyAt: early ? null : stamp };
   const states = early
     ? { journeyStage: early, waitingOn: "STAFF", blockers: [], currentAction: { code: early === "RECEIVED" ? "WAIT_COORDINATOR_REVIEW" : "WAIT_CONSULTANT_REVIEW", kind: "WAIT", expectedWorkingDays: 2 }, availableActions: ["MESSAGE_COORDINATOR"] }
@@ -58,7 +76,15 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     : paid ? { journeyStage: "TRAVEL_COORDINATION", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_COORDINATION", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] }
     : paying ? { journeyStage: "ACCEPTED", waitingOn: "PATIENT", blockers: [], currentAction: { code: "PAY_DEPOSIT", kind: "FOCUS" }, availableActions: ["MESSAGE_COORDINATOR"] }
     : { journeyStage: "ACCEPTED", waitingOn: "STAFF", blockers: [], currentAction: { code: "WAIT_PAYMENT_CHECK", kind: "WAIT" }, availableActions: ["MESSAGE_COORDINATOR"] };
-  const actions = { ...states, viewer, ...(identity !== undefined ? { currentAction: { code: "VERIFY_IDENTITY", kind: "FOCUS", blocker: "IDENTITY_NOT_VERIFIED" } } : {}) };
+  const actions = { ...states, viewer, ...(identity !== undefined ? { currentAction: { code: "VERIFY_IDENTITY", kind: "FOCUS", blocker: "IDENTITY_NOT_VERIFIED" } } : {}),
+    ...(guardian ? { waitingOn: "PATIENT", currentAction: { code: "COMPLETE_PROFILE", kind: "FOCUS", blockerCode: guardian },
+      blockers: [{ code: guardian, labelEn: "Guardian details required", labelAr: "مطلوب إدخال بيانات الوصي", owner: "PATIENT", gating: true }] } : {}),
+    ...(admission ? { journeyStage: caseSummary.status, waitingOn: "PATIENT", currentAction: { code: admission.code, kind: ["CONFIRM_ARRIVAL", "PAY_BALANCE"].includes(admission.code) ? "FOCUS" : "WAIT" } } : {}),
+    ...(treatment ? { journeyStage: caseSummary.status, waitingOn: treatment.code === "REVIEW_CHANGE_ORDER" ? "PATIENT" : "STAFF", currentAction: { code: treatment.code, kind: treatment.code === "REVIEW_CHANGE_ORDER" ? "FOCUS" : "WAIT" } } : {}),
+    ...(discharge ? { journeyStage: caseSummary.status, waitingOn: "STAFF", currentAction: { code: discharge.code, kind: "WAIT" } } : {}),
+    ...(followUp ? { journeyStage: caseSummary.status, waitingOn: followUp.code === "REPORT_OUTCOME" ? "PATIENT" : "STAFF",
+      currentAction: followUp.code === "COMPLETED" ? { code: "NONE", kind: "NONE", exit: "COMPLETED" } : { code: followUp.code, kind: followUp.code === "REPORT_OUTCOME" ? "FOCUS" : "WAIT" },
+      availableActions: followUp.code === "COMPLETED" ? [] : ["MESSAGE_COORDINATOR"] } : {}) };
   const workspace = {
     caseSummary, timeline: [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: "2026-09-01T09:00:00Z" }, { type: "STATUS", label: caseSummary.status, status: caseSummary.status, occurredAt: stamp }],
     tasks: [], messages: [{ id: "m1", threadType: "PATIENT_COORDINATOR", senderRole: "COORDINATOR", senderName: "Sara Ahmed", direction: "INBOUND", body: "Welcome — I will send the deposit details shortly.", createdAt: stamp, internalOnly: false, read: false }],
@@ -89,6 +115,7 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     actions: { journeyStage: "CLOSED", waitingOn: null, blockers: [], currentAction: { code: "NONE", kind: "NONE" }, availableActions: ["MESSAGE_COORDINATOR"], viewer: "SELF" } };
   const caseList = multipleCases ? [relative, { ...caseSummary, viewer: "SELF" }, closed] : [caseSummary];
   const writes: { path: string; body: unknown }[] = [];
+  let uploading: { documentId: string; fileName: string } | null = null;
   // Counted from the browser side so a request storm shows up even when every call is answered: a linked patient's
   // session registration refreshes /me once; repeating it is the reload loop this suite must catch.
   const calls = { session: 0, me: 0, roleless: 0 };
@@ -98,11 +125,13 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (request.method() === "GET" && path.endsWith("/api/v1/me")) calls.me++;
     if (path.includes("/api/v1/undefined/")) calls.roleless++;
   });
+  if (finalQuote && workspace.proposal) Object.assign(workspace.proposal, { documentType: "FINAL_TREATMENT_QUOTE", scopeChangeReason: finalQuote.scopeChangeReason ?? null, acceptableFrom: finalQuote.acceptableFrom ?? null, fxReapprovalStatus: finalQuote.fxReapprovalStatus ?? null });
   await page.route("**/api/v1/**", async route => {
     const request = route.request(), api = new URL(request.url()).pathname.replace("/api/v1", "");
     const reply = (data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204 });
-    if (request.method() !== "GET") writes.push({ path: api, body: request.postDataJSON() });
+    // An upload's bytes are not JSON: recorded by size only.
+    if (request.method() !== "GET") writes.push({ path: api, body: api.startsWith("/local-uploads/") ? { bytes: request.postDataBuffer()?.length ?? 0 } : request.postDataJSON() });
     if (api === "/account/preferences") return reply({ displayName: null, locale: "en" });
     if (api === "/patient/account/session") return reply({ linked: true, currentCaseId: scenario === "no-case" ? null : multipleCases ? "case-2" : "case-1", accountStatus: "ACTIVE", pendingLinkRequests: 0 });
     if (api === "/patient/account/profile") return reply({ givenName: "Maya", familyName: "Example", displayName: "Maya Example", preferredName: null, dateOfBirth: "1990-04-02", country: "Kenya", nationality: "KE", preferredLanguage: "en", email: "maya@example.test", emailVerified: true, whatsappNumber: "+254700000081", phoneVerified: true, accountStatus: "ACTIVE" });
@@ -116,13 +145,36 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (multipleCases && api === "/patient/cases/case-2") return reply(relativeWorkspace);
     if (multipleCases && api === "/patient/cases/case-3") return reply(closedWorkspace);
     if (api === "/patient/cases/case-1") return reply(workspace);
-    if (api === "/patient/cases/case-1/onboarding") return reply({ identity: identity ?? null });
+    if (api === "/patient/cases/case-1/onboarding") return reply({ identity: identity ?? null, version: 2, subjectType: guardian ? "GUARDIAN" : "PATIENT", completedConsentTypes: [] });
+    if (/^\/patient\/cases\/case-1\/onboarding\/(consents|subject|guardian-evidence)$/.test(api)) return reply({ version: 3, subjectType: "GUARDIAN", completedConsentTypes: ["GUARDIAN_AUTHORIZATION"] });
+    if (api === "/patient/cases/case-1/concerns" && request.method() === "POST") { concerns.unshift({ id: `c${concerns.length + 1}`, type: request.postDataJSON().type, status: "OPEN", raisedAt: stamp }); return reply(concerns[0]); }
+    if (api.endsWith("/concerns")) return reply(concerns);
+    if (api === "/patient/cases/case-1/proposals/v1/decision" && finalQuote?.decisionRefusal) return reply({ code: finalQuote.decisionRefusal.code, message: "Server wording in English (must not reach the patient)" }, finalQuote.decisionRefusal.status);
     if (api === "/patient/cases/case-1/proposals/v1/decision") return reply({ ...proposal, status: "ACCEPTED" });
     // The Arabic assisted path: asking once opens the coordinator's work; the page then says it was asked.
     if (api === "/patient/cases/case-1/proposals/v1/assistance") { const assistance = { requestedAt: "2026-10-08T09:00:00Z" }; if (workspace.proposal) workspace.proposal.assistance = assistance; return reply(assistance); }
-    if (api.endsWith("/documents")) return reply([{ documentId: "d1", fileName: "Echo_Report.pdf", contentType: "application/pdf", sizeBytes: 1024, status: "CLEAN", createdAt: "2026-09-01T09:00:00Z" }]);
+    // My Care upload: presign names a synthetic local upload URL, the bytes go there, confirm "scans" them clean.
+    if (api === "/patient/cases/case-1/documents/presign") { const file = request.postDataJSON(); uploading = { documentId: `u${documents.length + 1}`, fileName: file.originalFileName };
+      return reply({ documentId: uploading.documentId, uploadUrl: `${new URL(request.url()).origin}/api/v1/local-uploads/${uploading.documentId}`, requiredHeaders: { "Content-Type": file.contentType }, expiresInSeconds: 300 }, 201); }
+    if (api.startsWith("/local-uploads/")) return route.fulfill({ status: 200, body: "" });
+    if (api === "/patient/cases/case-1/documents/confirm" && uploading) { documents.unshift({ ...uploading, status: "CLEAN", createdAt: stamp }); return reply({ documentId: uploading.documentId, status: "CLEAN" }); }
+    if (api.endsWith("/documents")) return reply(documents);
+    if (api === "/patient/cases/case-1/admission" && admission) return reply(admission.view);
+    if (api === "/patient/cases/case-1/arrived" && admission) return route.fulfill({ status: 200, body: "" });
+    if (api === "/patient/cases/case-1/treatment" && treatment) return reply(treatment.view);
+    if (api === "/patient/cases/case-1/discharge" && discharge) return reply(discharge.view);
+    if (api === "/patient/cases/case-1/statements" && discharge) return reply(discharge.statements);
+    if (api === "/patient/cases/case-1/statements" && followUp) return reply(followUp.statements ?? []);
+    if (api === "/patient/cases/case-1/follow-up" && followUp) return reply(followUp.view);
+    if (/^\/patient\/cases\/case-1\/follow-up\/outcomes\/D(30|90)$/.test(api) && followUp) { if (followUp.reported) followUp.view = followUp.reported; return reply(followUp.view); }
+    if (/^\/patient\/cases\/case-1\/change-orders\/[^/]+\/decision$/.test(api) && treatment) { if (treatment.decided) treatment.view = treatment.decided; return reply(treatment.view); }
     return reply({ message: `unstubbed ${api}` }, 404);
   });
   await routeMe(page, meFor("patient-1", roles));
   return { writes, calls };
+}
+
+/** P1-15: the case stage each admission step belongs to. */
+function admissionStage(code?: string) {
+  return code === "CONFIRM_ARRIVAL" || !code ? "TRAVEL_COORDINATION" : code === "CLEARED_FOR_ADMISSION" ? "ADMISSION_READY" : "ARRIVAL_CONFIRMED";
 }

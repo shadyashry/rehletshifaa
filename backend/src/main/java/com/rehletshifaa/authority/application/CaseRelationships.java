@@ -26,6 +26,9 @@ public interface CaseRelationships {
     /** The case is ACCEPTED and its coordination deposit is open: requested or partly paid, and not waived. */
     boolean depositOpen(UUID caseId);
 
+    /** P1-15: the deposit is open, or the hospital admission is reserved or confirmed (money Finance must act on). */
+    boolean moneyOpen(UUID caseId);
+
     /** The case belongs to the subject's own patient record or to a patient they currently represent. */
     boolean ownPatientCase(UUID caseId, String subject);
 

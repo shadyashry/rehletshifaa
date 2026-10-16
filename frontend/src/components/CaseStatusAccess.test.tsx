@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, configure, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, configure, fireEvent, render, screen, within } from "@testing-library/react";
 
 import { CaseStatusAccess } from "./CaseStatusAccess";
 import en from "@/messages/en.json";
@@ -442,5 +442,183 @@ describe("CaseStatusAccess journey", () => {
     expect(screen.queryByText(/coordinator will share the payment details/i)).toBeNull();
     expect(screen.queryByText(/usually takes/i)).toBeNull();
     expect(screen.getByRole("link", { name: "Sign in to pay" }).getAttribute("href")).toBe("/en/portal?signin=1");
+  });
+
+  // P1-15: arrival and the hospital balance are the patient's own steps in My Care, and this link cannot tell which is due.
+  it("in the treatment phase points to My Care for arrival and the voucher, and never says nothing is needed", async () => {
+    await reachStatus({ ...consultantStatus, statusEn: "Cleared for admission", phase: "treatment", expectedWorkingDays: 2 });
+    expect(await screen.findByRole("heading", { name: "We are arranging your treatment" })).toBeTruthy();
+    expect(screen.getByText(/confirm it in My Care, where your admission voucher and what to pay at the hospital also appear/i)).toBeTruthy();
+    expect(screen.queryByText(/no action is required/i)).toBeNull();
+    expect(screen.queryByText(/usually takes/i)).toBeNull();
+    const link = screen.getByRole("link", { name: "Sign in to My Care" });
+    expect(link.getAttribute("href")).toBe("/en/portal?signin=1");
+    expect(link.className).toContain("btn-secondary");
+  });
+});
+
+// P1-16: in the treatment phase the link reads the treatment page on the verified grant; a change above the band is decided here.
+describe("CaseStatusAccess treatment", () => {
+  beforeAll(() => {
+    HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new Event("close")); };
+  });
+  beforeEach(() => vi.resetAllMocks());
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  const inTreatment = { caseNumber: "RS-10281", statusEn: "In treatment", statusAr: "قيد العلاج", phase: "treatment", actionRequired: false, action: null };
+  const order = { id: "o2", orderNumber: "RS-CO-RS-10281-2", status: "AWAITING_PATIENT", emergency: false, reason: "One more night of observation.",
+    lines: [{ kind: "EXTRA_NIGHT", description: "Extra ICU night", quantity: 1, lineEgp: 12345.5, lineDisplay: 251.86 }], totalEgp: 12345.5, totalDisplay: 251.86,
+    displayCurrency: "USD", awaitingDecision: true };
+  const treatment = { facilityName: "Nile Heart Hospital", facilityCity: "Cairo", awaitingDecisionId: "o2",
+    timeline: [{ kind: "ADMITTED", occurredAt: "2026-10-20T08:00:00Z", reportedBy: "CONSULTANT" }], changeOrders: [order] };
+  const decided = { ...treatment, awaitingDecisionId: null, changeOrders: [{ ...order, status: "ACCEPTED", awaitingDecision: false, decidedAt: "2026-10-21T13:00:00Z" }] };
+  const treatmentCopy = { ...en.portalWork.myCare.treatment, review: en.portalWork.myCare.steps.REVIEW_CHANGE_ORDER };
+
+  async function reachTreatment(page: unknown, decision: () => Promise<Response> = () => json(decided)) {
+    const fetchMock = stub({
+      "/request-access": () => json(summary),
+      "/verify": () => json({ grant: "grant-1" }),
+      "/view": () => json(inTreatment),
+      "/treatment": () => json(page),
+      "/decision": decision,
+      "tok-1": () => json(summary),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey} treatmentCopy={treatmentCopy}/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+    return fetchMock;
+  }
+
+  it("makes a change awaiting the patient the page's one action, decided on the verified grant", async () => {
+    const fetchMock = await reachTreatment(treatment);
+    expect(await screen.findByRole("heading", { name: "Review a change to your treatment" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/public\/cases\/tok-1\/treatment$/), expect.objectContaining({ body: JSON.stringify({ grant: "grant-1" }) }));
+    expect(screen.getByText("One more night of observation.")).toBeTruthy();
+    expect(screen.getByText(/About.*\$251\.86.*at the rate fixed on your quote/)).toBeTruthy();
+    expect(screen.getByText("You were admitted to hospital")).toBeTruthy();
+    // No "nothing needed", no second way out: the decision is the page's one filled action.
+    expect(screen.queryByText(/no action is required/i)).toBeNull();
+    expect(screen.queryByRole("link", { name: "Sign in to My Care" })).toBeNull();
+    const accept = screen.getByRole("button", { name: "Accept the change" });
+    expect([...document.querySelectorAll(".btn-primary")]).toEqual([accept]);
+    fireEvent.click(accept);
+    fireEvent.click(screen.getByRole("alertdialog", { name: "Accept this change?" }).querySelector(".btn-primary") as HTMLElement);
+    await screen.findByText("Accepted");
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/public\/cases\/tok-1\/change-orders\/o2\/decision$/),
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ grant: "grant-1", decision: "ACCEPT", note: null }) }));
+    expect(screen.queryByRole("button", { name: "Accept the change" })).toBeNull();
+  });
+
+  it("says so when the change is no longer waiting for a decision", async () => {
+    await reachTreatment(treatment, () => json({ code: "CHANGE_ORDER_NOT_AWAITING" }, false, 409));
+    fireEvent.click(await screen.findByRole("button", { name: "Decline" }));
+    fireEvent.click(screen.getByRole("alertdialog", { name: "Decline this change?" }).querySelector(".btn-primary") as HTMLElement);
+    expect((await screen.findByRole("alert")).textContent).toBe("This change is no longer waiting for a decision.");
+  });
+
+  it("with nothing to decide shows the timeline and keeps the quiet way to My Care", async () => {
+    await reachTreatment(decided);
+    expect(await screen.findByText("You were admitted to hospital")).toBeTruthy();
+    expect(screen.getByText("Accepted")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Accept the change" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Sign in to My Care" }).className).toContain("btn-secondary");
+  });
+});
+
+// P1-17: after discharge the link reads going home and the statement on the verified grant; nothing to decide there.
+describe("CaseStatusAccess going home", () => {
+  beforeEach(() => vi.resetAllMocks());
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  const followUp = { caseNumber: "RS-10281", statusEn: "Follow-up", statusAr: "المتابعة", phase: "followup", actionRequired: false, action: null };
+  const home = { discharged: true, documents: [{ kind: "DISCHARGE_SUMMARY", documentId: "d1", recordedAt: "2026-10-24T09:00:00Z" }],
+    medications: [{ name: "Aspirin", dose: "75 mg", frequency: "Once a day", duration: "Lifelong" }], warningSigns: "Chest pain or breathlessness",
+    followUpDueAt: "2026-11-25T09:00:00Z", followUpMode: "VIDEO", returnMode: "FLIGHT", returnDepartureAt: "2026-10-27T09:00:00Z", departed: false, handoverLetter: null };
+  const statement = { id: "s1", kind: "DISCHARGE", statementNumber: "RS-ST-RS-10281-1", revision: 1, issuedAt: "2026-10-26T09:00:00Z", displayCurrency: "USD",
+    totals: { packageEgp: 200000, changeOrdersEgp: 0, medicalChargedEgp: 200000, platformFeeEgp: 30000, totalChargedEgp: 230000, totalChargedDisplay: 4692.31, depositPaidEgp: 34500,
+      feeBalancePaidEgp: 0, paidAtFacilityEgp: 190000, refundedEgp: 0, balanceDueEgp: 5500.5, balanceDueDisplay: 112.21, creditDueEgp: 0, creditDueDisplay: 0 },
+    lines: [{ kind: "PACKAGE", description: "Coronary stent package", amountEgp: 200000, amountDisplay: 4080.2 }] };
+
+  it("shows the warning signs, the medicines and the statement as returned", async () => {
+    const fetchMock = stub({
+      "/request-access": () => json(summary),
+      "/verify": () => json({ grant: "grant-1" }),
+      "/view": () => json(followUp),
+      "/discharge": () => json(home),
+      "/statements": () => json([statement]),
+      "tok-1": () => json(summary),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey}
+                             dischargeCopy={{ goingHome: en.portalWork.myCare.goingHome, statement: en.portalWork.statement }}/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+    expect(await screen.findByRole("heading", { name: "Going home" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/public\/cases\/tok-1\/discharge$/), expect.objectContaining({ body: JSON.stringify({ grant: "grant-1" }) }));
+    expect(screen.getByRole("heading", { name: "Get medical help at once if" })).toBeTruthy();
+    expect(screen.getByText("Chest pain or breathlessness")).toBeTruthy();
+    expect(screen.getByText("Aspirin")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /Statement\W+RS-ST-RS-10281-1/ })).toBeTruthy();
+    expect(screen.getByText("Balance due")).toBeTruthy();
+    expect(screen.getByText(/5,500\.50/)).toBeTruthy();
+    expect(screen.getByText("$112.21")).toBeTruthy();
+  });
+});
+
+// P1-18: an OUTCOME link opens on its open question (the page's one action) and asks who is answering; in follow-up any link
+// shows the next contact and who to turn to.
+describe("CaseStatusAccess follow-up", () => {
+  beforeEach(() => vi.resetAllMocks());
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  const outcomeSummary = { ...summary, purpose: "OUTCOME" };
+  const inFollowUp = { caseNumber: "RS-10281", statusEn: "Follow-up", statusAr: "المتابعة", phase: "followup", actionRequired: false, action: null };
+  const followUp = { active: true, contacts: [{ dueAt: "2026-11-25T09:00:00Z", mode: "VIDEO", status: "SCHEDULED" }], windowEndsAt: "2026-11-24T09:00:00Z",
+    windowClosed: false, outcomes: [{ point: "D30", requestedAt: "2026-11-24T09:00:00Z", open: true, reportedAt: null }], openOutcome: "D30", closed: false };
+  const followUpCopy = { followUp: en.portalWork.myCare.followUp, step: en.portalWork.myCare.steps.REPORT_OUTCOME };
+
+  async function open(routes: Record<string, () => Promise<Response>>, linkSummary: typeof summary & { purpose?: string } = outcomeSummary) {
+    const fetchMock = stub({ "/request-access": () => json(linkSummary), "/verify": () => json({ grant: "grant-1" }), "/view": () => json(inFollowUp),
+      "tok-1": () => json(linkSummary), ...routes });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<CaseStatusAccess locale="en" token="tok-1" copy={statusCopy(en)} journeyCopy={en.secureLink.journey} followUpCopy={followUpCopy}/>);
+    fireEvent.click(await screen.findByRole("button", { name: /send verification code/i }));
+    fireEvent.change(await screen.findByLabelText(/verification code/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+    return fetchMock;
+  }
+
+  it("on an OUTCOME link opens on the questions, under the purpose notice, and sends who is answering with the notice version", async () => {
+    const fetchMock = await open({ "/follow-up": () => json(followUp), "/outcomes/D30": () => json({ ...followUp, openOutcome: null, outcomes: [{ ...followUp.outcomes[0], open: false, reportedAt: "2026-11-25T10:00:00Z" }] }) });
+    expect(await screen.findByRole("heading", { name: "How are you doing?" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Before you answer" })).toBeTruthy();
+    expect(screen.getByText(/a care manager and our compliance team read it too/)).toBeTruthy();
+    // Nothing answered yet: who is answering is asked first, then every question.
+    fireEvent.click(screen.getByRole("button", { name: "Send my answers" }));
+    expect(await screen.findByText("Say who is answering.")).toBeTruthy();
+    expect(screen.getAllByText("Answer this question.")).toHaveLength(4);
+    fireEvent.click(screen.getByLabelText("I am answering for the patient"));
+    for (const [legend, n] of [["How much pain do you have now?", "2"], ["How well can you manage your daily activities?", "7"], ["How satisfied are you with your care?", "9"]] as const) {
+      fireEvent.click(within(screen.getByRole("group", { name: legend })).getByLabelText(n));
+    }
+    fireEvent.click(within(screen.getByRole("group", { name: "Has anything gone wrong since you left hospital?" })).getByLabelText("No"));
+    fireEvent.click(screen.getByRole("button", { name: "Send my answers" }));
+    expect(await screen.findByText("Thank you. Your answers reached your care team.")).toBeTruthy();
+    const sent = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/outcomes/D30"))!;
+    expect(JSON.parse(String(sent[1]!.body))).toEqual({ grant: "grant-1", answeredBy: "REPRESENTATIVE", pain: 2, function: 7, satisfaction: 9, complication: false,
+      complicationNote: null, noticeVersion: "outcome-notice-2026-10" });
+  });
+
+  it("in follow-up on a status link shows the next contact, the free follow-up's end and who to turn to, with no questions", async () => {
+    await open({ "/follow-up": () => json({ ...followUp, openOutcome: null }) }, summary);
+    expect(await screen.findByRole("heading", { name: "Your follow-up" })).toBeTruthy();
+    expect(screen.getByText(/^By video on /)).toBeTruthy();
+    expect(screen.getByText(/Your free follow-up lasts until/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "If something goes wrong" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send my answers" })).toBeNull();
   });
 });

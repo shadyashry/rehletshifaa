@@ -131,6 +131,41 @@ public class PublicCaseAccessService {
     /** Case + patient a verified ONBOARDING grant is bound to. */
     public record OnboardingLinkContext(UUID caseId, UUID patientId) {}
 
+    /** P1-16: the case and patient a verified grant on any of the case's secure links is bound to. */
+    public record CaseLinkContext(UUID caseId, UUID patientId) {}
+
+    /**
+     * P1-16: resolve a verified grant on the case's secure link (the one-time code went to the patient's registered contact, the
+     * same fresh proof the proposal decision rests on) for the treatment page and a change-order decision.
+     */
+    @Transactional(readOnly=true) public CaseLinkContext requireCaseGrant(String token,String grant){
+        Link link=requireGrant(token,grant);
+        return new CaseLinkContext(link.caseId(),link.patientId());
+    }
+
+    /**
+     * P1-18: the outcome question's secure link (purpose OUTCOME): an earlier live OUTCOME link of the case is revoked, the new one
+     * lasts 30 days and goes to the case's communication contact with the {@code outcome-request} message. Returns the link's id
+     * (the outcome row keeps it).
+     */
+    @Transactional public UUID issueOutcomeLink(UUID caseId,String language){
+        Instant now=clock.instant();CaseContact contact=contacts.resolve(caseId);links.revokeForCase(caseId,"OUTCOME",micros(now));
+        String token=randomToken();UUID id=UUID.randomUUID();
+        links.saveAndFlush(new CaseAccessLink(id,caseId,contact.patientId(),"OUTCOME",intake.hash(token),now.plus(Duration.ofDays(30)),now));
+        String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();
+        if(hasText(destination))
+            notificationOutbox.enqueueOnce("FOLLOW_UP", channel, destination, "outcome-request", intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+("ar".equals(language)?"ar":"en")+"\"}"), "outcome-request:"+id, now);
+        audit("OUTCOME_LINK_CREATED",caseId,id.toString(),"CREATE");
+        return id;
+    }
+
+    /** P1-18: resolve a verified grant on an OUTCOME link; a link of another purpose cannot answer the outcome questions. */
+    @Transactional(readOnly=true) public CaseLinkContext requireOutcomeGrant(String token,String grant){
+        Link link=requireGrant(token,grant);
+        if(!"OUTCOME".equals(link.purpose()))throw new ApiException(403,"LINK_PURPOSE_MISMATCH","This link cannot be used to answer the follow-up questions");
+        return new CaseLinkContext(link.caseId(),link.patientId());
+    }
+
     /** Resolve a verified information-response grant without exposing the link's internal id. */
     @Transactional(readOnly=true) public InformationLinkContext requireInformationGrant(String token,String grant){
         Link link=requireGrant(token,grant);
@@ -214,12 +249,12 @@ public class PublicCaseAccessService {
         case "CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW","CLINICAL_RECOMMENDATION_READY","CLINICALLY_NOT_SUITABLE"->"consultant";
         case "PROPOSAL_PREPARATION","PROPOSAL_INTERNAL_APPROVAL","REVISION_REQUESTED","PATIENT_DECISION","DECLINED","EXPIRED"->"proposal";
         case "ACCEPTED"->"deposit";
-        case "TRAVEL_COORDINATION","ARRIVAL_CONFIRMED","TREATMENT_IN_PROGRESS"->"treatment";
+        case "TRAVEL_COORDINATION","ARRIVAL_CONFIRMED","ADMISSION_READY","TREATMENT_IN_PROGRESS"->"treatment";
         case "DISCHARGED","FOLLOW_UP","CLOSED","CANCELLED"->"followup";
         default->"received";};}
 
     private String mask(String value){if(value==null)return "***";String clean=value.replaceAll("\\s","");if(clean.contains("@")){int at=clean.indexOf('@');return (at==0?"*":clean.charAt(0)+"***")+clean.substring(at);}return clean.length()<4?"***":"***"+clean.substring(clean.length()-4);}
-    private Labels labels(String status){return switch(status){case "RECEIVED"->new Labels("Case received","تم استلام الحالة");case "INTAKE_REVIEW"->new Labels("Reviewing your information","جارٍ مراجعة معلوماتك");case "INFORMATION_REQUIRED"->new Labels("Action required from you","مطلوب إجراء منك");case "READY_FOR_CONSULTANT","CONSULTANT_ASSIGNMENT_PENDING"->new Labels("Matching your consultant","جارٍ اختيار الاستشاري المناسب");case "CONSULTANT_REVIEW"->new Labels("Under consultant review","قيد مراجعة الاستشاري");case "CLINICAL_RECOMMENDATION_READY"->new Labels("Treatment recommendation ready","توصية العلاج جاهزة");case "PROPOSAL_PREPARATION","PROPOSAL_INTERNAL_APPROVAL"->new Labels("Preparing your proposal","جارٍ إعداد عرضك");case "PATIENT_DECISION"->new Labels("Waiting for your decision","بانتظار قرارك");case "ACCEPTED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED"->new Labels("Coordinating your journey","جارٍ تنسيق رحلتك");case "TREATMENT_IN_PROGRESS","DISCHARGED"->new Labels("Treatment in progress","العلاج جارٍ");case "FOLLOW_UP"->new Labels("Follow-up","المتابعة");case "CLOSED"->new Labels("Journey completed","اكتملت الرحلة");case "DECLINED"->new Labels("Proposal declined by patient","تم رفض العرض من المريض");case "EXPIRED"->new Labels("Proposal expired","انتهت صلاحية العرض");case "CLINICALLY_NOT_SUITABLE"->new Labels("Your coordinator will contact you","سيتواصل معك منسق حالتك");default->new Labels("Your case is being coordinated","جارٍ تنسيق حالتك");};}
+    private Labels labels(String status){return switch(status){case "RECEIVED"->new Labels("Case received","تم استلام الحالة");case "INTAKE_REVIEW"->new Labels("Reviewing your information","جارٍ مراجعة معلوماتك");case "INFORMATION_REQUIRED"->new Labels("Action required from you","مطلوب إجراء منك");case "READY_FOR_CONSULTANT","CONSULTANT_ASSIGNMENT_PENDING"->new Labels("Matching your consultant","جارٍ اختيار الاستشاري المناسب");case "CONSULTANT_REVIEW"->new Labels("Under consultant review","قيد مراجعة الاستشاري");case "CLINICAL_RECOMMENDATION_READY"->new Labels("Treatment recommendation ready","توصية العلاج جاهزة");case "PROPOSAL_PREPARATION","PROPOSAL_INTERNAL_APPROVAL"->new Labels("Preparing your proposal","جارٍ إعداد عرضك");case "PATIENT_DECISION"->new Labels("Waiting for your decision","بانتظار قرارك");case "ACCEPTED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED"->new Labels("Coordinating your journey","جارٍ تنسيق رحلتك");case "ADMISSION_READY"->new Labels("Cleared for admission","جاهز للدخول إلى المستشفى");case "TREATMENT_IN_PROGRESS","DISCHARGED"->new Labels("Treatment in progress","العلاج جارٍ");case "FOLLOW_UP"->new Labels("Follow-up","المتابعة");case "CLOSED"->new Labels("Journey completed","اكتملت الرحلة");case "DECLINED"->new Labels("Proposal declined by patient","تم رفض العرض من المريض");case "EXPIRED"->new Labels("Proposal expired","انتهت صلاحية العرض");case "CLINICALLY_NOT_SUITABLE"->new Labels("Your coordinator will contact you","سيتواصل معك منسق حالتك");default->new Labels("Your case is being coordinated","جارٍ تنسيق حالتك");};}
     private void audit(String type,UUID caseId,String entityId,String action){auditTrail.event(type).actor("SECURE_LINK", "PATIENT").caseId(caseId).entity("CaseAccess", entityId).action(action).record();}
     private record Link(UUID id,UUID caseId,UUID patientId,String purpose,Instant expiresAt,Instant revokedAt){
         static Link of(CaseAccessLinkRepository.LinkState s){return new Link(s.getId(),s.getCaseId(),s.getPatientId(),s.getPurpose(),s.getExpiresAt(),s.getRevokedAt());}}

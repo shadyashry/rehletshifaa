@@ -38,18 +38,46 @@ public class SlaPolicy {
      *   <li>the Consultant's clinical review ({@code CLINICAL_REVIEW}): 2;</li>
      *   <li>the coordinator's intake review ({@code ASSIGN_CONSULTANT}, {@code REVIEW_PATIENT_RESPONSE}): 1;</li>
      *   <li>the coordinator's proposal ({@code PREPARE_PROPOSAL}): 2 (session 2, so the patient's "preparing your
-     *       proposal" has a window too).</li>
+     *       proposal" has a window too);</li>
+     *   <li>a Care Coordination Manager's review of an incident ({@code INCIDENT_REVIEW}, P1-13): 2.</li>
      * </ul>
      */
-    static final Map<String, Integer> QUEUE_WORKING_DAYS = Map.of(
-            "DEPOSIT_RECORD", 1,
-            "PATIENT_IDENTITY_REVIEW", 2,
-            "PREPARE_TRAVEL_PACKAGE", 2,
-            "UPDATE_TRAVEL_PLAN", 2,
-            "CLINICAL_REVIEW", 2,
-            "ASSIGN_CONSULTANT", 1,
-            "REVIEW_PATIENT_RESPONSE", 1,
-            "PREPARE_PROPOSAL", 2);
+    static final Map<String, Integer> QUEUE_WORKING_DAYS = Map.ofEntries(
+            Map.entry("DEPOSIT_RECORD", 1),
+            Map.entry("PATIENT_IDENTITY_REVIEW", 2),
+            Map.entry("PREPARE_TRAVEL_PACKAGE", 2),
+            Map.entry("UPDATE_TRAVEL_PLAN", 2),
+            Map.entry("CLINICAL_REVIEW", 2),
+            Map.entry("ASSIGN_CONSULTANT", 1),
+            Map.entry("REVIEW_PATIENT_RESPONSE", 1),
+            Map.entry("PREPARE_PROPOSAL", 2),
+            // P1-13: a manager takes up an incident (complaint, dispute, adverse event, death) within two working days.
+            Map.entry("INCIDENT_REVIEW", 2),
+            // P1-13: the Consultant of a reopened case reviews it within two working days.
+            Map.entry("FOLLOW_UP_REVIEW", 2),
+            // P1-15 (architecture §9): Finance checks a hospital letter in one working day (a price variance and a cashier receipt in
+            // four working hours, dated by the caller), approves the point of no return in one, reviews an emergency admission in
+            // two; Operations asks the hospital again for a refused letter in one.
+            Map.entry("CHECK_PROFORMA", 1),
+            Map.entry("APPROVE_POINT_OF_NO_RETURN", 1),
+            Map.entry("EMERGENCY_ADMISSION_REVIEW", 2),
+            Map.entry("REVISE_ADMISSION_LETTER", 1),
+            Map.entry("ADMISSION_VOUCHER_BLOCKED", 1),
+            // P1-16 (architecture §9): Finance reviews and prices an emergency change order in two working days. The milestone clock
+            // and its countersign (24 working hours), a change order's price and an interim bill's countersign (4 working hours) and
+            // the coordinator's follow-up of the patient's decision (24 hours) are dated by the caller.
+            Map.entry("EMERGENCY_CHANGE_ORDER_REVIEW", 2),
+            // P1-17 (architecture §9): Finance reconciles the hospital's final invoice in two working days and refunds a patient's
+            // credit in two; a Finance Manager countersigns a variance above the band in one and settles a facility dispute in five.
+            // The Consultant's discharge pack and Operations' final invoice are due on the planned discharge day (dated by the caller).
+            Map.entry("RECONCILE_INVOICE", 2),
+            Map.entry("REFUND_CREDIT", 2),
+            Map.entry("COUNTERSIGN_RECONCILIATION", 1),
+            Map.entry("FACILITY_DISPUTE", 5),
+            // P1-18 (architecture §9): the coordinator rebooks a missed follow-up contact in one working day. The Consultant's
+            // contact (its date), the check-ins (the end of day 3, 14, 30 after discharge) and the review of a reported
+            // complication (4 working hours) are dated by the caller.
+            Map.entry("REBOOK_FOLLOW_UP", 1));
 
     /**
      * P1-6 session 2 (D-02): the queue each waiting state waits on, so "usually within N working days" is read from the

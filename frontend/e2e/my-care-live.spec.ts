@@ -81,7 +81,7 @@ test("activation → password → sign-in lands on My Care for the current case;
   // --- Fixture: a synthetic case to the acknowledged estimate, through the real journey ------------------
   const created = await call<{ caseId: string; caseNumber: string; intakeGrant: string }>(null, "POST", "/cases", {
     caseFor: "MYSELF", givenName: "Playwright", familyName: "Landing", country: "Kenya", whatsappNumber: whatsapp, conditionDescription: "Synthetic case for the post-activation landing check.",
-    preferredLanguage: "en", consent: true, turnstileToken: null, email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: false,
+    preferredLanguage: "en", consent: true, turnstileToken: null, ageBand: "AGE_18_64", email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: false,
   }, 201);
   const caseId = created.body.caseId, caseNumber = created.body.caseNumber;
   await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200,{"X-Case-Grant":created.body.intakeGrant});

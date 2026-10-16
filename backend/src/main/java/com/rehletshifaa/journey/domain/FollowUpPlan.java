@@ -36,4 +36,13 @@ public class FollowUpPlan extends AssignedIdEntity {
         this.mode = mode; this.requiredTests = requiredTests; this.instructions = instructions; this.status = "PLANNED";
         this.createdAt = micros(now); this.updatedAt = micros(now);
     }
+
+    public UUID getCaseId() { return caseId; }
+    public UUID getPractitionerId() { return practitionerId; }
+    public String getRequiredTests() { return requiredTests; }
+    public String getInstructions() { return instructions; }
+    public Instant getDueAt() { return dueAt; }
+    public String getMode() { return mode; }
+    public String getStatus() { return status; }
+    public Instant getCreatedAt() { return createdAt; }
 }

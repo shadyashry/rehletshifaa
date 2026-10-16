@@ -188,6 +188,15 @@ Band rule (`CommercialPolicyService`): new setting `change_order_band_egp` and `
 `commercial_policies` (decision D-E: 10% of the facility package or EGP 15,000, lower wins). `within_band` is computed
 at pricing time against the admission's `package_total_egp`.
 
+*As built (P1-16 session 1, 2026-10-15, Flyway V100):* `change_orders` carries `order_number` (`RS-CO-<case>-<n>`), `seq_no`,
+`emergency`, `band_limit_egp` (the band at pricing), `display_currency`/`fx_rate`/`total_display` (the voucher's frozen rate),
+`decided_role`, `decision_note` (encrypted) and a `decision_channel` of `FINANCE / MY_CARE / SECURE_LINK / CONSULTANT`; there is no
+`PRICED` status (pricing ends in `ACCEPTED` within the band or `AWAITING_PATIENT` above it; an emergency stays `EMERGENCY` once
+priced). A check constraint makes the band the only path to acceptance (within → Finance, above → the patient). `within_band` is
+**cumulative**: the case's counted orders (accepted, emergency) plus this one against the band. Lines carry a `kind` (`PROCEDURE /
+IMPLANT / EXTRA_NIGHT / MEDICATION / OTHER`) instead of a `source`; Finance prices every line (no facility-package or catalogue link
+yet). `treatment_episode_id` was left out (the episode is not the unit a change is agreed against).
+
 ### 4.4 `reconciliations` and `reconciliation_lines` (module `settlement`)
 
 `reconciliations`: case_id, admission_id, final_invoice_evidence_id, invoice_total_egp, quoted_total_egp (final quote
@@ -323,6 +332,17 @@ milestone with a 24-working-hour due date; it closes when the next milestone arr
   `rs_statement_ready` with a secure link (purpose `STATEMENT`, same OTP flow).
 - `SettlementService` (P1-12) consumes the admission split and the reconciliation to produce the facility and
   Consultant settlement statement and "mark paid".
+
+*As built (P1-17 session 1, 2026-10-16, Flyway V101):* no PDF renderer is available offline, so statements and the handover letter
+are **immutable structured records** the portal renders and prints (open point 1): `statements` holds every total (schema-checked
+identities) and the encrypted lines; the handover letter is an encrypted `HANDOVER_LETTER` ledger row with the EN and AR text. The
+pack items are typed by their ledger row (`medical_documents` has no type column); fit to fly gates the **return flight**
+(`RETURN_CONFIRMED`, D-F), not discharge, and the travel plan's free-text flight field is left alone. The follow-up plan is made before
+discharge (the pack's last item); `DISCHARGED -> FOLLOW_UP` (and `-> CLOSED`) waits for the settled reconciliation (`RECONCILIATION`
+ledger row, closed or closed with a facility dispute). Reconciliation lines match `PACKAGE` / `CHANGE_ORDER_LINE` / `NONE` (Finance
+enters the invoice lines; no automatic description matching yet); `REFUND_CREDIT` is a Finance work item that the existing deposit
+refund records, not an automatic `PaymentService.recordRefund`. The facility's quarterly dispute counter and the Compliance item are
+not built (P1-19).
 
 ### 5.6 `FollowUpService` (journey)
 
@@ -466,6 +486,16 @@ rate and in EGP (`DepositView` pattern).
   recorder (`SELF_COUNTERSIGN_REFUSED`); statements immutable.
 - Retention (P1-7): evidence and statements are `LEGAL_RECORD` class (long retention, legal hold); outcome answers
   are health data (sensitive, PDPL licence scope).
+- Outcome data (P1-18, reviewed for PDPL 2026-10-16): `case_outcomes` scores (0-10) and the complication flag are plain
+  columns on pseudonymous rows keyed by case (the schema checks them, P1-19 counts them); every free text (the
+  complication, the Consultant's review, contact and check-in notes) is encrypted. Readers: the case's Consultant (all),
+  its coordinator and their lead (scores and flags, no free text: `FOLLOW_UP_READ` without `FOLLOW_UP_RECORD`); a reported
+  complication is also the adverse-event incident's summary, read by the incident's Care Coordination Manager and
+  Compliance (`INCIDENT_READ`). Never Finance or Operations. Each answer stores the purpose notice version it was given
+  under and who answered (a representative declares it on the secure link). Messages carry a link only; audit and logs
+  carry the point, the channel and ids. Open (owner/legal): the PDPC licence (D-I), the retention class and period for
+  outcome and follow-up rows (a health-record class, not `LEGAL_RECORD`; complications inherit the incident's legal
+  hold), the breach procedure and DPO; P1-19 reads aggregates only and flags representative answers.
 - Logging: `event.code` for every state change; no document names.
 
 ## 13. Frontend surfaces
@@ -487,6 +517,10 @@ All with CSS logical properties, EN/AR parity, WCAG 2.2 AA, one primary action p
 - `CaseTransitionPolicyTest`: new state reachable/terminal properties; blockers per edge.
 - `AdmissionServiceTest`: reserve/letter/variance/voucher money split (worked example: package 100,000 EGP, fee 15%,
   deposit credit 17,250, patient pays at facility = package − credit), balance countersign refusals, admission number.
+  *As built (P1-15 session 1, 2026-10-15):* the money rule follows the design's §6 rule 1 (the deposit covers the platform fee
+  first), so the worked example is deposit 17,250 → fee 15,000 covered, credit to the hospital 2,250, patient pays at the hospital
+  97,750, fee balance 0; with a capped deposit of 10,000 the hospital is paid 100,000 at its cashier and the platform is owed a fee
+  balance of 5,000 (`AdmissionMoneyTest`). The owner confirms this reading (plan, "Owner decisions still open").
 - `ChangeOrderServiceTest`: band rule table, patient decision, emergency path, idempotent replay.
 - `TreatmentMilestoneServiceTest`: countersign rule, complication → incident, SLA item rotation.
 - `DischargeServiceTest`: pack completeness matrix, fit-to-fly window, handover letter render EN/AR.

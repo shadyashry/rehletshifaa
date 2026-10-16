@@ -30,6 +30,14 @@ public enum Scope {
      * see the case they record against; it ends when the deposit is paid, waived or refunded, or the case leaves ACCEPTED.
      */
     CASE_DEPOSIT_OPEN,
+    /**
+     * P1-15: the case has money Finance must act on: its coordination deposit is open, or its hospital admission is reserved or
+     * confirmed (the letter to check, the cashier receipt to countersign, the point of no return to approve), or (P1-16) the
+     * patient is in treatment (change orders to price, interim bills to countersign), or (P1-17) the hospital's final invoice is
+     * recorded and not yet reconciled. It ends when the reconciliation is settled, the admission is cancelled or the case leaves
+     * the journey.
+     */
+    CASE_MONEY_OPEN,
     /** A live assignee of the case (or the affected subject) is in a team the principal leads, or reports to them. */
     SUPERVISED,
     /** The case belongs to the principal's own patient record or one they represent. */

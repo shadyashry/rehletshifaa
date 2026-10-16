@@ -8,5 +8,5 @@ export default async function ProposalPage({ params }: { params: Promise<{ local
   const { locale, token } = await params;
   if (!isLocale(locale)) notFound();
   const d = getDictionary(locale);
-  return <ProposalSign locale={locale} token={token} copy={{ ...d.secureLink.proposal, assisted: d.portalProposal.assisted, services: d.portalWork.plural.services, stampEstimateReady: d.portalWork.myCare.stamp.estimateReady, estimateBar: d.portalWork.myCare.estimate.bar }} />;
+  return <ProposalSign locale={locale} token={token} copy={{ ...d.secureLink.proposal, assisted: d.portalProposal.assisted, services: d.portalWork.plural.services, stampEstimateReady: d.portalWork.myCare.stamp.estimateReady, estimateBar: d.portalWork.myCare.estimate.bar, price: d.portalProposal.price }} />;
 }

@@ -24,6 +24,26 @@ public enum Permission {
     PATIENT_SELF_SERVICE(false), PATIENT_DECIDE(true), ACCOUNT_BINDING(false),
     /** DEP-3: the patient (or representative) enters the bank's transfer reference for their deposit; evidence, not a decision, so no step-up. */
     DEPOSIT_TRANSFER_REPORT(false),
+    // P1-13 (A-06): incidents are raised by the case team or the patient, owned and resolved by a Care Coordination Manager,
+    // read by managers and Compliance; a CLOSED case is reopened by a manager or the case's Consultant.
+    INCIDENT_REPORT(false), INCIDENT_MANAGE(false), INCIDENT_READ(false), CASE_REOPEN(false),
+    // P1-15 (D-B, D-C): the admission with the hospital. Operations reserves it and records the letter, the cashier receipt and the
+    // admission number; Finance countersigns money evidence with a fresh sign-in; the case team reads the "Admission & money"
+    // panel; the patient (or representative) confirms they have arrived.
+    ADMISSION_READ(false), ADMISSION_MANAGE(false), EVIDENCE_COUNTERSIGN(true), ARRIVAL_REPORT(false),
+    // P1-16 (D-E): treatment evidence. The Consultant (or Operations on their behalf) records milestones and the Consultant
+    // countersigns Operations' with a fresh sign-in; the Consultant proposes change orders and Finance prices them (fresh sign-in).
+    MILESTONE_RECORD(false), MILESTONE_COUNTERSIGN(true), CHANGE_ORDER_PROPOSE(false), CHANGE_ORDER_PRICE(true),
+    // P1-17 (D-F): the Consultant records the discharge pack (and generates the handover letter); Finance reconciles the hospital's
+    // final invoice with a fresh sign-in, a Finance Manager countersigns a variance above the band and settles a facility dispute;
+    // the case team and Finance read the settlement; Finance records the platform e-invoice reference on a statement.
+    DISCHARGE_RECORD(false), RECONCILE(true), RECONCILE_COUNTERSIGN(true), SETTLEMENT_READ(false), STATEMENT_ISSUE(true),
+    // P1-18 (D-G): follow-up. The Consultant keeps the contact schedule and reviews a reported complication; the coordinator records
+    // the day-3/14/30 check-ins; the patient (or representative) answers the day-30/90 outcome questions (no step-up: an answer,
+    // not a decision). The staff follow-up view holds the outcome answers (health data, PDPL): the case's Consultant and coordinator
+    // (the clinical free text only with FOLLOW_UP_RECORD), never Finance or Operations (data minimisation); a reported complication
+    // also reaches the incident's owner and Compliance through the incident (INCIDENT_READ).
+    FOLLOW_UP_RECORD(false), CHECK_IN_RECORD(false), OUTCOME_REPORT(false), FOLLOW_UP_READ(false),
     // consultants, credentials, identity
     CONSULTANT_ONBOARD(true), CREDENTIAL_READ(false), CREDENTIAL_DECIDE(true), PATIENT_IDENTITY_REVIEW(true), PATIENT_IDENTITY_READ(false),
     CLINIC_MANAGE(false), CLINIC_APPROVE(true), CAPABILITY_DECIDE(true),

@@ -1,6 +1,7 @@
 package com.rehletshifaa.casemanagement.application;
 
 import com.rehletshifaa.casemanagement.api.CaseDtos.*;
+import com.rehletshifaa.casemanagement.domain.AgeBand;
 import com.rehletshifaa.casemanagement.domain.MedicalCase;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.shared.api.ApiException;
@@ -32,6 +33,7 @@ public class CaseService {
         UUID patientId = intake.registerPatient(request);
         var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), patientId, request.country(), request.conditionDescription(), request.preferredLanguage(), request.careArea(), now);
         if (Boolean.TRUE.equals(request.travelPackageRequested())) medicalCase.setTravelPackageRequested(true);
+        medicalCase.recordAgeBand(AgeBand.parseOrNull(request.ageBand()), now);
         cases.saveAndFlush(medicalCase); intake.createFoundation(medicalCase,request,submittedBy);
         return new CreateCaseResponse(medicalCase.getId(), medicalCase.getCaseNumber(), medicalCase.getStatus().name(),intakeGrants.issue(medicalCase.getId()));
     }
@@ -47,6 +49,7 @@ public class CaseService {
         if (p.whatsapp() == null) throw new ApiException(409, "MOBILE_REQUIRED", "Add a WhatsApp number to your profile before starting a new case");
         var medicalCase = new MedicalCase(UUID.randomUUID(), numbers.next(), patientId, p.country(), request.conditionDescription(), p.language(), request.careArea(), now);
         if (Boolean.TRUE.equals(request.travelPackageRequested())) medicalCase.setTravelPackageRequested(true);
+        medicalCase.recordAgeBand(AgeBand.parseOrNull(request.ageBand()), now);
         cases.saveAndFlush(medicalCase); intake.createFoundationForExistingPatient(medicalCase, p.language());
         return new CreateCaseResponse(medicalCase.getId(), medicalCase.getCaseNumber(), medicalCase.getStatus().name(),intakeGrants.issue(medicalCase.getId()));
     }

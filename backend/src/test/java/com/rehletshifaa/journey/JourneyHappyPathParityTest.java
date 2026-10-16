@@ -195,7 +195,7 @@ class JourneyHappyPathParityTest {
         fixture.signIn("maker");
         var bound = verification.create(version.definitionId(), version.id(),
                 new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(),
-                        new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology")));
+                        new CreateCaseRequest("MYSELF", "Synthetic", "Fixture", null, null, "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology", null, "AGE_18_64")));
         verification.start(bound.caseId());
         bindDoctor(bound.caseId(), initialConsultant); // provenance only
 
@@ -436,7 +436,7 @@ class JourneyHappyPathParityTest {
 
         var bound = verification.create(commercialVersion.definitionId(), commercialVersion.id(),
                 new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(),
-                        new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology")));
+                        new CreateCaseRequest("MYSELF", "Synthetic", "Fixture", null, null, "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology", null, "AGE_18_64")));
         verification.start(bound.caseId());
         bindDoctor(bound.caseId(), initialConsultant);
 
@@ -547,7 +547,7 @@ class JourneyHappyPathParityTest {
         fixture.signIn("maker");
         var bound = verification.create(version.definitionId(), version.id(),
                 new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(),
-                        new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology")));
+                        new CreateCaseRequest("MYSELF", "Synthetic", "Fixture", null, null, "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology", null, "AGE_18_64")));
         verification.start(bound.caseId());
         bindDoctor(bound.caseId(), initialConsultant);
 
@@ -591,7 +591,7 @@ class JourneyHappyPathParityTest {
         fixture.signIn("maker");
         var bound = verification.create(version.definitionId(), version.id(),
                 new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(),
-                        new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology")));
+                        new CreateCaseRequest("MYSELF", "Synthetic", "Fixture", null, null, "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology", null, "AGE_18_64")));
         verification.start(bound.caseId());
         bindDoctor(bound.caseId(), initialConsultant);
 
@@ -690,7 +690,7 @@ class JourneyHappyPathParityTest {
         fixture.signIn("maker");
         var bound = verification.create(version.definitionId(), version.id(),
                 new JourneyCaseVerificationService.Create(UUID.randomUUID().toString(),
-                        new CreateCaseRequest("Synthetic", "Fixture", "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology")));
+                        new CreateCaseRequest("MYSELF", "Synthetic", "Fixture", null, null, "AE", "+971500000001", "Synthetic verification only", "en", true, null, null, null, "cardiology", null, "AGE_18_64")));
         verification.start(bound.caseId());
         bindDoctor(bound.caseId(), initialConsultant);
 

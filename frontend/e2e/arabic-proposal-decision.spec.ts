@@ -46,7 +46,7 @@ for (const width of [390, 1440]) {
     await expect(page.getByRole("checkbox")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "الإقرار والمتابعة" })).toHaveCount(0);
     // "What happens next" starts with the conversation, not an acknowledgement the page does not offer.
-    await expect(page.locator("ol li").first()).toContainText("يراجع منسّق حالتك الشروط معك بالعربية ويسجّل قرارك.");
+    await expect(page.locator("section[aria-labelledby='next-heading'] ol li").first()).toContainText("يراجع منسّق حالتك الشروط معك بالعربية ويسجّل قرارك.");
     await expect(page.getByText("تُقرّ بهذا التقدير للمتابعة.")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "المراجعة والقرار بالإنجليزية" })).toHaveAttribute("href", `/en/proposal/${TOKEN}`);
     await page.getByRole("button", { name: /منسّقي مراجعة الشروط معي/ }).first().click();

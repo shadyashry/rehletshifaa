@@ -98,9 +98,13 @@ public class ProposalQueryService {
                         i.getUnitPriceEgp(), i.getUnitPrice(), i.getFacilityPackageId(), i.getFacilityPackageId() == null ? null : facilityNames.get(i.getFacilityPackageId())))
                 .toList();
         BigDecimal displayTotal = lines.stream().map(l -> l.displayUnitPrice().multiply(l.quantity())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        // P1-10: Finance deciding a rate re-approval sees the total at the rate that tripped the band beside the frozen one.
+        var reapproval = versions.findAcceptanceTerms(versionId).filter(t -> "PENDING".equals(t.getFxReapprovalStatus()) && t.getFxReapprovalRate() != null).orElse(null);
+        BigDecimal reapprovalRate = reapproval == null ? null : reapproval.getFxReapprovalRate();
+        BigDecimal reapprovalTotal = reapprovalRate == null ? null : displayTotals(versionId, reapprovalRate).expected();
         return new ProposalCommercialView(v.getId(), v.getCurrency(), v.getFxRate(), v.getFxRateDate(), Boolean.TRUE.equals(v.getRequiresFinanceApproval()),
                 v.getPolicyName(), v.getPolicyCareArea(), v.getCommercialPolicyVersion(), v.getMarginRate(), v.getProviderNetEgp(),
-                v.getMarginAmountEgp(), v.getPatientTotalExpectedEgp(), displayTotal, lines);
+                v.getMarginAmountEgp(), v.getPatientTotalExpectedEgp(), displayTotal, lines, reapprovalRate, reapprovalTotal);
     }
 
     /** The patient's totals in the proposal currency: lowest, expected and highest. */

@@ -107,7 +107,7 @@ const PHASES: { key: string; en: string; ar: string; statuses: string[] }[] = [
   { key: "proposal", en: "Proposal", ar: "العرض", statuses: ["PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL", "REVISION_REQUESTED"] },
   { key: "decision", en: "Patient decision", ar: "قرار المريض", statuses: ["PATIENT_DECISION", "DECLINED", "EXPIRED"] },
   { key: "deposit", en: "Coordination deposit", ar: "وديعة التنسيق", statuses: ["ACCEPTED"] },
-  { key: "treatment", en: "Treatment", ar: "العلاج", statuses: ["TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS"] },
+  { key: "treatment", en: "Treatment", ar: "العلاج", statuses: ["TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "ADMISSION_READY", "TREATMENT_IN_PROGRESS"] },
   { key: "followup", en: "Follow-up", ar: "المتابعة", statuses: ["DISCHARGED", "FOLLOW_UP", "CLOSED", "CANCELLED"] },
 ];
 
@@ -151,6 +151,7 @@ const STAGES: Record<string, { en: string; ar: string }> = {
   EXPIRED: { en: "Expired", ar: "منتهي" },
   TRAVEL_COORDINATION: { en: "Treatment coordination", ar: "تنسيق العلاج" },
   ARRIVAL_CONFIRMED: { en: "Arrival confirmed", ar: "تم تأكيد الوصول" },
+  ADMISSION_READY: { en: "Cleared for admission", ar: "جاهز للدخول إلى المستشفى" },
   TREATMENT_IN_PROGRESS: { en: "Treatment in progress", ar: "العلاج جارٍ" },
   DISCHARGED: { en: "Discharged", ar: "تم الخروج" },
   FOLLOW_UP: { en: "Follow-up", ar: "المتابعة" },

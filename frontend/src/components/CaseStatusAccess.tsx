@@ -16,9 +16,13 @@ import { intlLocale, type Locale } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
 import { localeHref } from "@/lib/links";
 import { EmergencyGuidance } from "@/components/EmergencyGuidance";
+import { ChangeOrderDecision, TreatmentStory, type ChangeDecision, type TreatmentCopy } from "@/components/portal/TreatmentStory";
+import { GoingHomeStory, StatementSheet, type GoingHomeCopy, type StatementCopy } from "@/components/portal/GoingHomeStory";
+import { AnsweredBy, FollowUpStory, OutcomeQuestions, type FollowUpCopy } from "@/components/portal/FollowUpStory";
+import type { OutcomeAnswer, PatientDischargeView, PatientFollowUpView, PatientStatement, PatientTreatmentView } from "@/components/portal/portal-model";
 
-/** `channel`: where the backend sends the code (WHATSAPP or EMAIL); this link offers no other. */
-type Summary = { caseNumber: string; destinationHint: string; channel?: string | null };
+/** `channel`: where the backend sends the code (WHATSAPP or EMAIL); this link offers no other. `purpose`: OUTCOME for the follow-up questions' link (P1-18). */
+type Summary = { caseNumber: string; destinationHint: string; channel?: string | null; purpose?: string | null };
 type ActionItem = { id: string; kind: "INFORMATION" | "DOCUMENT"; code: string; label: string; required: boolean; completed: boolean; response: string | null };
 type Action = { taskId: string; title: string; message: string | null; blocking: boolean; dueAt: string | null; items: ActionItem[] };
 /** `documentType` and `releasedAt` come with the backend's `PatientProposalState`: the estimate's stamp date, and which noun the page uses. */
@@ -48,6 +52,12 @@ export type StatusCopy = Dictionary["secureLink"]["status"] & {
 };
 
 type Page = "loading" | "sealed" | "view" | "done" | "invalid";
+/** P1-16: the patient's treatment words (`portalWork.myCare.treatment`) and the decision step's own story. */
+export type LinkTreatmentCopy = TreatmentCopy & { review: { title: string; body: string; next?: string } };
+/** P1-17: the patient's going-home words (`portalWork.myCare.goingHome`) and the statement's (`portalWork.statement`). */
+export type LinkDischargeCopy = { goingHome: GoingHomeCopy; statement: StatementCopy };
+/** P1-18: the patient's follow-up words (`portalWork.myCare.followUp`) and the outcome step's own story. */
+export type LinkFollowUpCopy = { followUp: FollowUpCopy; step: { title: string; body: string; next?: string } };
 
 /**
  * The patient's secure, no-login status page: one page of the case file, sealed until the patient proves the contact.
@@ -57,8 +67,14 @@ type Page = "loading" | "sealed" | "view" | "done" | "invalid";
  * after it, the current page of the file — where the case is (stamped on the three real moments, dated by the backend),
  * whether anything is needed, the journey, and only what this case's coordinator actually asked for.
  */
-export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCopy }: { locale: Locale; token: string;
+export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCopy, treatmentCopy, dischargeCopy, followUpCopy }: { locale: Locale; token: string;
   copy: StatusCopy;
+  /** P1-16: in the treatment phase, the timeline and a change awaiting the patient's decision (absent: the link shows neither). */
+  treatmentCopy?: LinkTreatmentCopy;
+  /** P1-17: after discharge, going home and the statement (absent: the link shows neither). */
+  dischargeCopy?: LinkDischargeCopy;
+  /** P1-18: on an OUTCOME link the questions; in follow-up the next contact and who to turn to (absent: the link shows neither). */
+  followUpCopy?: LinkFollowUpCopy;
   /** A-02: the bilingual emergency instruction (common.emergencyNotice), passed by the page so the client bundle carries no dictionary. */
   emergency?: { title: string; body: string; more?: string };
   /** The journey's words (secureLink.journey), passed by the page for the same reason. */
@@ -80,6 +96,18 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
   const [openError, setOpenError] = useState("");
   // Each successful send starts a fresh code step (the typed code is kept when a resend fails).
   const [codeRound, setCodeRound] = useState(0);
+  /** P1-16: the treatment page read with the verified grant in the treatment phase; null otherwise or when it could not be read. */
+  const [treatment, setTreatment] = useState<PatientTreatmentView | null>(null);
+  /** P1-17: going home and the statements, read with the verified grant once discharged; null / empty otherwise. */
+  const [discharge, setDischarge] = useState<PatientDischargeView | null>(null);
+  const [statements, setStatements] = useState<PatientStatement[]>([]);
+  /** P1-18: the follow-up read with the verified grant on an OUTCOME link or in follow-up; null otherwise. */
+  const [followUp, setFollowUp] = useState<PatientFollowUpView | null>(null);
+  const [answering, setAnswering] = useState(false);
+  const [outcomeError, setOutcomeError] = useState("");
+  const [outcomeSent, setOutcomeSent] = useState("");
+  const [deciding, setDeciding] = useState(false);
+  const [decisionError, setDecisionError] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
   const shownPage = useRef<Page>("loading");
   /** The field to focus once the errors just set are on screen (so it is announced with its error). */
@@ -145,10 +173,49 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
       const access = await post<{ grant: string }>(`/verify`, { code: code.trim() });
       setGrant(access.grant);
       const view = await post<Status>(`/view`, { grant: access.grant });
+      // P1-16: in treatment, what has happened and any change awaiting the patient, on the same verified grant.
+      if (treatmentCopy && view.phase === "treatment") setTreatment(await post<PatientTreatmentView>(`/treatment`, { grant: access.grant }).catch(() => null));
+      // P1-17: after discharge, going home and the statement on the same verified grant (each read on its own; one failing hides only itself).
+      if (dischargeCopy && view.phase === "followup") {
+        const [home, issued] = await Promise.all([post<PatientDischargeView>(`/discharge`, { grant: access.grant }).catch(() => null),
+          post<PatientStatement[]>(`/statements`, { grant: access.grant }).catch(() => [])]);
+        setDischarge(home); setStatements(issued ?? []);
+      }
+      // P1-18: the outcome questions (an OUTCOME link opens on them) and the follow-up, on the same verified grant.
+      if (followUpCopy && (summary?.purpose === "OUTCOME" || view.phase === "followup")) setFollowUp(await post<PatientFollowUpView>(`/follow-up`, { grant: access.grant }).catch(() => null));
       setStatus(view);
       setValues(Object.fromEntries((view.action?.items ?? []).map(item => [item.id, item.response ?? ""])));
       setPhase("view");
     } catch (e) { codeFailure(e); } finally { setBusy(false); }
+  }
+
+  /** P1-16 (D-E): the patient's decision on a change above the band; the verified grant is the fresh proof. */
+  async function decide(orderId: string, decision: ChangeDecision, note: string | null) {
+    if (!treatmentCopy) return;
+    setDeciding(true); setDecisionError("");
+    try { setTreatment(await post<PatientTreatmentView>(`/change-orders/${orderId}/decision`, { grant, decision, note })); }
+    catch (e) {
+      const failure = e as Failure;
+      if (failure.code === "CASE_LINK_INVALID") { setPhase("invalid"); return; }
+      setDecisionError(failure.code === "CHANGE_ORDER_NOT_AWAITING" ? treatmentCopy.errors.notAwaiting
+        : failure.status === 401 || failure.code === "VERIFICATION_REQUIRED" ? treatmentCopy.errors.session : treatmentCopy.errors.failed);
+    } finally { setDeciding(false); }
+  }
+
+  /** P1-18: the outcome answers from the OUTCOME link; the verified grant is the proof, and the sender says who is answering. */
+  async function answer(point: string, answer: OutcomeAnswer, data: FormData) {
+    if (!followUpCopy) return;
+    const w = followUpCopy.followUp.outcome;
+    setAnswering(true); setOutcomeError("");
+    try {
+      setFollowUp(await post<PatientFollowUpView>(`/outcomes/${point}`, { grant, answeredBy: String(data.get("answeredBy") ?? ""), ...answer }));
+      setOutcomeSent(answer.complication ? w.sentComplication : w.sent);
+    } catch (e) {
+      const failure = e as Failure;
+      if (failure.code === "CASE_LINK_INVALID") { setPhase("invalid"); return; }
+      setOutcomeError(failure.code === "OUTCOME_ALREADY_REPORTED" ? w.errors.already : failure.code === "OUTCOME_CLOSED" || failure.code === "OUTCOME_NOT_REQUESTED" ? w.errors.closed
+        : failure.code === "OUTCOME_NOTICE_OUTDATED" ? w.errors.outdated : failure.status === 401 || failure.code === "VERIFICATION_REQUIRED" ? w.errors.session : w.errors.failed);
+    } finally { setAnswering(false); }
   }
 
   /** POSTs to this link's endpoint; a call without a body sends none (request-access takes no channel on this link). */
@@ -322,15 +389,22 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
   const reviewable = proposalState === "READY" && proposal?.action === "REVIEW_PROPOSAL";
   // The page's story: the coordinator's request first; otherwise what the backend says about the estimate (so the page
   // never says "being prepared, or ready" when it knows which); otherwise the phase.
-  const story = status.actionRequired ? null : proposalStory(proposalState, quote, t);
+  // P1-16: a change above the band awaiting the patient is this page's one action, decided here on the verified grant.
+  const awaitingChange = treatment && treatmentCopy && !status.actionRequired ? treatment.changeOrders.find(order => order.id === treatment.awaitingDecisionId) ?? null : null;
+  // P1-18: an OUTCOME link opens on its open question, which is then the page's one action.
+  const outcomePoint = followUpCopy && summary?.purpose === "OUTCOME" && !status.actionRequired ? followUp?.openOutcome ?? null : null;
+  const story = status.actionRequired ? null : outcomePoint ? followUpCopy!.step : awaitingChange ? treatmentCopy!.review : proposalStory(proposalState, quote, t);
   const explain = story ?? phaseExplanation(status.phase, status.actionRequired, journeyCopy);
   const ready = !status.actionRequired && proposalState === "READY";
   const settled = !status.actionRequired && (proposalState === "DECLINED" || proposalState === "EXPIRED");
   // DEP-3: in the deposit phase the payment is the patient's own step (paid in My Care), and this link cannot tell whether it
   // was made: no "nothing needed", no team timing, and one way to My Care.
   const depositStep = !status.actionRequired && !story && status.phase === "deposit";
+  // P1-15: in the treatment phase the patient confirms their arrival and pays the hospital balance against the voucher in
+  // My Care, and this link cannot tell which of those is due: no "nothing needed", and one quiet way to My Care.
+  const admissionStep = !status.actionRequired && !story && status.phase === "treatment";
   // P1-6 (D-02): while the team has the step, how long it usually takes and what the patient can do meanwhile.
-  const teamStep = !status.actionRequired && !ready && !depositStep;
+  const teamStep = !status.actionRequired && !ready && !depositStep && !admissionStep && !awaitingChange && !outcomePoint && !outcomeSent;
   const usually = teamStep && !settled && status.expectedWorkingDays ? t.usuallyWithin.replace("{duration}", plural(locale, status.expectedWorkingDays, t.workingDays)) : null;
   const meanwhile = teamStep && !settled ? phaseMeanwhile(status.phase, false, journeyCopy) : null;
   // The estimate in one line where it is not the page's own story: acknowledged (any phase), or decided while the
@@ -367,6 +441,7 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
           {proposalError}
         </>}
         {depositStep && <a className="btn-primary mt-6 w-full sm:w-auto" href={`${localeHref(locale, "portal")}?signin=1`}>{journeyCopy.payInMyCare}</a>}
+        {admissionStep && <a className="btn-secondary mt-6 w-full sm:w-auto" href={`${localeHref(locale, "portal")}?signin=1`}>{journeyCopy.inMyCare}</a>}
         {teamStep && (
           <p className="mt-5 flex items-center gap-2.5 text-[0.9375rem] font-semibold text-brand-800">
             <span aria-hidden className="grid h-6 w-6 flex-none place-items-center rounded-full bg-brand-100 text-brand-700"><Check size={14} strokeWidth={3}/></span>
@@ -376,6 +451,40 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
 
         {/* Everything below the page's opening sits under the stamp's corner, so it takes the page's full width back. */}
         <div className="dossier-page-full">
+        {outcomePoint && followUpCopy && (
+          <div className="mt-6">
+            <OutcomeQuestions copy={followUpCopy.followUp.outcome} point={outcomePoint} busy={answering} error={outcomeError || null}
+                              checkChildren={data => data.get("answeredBy") ? null : followUpCopy.followUp.outcome.errors.who}
+                              onSend={(answers, data) => answer(outcomePoint, answers, data)}>
+              <AnsweredBy copy={followUpCopy.followUp.outcome.answeredBy}/>
+            </OutcomeQuestions>
+          </div>
+        )}
+        {outcomeSent && <p role="status" className="mt-5 max-w-[65ch] text-[0.9375rem] font-semibold text-brand-800">{outcomeSent}</p>}
+        {followUp?.active && followUpCopy && !outcomePoint && (
+          <div className="mt-5 border-t border-line pt-4">
+            <FollowUpStory locale={locale} copy={followUpCopy.followUp} view={followUp}/>
+          </div>
+        )}
+        {treatment && treatmentCopy && (treatment.timeline.length > 0 || treatment.changeOrders.length > 0) && (
+          <div className="mt-5 border-t border-line pt-4">
+            <TreatmentStory locale={locale} copy={treatmentCopy} view={treatment} decision={awaitingChange && (
+              <ChangeOrderDecision key={awaitingChange.id} locale={locale} copy={treatmentCopy} order={awaitingChange} busy={deciding} error={decisionError || null}
+                                   onDecide={(decision, note) => decide(awaitingChange.id, decision, note)}/>
+            )}/>
+          </div>
+        )}
+        {discharge?.discharged && dischargeCopy && (
+          <div className="mt-5 border-t border-line pt-4">
+            <h2 className="mb-3 text-[1rem] font-bold text-brand-900">{dischargeCopy.goingHome.title}</h2>
+            <GoingHomeStory locale={locale} copy={dischargeCopy.goingHome} view={discharge}/>
+          </div>
+        )}
+        {statements.length > 0 && dischargeCopy && (
+          <div className="mt-5 space-y-5 border-t border-line pt-4">
+            {statements.map(s => <StatementSheet key={s.id} locale={locale} copy={dischargeCopy.statement} statement={s}/>)}
+          </div>
+        )}
         {proposalNote && <p id="status-proposal" className="mt-5 border-t border-line pt-4 text-[0.9375rem] leading-7 text-ink-600">{proposalNote}</p>}
         {/* A decidable estimate while the coordinator is also asking for something: still reachable, but the form below
             keeps the page's one filled action. */}

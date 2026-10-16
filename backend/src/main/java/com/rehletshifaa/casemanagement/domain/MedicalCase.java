@@ -37,6 +37,8 @@ public class MedicalCase extends AssignedIdEntity {
     @Column(name="waiting_reason_code", length=120) private String waitingReasonCode;
     @Column(name="waiting_since") private Instant waitingSince;
     @Enumerated(EnumType.STRING) @Column(nullable=false, length=20) private CaseUrgency urgency;
+    /** P1-13 (A-05): the patient's age band as stated at intake or recorded in intake review; null = not stated. */
+    @Enumerated(EnumType.STRING) @Column(name="age_band", length=20) private AgeBand ageBand;
 
     protected MedicalCase() {}
     /**
@@ -61,6 +63,9 @@ public class MedicalCase extends AssignedIdEntity {
     public boolean isTravelPackageRequested() { return travelPackageRequested; }
     public void setTravelPackageRequested(boolean value) { this.travelPackageRequested = value; }
     public CaseUrgency getUrgency() { return urgency; }
+    public AgeBand getAgeBand() { return ageBand; }
+    /** Intake states it; a coordinator corrects it in intake review (audited by the caller). Not a case revision, like urgency. */
+    public void recordAgeBand(AgeBand band, Instant now) { this.ageBand = band; this.updatedAt = micros(now); }
     /**
      * The coordinator's urgency judgement. Bookkeeping like the waiting-on marker, not a case revision: it never bumps
      * {@code version}, so a coordinator raising urgency never invalidates someone else's open form.

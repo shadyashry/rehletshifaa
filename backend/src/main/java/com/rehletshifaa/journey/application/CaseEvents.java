@@ -30,6 +30,41 @@ public final class CaseEvents {
     /** A step only the patient could complete (profile, contact, consents, onboarding) just changed. */
     public record PatientReadinessChanged(UUID caseId) {}
 
+    /** P1-15: the patient accepted a final treatment quote; the admission voucher is issued against it when the letter is checked. */
+    public record FinalQuoteAccepted(UUID caseId, UUID versionId) {}
+
+    /**
+     * P1-15: something the admission gate reads changed (a voucher issued, a receipt countersigned, the fee balance received,
+     * procedure consent captured, an emergency override): the handoff tries ARRIVAL_CONFIRMED to ADMISSION_READY under the policy.
+     */
+    public record AdmissionEvidenceChanged(UUID caseId) {}
+
+    /**
+     * P1-16: the treatment episode moved the case into TREATMENT_IN_PROGRESS (the Consultant, with the hospital's admission
+     * number). {@link TreatmentMilestoneService} records the {@code ADMITTED} milestone and starts the Consultant's milestone clock.
+     */
+    public record TreatmentStarted(UUID caseId, String subject) {}
+
+    /**
+     * P1-17: evidence the discharge gate or the settlement gate reads changed (a pack item, the follow-up plan, the final invoice,
+     * a countersigned milestone or interim bill, a settled change order, the settled reconciliation). {@link DischargeService} tries
+     * TREATMENT_IN_PROGRESS -> DISCHARGED and then DISCHARGED -> FOLLOW_UP, each only when its gate passes. Synchronous: it runs
+     * inside the publisher's transaction.
+     */
+    public record DischargeEvidenceChanged(UUID caseId) {}
+
+    /**
+     * P1-18: the case just moved TREATMENT_IN_PROGRESS -> DISCHARGED. {@link FollowUpService} opens the follow-up window (D-G) and
+     * schedules the plan's first contact. Synchronous, inside the move's transaction.
+     */
+    public record PatientDischarged(UUID caseId) {}
+
+    /**
+     * P1-18: the case just closed (its follow-up completed, or no follow-up needed). The settlement module issues the CLOSURE
+     * statement and {@link FollowUpService} asks the patient for a review. Synchronous, inside the exit's transaction.
+     */
+    public record CaseClosed(UUID caseId) {}
+
     /**
      * Work, an assignment, the proposal's sign-offs or who has the ball changed on the case: the stage's own steps are
      * re-derived ({@link CaseActionService#syncStageWork}) so every step someone owes is in their My work (QA A3).

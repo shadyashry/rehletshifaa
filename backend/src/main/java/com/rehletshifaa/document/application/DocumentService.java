@@ -17,18 +17,22 @@ public class DocumentService {
     private final MedicalDocumentRepository documents; private final CaseService cases; private final CaseIntakeGrantService intakeGrants; private final StoragePort storage; private final DocumentInspectionPort inspector; private final Clock clock; private final long maxBytes; private final long maxCaseBytes; private final int maxFilesPerCase; private final Set<String> allowedTypes;
     public DocumentService(MedicalDocumentRepository documents, CaseService cases, CaseIntakeGrantService intakeGrants, StoragePort storage, DocumentInspectionPort inspector, Clock clock, @Value("${app.storage.max-bytes}") long maxBytes, @Value("${app.storage.max-case-bytes}") long maxCaseBytes, @Value("${app.storage.max-files-per-case}") int maxFilesPerCase, @Value("${app.storage.allowed-types}") String allowedTypes) { this.documents=documents; this.cases=cases; this.intakeGrants=intakeGrants;this.storage=storage;this.inspector=inspector;this.clock=clock;this.maxBytes=maxBytes;this.maxCaseBytes=maxCaseBytes;this.maxFilesPerCase=maxFilesPerCase;this.allowedTypes=Set.of(allowedTypes.split(",")); }
     @Transactional public PresignResponse presign(UUID caseId, PresignRequest request) {
-        return presignForCase(cases.findDraft(caseId),caseId,request);
+        return presignForCase(cases.findDraft(caseId),caseId,request,INTAKE);
     }
+    /** Who added a document when no signed-in account did: the channel it came through ({@link MedicalDocument#getUploadedBy}). */
+    public static final String INTAKE="INTAKE", SECURE_LINK="SECURE_LINK", WHATSAPP="WHATSAPP";
     @Transactional public PresignResponse presignIntake(UUID caseId,String grant,PresignRequest request){intakeGrants.require(caseId,grant);return presign(caseId,request);}
-    @Transactional public PresignResponse presignAdditional(UUID caseId, PresignRequest request) {
+    @Transactional public PresignResponse presignAdditional(UUID caseId, PresignRequest request) { return presignAdditional(caseId,request,SECURE_LINK); }
+    /** As above, recording who uploads: a signed-in account's subject, or a channel. */
+    @Transactional public PresignResponse presignAdditional(UUID caseId, PresignRequest request, String uploader) {
         var medicalCase=cases.findById(caseId); if(medicalCase.getStatus()==com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT)throw new ApiException(409,"CASE_NOT_SUBMITTED","Additional documents require a submitted case");
-        return presignForCase(medicalCase,caseId,request);
+        return presignForCase(medicalCase,caseId,request,uploader);
     }
-    private PresignResponse presignForCase(com.rehletshifaa.casemanagement.domain.MedicalCase medicalCase,UUID caseId,PresignRequest request){validate(request.contentType(), request.sizeBytes()); validateQuota(caseId,request.sizeBytes());
+    private PresignResponse presignForCase(com.rehletshifaa.casemanagement.domain.MedicalCase medicalCase,UUID caseId,PresignRequest request,String uploader){validate(request.contentType(), request.sizeBytes()); validateQuota(caseId,request.sizeBytes());
         UUID documentId=UUID.randomUUID(); String extension=extensionFor(request.contentType()); LocalDate date=LocalDate.now(clock);
         String objectKey="medical/%d/%02d/%s".formatted(date.getYear(), date.getMonthValue(), UUID.randomUUID());
         String safeName=documentId+extension; String original=sanitizeFileName(request.originalFileName());
-        var document=new MedicalDocument(documentId, medicalCase, objectKey, original, safeName, request.contentType(), request.sizeBytes(), clock.instant()); documents.save(document);
+        var document=new MedicalDocument(documentId, medicalCase, objectKey, original, safeName, request.contentType(), request.sizeBytes(), clock.instant()).uploadedBy(uploader); documents.save(document);
         var upload=storage.presign(objectKey, request.contentType(), request.sizeBytes()); return new PresignResponse(documentId, upload.url(), upload.requiredHeaders(), upload.expiresInSeconds());
     }
     @Transactional(noRollbackFor=ApiException.class) public ConfirmResponse confirm(UUID caseId, ConfirmRequest request) {
@@ -39,14 +43,47 @@ public class DocumentService {
     private ConfirmResponse confirmForCase(UUID caseId,ConfirmRequest request){var document=documents.findByIdAndMedicalCaseId(request.documentId(), caseId).orElseThrow(() -> new ApiException(404,"DOCUMENT_NOT_FOUND","Document was not found"));
         if (document.getStatus()==DocumentStatus.CLEAN) return new ConfirmResponse(document.getId(),document.getStatus().name()); // a retry after a lost response
         if (document.getStatus()!=DocumentStatus.PENDING) throw new ApiException(409,"DOCUMENT_NOT_PENDING","Document cannot be confirmed in its current state");
+        inspectStored(document); return new ConfirmResponse(document.getId(),document.getStatus().name());
+    }
+
+    /** What {@link #recheckStale} did with one upload nobody finished confirming. */
+    public enum Recheck { CLEAN, CONDEMNED, NEVER_ARRIVED, STILL_UNAVAILABLE, SKIPPED }
+    /** The outcome, the case it concerns and who uploaded the file (null when the document is gone or predates V98). */
+    public record Rechecked(Recheck outcome, UUID caseId, String uploadedBy) {}
+
+    /**
+     * The sweeper's second look at an upload left unconfirmed (PENDING: never confirmed, or the scanner had no verdict) or
+     * stuck mid-scan (QUARANTINED: the process or the storage stopped after quarantine). Bytes in storage get the confirm's
+     * own checks and scan; no bytes after the presign has expired means the upload never arrived, so the row is rejected and
+     * stops counting against the case's limits. No verdict, or storage down, leaves it for the next run. A row someone
+     * confirmed meanwhile is skipped; a concurrent confirm loses on the row version, never both.
+     */
+    @Transactional(noRollbackFor=ApiException.class) public Rechecked recheckStale(UUID documentId){
+        var document=documents.findById(documentId).orElse(null);
+        if(document==null)return new Rechecked(Recheck.SKIPPED,null,null);
+        UUID caseId=document.getMedicalCase().getId(); String uploader=document.getUploadedBy();
+        if(document.getStatus()==DocumentStatus.QUARANTINED)document.scanDeferred();
+        if(document.getStatus()!=DocumentStatus.PENDING)return new Rechecked(Recheck.SKIPPED,caseId,uploader);
+        try{inspectStored(document);return new Rechecked(Recheck.CLEAN,caseId,uploader);}
+        catch(ApiException e){return new Rechecked(switch(e.code()){
+            case "UPLOAD_NOT_FOUND"->{document.reject();documents.save(document);yield Recheck.NEVER_ARRIVED;}
+            case "DOCUMENT_SCAN_UNAVAILABLE","STORAGE_UNAVAILABLE"->Recheck.STILL_UNAVAILABLE;
+            default->Recheck.CONDEMNED;},caseId,uploader);}
+    }
+
+    /** Checks the stored bytes against the presign and scans them; leaves the document CLEAN or throws why it is not. */
+    private void inspectStored(MedicalDocument document){
         StoragePort.StoredObject stored=storage.verify(document.getObjectKey());
         if (stored.sizeBytes()!=document.getSizeBytes() || !document.getContentType().equalsIgnoreCase(stored.contentType())) { document.reject(); documents.save(document); storage.delete(document.getObjectKey()); throw new ApiException(422,"DOCUMENT_METADATA_MISMATCH","Uploaded document metadata does not match the request"); }
         document.quarantine(clock.instant()); documents.saveAndFlush(document);
-        var result=inspector.inspect(storage.read(document.getObjectKey(),maxBytes),document.getContentType());
+        byte[] content;
+        // Storage gone between quarantine and read: no verdict either, so back to unconfirmed rather than stuck in quarantine.
+        try{content=storage.read(document.getObjectKey(),maxBytes);}catch(ApiException e){if("STORAGE_UNAVAILABLE".equals(e.code())){document.scanDeferred();documents.save(document);}throw e;}
+        var result=inspector.inspect(content,document.getContentType());
         // No verdict is not a verdict: keep the upload, keep it unusable, and let the same confirm be retried.
         if(result.retryable()){document.scanDeferred();documents.save(document);throw new ApiException(503,"DOCUMENT_SCAN_UNAVAILABLE","Document security inspection is temporarily unavailable; retry shortly");}
         if(!result.clean()){document.scanFailed();documents.save(document);storage.delete(document.getObjectKey());throw new ApiException(422,"DOCUMENT_INSPECTION_FAILED","Uploaded document did not pass security inspection");}
-        storage.markClean(document.getObjectKey());document.markClean();documents.save(document);return new ConfirmResponse(document.getId(),document.getStatus().name());
+        storage.markClean(document.getObjectKey());document.markClean();documents.save(document);
     }
     /** A file that arrived on a patient channel (WhatsApp): the case document it became, or why there is none. */
     public record ChannelFile(UUID documentId, String status) {}
@@ -67,7 +104,7 @@ public class DocumentService {
         UUID documentId = UUID.randomUUID(); LocalDate date = LocalDate.now(clock);
         String objectKey = "medical/%d/%02d/%s".formatted(date.getYear(), date.getMonthValue(), UUID.randomUUID());
         String original = sanitizeFileName(originalFileName == null || originalFileName.isBlank() ? "whatsapp" + extensionFor(type) : originalFileName);
-        var document = new MedicalDocument(documentId, cases.findById(caseId), objectKey, original, documentId + extensionFor(type), type, content.length, clock.instant());
+        var document = new MedicalDocument(documentId, cases.findById(caseId), objectKey, original, documentId + extensionFor(type), type, content.length, clock.instant()).uploadedBy(WHATSAPP);
         storage.seal(objectKey, content, type); storage.markClean(objectKey);
         document.quarantine(clock.instant()); document.markClean(); documents.save(document);
         return new ChannelFile(documentId, "CLEAN");
@@ -101,7 +138,7 @@ public class DocumentService {
         try { validateQuota(caseId, sizeBytes); } catch (ApiException e) { return null; }
         UUID documentId = UUID.randomUUID();
         var document = new MedicalDocument(documentId, cases.findById(caseId), objectKey, sanitizeFileName(fileName), documentId + extensionFor(contentType),
-                contentType, sizeBytes, clock.instant());
+                contentType, sizeBytes, clock.instant()).uploadedBy(WHATSAPP);
         document.quarantine(clock.instant()); document.markClean(); documents.save(document);
         return documentId;
     }

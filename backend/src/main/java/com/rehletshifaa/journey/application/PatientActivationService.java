@@ -293,8 +293,16 @@ public class PatientActivationService {
     }
     /** Deposit-terms consent names the terms version the patient was shown; the other consents stay on v1. */
     static String consentPolicyVersion(String type) {
+        if ("GUARDIAN_AUTHORIZATION".equals(type)) return GUARDIAN_CONSENT_VERSION;
         return "DEPOSIT_CANCELLATION_TERMS".equals(type) ? PaymentService.DEPOSIT_TERMS_VERSION : "v1";
     }
+    /**
+     * P1-13: the guardian consent is a PLACEHOLDER. Its wording is reviewed by counsel (and a native Arabic reader) before
+     * launch; the version says so, so every consent recorded against it can be found and re-asked when the final text ships.
+     * The same words live under {@code guardianConsent.text} in the frontend message files.
+     */
+    static final String GUARDIAN_CONSENT_VERSION = "guardian-v0-placeholder";
+
     private static String consentText(String type, String language) {
         boolean ar = "ar".equals(language);
         return switch (type) {
@@ -312,6 +320,8 @@ public class PatientActivationService {
                     : "I consent to remote consultation where clinically appropriate.";
             case "REPRESENTATIVE_AUTHORIZATION" -> ar ? "أقر بتفويض الممثل للتصرف نيابة عن المريض في تنسيق الرعاية."
                     : "I confirm the representative is authorized to act for the patient in coordinating care.";
+            case "GUARDIAN_AUTHORIZATION" -> ar ? "أقر بأنني أحد والدي المريض أو وصيه القانوني، وأن المستند الذي قدمته صحيح، وأوافق نيابة عن المريض على تنسيق رعايته. (نص مبدئي قيد المراجعة القانونية)"
+                    : "I confirm I am the patient's parent or legal guardian, that the document I provided is genuine, and that I consent on the patient's behalf to coordinating their care. (Placeholder text pending legal review.)";
             default -> ar ? "موافقة على التسجيل." : "Onboarding consent.";
         };
     }

@@ -25,6 +25,7 @@ public class SecurityConfig {
         // P0-5: the facility directory behind the pickers; REFERENCE_DATA_READ is decided per call.
         .requestMatchers("/api/v1/facilities/**").authenticated()
         .requestMatchers("/api/v1/tasks/**","/api/v1/work/**","/api/v1/notifications/**","/api/v1/notifications").authenticated()
+        .requestMatchers("/api/v1/incidents","/api/v1/incidents/**").authenticated()
         .requestMatchers("/api/v1/admin/journeys/**","/api/v1/admin/journeys").authenticated()
         .requestMatchers(HttpMethod.GET,"/api/v1/admin/journey-cutover","/api/v1/admin/journey-cutover/**").authenticated()
         .requestMatchers("/api/v1/admin/coordination/**").authenticated()

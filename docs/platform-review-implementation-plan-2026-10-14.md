@@ -673,6 +673,46 @@ phases.
   nightly Keycloak realm export; a `scripts/restore-drill.sh` that restores to a scratch stack and runs the smoke
   suite; RTO/RPO written into `docs/deployment.md`.
 - Sessions: 1–2. Model: Opus 5.5 fast, medium.
+- **Status (2026-10-15, session 1 of 1, Opus 5.5; committed on `claude/amazing-jepsen-cb80d9`, cut from `claude/guardian-upload` at
+  `9d0309b`):** delivered, scripts and docs only (no Java, no migration; V98 stays the newest, V99 the next free). The production host is
+  not decided in the docs, so the settings are written host-neutral with **AWS RDS/S3 as the worked example**; the runbook is the new
+  `docs/disaster-recovery.md`, the targets and the drill table are in `docs/deployment.md` ("Recovery objectives").
+  - Delivered: **PITR** `scripts/dr/aws-rds-pitr.sh` (`configure`: 35-day automated backups, the log shipped every 5 min, backup window
+    00:30–01:30 UTC, deletion protection, automated backups + logs replicated to a second region for 14 days with its own KMS key;
+    `status`: latest restorable time; `restore`: always to a new private instance) and the same settings for self-managed PostgreSQL
+    (pgBackRest/WAL-G, `archive_timeout = 300`). **Object storage** `scripts/dr/aws-s3-versioning-replication.sh` +
+    `infrastructure/s3-replication.example.json` (new; RTC 15 min, delete markers not replicated, SSE-KMS replica key) +
+    `infrastructure/s3-lifecycle.example.json` (noncurrent versions kept 35 days = the PITR window, expired delete markers removed):
+    `configure`, `versions KEY`, `recover KEY` (deleted: remove the delete marker; overwritten: copy `--version-id` over as a new version),
+    each step with its `mc` equivalent; the app role still has no `s3:DeleteObjectVersion`. **Realm export**
+    `infrastructure/keycloak/export-realm.sh` (admin partial export: realm, clients, roles, groups, flows; secrets and key material masked by
+    Keycloak; refuses a file with a person's account, a stored credential or an unmasked secret; only client service accounts pass) and
+    the opt-in overlay `docker-compose.backup.yml` (`keycloak-realm-export`, extends `keycloak-sync` so no credential is repeated; nightly
+    02:00 UTC, 30 kept in `backups/keycloak-realm/`, `EXPORT_ONCE=true` for one run). Users and second factors are recovered with Keycloak's
+    database (PITR), never from a file. **Backup set** `scripts/backup-set.sh` (read-only on the source: pg_dump, the realm export, a bucket
+    copy, row counts per table via `scripts/restore-drill/table-counts.sql`, `MANIFEST`, `SHA256SUMS`; containers found by Compose labels,
+    credentials only from the containers' own environment). **Drill** `scripts/restore-drill.sh <set>` into `scripts/restore-drill/compose.yml`
+    (project `rehletshifaa-restore-drill`, loopback ports 15432/18180/19000/18080, own volumes, a scratch Mailpit for the mail health check,
+    every credential generated per run, default Spring profile so no demo seeder, notifications off; `down -v` of that project only):
+    checksums → infrastructure → `pg_restore` with every table's row count compared → realm import, `staff-identity-admin` re-keyed, a
+    scratch-only `restore-drill` client (client credentials, API audience; the scratch backend allows it as a presenter) → objects restored
+    into a versioned bucket, every checksum compared → backend from this checkout → smoke: readiness and health UP, Flyway at the
+    checkout's newest (V98) with 0 failed, `/api/v1/me` 401 without a token and 200 with a restored-realm token → overwrite-then-delete
+    recovery of a canary object from its versions; a timed Markdown report in `backups/drill-reports/`. `/backups/` is git-ignored.
+  - Drill, run for real (2026-10-15, Docker Desktop on Windows 11, set taken from the running dev stack, which was only read): **PASS,
+    restore time 135 s** (realm import 71 s, mostly Keycloak start; backend start 40 s; image build 3 s cached, reported apart): 136 tables
+    / 798 rows equal, 7 bound + 3 custom flows and every client back, Flyway V96 → V98, `/api/v1/me` 401/200, canary recovered (4 versions).
+    The dev bucket held **0 objects**, so the object path was also run with a synthetic copy of the set (3 added files, labelled in its
+    `MANIFEST`): PASS, 122 s, 3 checksums equal. `keycloak-realm-export` ran once in the dev project (`run --rm --no-deps`): export written,
+    checksum OK; no dev service was recreated. Keycloak 26 does not recreate the unused built-in `saml ecp` flow on import, so the drill
+    compares bound and custom flows, not the total. The `scripts/dr/` scripts were dry-run only (no AWS account here).
+  - Tests and numbers: backend `mvn -o -q test` (JVM in UTC) 887 tests, 0 failures, 3 skips (unchanged: no Java in this phase); `bash -n` on every new script.
+  - Open gaps: the **production drill** (managed-host PITR restore time, region failover, the PII keys from the secret store) must add its
+    row to `docs/deployment.md` before real patient data; a host decision (then fill the settings table for it); the Oracle option's
+    `backup.sh` is a 24 h RPO and does not meet the target alone; sealed-evidence Object Lock waits for the evidence ledger (P1-15/16);
+    an alert on backup age / replication lag (Alertmanager route is a P1-8 follow-up); the drill as a scheduled quarterly job.
+  - Next exact action: owner fast-forwards `feat/review-p0` (after `claude/guardian-upload`) to this commit; optionally starts the nightly
+    export (`... -f docker-compose.backup.yml up -d --no-deps keycloak-realm-export`). Then P1-15 once D-B, D-C, D-D are decided.
 
 ### P1-10  Commercial truth on the proposal  (B-03, A-08, B-05, D-01)
 - "How your price works" three-step panel and the no-surprise guarantee text (counsel-approved) on the proposal and
@@ -777,6 +817,54 @@ phases.
     session (Sonnet 5.5 for copy/UI, per the UX plan): the three-step "How your price works" panel and the guarantee placeholder on
     `ProposalSign.tsx` and the homepage (EN/AR, one key each, logical CSS, WCAG 2.2 AA), the fee line's patient wording, the
     cooling-period and FX-pause states, and the minimum Finance UI for the FX re-approval item. V97 is the next free Flyway version.
+- **Status (2026-10-15, session 2 of 2, Sonnet 5.5 as the plan names it; committed on `claude/p1-10-s2-ui-bf8b61`, cut from `feat/review-p0` at
+  b4ab584, so the owner fast-forwards `feat/review-p0` to this commit):** the patient-facing and Finance UI and the copy are delivered; the only backend change is
+  two read-only fields on Finance's commercial view (below), no migration (V97 is still the next free Flyway version). The backend and the frontend need a rebuild of the dev stack
+  (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`).
+  - Delivered: **Fee line wording.** A `PLATFORM_FEE` item (`lib/price-transparency.ts` `isPlatformFee`) is worded from `portalProposal.price.feeLabel` /
+    `feeNote` ("Coordination and guarantee fee", what it covers) on the public proposal (`ProposalSign.tsx`: after the medical lines, not grouped under a raw
+    category, not counted as a service), the signed-in proposal (`PatientProposal.tsx`), the staff proposal card, and Finance's approval table (tagged "Platform
+    fee"). **"How your price works"** (`components/PriceTransparency.tsx` `HowYourPriceWorks`): three numbered steps (specialist reviews and gives a range;
+    Consultant examines you, final quote only then; your protection = the guarantee), on the estimate in `ProposalSign.tsx` and on the home page
+    (`home/PriceSection.tsx`, between Trust and Travel, no action of its own); My Care's proposal drawer shows the guarantee paragraph under the items instead
+    of the panel (narrow surface). **Guarantee:** one key per language, `portalProposal.price.guarantee` (EN = the binding placeholder from this entry; AR
+    is a draft, **pending native review and counsel**); no refund promise. **Final-quote states:** the Consultant's reason in a prominent block before the
+    recommendation (`ScopeChangeNotice`); the cooling period as a calm note with the opening time in the viewer's locale and timezone, accept disabled
+    (`aria-describedby` the note) and re-enabled by a timer when the time passes, request changes and decline never held; Finance checking the rate as
+    "you do not need to do anything" with accept disabled. Both 409 codes (`COOLING_PERIOD`, `FX_REAPPROVAL_REQUIRED`) are explained in place on the
+    **secure-link** path (`ProposalSign.decide`; any other 409 stays "newer version") and on the **signed-in** path: `Portal.api` now carries the
+    backend `code` on its error, `mutate` keeps the four proposal codes out of the page banner, only on the two requests whose form or note explains them (the patient's decision, the coordinator's final-quote creation; a decision recorded on the patient's behalf still shows the banner), and exposes them as `FeedbackContext.errorCode` +
+    `errorPath`, and `PatientProposal`/`PatientProposalDecision` answer with the same notes (never "your decision was not sent"). **Finance UI:**
+    `portal/FxReapproval.tsx` on Finance's case page when the version's `fxReapprovalStatus` is PENDING: the frozen total and rate, "Keep the frozen rate"
+    and "Re-release at today's rate", each behind a `ConfirmDialog`, POSTing to the two Finance endpoints; the coordinator's proposal card says Finance is
+    checking and, in the cooling period, when the patient can accept. Work titles `FX_REAPPROVAL` and `FINAL_QUOTE_EXPIRED` added to `portalWork.workTitles`
+    (en, ar). **Coordinator final-quote form:** optional "Valid until" date (hint "Leave empty for 14 days from sending; you can only shorten it."), no
+    `validUntil` sent when empty (end of the chosen day otherwise), `SCOPE_CHANGE_REASON_REQUIRED` shown under the reason field and `QUOTE_VALIDITY_TOO_LONG`
+    under the date (focus moves there). **Control Center › Margin & Deposit:** "Final quote validity (days)" and "Exchange-rate tolerance (%)" shown on the
+    active version, prefilled in the revision form, in the confirmation, and sent with every margin revision (`finalQuoteValidityDays`, `fxToleranceRate`).
+  - Tests and numbers: new `PriceTransparency.test.tsx` (21: fee label en and ar on the public and signed-in pages, the three steps and guarantee from the
+    keys in en and ar and on the home page, no refund wording, scope-change block before the recommendation, cooling hides accept and shows the time,
+    passed cooling re-enables accept, FX pending, both 409 codes on the secure link, any other 409 still "newer version", the signed-in cooling/FX
+    notes and the refusal contract) and `portal/FinalQuotePricing.test.tsx` (8: both Finance confirmations call exactly their endpoint, cancelling sends
+    nothing, Arabic, the coordinator form sends no `validUntil` when empty and the chosen date otherwise, both field errors). `PageHeaders.test.tsx` updated
+    (the margin body now carries the two fields) plus one new test (prefilled, confirmed, sent). Verification: `pnpm typecheck` clean; eslint clean on every
+    touched file; `vitest run` 69 files / 505 tests green; backend `mvn -o -q test` (JVM in UTC) 853 tests, 0 failures, 3 skips, ArchitectureRulesTest green; Playwright (production build) on a11y, home-quality, home-visual, pre8c-commercial-copy,
+    proposal-responsive, arabic-proposal-decision, proposal-otp, my-care (+ my-care-new-case, my-care-polish, final-quote-holds): green. The first run had 8 failures: 6 in `my-care.spec.ts`, stale since DEP-3 (they expected a "Deposit arrangements" step My Care no longer renders; fixture and strings updated), and 2 Arabic-decision specs my price panel broke by being the first `ol li` on the page (locator scoped to "What happens next"). Checked in the browser pane with a throwaway harness (not committed): the
+    estimate in en and ar (RTL: step numbers at the start, amounts at the end, fee row), the cooling note with its time and the disabled accept, the
+    Arabic rate-check note, and the Arabic home section.
+  - Closed after the first review: Finance's panel now also shows the total and rate at today's rate and the difference
+    (`ProposalCommercialView.fxReapprovalRate` / `fxReapprovalTotal`, filled only while the re-approval is PENDING, from the rate stored when the patient
+    tried to accept; `FinalQuoteRulesTest` asserts both and that they clear on confirmation); the signed-in refusal wiring is proved through the real `Portal` in
+    `e2e/final-quote-holds.spec.ts` (cooling note, both refusals, no banner); the six stale `my-care.spec.ts` failures are repaired (the fixture's default step is
+    now DEP-3's "We're checking your payment" with a submitted transfer).
+  - Open gaps: the Arabic guarantee and every new Arabic string are drafts, pending native review (UX plan area X) and counsel (the English is the
+    owner's placeholder). Not built: the Finance-side
+    notification copy codes beyond the two work titles, a coordinator-facing control for `FINAL_QUOTE_EXPIRED` (it opens a normal item), the
+    scope-change reason on the Consultant's final assessment (still entered by the coordinator, as session 1 noted), the guarantee on the final quote
+    (a final quote is past the promise; it shows the reason and the hold instead). Final look is the UX plan's (areas 1 and 4), this is the faithful minimum.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit and rebuilds the frontend of the dev stack; walk it once live (release a final
+    quote above the estimate's maximum, confirm the cooling note and disabled accept in My Care and on the secure link, move the rate beyond 3% and
+    decide as Finance); counsel and a native reviewer read the guarantee and the new Arabic. Then P1-13.
 
 ### P1-11  Split `JourneyService`  (E-06)
 - Extract `ConsultantAssignmentService`, `ClinicalReviewService`, `ProposalService` (create / release / decide /
@@ -798,6 +886,141 @@ phases.
   `incidents` (COMPLAINT / DISPUTE / ADVERSE_EVENT / DEATH, severity, owner, resolution) visible to Compliance;
   complaint intake from My Care routed to the Care Coordination Manager; `REOPEN` from `CLOSED` into `FOLLOW_UP`.
 - Sessions: 2. Model: Opus 5.5 fast, medium (guardian consent reviewed by Fable).
+- **Status (2026-10-15, session 1 of 2 = backend, Sonnet 5.5 stood in for Opus 5.5; committed on `claude/p1-13-guardians-23a6cb`, cut from
+  `claude/p1-10-s2-ui-bf8b61` at 67b56ce, so the owner fast-forwards `feat/review-p0` to this commit):** the model, the rules, the endpoints and
+  the tests are delivered; no screen. The model, its rules and the hooks for P1-16 and P1-18 are written down in
+  `docs/incidents-guardians-reopen-model.md`. Flyway **V97** (`V97__guardians_incidents_reopen.sql`) is now used: the next free version is V98 (the
+  `V95…V100` file names in the P1-15…P1-19 entries below are already stale, take the next free number when each is built). The dev stack needs a
+  backend rebuild (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`) for V97; the frontend only gained message keys.
+  - Delivered: **(1) Age band.** `medical_cases.age_band` (`UNDER_12`, `AGE_12_17`, `AGE_18_64`, `AGE_65_PLUS`, NULL = not stated), optional `ageBand` on the
+    public intake, the signed-in next case and the case sent for someone else; a coordinator records or corrects it (`PUT /api/v1/coordinator/cases/{id}/age-band`,
+    audited); `CaseView.ageBand` on staff views. **(2) Guardian delegation.** `patient_representatives.delegation_type` (`REPRESENTATIVE` | `GUARDIAN`), `legal_basis`
+    (`PARENT`, `LEGAL_GUARDIAN`, `COURT_ORDER`), an evidence document (a clean document of the case) that a coordinator verifies or refuses
+    (`GuardianService`). A minor's onboarding starts as GUARDIAN and PATIENT/REPRESENTATIVE/PAYER are refused for a minor; the account that sends a case for a
+    child becomes a guardian when it is the PARENT or the GUARDIAN; readiness gains `MINOR_REQUIRES_GUARDIAN`, `GUARDIAN_AUTH_MISSING`,
+    `GUARDIAN_EVIDENCE_MISSING` (patient-owed) and `GUARDIAN_EVIDENCE_UNVERIFIED` (coordinator-owed, deferred at submit, gating at treatment coordination).
+    The guardian's consent is its own type `GUARDIAN_AUTHORIZATION` (policy version `guardian-v0-placeholder`; the wording is a **placeholder**, one key per
+    language `guardianConsent.text` in `en.json` and `ar.json`, same words in `PatientActivationService.consentText`; counsel and a native reader replace it).
+    **(3) Incidents.** `case_incidents` (COMPLAINT / DISPUTE / ADVERSE_EVENT / DEATH, severity, status, owner, typed resolution, encrypted summary and note),
+    `IncidentService`: raised by the patient, the case team or another phase (`raiseFromSystem`); owner = a Care Coordination Manager, never the case's
+    coordinator nor the reporter, least loaded and one per case; one `INCIDENT_REVIEW` item (2 working days, survives the case's exit); a critical
+    incident tells the other managers, a clinical one the Consultant; Compliance and managers read (`INCIDENT_READ`), only the owner works it
+    (`INCIDENT_MANAGE`); new permissions `INCIDENT_REPORT/MANAGE/READ`, `CASE_REOPEN`. **(4) Complaint intake from My Care:** `POST|GET
+    /api/v1/patient/cases/{id}/concerns` (the patient sees type, status and dates only). **(5) Reopen:** `CLOSED -> FOLLOW_UP` through `CaseReopenService` only
+    (`CLOSED` is no longer terminal in `CaseTransitionPolicy`), typed reason, `case_reopenings` row, the same Consultant gets a `FOLLOW_UP_REVIEW` item,
+    the coordinator is told; by a manager or the case's own Consultant. Staff copy for the new work and notifications (`INCIDENT_REVIEW`,
+    `INCIDENT_CRITICAL`, `INCIDENT_CLINICAL`, `CASE_REOPENED`, `FOLLOW_UP_REVIEW`) is in both message files (Arabic is a draft).
+  - Tests and numbers: new `IncidentsAndReopenTest` (14) and `GuardiansAndAgeBandTest` (8); `CaseTransitionPolicyTest` updated (CLOSED reopens, no longer
+    final). Verification: backend `mvn -o -q test` (JVM in UTC) 875 tests, 0 failures, 3 skips (853 before, 22 new),
+    `ArchitectureRulesTest` and `RolePolicyTest` green (no JDBC or native query added; journey imports no coordination); `PostgresJpaMappingTest` green on a
+    disposable PostgreSQL 17 (V97 applied, Hibernate validated, every new repository query executed). The two English/Arabic message files keep key parity; no
+    frontend code changed, so no frontend suite was run (it needs `pnpm install --offline --frozen-lockfile` in the worktree first).
+  - Open gaps (session 2 and later): **no screens yet**: the age-band question on the intake forms (it becomes required on the wire then), the guardian
+    steps and evidence upload in onboarding, the guardian consent checkbox wired to `guardianConsent.text`, "Raise a concern" on My Care, the manager's incident
+    list and detail, the Compliance view in the Control Center, the coordinator's age-band control and evidence decision, "Reopen case" for managers and
+    Consultants, a patient-visible wording of a reopened case. Decisions not taken: Consultant matching on the `AGE_GROUP` capability, deriving the band from a date of birth
+    at activation, a guardian's authority at 18, a patient notice when a concern is resolved (needs a WhatsApp template), an SLA clock on patient concerns
+    visible to the patient, who may reopen a case cancelled for an unanswered information request. Counsel reviews the guardian consent wording; a native reader
+    the Arabic. The incident summary is free text kept encrypted; its retention and its data-protection class
+    (P1-7, and the PDPL review of P1-18) are not decided.
+  - Next exact action (session 1): owner fast-forwards `feat/review-p0` to this commit and rebuilds the backend of the dev stack (V97); then P1-13 session 2.
+- **Status (2026-10-15, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/upbeat-snyder-df6742`, cut from `76d6289`):** every screen of the
+  session-1 contract is built, frontend only apart from one wire change (`ageBand` required). No migration; V97 stays the newest.
+  - Delivered: **(1) Age band at intake.** One required question (four bands, chips) on Send my case (myself and someone else) and on the signed-in
+    new-case form (myself and someone else), shown again on the review step; sent as `ageBand`. `CreateCaseRequest.ageBand` and
+    `NewCaseForPatientRequest.ageBand` are now `@NotBlank` (a case created another way can still hold none and is recorded in intake review).
+    **(2) Guardian onboarding in My Care** (`GuardianStep`): when the backend's step is `COMPLETE_PROFILE` with blocker `MINOR_REQUIRES_GUARDIAN` /
+    `GUARDIAN_AUTH_MISSING`, the guardian chooses the legal basis (parent, legal guardian, court order), may choose the evidence document and gives the
+    guardian consent (`guardianConsent.text`, recorded as `GUARDIAN_AUTHORIZATION` with policy version `guardian-v0-placeholder`); then
+    `PUT .../onboarding/subject` (GUARDIAN). On `GUARDIAN_EVIDENCE_MISSING` only the document is asked (`PUT .../onboarding/guardian-evidence`). The step has
+    its own title and body; `GUARDIAN_EVIDENCE_UNVERIFIED` is the coordinator's, so the patient sees no action. The secure-link activation page shows the
+    same consent wording when `requiredConsents` holds `GUARDIAN_AUTHORIZATION` (it showed the raw code before). Staff waiting copy for the four guardian
+    blockers (`readiness.*`). **(3) Coordinator** (`GuardianReview`, overview tab, coordinators): the age band read and corrected by the owner
+    (`PUT .../age-band`), and for a minor the guardian (state, basis, verified date), "View the document" and Verify / Refuse (refusal confirmed;
+    `POST .../guardian/evidence-decision`); read-only for a coordinator who does not own the case. **(4) My Care "Raise a concern"** (`PatientConcerns`):
+    one quiet text line beside "Withdraw", opening a short form in place (a complaint, or a health problem after treatment = `ADVERSE_EVENT`, what
+    happened); the patient's own concerns listed with status and dates. No new button-styled CTA. **(5) Incidents** (Control Center › Reviews & Safety ›
+    Incidents, `/portal/control-center/incidents`, visible with `INCIDENT_READ`): list with status/type/"only mine" filters, severity, status and owner
+    ("You", "Another manager", "Not assigned"); detail with what was reported, stage, source, outcome. A manager (`INCIDENT_MANAGE`) takes an incident
+    (assign to self), and as owner starts the review, changes the severity and resolves with a typed outcome and a required note; Compliance reads the same
+    list and detail with no control. A manager also gets one quiet "Incidents — in the Control Center" link on the portal work list. **Reopen case**
+    (`ReopenCase`): on a `CLOSED` case, one quiet line for a holder of `CASE_REOPEN` (manager, `/coordinator/.../reopen`) and for the case's Consultant
+    (`/doctor/.../reopen`); the dialog asks the reason, offers the case's incidents to a manager and an optional note. All copy is in `portalWork.safety`
+    in `en.json` and `ar.json` (Arabic is a draft), apart from the Control Center sidebar label, which follows that file's inline pair convention.
+  - Tests and numbers: frontend `pnpm typecheck` clean; `pnpm exec vitest run` 73 files, 528 tests green (new: `GuardianStep.test` 7,
+    `PatientConcerns.test` 4, `GuardianReview.test` 6 incl. Reopen, `IncidentsPage.test` 4, plus one each in `case-form-schema.test` and
+    `ProfileActivation.test`); eslint clean on every touched file (two warnings on untouched lines remain). New Playwright spec `my-care-safety.spec.ts`
+    (guardian step en 1440 and ar 390, concern form en and ar 390, the age question en/ar 390; screenshots to `test-results/p1-13`, untracked);
+    `my-care-new-case`, `public-batch-3`, `case-flow` and the three live specs choose an age band now (`case-flow` and the live specs need the backend and
+    were not run here); the three mocked specs ran on the dev server, 23 passed. Backend (`mvn -o -q test`, JVM in UTC): 876 tests, 0 failures, 3 skips
+    (875 before; `CaseControllerTest.rejectsAMissingAgeBand` new). The required `ageBand` also applies to the journey verification intake (`JourneyCaseVerificationService`
+    validates the same record), so the fixtures of four journey integration tests now send `AGE_18_64`.
+  - Open gaps: **the signed-in portal has no document upload**, so a guardian can only choose a document already on the case; without one they are sent to
+    their coordinator for a secure upload link (an authenticated presign/confirm for My Care is a small backend phase of its own). Assigning an incident to
+    another manager (only "take it" is offered; the API accepts any manager), a staff "Report an incident" form (`POST /incidents/cases/{id}`; the work
+    copy exists), a link from an `INCIDENT_REVIEW` work item straight to its incident, and the patient-visible wording of a reopened case (P1-18) are not
+    built. The Control Center still renders the legacy base theme (the new page uses its own `cc-*` classes). Unchanged from session 1: counsel replaces the
+    guardian consent wording (bump the version on both sides together), a native reader reviews the Arabic, the AGE_GROUP matching decision, a guardian's
+    authority at 18, a patient notice when a concern is resolved.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this session's commit (it contains `76d6289`) and rebuilds the dev stack (backend for V97 and the
+    required `ageBand`, frontend for the screens: `docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`); then walks a minor's
+    case (send for a child as PARENT, acknowledge, guardian step, coordinator verifies) and a concern to resolution. Then P1-15 / P1-16 per "Remaining work".
+- **Status (2026-10-15, follow-up = My Care upload for guardian evidence, Opus 5.5; committed on `claude/guardian-upload`, cut from `ee11261`):** the
+  session-2 gap "the signed-in portal has no document upload" is closed for the guardian step. No migration; V97 stays the newest.
+  - Delivered: **backend** `POST /api/v1/patient/cases/{caseId}/documents/presign|confirm` (`PatientDocumentController`, `PatientDocumentService` in the
+    document module): `PATIENT_SELF_SERVICE` plus `MedicalCaseRepository.findPatientIdAccessibleTo` (the patient, or an active representative or guardian),
+    then `DocumentService.presignAdditional|confirmAdditional` (submitted case only; same type, size, per-case limits and scan as every channel); a clean confirm
+    is audited `PATIENT_DOCUMENT_UPLOADED`. **Frontend** `GuardianStep` gains `EvidenceUpload` (prop `send`, the portal `api`, passed by `Portal` →
+    `PatientCaseView`): choose a PDF/JPG/PNG up to 15 MB, status "Uploading…" then "Checking … for viruses…", the clean file is listed first, selected and
+    focused, then attached with "Use this document" (or sent with the guardian declaration). Scanner outage: "Check again" re-confirms the same upload;
+    condemned file, wrong type, size and case-limit errors each have their own line. With documents already on the case the upload is offered under the list
+    ("Not in the list? Upload it here."), because intake files are usually medical reports, not the guardianship paper. Copy `portalWork.safety.guardian.upload.*`
+    in `en.json` and `ar.json` (Arabic is a draft); `noEvidence` (coordinator link) stays for a view without `send`.
+  - Tests and numbers: new `PatientDocumentServiceTest` (3: stranger refused with no storage touched, upload rules and draft refusal, scanner outage kept
+    PENDING and unaudited until the same confirm succeeds) and `GuardiansAndAgeBandTest.aGuardianWithNothingOnTheCaseUploadsTheEvidenceFromMyCareAndAttachesItOnceScanned`
+    (presign, bytes to the local store, condemned fake refused as evidence, clean upload attached, audit row). Backend `mvn -o -q test` (JVM in UTC):
+    880 tests, 0 failures, 3 skips (876 before, 4 new), `ArchitectureRulesTest` green. Frontend: `pnpm typecheck` clean, eslint clean on touched files, `vitest run` 73 files, 533 tests (5 new in `GuardianStep.test`: upload →
+    check → selected, focused and attached; scanner outage and "Check again" with one presign; wrong type and condemned file; upload under an existing list;
+    Arabic label). Not run: Playwright (`my-care-safety.spec.ts` still covers the step without an upload) and a live walk with ClamAV.
+  - Follow-up, same branch (2026-10-15), closing the two gaps above. **(a) Documents tab upload** (`13859e8`): the control becomes
+    `CaseDocumentUpload`, used by the guardian step and by My Care's Documents tab (`documentUpload` slot of `MyCare`; a clean upload calls
+    `reloadDocuments`, new in `CaseViewProps`/`Portal`); the list says "Being checked" / "Did not pass the virus check" and hides REJECTED rows;
+    the tab's hint no longer points to the coordinator's link; generic upload copy moved to `portalWork.myCare.upload` (en, ar draft).
+    Tests: `CaseDocumentUpload.test` (3), `MyCare.test` +1; frontend gate 74 files, 537 tests. **(b) Unfinished-upload sweeper** (this commit):
+    `PendingDocumentSweeper.sweep` (`@LeasedJob`, every 5 min, 50 per run) gives each upload PENDING since before presign expiry + 10 min, or
+    QUARANTINED that long, `DocumentService.recheckStale`: bytes stored → scanned like a confirm; no bytes → REJECTED, which frees the case's
+    quota (abandoned presigns counted against it before); no verdict or storage down → next run. The confirm path no longer leaves an upload
+    stuck in QUARANTINED when storage fails between quarantine and read. JPQL `findStaleUploads` on the existing `(status, created_at)` index; no
+    migration. The outage message now says the file is checked automatically. Tests: `DocumentServiceTest` +5, new `PendingDocumentSweeperTest`
+    (arrived, never arrived, stuck in quarantine, in flight untouched, quota), `SchedulerLeaseTest` lists the job; `PostgresJpaMappingTest` green on a
+    disposable PostgreSQL 17; backend `mvn -o -q test` (JVM in UTC) 886 tests, 0 failures, 3 skips (880 before, 6 new).
+  - Minor gaps closed, same branch (2026-10-15): **progress bar**: the PUT goes through `putWithProgress` (`lib/upload.ts`,
+    XMLHttpRequest, because fetch has no upload progress) and `CaseDocumentUpload` shows a progress bar (`role="progressbar"`, outside the live
+    region); **sweeper audit and notice**: each decision is audited `DOCUMENT_RECHECKED` (actor `SYSTEM` / `DOCUMENT_SWEEPER`, the outcome as
+    reason) and a file cleared in the sweep publishes `DocumentEvents.UploadCleared`, which `UploadNotices` (journey) turns into an in-app
+    notification `DOCUMENT_CLEARED` for the case's coordinators (copy in `workCopy.items`, en and ar draft); patients have no notification
+    centre, so they see it in My Care; **guardian step**: files of the case still PENDING or QUARANTINED are listed under "Still being checked",
+    not choosable. Tests: `upload.test` (2), `CaseDocumentUpload.test` +1 (progress), `GuardianStep.test` +1, `PendingDocumentSweeperTest`
+    asserts the audit rows and the notices; frontend 75 files, 541 tests; backend `mvn -o -q test` (JVM in UTC) 886 tests, 0 failures, 3 skips.
+  - Last gaps closed, same branch (2026-10-15): **uploader recorded**: Flyway **V98** (`V98__document_uploaded_by.sql`) adds
+    `medical_documents.uploaded_by`: the account's subject for a My Care upload, else the channel (`INTAKE`, `SECURE_LINK`, `WHATSAPP`); the
+    next free version is V99. **Patient notice**: when the sweep clears an upload, `UploadNotices` also queues `document-cleared` through the
+    outbox (WhatsApp, else email, in the patient's language, at the case's on-file contact, which for a child's case is the sender's; links
+    to the case page, sign-in required, no file name); not for a draft's INTAKE upload (no case page yet). New WhatsApp template
+    `rs_document_cleared` (bound in `application.yml`, wording in `docs/whatsapp-message-templates.md`) **must be created and approved in
+    WhatsApp Manager**; until it exists Meta refuses those sends (retried, then dead-lettered); email works. **Playwright**: `my-care-safety.spec.ts` gains the
+    guardian upload (presign, bytes, confirm, consent, evidence, en 1440) and the Documents tab upload (ar 390, no side scroll); the fixture
+    serves presign, upload and confirm; the age spec now retries its first click until the form has hydrated (it failed on the dev server
+    when run after other tests). Tests: `NotificationOutboxProcessorTest` +1 and the template in the language check,
+    `PendingDocumentSweeperTest` (outbox row for the patient, none for an INTAKE upload, `uploaded_by`), `GuardiansAndAgeBandTest`
+    (`uploaded_by` = the guardian); backend `mvn -o -q test` (JVM in UTC) 887 tests, 0 failures, 3 skips; `PostgresJpaMappingTest` green
+    on PostgreSQL 17 with V98; frontend 75 files, 541 tests; Playwright `my-care-safety.spec.ts` 7 passed (dev server).
+  - Open: owner tasks only: create and approve `rs_document_cleared` in WhatsApp Manager, native review of the new Arabic, the live walk
+    below. A representative who uploads is reached at the case's contact, not their own (no separate contact is stored for them).
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/guardian-upload` and rebuilds backend and frontend; live walk: a minor's case with no
+    document, the guardian uploads the guardianship paper from My Care, sees it checked, attaches it, the coordinator verifies; a patient
+    uploads from the Documents tab; with ClamAV stopped, an upload shows the outage and is finished by the sweeper within ~5 minutes of
+    ClamAV returning (once the upload is 15 minutes old).
 
 ### P1-14  Consultant public profiles — data and endpoint  (D-03, §16.2 item 5)
 - Backend only: a public read of the published profile ("Credentials reviewed · current" derived from the credential
@@ -822,6 +1045,127 @@ phases.
 - Tests: architecture §14 rows for the policy, admission and money split; `PasswordOnlySessionCoverageTest`;
   `PostgresJpaMappingTest` on V95–V96.
 - Sessions: 2. Model: Fable 5.1, high (lifecycle and money). Needs: D-B, D-C, D-D decided; P1-10 fee line first.
+- **Status (2026-10-15, session 1 of 2 = backend, Opus 5.5 stood in for Fable 5.1; committed on `claude/magical-edison-f4f675`):** delivered;
+  no screen. Owner decisions recorded 2026-10-15: **D-B yes**, **D-C yes**, **D-D applied as recommended** (the owner agreed to "both
+  recommendations" and asked to implement; D-D was not asked separately and may still be objected to). Flyway **V99**
+  (`V99__admission_evidence_and_voucher.sql`; the `V95`/`V96` names above were stale) is now the newest; V100 is the next free.
+  - **Integration merge first (step 0).** `feat/review-p0` had diverged (P1-10 session 1 + 21 UX commits), so this branch was cut from
+    `claude/guardian-upload` (`9d0309b`: P1-10 session 2, P1-13 backend + UI, V97, My Care upload, sweeper, V98), merged
+    `claude/amazing-jepsen-cb80d9` (`269d1b2`, P1-9, scripts and docs) and then `feat/review-p0` (`1a3ed8f`): merge `2287ae1` + fix `635ae46`.
+    Conflicts were frontend only (ProfileActivation, ProposalSign, MyCare, the patient e2e fixture and two specs): the UX side's structure was
+    kept and the P1-10/P1-13 behaviour re-applied (guardian consent words, acceptance holds, guardian step, final-quote step, fixture options;
+    ProposalSign's price copy now comes from the page instead of `getDictionary` in the client). Verified on the merge: backend `mvn -o -q test`
+    891 tests, 0 failures, 3 skips; `pnpm typecheck` clean; vitest of the touched components 336 green. So this branch contains
+    `feat/review-p0`, and the owner can fast-forward `feat/review-p0` to it.
+  - Delivered: **(1) `ADMISSION_READY`** in `CaseStatus`, the status check and `CaseTransitionPolicy`: `ARRIVAL_CONFIRMED -> ADMISSION_READY |
+    CANCELLED`, `ADMISSION_READY -> TREATMENT_IN_PROGRESS | CANCELLED` (no edge around it), typed cancellation, advancing, `stageDefault`
+    HOSPITAL, the status link's treatment phase and label. Entry blockers come from **`AdmissionReadiness`** (one answer for the gate, the
+    treatment episode and the views): final quote accepted when one exists, procedure consent (or the consent override), and the balance
+    evidenced against the voucher (cashier receipt countersigned by Finance for the hospital part, the platform's receipt for any fee balance)
+    or the Consultant's emergency admission override; `TREATMENT_IN_PROGRESS` needs the hospital's admission number. Errors
+    `ADMISSION_NOT_READY` and `ADMISSION_NUMBER_REQUIRED` list the missing pieces. **(2) Evidence ledger** `case_evidence` +
+    `EvidenceLedger`: append-only rows (kind, stage, document of the case and clean, reference, amount, effective time, encrypted payload),
+    countersigned once and never by the recorder (`SELF_COUNTERSIGN_REFUSED`, also a check constraint), corrections supersede; P1-15 kinds
+    `FACILITY_ADMISSION_LETTER`, `PRICE_VARIANCE_CHECK`, `ARRIVAL_ATTESTED`, `PATIENT_ARRIVED`, `BALANCE_EVIDENCED`, `FEE_BALANCE_RECEIVED`,
+    `ADMISSION_NUMBER`, `POINT_OF_NO_RETURN`, `EMERGENCY_ADMISSION_OVERRIDE`. **(3) `facility_admissions`** (one per case; Operations
+    reserves facility + planned date in treatment coordination or after arrival; a new hospital supersedes the voucher; cancelled with the case).
+    **(4) Letter and price check**: Operations records the hospital's letter with its quoted package (EGP); within the accepted version's provider
+    maximum → Finance `CHECK_PROFORMA` (1 working day), above it → `PRICE_VARIANCE` (4 working hours) that Finance accepts with a reason
+    (`PRICE_VARIANCE_CHECK` row) or refuses (back to Operations, `REVISE_ADMISSION_LETTER`); travel cannot be `CONFIRMED` while a variance is
+    open (`PRICE_VARIANCE_OPEN`). **(5) Voucher (D-B)** `admission_vouchers` (immutable, revision `RS-V-<case>-<n>`, no sequence needed),
+    issued by the system when the final quote is accepted and the letter is checked (both orders), or by Operations for a case with no final
+    quote (then priced from the accepted estimate). Money rule `AdmissionMoney`, schema-checked: the deposit covers the platform fee first, the
+    rest is credited to the hospital, the patient pays the hospital the package less that credit, a fee the capped deposit did not cover is
+    owed to the platform. Hospital emailed (`admission-voucher-facility`, EN+AR, to `facilities.contact_email`), patient told
+    (`admission-balance-due`). A voucher that cannot be issued (deposit above package + fee) never undoes the acceptance: it becomes Finance
+    work `ADMISSION_VOUCHER_BLOCKED`. **(6) Balance (D-C)**: Operations records the cashier receipt (receipt number, EGP amount, paid at,
+    method, optional document and paid currency; never above what is owed, `AMOUNT_EXCEEDS_BALANCE`), Finance countersigns with a fresh
+    sign-in (`COUNTERSIGN_BALANCE`, 4 working hours); Finance records the fee balance (`PAYMENT_RECORD`). When the last gate passes,
+    `CaseHandoffService.onAdmissionEvidenceChanged` moves the case to `ADMISSION_READY` and tells the patient (`cleared-for-admission`), the
+    coordinator and Operations. **(7) Pay to admit**: `JourneyService.treatment` refuses the first episode without the balance
+    (`BALANCE_EVIDENCE_REQUIRED`), walks `ADMISSION_READY` then `TREATMENT_IN_PROGRESS`, and takes the admission number
+    (`TreatmentRequest.admissionNumber`, new optional field; Operations can record it too). **(8) Emergency**: the Consultant records an
+    emergency admission with a reason (encrypted; audit carries no text); Finance gets `EMERGENCY_ADMISSION_REVIEW` (2 working days,
+    survives the case's exit); it never stands in for the quote or the consent. **(9) Arrival**: Operations' confirmed arrival writes
+    `ARRIVAL_ATTESTED`; the patient confirms "I have arrived" (`POST /patient/cases/{id}/arrived`, travel `CONFIRMED`), which records
+    `PATIENT_ARRIVED` and moves the case under the policy. **(10) Point of no return**: Operations sets it, Finance approves (countersign).
+    **(11) Patient states** (`CaseActionService`): `CONFIRM_ARRIVAL` (focus, arrival within a day), `PAY_BALANCE` (focus),
+    `WAIT_BALANCE_CHECK`, `CLEARED_FOR_ADMISSION`; Operations' current action `RECORD_HOSPITAL_BALANCE` / `RECORD_ADMISSION_NUMBER`.
+    **(12) Access**: permissions `ADMISSION_READ`, `ADMISSION_MANAGE`, `EVIDENCE_COUNTERSIGN` (step-up), `ARRIVAL_REPORT`; new scope
+    `CASE_MONEY_OPEN` (deposit open or admission reserved/confirmed; reads audited like deposit reads) so any Finance member reads and
+    countersigns an open admission without a clinical record. Finance's admission work goes to the case's Finance person, else the least-loaded
+    Finance holder, and every Finance holder is told (the pool queries only cover deposits). **API** (`AdmissionController`):
+    `GET …/{operations|finance|coordinator|doctor}/cases/{id}/admission`; Operations `POST /operations/cases/{id}/admission`, `…/letter`,
+    `…/voucher`, `…/balance`, `…/point-of-no-return`, `…/number`; Finance `POST /finance/cases/{id}/admission/letter/decision`,
+    `/finance/cases/{id}/evidence/{evidenceId}/countersign`, `…/admission/fee-balance`; Consultant `POST /doctor/cases/{id}/emergency-admission`;
+    patient `GET /patient/cases/{id}/admission`, `POST /patient/cases/{id}/arrived`.
+  - Tests and numbers: new `AdmissionServiceTest` (14: frozen split and replay, new hospital supersedes, estimate-only voucher by hand,
+    blocked voucher never undoes acceptance, variance holds travel and needs a reason, refused letter back to Operations, countersigned receipts
+    clear for admission then the admission number opens treatment, no self-countersign, capped deposit fee balance, pay to admit + emergency
+    override + Finance review, override never replaces quote or consent, patient arrival, Finance scope and Operations assignment, cancellation
+    cancels the admission), `AdmissionMoneyTest` (5, the worked examples), `CaseTransitionPolicyTest` +1, `NotificationOutboxProcessorTest` +2
+    (and the two patient messages in the language test); `JourneyServiceIntegrationTest` updated for the new gate (episodes carry an admission
+    number; a fixture emergency-admission row stands in for the receipt). Backend `mvn -o -q test` (JVM in UTC): 913 tests, 0 failures, 3 skips (891 after the merge, 22 new).
+    `ArchitectureRulesTest` and `RolePolicyTest` green (JPA only, no native query). `PostgresJpaMappingTest` green on a disposable PostgreSQL 17 (V99 applied,
+    Hibernate validated, every new repository query executed). No frontend code changed in this session after the merge.
+  - Not done here (session 2 and later): **no screens or copy** — My Care / status-link blocks (`CONFIRM_ARRIVAL`, `PAY_BALANCE` with the voucher
+    number and amounts, `WAIT_BALANCE_CHECK`, `CLEARED_FOR_ADMISSION`, "Your dates"), the staff "Admission & money" panel and forms, Finance
+    letter decision / countersign / fee balance, the Consultant's emergency admission and admission number on the treatment form, the
+    `ADMISSION_READY` label, staff work copy for the new work types. No voucher PDF (no renderer resolvable offline; the voucher is a record,
+    an API view and the hospital email — architecture open point 1). No `PROVIDER` deposit component (the credit to settle is on the voucher;
+    P1-12's settlement consumes it). `CaseExitService` does not read the point of no return for a refund class yet. No `RESERVE_ADMISSION`
+    work item (Operations' `UPDATE_TRAVEL_PLAN` step covers the stage). Arrival is not gated on the letter (the voucher is), to keep existing
+    flows. Templates `rs_your_dates` and `rs_arrival_card` not added; `rs_admission_voucher` and `rs_cleared_for_admission` need Meta approval.
+    A date-only change of the reservation keeps the voucher (its email shows the old date).
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `feat/review-p0`) and rebuilds the dev stack backend
+    for V99 (`docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --build`); confirm the money rule (Owner decisions still
+    open); then P1-15 session 2 (UI and copy).
+- **Status (2026-10-15, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/p1-15-s2-ui`, cut from `1653760`):** delivered,
+  frontend only (no wire gap blocked the brief; the status link's one gap is below). Amounts are shown exactly as the API returns them;
+  nothing is recomputed in the browser. The money rule (deposit covers the platform fee first) is still awaiting the owner's confirmation.
+  - **Patient (My Care).** New `PatientAdmission` block inside the current step (one `admissionStep` slot in `MyCare`, loaded on demand by
+    `PatientCaseView`, keyed by the backend's step code; `admission-steps.ts` holds the four codes). It reads
+    `GET /patient/cases/{id}/admission` (an empty answer = no reservation = the step alone) and shows the hospital, the admission date, the
+    voucher number (`translate="no"`), what to pay at the cashier in EGP and "about … at the rate fixed on your quote" in the patient's
+    currency, the deposit credit and any platform fee balance, with the balance state (To pay / Checking / Paid). `CONFIRM_ARRIVAL` carries
+    the step's one primary action, "I have arrived", behind a confirmation (`POST /patient/cases/{id}/arrived`); `PAY_BALANCE` has no button
+    (paid at the cashier); `WAIT_BALANCE_CHECK` says the receipt is being checked; `CLEARED_FOR_ADMISSION` says "You are cleared for
+    admission on {date}". Step texts in `myCare.steps`, block copy in `myCare.admission`. `ADMISSION_READY` is in the staff `STATUS_LABELS`,
+    the journey snapshot and the patient's Treatment phase (`CaseSwitcher` `PHASES`).
+  - **Status link.** The public status carries no admission step, so in the treatment phase `CaseStatusAccess` no longer says "nothing is
+    needed": the treatment explanation tells the patient to confirm arrival in My Care, where the voucher and the amount appear, with one quiet
+    "Sign in to My Care" link (as DEP-3 did for the deposit). Open gap: showing the step itself on the link needs a patient-safe step code
+    on `PublicCaseStatus` (backend).
+  - **Staff "Admission & money" panel** (`AdmissionPanel`, on the case page for Operations, Finance, coordinator and Consultant from
+    `TRAVEL_COORDINATION` to `TREATMENT_IN_PROGRESS`, reading `GET /{role}/cases/{id}/admission`): reservation, letter check, reference
+    maximum, point of no return, admission number; the voucher with its frozen split and rate; the checklist from `admissionBlockers`; the
+    emergency flag; the evidence trail (kind, amount, reference, recorded/countersigned by role and time, replaced rows). Every command
+    answers with the view and the panel shows it. One primary action: the next task's disclosure opens first and is the "do it" target of
+    the current-action panel (`ADMISSION_WORK`, `#admission-next`). Operations: reserve (facility + date), record the letter (clean case
+    document + quoted EGP + reference), issue the voucher by hand (estimate-only cases), cashier receipt (number, EGP, paid at, method,
+    optional copy, paid currency and amount), point of no return, admission number (after clearance). Finance (step-up through the portal's
+    re-sign-in and replay): letter accept/refuse (a reason required for every refusal and for accepting `VARIANCE_OPEN`), countersign a
+    receipt or the point of no return after a confirmation, fee balance (reference, EGP, received at). Consultant: "Emergency admission"
+    with a required reason and a confirmation; the treatment episode form now opens at `ADMISSION_READY` and sends
+    `TreatmentRequest.admissionNumber`.
+  - **Copy** (en + ar; **Arabic is a draft** pending native review): `portalWork.workTitles` and `workCopy.items` for `CHECK_PROFORMA`,
+    `PRICE_VARIANCE`, `REVISE_ADMISSION_LETTER`, `COUNTERSIGN_BALANCE`, `APPROVE_POINT_OF_NO_RETURN`, `EMERGENCY_ADMISSION_REVIEW`,
+    `ADMISSION_VOUCHER_BLOCKED` (+ their `currentAction.work` button words), the `CLEARED_FOR_ADMISSION` notification, current-action states
+    and buttons `RECORD_HOSPITAL_BALANCE` / `RECORD_ADMISSION_NUMBER`, waiting reasons `ADMISSION_BALANCE_DUE` / `ADMISSION_BALANCE_TO_CHECK`
+    / `CLEARED_FOR_ADMISSION`, `portalWork.admission` (panel), `myCare.admission` and the four steps, `secureLink.journey.inMyCare`.
+  - Tests: new `AdmissionPanel.test.tsx` (11: Operations reserve/letter/receipt/number with one primary, amounts as returned, pending
+    documents never offered; Finance variance reason, refusal reason, countersign after confirmation, fee balance; read-only coordinator;
+    Consultant emergency; Arabic), `PatientAdmission.test.tsx` (6, through `MyCare`), +1 `CaseWorkflowActions` (admission number), +1
+    `CaseStatusAccess` (treatment phase), +1 `StaffOperationalUi` (current-action words en/ar). Playwright `e2e/my-care-admission.spec.ts`
+    (6, route mocks via the new `admission` option of `patient-fixture.ts`: pay-balance en/ar × 390/1440 with no page scroll, arrival
+    confirmation sent, cleared date in Arabic) green on the dev server. `pnpm typecheck` clean, eslint clean on touched files, vitest 79 files
+    / 617 tests green. Reviewed with react-best-practices, composition-patterns, web-design-guidelines and Impeccable (fixes: no spell-check on
+    codes and references, `translate="no"` on the voucher number, point of no return hidden once cleared).
+  - Not done (later or owner): the final UX design of these screens (UX plan); the status link's own admission step (backend field above);
+    no voucher PDF (session 1); staff panel not walked live — needs the dev stack rebuilt at V99 with this frontend.
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/p1-15-s2-ui` (it contains `1653760`), rebuilds backend and frontend,
+    and walks one case live (reserve → letter → final quote → voucher → arrival → receipt → countersign → cleared → admission number); then
+    P1-16 (treatment evidence: milestones and change orders), started in a new session.
 
 ### P1-16  Treatment evidence: milestones and change orders  (design §5 stage 4; architecture §5.2–5.3)
 - `TreatmentMilestoneService` (eight milestone kinds, Consultant or Operations-with-countersign, 24-working-hour
@@ -832,6 +1176,136 @@ phases.
   `MyCare.tsx` timeline; Finance pricing screen; templates `rs_treatment_update`, `rs_change_order_review`.
 - Sessions: 2. Model: Fable 5.1, high (money and consent-adjacent); milestone forms by Opus 5.5. Needs: P1-13
   incidents (can be built in the same session order: P1-13 first).
+- **Status (2026-10-15, session 1 of 2 = backend, Opus 5.5 stood in for Fable 5.1; committed on `claude/p1-16-s1-treatment-d2acd9`, cut from
+  `2aacb41` = `claude/p1-15-s2-ui`):** delivered; no screen. Flyway **V100** (`V100__treatment_milestones_and_change_orders.sql`; the
+  `V97` name above was stale) is now the newest; V101 is the next free.
+  - Decision recorded (owner's standing rule 2026-10-15: decide by the recommendation, do not ask): **D-E applied as recommended**: the
+    band is the lower of 10% of the facility package and EGP 15,000 (`commercial_policies.change_order_band_rate` /
+    `change_order_band_egp`; Finance Managers change them per care area; left out they carry over); Finance alone within it, the patient
+    above it, emergency path with a Finance review. Further choices made here, each the design's best-practice reading: the band is
+    **cumulative** over the case's accepted and emergency change orders (splitting a change never avoids the patient); the facility package
+    is the current voucher's (else the accepted version's provider net, for an emergency admission without a voucher); an **interim bill is
+    the hospital's running statement to date** (the latest countersigned one is "billed to date", not a sum); a **complication** opens a
+    P1-13 adverse-event incident with the summary, reads `CARE_UPDATE` on the patient's timeline and sends no message (the Consultant tells
+    the patient in person; the incident is the review, so no separate `REVIEW_COMPLICATION` item); the patient decides on the **verified
+    secure status link** too (the one-time code to the registered contact is the fresh proof, as for the proposal decision). The P1-15
+    money rule (deposit covers the fee first) is untouched and still awaits the owner.
+  - Delivered: **(1) Milestones** (`TreatmentMilestoneService`): the eight kinds as `case_evidence` rows (`MILESTONE_ADMITTED` to
+    `MILESTONE_DISCHARGE_PLANNED`; payload encrypted: operative note reference, implants, note, planned discharge date, incident id),
+    recorded by the case's Consultant or by its Operations person on the Consultant's behalf; Operations' rows open
+    `COUNTERSIGN_MILESTONE` for the Consultant (24 working hours) and the Consultant countersigns with a fresh sign-in
+    (`MILESTONE_COUNTERSIGN`); until then the patient reads "reported by the care team". Rules: only in `TREATMENT_IN_PROGRESS`, not in
+    the future; the completed procedure needs the operative note (reference or clean document), a complication a summary and severity, a
+    planned discharge a date not in the past; ADMITTED / PROCEDURE_STARTED / PROCEDURE_COMPLETED / DISCHARGE_PLANNED are single facts
+    (recording again supersedes). **The clock**: the treatment episode that opens treatment publishes `CaseEvents.TreatmentStarted`; the
+    ADMITTED milestone is recorded for the Consultant with the admission number and `RECORD_MILESTONE` opens (24 working hours); every
+    milestone rotates it, a planned discharge stops it, leaving treatment closes it (read-time repair in `CaseActionService`). Each
+    milestone except a complication sends the patient `treatment-update`. **(2) Change orders** (`ChangeOrderService`, `change_orders` +
+    `change_order_lines`): the Consultant proposes (encrypted clinical reason, 1-20 lines of kind PROCEDURE / IMPLANT / EXTRA_NIGHT /
+    MEDICATION / OTHER), number `RS-CO-<case>-<n>`; Finance prices every line with a fresh sign-in (`CHANGE_ORDER_PRICE`,
+    `PRICE_CHANGE_ORDER` 4 working hours); within the band it is `ACCEPTED` by Finance, above it `AWAITING_PATIENT` (patient
+    `change-order-review`, coordinator `CHANGE_ORDER_PATIENT_DECISION` due in 24 h, waiting on PATIENT); the patient or representative
+    accepts or declines in My Care (`PATIENT_DECIDE`, step-up) or on the secure link; the Consultant may withdraw an undecided order.
+    **Emergency**: done first (`EMERGENCY`, the Consultant's decision is the record), Finance prices and reviews it after
+    (`EMERGENCY_CHANGE_ORDER_REVIEW`, 2 working days, survives the case's exit), the patient is told (`change-order-applied`). Every
+    decision is also a `CHANGE_ORDER` ledger row; amounts in EGP and at the voucher's frozen rate. A check constraint makes the band the
+    only path to acceptance. **(3) Interim bills** (`InterimBillService`): Operations records the hospital's bill (clean document, number,
+    EGP, billed at) as `INTERIM_BILL`; Finance countersigns it with a fresh sign-in (`COUNTERSIGN_INTERIM_BILL`, 4 working hours).
+    **(4) Views** (`TreatmentViews`): the staff panel `TreatmentView` (milestones with countersign state, next milestone due, change
+    orders, running money = package + counted change orders vs billed to date, variance, band and band used, interim bills, and the
+    **evidence checklist per stage**: ADMISSION = reserved, letter checked, arrival, final quote, consent, voucher, balance, admission
+    number; TREATMENT = the four required milestones, milestones countersigned, change orders settled, interim bills countersigned);
+    clinical details and the change-order reason only for a reader of the clinical record. The patient's `PatientTreatmentView`: facility,
+    calm timeline, priced (and emergency) change orders, the one awaiting their decision. **(5) Access**: permissions `MILESTONE_RECORD`,
+    `MILESTONE_COUNTERSIGN` (step-up), `CHANGE_ORDER_PROPOSE`, `CHANGE_ORDER_PRICE` (step-up); the staff panel reuses `ADMISSION_READ`;
+    `CASE_MONEY_OPEN` now also covers a case in `TREATMENT_IN_PROGRESS` (Finance prices and countersigns without a clinical record);
+    `FinanceWork` is the one Finance router, shared with `AdmissionService`. **(6) Patient and staff states**: patient
+    `REVIEW_CHANGE_ORDER` (FOCUS) in treatment; Consultant `RECORD_MILESTONE` stage step. **API** (`TreatmentController`):
+    `GET .../{operations|finance|coordinator|doctor}/cases/{id}/treatment`; `POST /doctor|operations/cases/{id}/milestones`,
+    `/doctor/cases/{id}/milestones/{evidenceId}/countersign`; `/doctor/cases/{id}/change-orders` (+ `/emergency`, `/{orderId}/withdraw`);
+    `/finance/cases/{id}/change-orders/{orderId}/price`; `/operations/cases/{id}/treatment/interim-bills`,
+    `/finance/cases/{id}/treatment/interim-bills/{evidenceId}/countersign`; patient `GET /patient/cases/{id}/treatment`,
+    `POST /patient/cases/{id}/change-orders/{orderId}/decision`; link `POST /public/cases/{token}/treatment`,
+    `/public/cases/{token}/change-orders/{orderId}/decision`.
+  - Tests and numbers: new `TreatmentEvidenceServiceTest` (11: admitted on the episode and the rotating clock stopped by a planned discharge;
+    Operations on the Consultant's behalf + countersign; complication to incident, `CARE_UPDATE`, no message; only in treatment; within band
+    by Finance alone; cumulative band and the patient's fresh decision (+ the schema refusing Finance above the band); decline on the
+    verified secure link; emergency priced and reviewed after; withdraw; band from the policy and carried over; interim bills countersigned,
+    billed to date and variance). The P1-15 fixture moved to `AdmissionFixture` (shared; `AdmissionServiceTest` unchanged in substance);
+    `NotificationOutboxProcessorTest` covers the three new patient messages in both languages and their case-page link. Backend
+    `mvn -o -q test`: 924 tests, 0 failures, 3 skips (913 before, 11 new). `ArchitectureRulesTest` and `RolePolicyTest` green (JPA only,
+    no native query). `PostgresJpaMappingTest` green on a disposable PostgreSQL 17 (V100 applied, Hibernate validated, every repository
+    query executed). No frontend change.
+  - Not done here (session 2 and later): **no screens or copy**: Consultant milestone / countersign / change-order forms, Operations
+    milestone-on-behalf and interim-bill forms, Finance pricing and countersign, the staff "Treatment" panel and checklist, My Care
+    timeline and change-order decision, the status link's treatment view, Control Center band fields; staff work copy for the six new work
+    types. No assisted (coordinator-recorded) change-order decision; lines are priced by hand (no facility-package or catalogue link); the
+    checklist gates nothing yet (P1-17's discharge gate will read it); templates `rs_treatment_update`, `rs_change_order_review` need Meta
+    approval; the status link's own current step still needs a patient-safe step code on `PublicCaseStatus`.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `2aacb41`) and rebuilds the dev backend for V100;
+    then P1-16 session 2 (UI and copy, started in a new session; contract in the shared notes folder,
+    `p1-16-session-1-handover.md`).
+- **Status (2026-10-15, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/p1-16-s2-ui-aca50e`, cut from `b8dcf2d`):** delivered,
+  frontend only (no wire gap blocked a screen). Amounts are shown exactly as the API returns them; nothing is added up or converted in the
+  browser. The P1-15 money rule (deposit covers the platform fee first) is untouched and still awaits the owner.
+  - **Staff "Treatment" panel** (`TreatmentPanel`, on the case page after "Admission & money" for Operations, Finance, the coordinator and
+    the Consultant while the case is `TREATMENT_IN_PROGRESS`, and for an open Treatment work item afterwards, e.g. Finance's emergency
+    review that survives the exit; reads `GET /{role}/cases/{id}/treatment`): milestones with who recorded them, countersign state, the
+    clinical details (null for Finance) and "Incident opened for review" on a complication; the next milestone due (or "discharge is
+    planned: no further milestone is due"); change orders (number, status, clinical reason, the lines table, total in EGP and the patient's
+    currency, within/above the band, proposed and decided by channel); the running money (package, change orders, authorised, billed to
+    date, bill awaiting countersign, variance marked "over" when positive, band and band used); interim bills; and the evidence checklist
+    per stage (done/missing in words for screen readers, optional items marked). Every command answers with the view and the panel shows
+    it. One primary action: the viewer's next task, and the "do it" target of the current-action panel (`TREATMENT_WORK`,
+    `#treatment-next`). **Consultant**: the milestone form (eight kinds; the operative note reference or document for a completed
+    procedure, checked before the round trip; implants; summary + severity for a complication with its incident hint; the date for a
+    planned discharge; "recording this again corrects the one on file" for the four single facts), opening first on `RECORD_MILESTONE`;
+    countersign Operations' milestones after a confirmation (step-up via the portal's re-sign-in and replay); the change-order form (reason
+    the patient reads, 1-20 lines of kind / description / quantity) and its emergency variant behind a confirmation; withdraw an undecided
+    order with a reason and a confirmation. **Operations**: the milestone form on the Consultant's behalf (with the countersign hint) and
+    the interim-bill form (checked case document, bill number, EGP to date, issued at). **Finance**: line pricing per order (every line,
+    EGP unit price; step-up) and the interim-bill countersign after a confirmation (step-up). In treatment the Finance primary goes to this
+    panel only for `PRICE_CHANGE_ORDER` / `EMERGENCY_CHANGE_ORDER_REVIEW` / `COUNTERSIGN_INTERIM_BILL`, and "Admission & money" leads
+    only for its own work, so the page never shows two filled actions. The shared panel pieces (task disclosure, facts, money, document
+    picker, confirm-then-act, form helpers) moved to `panel-parts.tsx`; `AdmissionPanel` uses them unchanged in behaviour.
+  - **My Care**: a `treatmentStep` slot (`TREATMENT_STEPS` = `IN_TREATMENT`, `REVIEW_CHANGE_ORDER` in `admission-steps.ts`) renders
+    `PatientTreatment` (reads `GET /patient/cases/{id}/treatment`): the calm timeline (one line per milestone, `CARE_UPDATE` as "Care
+    update: your Consultant will talk it through with you", "reported by the care team" for `CARE_TEAM`, the planned discharge date) and
+    the decided changes ("Done in an emergency", "Price to follow" until priced). On `REVIEW_CHANGE_ORDER` (new step text) the change
+    awaiting the patient comes first: the reason, the lines with EGP and the patient's currency per line, the added cost in EGP and "about
+    … at the rate fixed on your quote", an optional note, then "Accept the change" (the step's one primary) and "Decline", each behind its
+    own confirmation; `POST /patient/cases/{id}/change-orders/{orderId}/decision` with the portal's step-up replay; the answer is shown.
+  - **Status link**: in the treatment phase the link reads `POST /public/cases/{token}/treatment` with the verified grant and shows the same
+    timeline; when a change awaits the patient (and the coordinator is not asking for something) it is the page's story and its one action,
+    decided with `POST /public/cases/{token}/change-orders/{id}/decision` on the grant (the one-time code is the fresh proof); "nothing is
+    needed" and the My Care link are hidden then; refusals in the patient's words (`CHANGE_ORDER_NOT_AWAITING`, an ended session).
+    `TreatmentStory` / `ChangeOrderDecision` are shared by both surfaces.
+  - **Control Center**: the margin-policy form carries "Change-order band (% of the package)" and "Change-order band cap (EGP)", prefilled
+    from the active version (10% / EGP 15,000 when none), sent as `changeOrderBandRate` / `changeOrderBandEgp`, listed and stated in the
+    confirmation (inline en/ar, as the rest of that screen).
+  - **Copy** (en + ar; **Arabic is a draft** pending native review): `portalWork.workTitles`, `workCopy.items` and `currentAction.work` for
+    the six work types; `workCopy.items` for `CHANGE_ORDER_ACCEPTED`, `CHANGE_ORDER_REJECTED`, `TREATMENT_COMPLICATION`; waiting reason
+    `CHANGE_ORDER_DECISION`; current actions `RECORD_MILESTONE` (state + button) and `REVIEW_CHANGE_ORDER` (`myCare.steps`); the panel
+    (`portalWork.treatment`), the patient block (`myCare.treatment`), the ten evidence kinds on the admission trail; and a new
+    `portalWork.errorCodes` (the 17 treatment codes + `CHANGE_ORDER_BAND_INVALID`), which the portal now shows in the viewer's language
+    in place of the backend's English message (other codes unchanged).
+  - Tests: new `TreatmentPanel.test.tsx` (9: Consultant countersign as the one primary after a confirmation, milestone per-kind fields and
+    the operative-note check, change order with lines + emergency after a confirmation, withdraw; Finance money as returned + pricing,
+    interim-bill countersign; Operations on-behalf milestone + interim bill from a checked document; read-only coordinator; Arabic and no
+    primary without Finance's own work), `PatientTreatment.test.tsx` (4, through `MyCare`: accept, decline with note, timeline, Arabic),
+    +3 `CaseStatusAccess` (decide on the grant, not-awaiting refusal, timeline only), +1 `StaffOperationalUi` (current-action words
+    en/ar), +1 and 2 updated `PageHeaders` (band fields). Playwright `e2e/my-care-change-order.spec.ts` (4: en/ar × 390/1440, one primary,
+    amounts as returned, no page scroll, the decision sent after the confirmation and read back) via the new `treatment` option of
+    `patient-fixture.ts`, green on a dev server together with `my-care-admission.spec.ts` (10/10). `pnpm typecheck` clean, eslint clean on
+    touched files, vitest 81 files / 635 tests green. Reviewed with react-best-practices, composition-patterns, web-design-guidelines and
+    Impeccable (detector: no findings; fixes: one filled action across the two panels in treatment, `autocomplete="off"` on line
+    descriptions, hoisted number format, generated heading ids, no glyphs standing in for icons).
+  - Not done (later or owner): the final UX design of these screens (UX plan); no assisted (coordinator-recorded) change-order decision
+    (backend has none); the status link still has no patient-safe step code of its own (`PublicCaseStatus`); staff panel not walked live —
+    needs the dev stack rebuilt at V100 with this frontend; Meta approval of `rs_treatment_update` / `rs_change_order_review`.
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/p1-16-s2-ui-aca50e` (it contains `b8dcf2d`), rebuilds backend and
+    frontend, and walks one case live (Operations milestone → Consultant countersign → change order → Finance price above the band →
+    patient accepts in My Care); then P1-17 (discharge pack, reconciliation and statements), started in a new session.
 
 ### P1-17  Discharge pack, reconciliation and statements  (design §5 stage 5, §6; architecture §5.4–5.5)
 - `DischargeService` pack completeness (summary, medication list, operative note, implant record, fit-to-fly with the
@@ -844,6 +1318,154 @@ phases.
   `rs_discharge_pack_ready`, `rs_statement_ready`.
 - Sessions: 2. Model: Fable 5.1, high. Needs: P1-12's settlement statement for the payout leg (the reconciliation
   itself does not).
+- **Status (2026-10-16, session 1 of 2 = backend, Opus 5.5 stood in for Fable 5.1; committed on `claude/p1-17-s1-discharge`, cut from
+  `98958c3` = `claude/p1-16-s2-ui-aca50e`):** delivered; no screen. Flyway **V101** (`V101__discharge_reconciliation_and_statements.sql`; the
+  `V98` name above was stale) is now the newest; V102 is the next free.
+  - Decision recorded (owner's standing rule: decide by the recommendation, do not ask): **D-F applied as recommended**: a fit-to-fly is
+    valid for a flight that leaves after the examination and within 72 hours of it (`commercial_policies.fit_to_fly_hours`, 24-168, Finance
+    Managers change it per care area; left out it carries over); Operations cannot confirm a return flight without one (a ground return
+    needs none). Further choices made here, each the design's best-practice reading: fit to fly is a pack item owed **before the return
+    flight, not before discharge** (patients often fly days after discharge, outside any 72-hour window from it); the **discharge summary
+    is the Consultant's discharge decision** (no separate "discharge ready" flag; the treatment episode's completion only triggers the
+    check); the follow-up plan is made **before** discharge (the pack's last item) and the case moves `DISCHARGED -> FOLLOW_UP` (or closes
+    with no follow-up) only once the final invoice is **reconciled** (closed, or closed with a facility dispute recorded), so the patient
+    sees "Going home" until their statement is issued; the final invoice need only be **recorded** for discharge (Finance countersigns it
+    when it opens the reconciliation: money never holds a patient in hospital); statements and the handover letter are **immutable
+    structured records** the portal renders and prints (no PDF library resolves offline; architecture open point 1). The P1-15 money rule
+    (deposit covers the fee first) is untouched and still awaits the owner.
+  - Delivered: **(1) Discharge pack** (`DischargeService`, journey): the Consultant records the discharge summary (diagnosis, procedures,
+    pending results, warning signs), the medication list (name, dose, frequency, duration), the operative note (the completed-procedure
+    milestone's document also counts), the implant record (required when implants are on that milestone or a counted change-order line)
+    and fit to fly (examination time), each a **typed clean document** (the `case_evidence` row is the type; `medical_documents` has no
+    type) with its facts encrypted; recording a kind again corrects it. A planned discharge (P1-16 milestone) opens `DISCHARGE_PACK`
+    (Consultant) and `RECORD_FINAL_INVOICE` (Operations), due 18:00 Cairo on that day. **Handover letter**: generated EN and AR from the
+    pack (summary, medicines, implants, operative-note reference, pending results, warning signs, follow-up date and mode, facility and
+    dates, patient and case), an encrypted `HANDOVER_LETTER` row; generating again replaces it. **(2) The discharge gate**
+    (`DischargeReadiness`, read by `CaseTransitionPolicy`): `DISCHARGED` needs P1-16's TREATMENT checklist complete, the summary, the
+    medication list, the operative note (after a completed procedure), the implant record (when implants were used), the follow-up plan
+    and the final invoice recorded (codes `TREATMENT_CHECKLIST_INCOMPLETE`, `*_MISSING`); the move is automatic on any change of that
+    evidence (`CaseEvents.DischargeEvidenceChanged`: a pack item, the plan, the invoice, a countersigned milestone or interim bill, a
+    settled change order, the episode's completion); the coordinator's generic transition never discharges. Leaving `DISCHARGED` (follow-up
+    or closed) needs the settled reconciliation (`SETTLEMENT_PENDING`). On discharge the patient gets `discharge-pack-ready`, the
+    coordinator and Operations `PATIENT_DISCHARGED`. **(3) Final invoice, return, departure** (Operations, `ADMISSION_MANAGE`): the final
+    invoice (clean document, number, EGP, issued at; corrections supersede until reconciled) opens Finance's `RECONCILE_INVOICE` (2 working
+    days); the return travel (`FLIGHT` with a valid fit-to-fly, `GROUND`) and then the departure (`PATIENT_DEPARTED` to the coordinator).
+    **(4) New module `settlement`**: `ReconciliationService` — Finance opens it (fresh sign-in; countersigns the invoice; authorised =
+    voucher package + counted change orders; band = the case's D-E band), submits the invoice lines matched to `PACKAGE` / a counted
+    `CHANGE_ORDER_LINE` / `NONE` with the amount the invoice shows the patient paid the hospital (at least the countersigned admission
+    receipts); variance codes `WITHIN_BAND`, `CHANGE_ORDER`, `CREDIT` (billed below), `BILLING_ERROR` (billed above the price: the excess,
+    or an unmatched mistake) and `UNAPPROVED_EXTRA`, the last two **never charged to the patient** (schema-enforced); a variance above the
+    band waits for a Finance Manager (`COUNTERSIGN_RECONCILIATION`, 1 working day; approve or return; never the submitter); settling writes
+    the `RECONCILIATION` ledger row (which ends Finance's open money on the case), issues the statement, opens `FACILITY_DISPUTE` (Finance
+    Manager, 5 working days, survives exit; outcomes `FACILITY_WITHDREW` / `PLATFORM_ABSORBED`) when anything was not charged and
+    `REFUND_CREDIT` (Finance, 2 working days, survives exit) when the patient paid more than charged. `StatementService` — the `DISCHARGE`
+    statement (`RS-ST-<case>-<rev>`): package, change orders, medical charged (reconciled), platform fee, total; deposit paid, fee balance
+    paid, paid at the hospital, refunded; balance due or credit due (schema-checked identities), EGP and the patient's currency at the
+    voucher's frozen rate, encrypted lines; immutable, a correction is a new revision; the **e-invoice reference slot** set once by Finance
+    (`STATEMENT_ISSUE`, fresh sign-in); the patient gets `statement-ready`. **(5) Access**: permissions `DISCHARGE_RECORD` (Consultant),
+    `RECONCILE` (Finance, step-up), `RECONCILE_COUNTERSIGN` (Finance Manager @ platform, step-up), `SETTLEMENT_READ` (Finance, Finance
+    Manager, the case's coordinator and Operations), `STATEMENT_ISSUE` (Finance @ platform, step-up); `CASE_MONEY_OPEN` also covers a
+    recorded final invoice until it is reconciled. `SettlementBasis` is the journey's one door for the settlement module (no cycle).
+    **(6) Patient and staff states**: patient `GOING_HOME` in `DISCHARGED`; Consultant `COMPLETE_DISCHARGE_PACK`; Operations
+    `RECORD_FINAL_INVOICE`, `CONFIRM_RETURN`, `CONFIRM_DEPARTURE`. **API**: journey `DischargeController` — `GET .../{operations|finance|
+    coordinator|doctor}/cases/{id}/discharge`; `POST /doctor/cases/{id}/discharge/pack`, `/doctor/cases/{id}/discharge/handover-letter`;
+    `POST /operations/cases/{id}/discharge/{final-invoice|return|departure}`; patient `GET /patient/cases/{id}/discharge`, link `POST
+    /public/cases/{token}/discharge`; the existing `POST /doctor/cases/{id}/follow-ups` now also in treatment. Settlement
+    `SettlementController` — `GET .../{finance|coordinator|operations}/cases/{id}/reconciliation`; `POST /finance/cases/{id}/reconciliation`
+    (+ `/submit`, `/countersign`, `/dispute/resolve`), `/finance/cases/{id}/statements/{statementId}/e-invoice`; patient `GET
+    /patient/cases/{id}/statements`, link `POST /public/cases/{token}/statements`. Control Center: `fitToFlyHours` on the commercial policy.
+  - Tests and numbers: new `DischargeServiceTest` (5: the gate waits for the pack, the plan and the invoice then tells the patient, with
+    the typed-document and encryption checks and Finance's non-clinical read; fit-to-fly window on a return flight incl. the policy's 96
+    hours and the departure; a ground return; the EN/AR handover letter and "Going home"; an uncountersigned interim bill holding
+    discharge until Finance countersigns) and `SettlementServiceTest` (4: an invoice at the quoted price closes, issues the statement and
+    starts follow-up, with the e-invoice slot, the schema's totals check and the patient's lines; an unapproved extra never charged,
+    disputed and refunded as a credit, the dispute settled by a Finance Manager; a variance above the band returned then approved; the
+    submitter never countersigns), both on the shared `DischargeFixture`; `JourneyServiceIntegrationTest`'s four discharge and exit tests
+    now write the pack evidence first (the gate is `DischargeServiceTest`'s); `NotificationOutboxProcessorTest` covers the two new patient
+    messages. Backend `mvn -o -q test`: 933 tests, 3 skips (924 before, 9 new); green except 5 facility-package tests that fail only between 00:00 and 04:00 local time (+04: the tests take the machine's date, the services UTC/Cairo; pre-existing, untouched here, green with `-Duser.timezone=UTC`). `ArchitectureRulesTest` and `RolePolicyTest` green (JPA only, no native query, no
+    module cycle). `PostgresJpaMappingTest` green on a disposable PostgreSQL 17 (V101 applied, Hibernate validated, every repository query executed, the settlement repositories included). No frontend change.
+  - Not done here (session 2 and later): **no screens or copy**: Consultant pack and letter, Operations invoice, return and departure, the
+    Finance reconciliation workbench (two columns), statements and the e-invoice field, the Finance Manager's countersign and dispute, My
+    Care "Going home" and the statement, the status link's equivalents, the Control Center fit-to-fly field; staff work copy for the six
+    new work types. No PDF; no automatic invoice-line matching; `REFUND_CREDIT` is a work item (the refund is recorded with the existing
+    deposit refund); no facility quarterly dispute counter or Compliance item (P1-19); no payout statement (P1-12); VAT stays inside the
+    platform fee figure. Templates `rs_discharge_pack_ready`, `rs_statement_ready` need Meta approval.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `98958c3`) and rebuilds the dev backend for V101;
+    then P1-17 session 2 (UI and copy, started in a new session; contract in the shared notes folder, `p1-17-session-1-handover.md`).
+- **Status (2026-10-16, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/p1-17-s2-discharge-ui`, cut from `423bbae`):** delivered,
+  frontend only (no wire gap blocked a screen). Amounts are shown exactly as the API returns them; the only sum in the browser is the
+  "lines entered: X of Y" input help on the reconciliation form (whole cents; the backend still checks `INVOICE_LINES_MISMATCH`). The
+  P1-15 money rule (deposit covers the platform fee first) is untouched and still awaits the owner.
+  - **Staff "Discharge" panel** (`DischargePanel`, after "Treatment" on the case page for Operations, the coordinator and the Consultant
+    while the case is `TREATMENT_IN_PROGRESS`, `DISCHARGED` or `FOLLOW_UP`, or for an open discharge item; reads
+    `GET /{role}/cases/{id}/discharge`): what still blocks discharge, in words (the seven blocker codes), with "discharge happens on its
+    own … there is no discharge button" instead of a button; the pack in the backend's order with each item's state (recorded / missing /
+    not needed / before a return flight) and its facts (diagnosis, procedures, pending results, warning signs, medicines, implants, note;
+    null for Finance), the fit to fly's examination time and "valid for a flight until"; the follow-up plan; the handover letter, English
+    and Arabic side by side (`lang`/`dir` per version), each printable on its own page (a blank window written through the DOM, never as
+    markup); the hospital's final invoice (number, EGP, issued, Finance's countersign); the return and the departure. Every command answers
+    with the view. One primary action: the viewer's next one (`DISCHARGE_WORK`, `#discharge-next`). **Consultant**: the pack form (type,
+    checked case document, and per type: diagnosis + warning signs with its plain-language hint + optional procedures and pending results;
+    1-30 medicines of name / dose / how often / how long, "None" allowed; 1-20 implants of description / maker / lot; the examination time
+    with "valid for a return flight within N hours" from `fitToFlyHours`; "recording this type again replaces the one on file"), opening on
+    the first missing item on `COMPLETE_DISCHARGE_PACK` / `DISCHARGE_PACK`; the follow-up plan form (due, video/phone/in person, tests,
+    instructions → `POST /doctor/cases/{id}/follow-ups`) while none is on file, leading once the pack is complete; generate / regenerate
+    the letter. **Operations**: final invoice (record, or correct with `replaces` until the reconciliation is settled) leading on
+    `RECORD_FINAL_INVOICE`; the return (flight or by land; for a flight "valid at departure: until …" from the fit to fly, or "the Consultant
+    records it first"; departure, booking reference) leading on `CONFIRM_RETURN`; the departure once the return is confirmed, leading on
+    `CONFIRM_DEPARTURE`. The coordinator reads only.
+  - **Finance reconciliation workbench** (`ReconciliationPanel`, for Finance, the coordinator and Operations once `DISCHARGED` /
+    `FOLLOW_UP`, and for Finance on any settlement item (`SETTLEMENT_WORK`, incl. an invoice recorded during treatment and Finance Manager
+    items that survive the exit); reads `GET /{role}/cases/{id}/reconciliation`): status badge, the final invoice line, two columns —
+    "What was authorised" (package with its voucher number, each counted change-order line) and "The hospital's invoice" (submitted lines
+    with invoiced / authorised / charged and the variance code as a badge); the figures as returned (authorised, charged, variance,
+    billed-not-charged, paid at the hospital, band limit, "above the band: a Finance Manager approves it") and the trail (opened /
+    submitted / countersigned / settled). **Finance**: "Open the reconciliation" (countersigns the invoice; again after a corrected
+    invoice) and the line form (description, signed EGP amount, "authorised by" = the package / a change-order line / nothing with
+    unapproved extra or billing error; add/remove up to 100; paid at the hospital with its receipts hint; note), leading on
+    `RECONCILE_INVOICE`; the credit reminder; the e-invoice reference on the current statement (once). **Finance Manager**: approve (after a
+    confirmation) or return with what to correct, from `COUNTERSIGN_RECONCILIATION`; settle the dispute (hospital withdrew / platform
+    absorbed + note) from `FACILITY_DISPUTE`; other viewers read "a Finance Manager approves / settles it". Every command is step-up
+    through the portal's re-sign-in and replay, and each form says so. Statements: every revision with current/replaced and the shared
+    `StatementSheet`.
+  - **My Care**: a `dischargeStep` slot (`DISCHARGE_STEPS` = `GOING_HOME`, `FOLLOW_UP`) renders `PatientGoingHome` (reads
+    `GET /patient/cases/{id}/discharge` and `/statements` in parallel): the warning signs first ("Get medical help at once if"), the
+    medicines, the follow-up ("By video on …"), the journey home, the pack documents with their file names and a link to Documents, the
+    letter for the home doctor (EN/AR, print), then the statement (lines with kind and the invoice's description, EGP and the patient's
+    currency per line, total charged, balance due or credit due or "nothing is owed either way") or "your statement is ready once the
+    hospital's final invoice has been checked". New step text `GOING_HOME`; no primary action on the step (nothing to do).
+  - **Status link**: in the `followup` phase (DISCHARGED / FOLLOW_UP) the link reads `POST /public/cases/{token}/discharge` and
+    `/statements` on the verified grant (each failing alone hides only itself) and shows "Going home" and the statement (`GoingHomeStory`,
+    `StatementSheet`, shared with My Care; the page passes `dischargeCopy`).
+  - **Control Center**: "Fit-to-fly window (hours)" (24-168, prefilled from the active version, 72 when none) on the margin-policy form,
+    sent as `fitToFlyHours`, listed on the version and stated in the confirmation (inline en/ar, as the rest of that screen).
+  - **Copy** (en + ar; **Arabic is a draft** pending native review): `portalWork.discharge`, `portalWork.reconciliation`,
+    `portalWork.statement`, `myCare.goingHome`, `myCare.steps.GOING_HOME`; the six work types in `workTitles`, `workCopy.items` and
+    `currentAction.work`; `workCopy.items` for `PATIENT_DISCHARGED` / `PATIENT_DEPARTED`; current actions `COMPLETE_DISCHARGE_PACK`,
+    `RECORD_FINAL_INVOICE`, `CONFIRM_RETURN`, `CONFIRM_DEPARTURE` (button + state); the ten evidence kinds on the trail; 32 error codes in
+    `portalWork.errorCodes` (the hand-over's list; `BILLED_IN_FUTURE` and `SELF_COUNTERSIGN_REFUSED` were already there), shown in the
+    viewer's language by the portal.
+  - Tests: new `DischargePanel.test.tsx` (8: blockers instead of a button and the pack states; pack form opening on the missing medication
+    list with medicine rows; fit to fly's window; follow-up plan and the bilingual letter with print; Operations invoice as the one primary;
+    return by land without a fit to fly and no departure before a return; departure in Arabic; read-only coordinator),
+    `ReconciliationPanel.test.tsx` (6: open after a step-up confirmation; three lines matched to package / change-order line / nothing and
+    submitted; variance codes and waiting for a Finance Manager; approve and return; dispute settled + statement + credit + e-invoice;
+    read-only Operations), `PatientGoingHome.test.tsx` (3, through `MyCare`: going home without an action, the statement in EGP and USD,
+    Arabic), +1 `CaseStatusAccess` (going home + statement on the grant), `PageHeaders` (fit-to-fly prefilled, listed and sent; four
+    bodies updated). Playwright `e2e/my-care-going-home.spec.ts` (6: en/ar × 390/1440 in follow-up with warning signs, medicines and the
+    statement as returned, no primary, no page scroll; en/ar going home before the statement) via the new `discharge` option of
+    `patient-fixture.ts`, green on a dev server together with `my-care-change-order.spec.ts`. `pnpm typecheck` clean, eslint clean on
+    touched files, vitest 84 files / 653 tests green (a pre-existing focus test in `CaseStatusAccess` failed once under the full
+    parallel run and passed alone and on the re-run). Reviewed with react-best-practices, composition-patterns, web-design-guidelines and Impeccable (detector: no
+    findings).
+  - Not done (later or owner): the final UX design of these screens (UX plan); no PDF of the statement or letter (print only); no
+    automatic invoice-line matching; pack documents download through My Care's Documents only if the patient documents endpoint lists
+    staff-uploaded case documents (not checked live); the status link still has no patient-safe step code of its own; not walked live —
+    needs the dev stack rebuilt at V101 with this frontend; Meta approval of `rs_discharge_pack_ready` / `rs_statement_ready`.
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/p1-17-s2-discharge-ui` (it contains `423bbae`), rebuilds backend and
+    frontend, and walks one case live (discharge planned → Consultant pack + plan → Operations final invoice → automatic discharge →
+    Finance opens, matches and submits → statement in My Care → Operations return and departure); then P1-18 (follow-up execution and
+    outcomes), started in a new session.
 
 ### P1-18  Follow-up execution and outcomes  (design §5 stage 6; architecture §5.6)
 - `FollowUpService`: scheduled contacts from the plan, `FOLLOW_UP_CONTACT` items and reminders, coordinator
@@ -854,6 +1476,134 @@ phases.
   follow-up gap); `MyCare.tsx` follow-up block and outcomes form; templates `rs_follow_up_reminder`,
   `rs_outcome_request`, `rs_closure_review`.
 - Sessions: 1–2. Model: Opus 5.5 fast, medium; the outcome data classification reviewed by Fable (PDPL).
+- **Status (2026-10-16, session 1 of 2 = backend, Opus 5.5; committed on `claude/goofy-neumann-7a404f`, cut from `7d2e78c` =
+  `claude/p1-17-s2-discharge-ui`):** delivered; no screen. Flyway **V102** (`V102__follow_up_contacts_and_outcomes.sql`; the `V99` name
+  above was stale) is now the newest; V103 is the next free. Two sessions: this one the backend, session 2 the UI and copy.
+  - Decision recorded (owner's standing rule: decide by the recommendation, do not ask): **D-G applied as recommended**: 30 days of
+    follow-up included (`commercial_policies.follow_up_free_days`, 7-90, Finance Managers change it per care area; left out it carries
+    over; frozen on each case at discharge), counted from discharge; paid teleconsultation after it stays P2-25. Further choices made
+    here, each the design's best-practice reading: the window **closes only when no reported complication waits for the Consultant**;
+    the case then **closes on its own** (no button) once every follow-up contact is held, missed or cancelled, the check-ins that fall
+    inside the window are recorded and no reopen review or rebooking is open; the **outcome questions are asked at day 30 and day 90
+    whether or not the case has closed** (day 90 is after the window), each open 30 days; a complication on a closed case does not
+    reopen it automatically — the Consultant or a manager reopens it with P1-13's reopen; check-ins are owed only inside the window,
+    so a case reopened later owes none. The P1-15 money rule (deposit covers the fee first) is untouched and still awaits the owner.
+  - Delivered (`FollowUpService`, `FollowUpReadiness`, journey): **(1) The window**: discharge (`CaseEvents.PatientDischarged`, from
+    P1-17's move) opens `follow_up_windows` (discharged at, free days, ends at); the hourly sweep (`app.follow-up.scan-ms`, leased)
+    writes `FOLLOW_UP_WINDOW_CLOSED` when it is over and then tries FOLLOW_UP -> CLOSED (`CaseExitService.closeAfterFollowUp`, exit
+    reason `FOLLOW_UP_COMPLETED`, My Care's `COMPLETED`); the policy refuses the move otherwise (`FOLLOW_UP_NOT_COMPLETE`, blockers
+    `FOLLOW_UP_WINDOW_OPEN`, `FOLLOW_UP_CONTACT_OPEN`, `CHECK_IN_OPEN`, `COMPLICATION_UNDER_REVIEW`, `FOLLOW_UP_REVIEW_OPEN`).
+    **(2) Contacts** (`follow_up_contacts`; Consultant, `FOLLOW_UP_RECORD`): the plan's first contact is scheduled at discharge (also
+    for a plan recorded after it), then as the Consultant adds; held (note required) or missed with a `FOLLOW_UP_CONTACT` ledger row, or
+    cancelled with a reason; notes encrypted. One `FOLLOW_UP_CONTACT` item points at the next contact (due on its date); a missed one
+    opens the coordinator's `REBOOK_FOLLOW_UP` (1 working day), closed by booking a new one; the patient is reminded once the day
+    before (`follow-up-reminder`). **(3) Check-ins** (coordinator, `CHECK_IN_RECORD`): `CHECK_IN_D3/D14/D30` opened the day before
+    their day, due 18:00 Cairo, recorded once as reached / not reached with a note (`CHECK_IN` ledger row, encrypted). **(4)
+    Outcomes** (`case_outcomes`; patient or representative, `OUTCOME_REPORT`, no step-up): at day 30 and 90 the question is asked (a
+    new secure link of purpose **`OUTCOME`**, 30 days, `outcome-request`; My Care `REPORT_OUTCOME`); pain, function, satisfaction
+    0-10 and complication yes/no (+ what happened); answered once from My Care or the OUTCOME link only (`LINK_PURPOSE_MISMATCH` for
+    another purpose). A complication opens an adverse-event incident (P1-13, HIGH, origin `OUTCOME_D30|D90`), the Consultant's
+    `REVIEW_COMPLICATION` (4 working hours, survives exit) and tells the coordinators (`COMPLICATION_REPORTED`); the review (note)
+    lets the window close. **(5) Closure**: `CaseEvents.CaseClosed` (here or "no follow-up needed") sends `closure-review` once per
+    case, and the settlement module issues the **`CLOSURE` statement** (`RS-SC-<case>-<rev>`, `StatementService`; the same account with
+    refunds since discharge; a new revision only when the figures changed). **(6) PDPL** (review by a Fable 5.1 sub-agent, fixes
+    applied): outcome rows are health data; scores and the flag plain on pseudonymous rows, all free text encrypted; readers
+    `FOLLOW_UP_READ` = the case's Consultant (everything) and coordinator + lead (no clinical free text: contact notes, complication
+    and review text are null for them), never Finance or Operations; the complication text also reaches the incident's manager and
+    Compliance as the incident summary (stated in the code and architecture §12); each answer stores the purpose notice version it
+    was given under (`OUTCOME_NOTICE_VERSION` = `outcome-notice-2026-10`, `OUTCOME_NOTICE_OUTDATED`) and who answered (the link's
+    `answeredBy`: PATIENT or REPRESENTATIVE → `PATIENT_REPRESENTATIVE`); audit and logs carry point, channel and ids, never an answer.
+    **API**: `FollowUpController` — `GET /{doctor|coordinator}/cases/{id}/follow-up`; `POST /doctor/cases/{id}/follow-up/contacts`
+    (+ `/{contactId}`, `/{contactId}/cancel`), `/doctor/cases/{id}/follow-up/outcomes/{point}/review`;
+    `POST /coordinator/cases/{id}/follow-up/check-ins/{point}`; patient `GET /patient/cases/{id}/follow-up`,
+    `POST /patient/cases/{id}/follow-up/outcomes/{point}`; links `POST /public/cases/{token}/follow-up`, `/public/cases/{token}/outcomes/{point}`.
+    Control Center: `followUpFreeDays` on the commercial policy (`FOLLOW_UP_WINDOW_INVALID`). Templates `follow-up-reminder`,
+    `outcome-request`, `closure-review` (EN/AR, bound to `rs_follow_up_reminder`, `rs_outcome_request`, `rs_closure_review`).
+  - Tests and numbers: new `FollowUpServiceTest` (3: the schedule kept — reminder once, held, missed and rebooked, cancelled — the
+    check-ins inside the window, the case closing on its own with the CLOSURE statement and the review request, the day-30 answer in
+    My Care, day 90, an expired question, Operations refused the view; a complication on the OUTCOME link from a declared
+    representative (encrypted text, no answer in audit, the coordinator sees the flag not the text) holding the window until the
+    Consultant's review, then closing, reopened and closing again with no second statement or message; only the OUTCOME link answers),
+    and the three templates in `NotificationOutboxProcessorTest` (+1 test). Backend `mvn -o -q test`: 937 tests, 3 skips (933 before, 4
+    new); green except the 5 facility-package tests that fail only between 00:00 and 04:00 local time (pre-existing zone flake; they ran
+    at 01:30 and are green with `-Duser.timezone=UTC`). `ArchitectureRulesTest` and `RolePolicyTest` green (JPA only, no native query,
+    no module cycle: settlement listens to the journey's event). `PostgresJpaMappingTest` green on a disposable PostgreSQL 17 (V102
+    applied, Hibernate validated, every repository query executed, the three new repositories included). No frontend change.
+  - Not done here (session 2 and later): **no screens or copy**: the Consultant "Follow-up" panel (closes the P0-2 follow-up gap), the
+    coordinator's check-ins, My Care's follow-up block, the outcomes form with the purpose notice (it sends `noticeVersion`), the
+    status link's OUTCOME page, the Control Center "Free follow-up (days)" field, work copy for the six new work types. No reminder
+    for an unanswered outcome question; the review request is a message only (where reviews are published is the owner's call);
+    retention class for outcome and follow-up rows waits for P1-7 and counsel; the PDPC licence (D-I), breach procedure and DPO are
+    the owner's; P1-19 must read outcome aggregates only and flag representative answers. Templates `rs_follow_up_reminder`,
+    `rs_outcome_request`, `rs_closure_review` need Meta approval; the P1-16/P1-17 keys (`treatment-update`, `change-order-review`,
+    `change-order-applied`, `discharge-pack-ready`, `statement-ready`) are still not bound in `application.yml` (pre-existing).
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `7d2e78c`) and rebuilds the dev backend for
+    V102; then P1-18 session 2 (UI and copy, started in a new session; contract in the shared notes folder, `p1-18-session-1-handover.md`).
+- **Status (2026-10-16, session 2 of 2 = UI and copy, Opus 5.5; committed on `claude/trusting-lamarr-b82819`, cut from `a879cd7`):** delivered,
+  frontend only (no wire gap blocked a screen); Flyway still at V102. Scores and dates are shown as the API returns them; nothing is
+  computed in the browser. The P1-15 money rule (deposit covers the platform fee first) is untouched and still awaits the owner.
+  - **Staff "Follow-up" panel** (`FollowUpPanel`, after Discharge / Reconciliation on the case page, for the case's Consultant and
+    coordinator only — never Finance or Operations — while the case is `DISCHARGED`, `FOLLOW_UP` or `CLOSED`, or for an open follow-up item
+    (`FOLLOW_UP_WORK`); reads `GET /{doctor|coordinator}/cases/{id}/follow-up`; renders nothing for a case closed before discharge): the
+    window (discharged, free follow-up N days, ends / ended), what holds the case open in words (the five closure blockers) with "the case
+    closes on its own … there is no close button", the plan (mode, due, tests, instructions), the contacts (mode and time, booked / held /
+    missed / cancelled, from the plan / added, reminded / recorded, the Consultant's note), the D3/D14/D30 check-ins (not yet / due / done,
+    reached or not, note), the outcomes (asked, awaiting / not answered, answered in My Care or by secure link, "answered by someone for the
+    patient", pain / daily activities / satisfaction "N out of 10", complication badge, its text for the Consultant or "the details are in
+    the Consultant's record" for the coordinator, awaiting review / reviewed + review note). On a closed case with `reopenAvailable`: "a
+    complication was reported after the case closed" with an in-page link to the existing P1-13 "Reopen case" (`#reopen-case`, added to
+    `ReopenCase`). Every command answers with the view. One primary action, the viewer's current work (`#follow-up-next`): **Consultant** —
+    record a booked contact held / missed with a required note (leads on `FOLLOW_UP_CONTACT`), review a reported complication with what was
+    done or advised (leads on `REVIEW_COMPLICATION`; also on a closed case), book another contact (when, video / phone / in person), cancel
+    a booked contact with a reason; recording forms only in `DISCHARGED` / `FOLLOW_UP`. **Coordinator** — read-only except the due
+    check-ins (reached / not reached + optional note with "no clinical detail here"; leads on `CHECK_IN_D3|D14|D30`); on `REBOOK_FOLLOW_UP`
+    the line "agree a new time with the patient and ask the Consultant to book it" (booking is the Consultant's endpoint). "Do it" from the
+    current-action panel lands on the panel's next form. This closes the P0-2 Consultant follow-up gap.
+  - **My Care**: a new `followUpStep` slot (`FOLLOW_UP_STEPS` = `FOLLOW_UP`, `REPORT_OUTCOME`, plus exit `COMPLETED`) renders
+    `PatientFollowUp` (reads `GET /patient/cases/{id}/follow-up`, and `/statements` once closed). `REPORT_OUTCOME` (new step text "How are
+    you doing?"): the purpose notice above the questions (who reads the answers — Consultant and coordinator, and for a reported problem a
+    care manager and Compliance; quality use without the name; kept with the case record; ask the coordinator to stop or delete), then pain,
+    daily activities and satisfaction as 0-10 choice cards (44px, 6 per row on a phone, 11 on wider screens, the ends named), "has anything
+    gone wrong since you left hospital" yes / no, a yes asks what happened and says not to wait in an emergency; inline errors, focus on the
+    first unanswered question; sends `noticeVersion` = `OUTCOME_NOTICE_VERSION` (`outcome-notice-2026-10`, in `admission-steps.ts`; change it
+    with the notice's words and the backend constant). Thanks after sending (complication-aware), and "we received your answers on …"
+    afterwards. `FOLLOW_UP`: the next contact ("By phone on …", "we remind you the day before") or "your Consultant books your next contact
+    if one is needed", "your free follow-up lasts until …" / "ended on …", earlier contacts, and "If something goes wrong" in order
+    (coordinator → Consultant → local emergency). Going home no longer repeats the plan's first date in follow-up. Completed (`NONE` + exit
+    `COMPLETED`, step text reworded for both completion kinds): the closing statement (`StatementSheet`, now naming its kind: "Closing
+    statement · Issued …") or "being prepared", and "How was your journey?" pointing at the review message the backend sent.
+  - **Status link**: the summary's `purpose`; on an OUTCOME link the page opens on the open question (step text "How are you doing?",
+    the page's one action) with "Who is answering? I am the patient / I am answering for the patient" first → `answeredBy`
+    PATIENT / REPRESENTATIVE on `POST /public/cases/{token}/outcomes/{point}`; failures in the patient's words (already sent, closed,
+    notice changed, session ended, link invalid). On any link in the `followup` phase (and on an OUTCOME link once answered), the follow-up
+    block via `POST /public/cases/{token}/follow-up`. The page passes `followUpCopy`.
+  - **Control Center**: "Free follow-up (days)" (7-90, prefilled from the active version, 30 when none) on the margin-policy form, sent as
+    `followUpFreeDays`, listed on the version and stated in the confirmation (inline en/ar, as the rest of that screen).
+  - **Copy** (en + ar; **Arabic is a draft** pending native review; **the purpose notice needs counsel's review** before go-live, with
+    P1-7's retention class): `portalWork.followUp` (panel), `myCare.followUp` (block, questions, notice, route, closed),
+    `myCare.steps.REPORT_OUTCOME`, `myCare.steps.COMPLETED` reworded; the six work types in `workTitles`, `workCopy.items` and
+    `currentAction.work`; `workCopy.items.COMPLICATION_REPORTED`; the three evidence kinds on the trail; `statement.kinds` (DISCHARGE,
+    CLOSURE); 16 error codes (`NOT_DISCHARGED` existed; `COMPLICATION_DETAILS_REQUIRED` now covers the patient's and the Consultant's case).
+  - Tests: new `FollowUpPanel.test.tsx` (7: window, blockers instead of a close button, contacts, check-ins and answers; review as the one
+    primary on `REVIEW_COMPLICATION`; record missed + book on `FOLLOW_UP_CONTACT`; coordinator without clinical text records `CHECK_IN_D14`;
+    `REBOOK_FOLLOW_UP` line; closed + reopen link in Arabic; nothing for a case closed before discharge), `PatientFollowUp.test.tsx` (4,
+    through `MyCare`: follow-up with the route in order; the questions with the notice, required answers, complication text and the notice
+    version; completed with the closing statement and the review; Arabic), +2 `CaseStatusAccess` (OUTCOME link with "answering for the
+    patient" → `REPRESENTATIVE`; follow-up block on a status link), `PageHeaders` (free follow-up prefilled, listed and sent; four bodies
+    updated). Playwright `e2e/my-care-follow-up.spec.ts` (8: en/ar × 390/1440 outcome questions with 44px targets, one primary, no page
+    scroll and the body sent; en/ar follow-up; en/ar completed) via the new `followUp` option of `patient-fixture.ts`, green on a dev server
+    together with `my-care-going-home.spec.ts` (6). `pnpm typecheck` clean, eslint clean on touched files, vitest 86 files / 666 tests
+    green. Reviewed with react-best-practices, composition-patterns (the link's "who is answering" is a child slot with its own check, not a
+    flag), web-design-guidelines and Impeccable (detector: no findings); the e2e run caught a duplicate React key between the follow-up and
+    going-home blocks, fixed.
+  - Not done (later or owner): the final UX design of these screens (UX plan); no reminder for an unanswered question (backend); where
+    reviews are published (owner); paid teleconsultation after the window (P2-25); the coordinator cannot book a contact (by design, the
+    Consultant's endpoint); not walked live — needs the dev stack rebuilt at V102 with this frontend; Meta approval of
+    `rs_follow_up_reminder`, `rs_outcome_request`, `rs_closure_review`.
+  - Next exact action: owner fast-forwards `feat/review-p0` to `claude/trusting-lamarr-b82819` (it contains `a879cd7`), rebuilds backend and
+    frontend, and walks one case live (discharge → follow-up window → Consultant records the plan's contact → coordinator D3 check-in → day-30
+    question answered in My Care with a complication → Consultant review → window ends → CLOSED with the closing statement); then P1-19
+    (hospital-agreement audit), started in a new session.
 
 ### P1-19  Hospital-agreement audit  (design §7; architecture §5.7)
 - `consultant_affiliations` (yearly declaration, Compliance review, eligibility condition D-H, `UNDECLARED_FACILITY`
@@ -904,8 +1654,8 @@ export on demand (C-07); region-per-market deployment (E-10); video consultation
 Delivered on `feat/review-p0` (pushed at `e68dbc5`, local beyond that; dev stack at V94): P0-1, P0-2, P0-3, P0-4 (re-scoped),
 P0-5, P1-6, and P1-8 sessions 1 and 2 (meters, internal metrics port, alert rules; `5919bf1`; scheduler lease V95, Prometheus
 registry, Prometheus + Grafana, rules file, dashboard on `claude/p1-8-lease-5e9409`) and its verification (`df40908`). P1-10 session 1
-(fee line, no-surprise cap, cooling period, validity, FX band; V96) is committed on `claude/p1-10-fee-fb4348` for the owner to
-fast-forward. Everything below is still to do.
+(fee line, no-surprise cap, cooling period, validity, FX band; V96, `b4ab584`) and session 2 (patient and Finance UI, copy; `claude/p1-10-s2-ui-bf8b61`)
+are done. P1-13 sessions 1 (backend: age band, guardians, incidents, reopen; V97; `76d6289`) and 2 (UI and copy; `claude/upbeat-snyder-df6742`) are done. Everything below is still to do.
 
 **Why the order changed.** The owner's two priorities are (1) a complete, auditable journey after the deposit —
 today nothing collects, proves or reconciles money after the 15%, and the Consultant's hospital deal is invisible —
@@ -919,9 +1669,9 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | # | Phase | Sessions | Model | Before it starts |
 |---|---|---|---|---|
 | 1 | P1-8 Metrics, alerts, scheduler leadership | done: sessions 1, 2 and the verification (2026-10-15, one fix) | Fable 5.1, high | Owner fast-forwards `feat/review-p0` to the session-2 result and rebuilds the dev stack (V95); verify the lease (18 leased jobs, 3 claim-based workers) and the row-lock claiming |
-| 2 | **P1-10 Commercial truth + fee restructuring** (D-A) | 2: session 1 done (2026-10-15, V96), session 2 next | Fable 5.1 high, then Sonnet 5.5 | Session 2 (panel, guarantee placeholder, fee wording, cooling/FX states, Finance UI) after the owner fast-forwards `feat/review-p0` and rebuilds the dev stack (V96). Counsel on the fee's VAT rate does not block it |
+| 2 | ~~P1-10 Commercial truth + fee restructuring~~ (D-A) | **done**: sessions 1 and 2 (2026-10-15) | Fable 5.1 high, then Sonnet 5.5 | Owner fast-forwards `feat/review-p0` to the session-2 commit, rebuilds the frontend and walks the flow; counsel on the guarantee wording and the fee's VAT rate; native Arabic review |
 | — | UI/UX (all areas) | own plan | see `docs/ux-redesign/PLAN.md` | Runs in parallel in its own worktree; Finance and Operations areas wait for P1-15 / P1-17 |
-| 3 | P1-13 Minors, guardians, incidents, reopen | 2 | Opus 5.5; guardian consent reviewed by Fable | — (P1-16 and P1-18 depend on it) |
+| 3 | ~~P1-13 Minors, guardians, incidents, reopen~~ | **done**: sessions 1 (backend) and 2 (UI, copy), 2026-10-15 | Opus 5.5; guardian consent reviewed by Fable | Owner fast-forwards `feat/review-p0` to the session-2 commit and rebuilds backend and frontend; counsel on the guardian consent, native Arabic review; My Care upload for guardian evidence done on `claude/guardian-upload` |
 | 5 | **P1-15 Admission, voucher, balance, `ADMISSION_READY`** | 2 | Fable 5.1, high | D-B, D-C, D-D decided; P1-10 merged |
 | 6 | **P1-16 Treatment evidence: milestones, change orders** | 2 | Fable 5.1 high; forms by Opus | D-E band; P1-13 |
 | 7 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths by Fable | Owner: payer terms, partner commission |
@@ -930,7 +1680,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | 10 | **P1-19 Hospital-agreement audit** | 1–2 | Opus 5.5; eligibility change by Fable | D-H |
 | 11 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide retention of plaintext WhatsApp sender digits; evidence and statements as `LEGAL_RECORD` class |
 | 12 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-18, so the extracted code is final |
-| 13 | P1-9 Backups and restore drill | 1–2 | Opus 5.5, medium | — |
+| 13 | ~~P1-9 Backups and restore drill~~ | **done**: 1 session (2026-10-15); local drill PASS in 135 s | Opus 5.5 | Production drill on the chosen host (managed PITR restore time, region failover) adds its row to `docs/deployment.md` before real patient data |
 | 14 | P1-14 Consultant public profiles (data and endpoint) | 1 | Opus 5.5 | The page is UX plan area 1b; photographs with consent |
 | 15 | P2-24 Refund rules enforced | 1 | Fable high | Moves up from P2: the point of no return (P1-15) and the 10-day rule need enforcement before the first paying patient |
 | 16 | P2-15 … P2-26 (rest) | about 19 | per the P2 table | P2-15 needs the second-destination timing decision |
@@ -942,8 +1692,24 @@ the licence now; the credential type is a one-line addition in P1-19.
 ### Owner decisions still open
 
 - [x] D-A (fee restructuring): yes, before launch (owner, 2026-10-15); see the P1-10 entry.
-- [ ] D-B…D-H from `docs/post-deposit-journey-design.md` §12 (voucher model, pay to admit, new stage, change-order
-      band, fit-to-fly window, free follow-up window, affiliations as eligibility).
+- [x] D-B (voucher model): yes (owner, 2026-10-15). Phase 1: the patient pays the medical balance at the hospital cashier against an
+      admission voucher the platform issues to the hospital (case, patient, package reference and price, inclusions, the deposit credit
+      the platform will settle, the amount paid at the cashier, the frozen FX rate); the platform never holds hospital money; the hospital
+      returns the cashier receipt. Phase 2 (later): platform collection through a licensed PSP. Built in P1-15 session 1.
+- [x] D-C (pay to admit): yes (owner, 2026-10-15). No treatment episode opens without balance evidence on file (hospital receipt now, PSP
+      confirmation in phase 2); emergency override by the Consultant with a reason plus a Finance review task, as for consent. Built in P1-15
+      session 1.
+- [x] D-D (`ADMISSION_READY` macro state): **applied as recommended** (2026-10-15; the owner agreed to "both recommendations" D-B and D-C and
+      asked to implement — D-D was not asked separately, so the owner may still object). Built in P1-15 session 1.
+- [ ] P1-15: the voucher's money rule was applied as recommended (design §6 rule 1: the deposit covers the platform fee first, the rest is
+      credited to the hospital, a fee the capped deposit did not cover is owed to the platform before admission); the owner confirms it, or
+      chooses "the whole deposit is credited to the hospital and the fee is paid to the platform separately" (the architecture's first
+      worked example). Counsel confirms the hospital voucher email's content (patient name and amounts to the hospital's contact).
+- [x] D-E (change-order band): **applied as recommended** (2026-10-15, owner's standing rule to decide by the recommendation; P1-16
+      session 1): the lower of 10% of the facility package and EGP 15,000, cumulative over the case's change orders; Finance alone within
+      it, the patient (fresh sign-in or verified secure link) above it, emergency path with a Finance review. Finance Managers can change
+      the rate and cap per care area. The owner may still object.
+- [ ] D-F…D-H from `docs/post-deposit-journey-design.md` §12 (fit-to-fly window, free follow-up window, affiliations as eligibility).
 - [ ] D-I: start the PDPL licence application and the Law 13/2025 liability-fund subscription (owner action).
 - [x] P1-10: final-quote validity 14 days and FX band 3% (owner, 2026-10-15); guarantee wording ships as a placeholder.
 - [ ] P1-10: counsel approves the guarantee wording and the VAT rate on the platform fee; owner decides whether the
@@ -957,9 +1723,11 @@ the licence now; the credential type is a one-line addition in P1-19.
 
 ### Before production (from delivered phases)
 
-- [ ] Submit the new WhatsApp templates to Meta for approval: `rs_patient_action_reminder`, `rs_information_request_closed` (P1-6), and the deposit templates if not yet approved (P0-4).
+- [ ] Submit the new WhatsApp templates to Meta for approval: `rs_patient_action_reminder`, `rs_information_request_closed` (P1-6), `rs_admission_voucher`, `rs_cleared_for_admission` (P1-15), and the deposit templates if not yet approved (P0-4).
+- [ ] P1-15: every facility that admits patients has an admissions contact email (`facilities.contact_email`): the voucher is emailed there; without one nothing is sent and Operations hands it over.
 - [ ] Set the real bank-transfer details (`PAYMENT_BANK_*`); the defaults are dummy values (DEP-3).
 - [ ] Start every environment with `PII_INDEX_KEY` set before V86 runs (P0-1).
+- [ ] Apply PITR and bucket versioning/replication on the chosen host (`scripts/dr/`), start the nightly realm export, and run the production restore drill; record its time in `docs/deployment.md` (P1-9).
 - [ ] Native Arabic review of all new copy (P0-3, P0-5, P1-6 and earlier), as part of P2-21.
 
 ### Follow-ups carried from delivered phases

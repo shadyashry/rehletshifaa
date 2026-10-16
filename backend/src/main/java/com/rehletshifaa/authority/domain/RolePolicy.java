@@ -82,6 +82,41 @@ public final class RolePolicy {
             g(CARE_COORDINATION_MANAGER, ROUTING_READ, PLATFORM), g(CARE_COORDINATION_MANAGER, ROUTING_CONFIGURE, PLATFORM),
             g(CARE_COORDINATION_MANAGER, ROUTING_ASSIGN, PLATFORM), g(CARE_COORDINATION_MANAGER, REPLY_COVER_MANAGE, PLATFORM),
             g(CARE_COORDINATION_MANAGER, CONVERSATION_READ, PLATFORM), g(CARE_COORDINATION_MANAGER, CONVERSATION_REASSIGN, PLATFORM),
+            // P1-13 (A-06): an incident is owned by a Care Coordination Manager, never by the coordinator it may concern; Compliance
+            // reads every one. The patient and their representative report on their own case; the case team reports what it sees.
+            g(CARE_COORDINATION_MANAGER, INCIDENT_MANAGE, PLATFORM), g(CARE_COORDINATION_MANAGER, INCIDENT_READ, PLATFORM),
+            g(COMPLIANCE_AUDITOR, INCIDENT_READ, PLATFORM), g(CARE_COORDINATION_MANAGER, CASE_REOPEN, PLATFORM),
+            g(CONSULTANT, CASE_REOPEN, CASE_ASSIGNED),
+            g(PATIENT, INCIDENT_REPORT, OWN_PATIENT), g(PATIENT_REPRESENTATIVE, INCIDENT_REPORT, OWN_PATIENT),
+            g(COORDINATOR, INCIDENT_REPORT, CASE_OWNER), g(CONSULTANT, INCIDENT_REPORT, CASE_ASSIGNED),
+            g(OPERATIONS, INCIDENT_REPORT, CASE_ASSIGNED), g(FINANCE, INCIDENT_REPORT, CASE_ASSIGNED),
+            // P1-15 (D-B, D-C): Operations manages the admission on its own cases; Finance reads and countersigns the money of any case
+            // whose admission is open (no clinical record, documents or threads), as it records deposits platform-wide; the case team
+            // reads the panel; the patient and their representative confirm the arrival.
+            g(OPERATIONS, ADMISSION_READ, CASE_ASSIGNED), g(OPERATIONS, ADMISSION_MANAGE, CASE_ASSIGNED),
+            g(COORDINATOR, ADMISSION_READ, CASE_ASSIGNED), g(CONSULTANT, ADMISSION_READ, CASE_ASSIGNED),
+            g(FINANCE, ADMISSION_READ, CASE_ASSIGNED), g(FINANCE, ADMISSION_READ, CASE_MONEY_OPEN), g(FINANCE, EVIDENCE_COUNTERSIGN, CASE_MONEY_OPEN),
+            g(PATIENT, ARRIVAL_REPORT, OWN_PATIENT), g(PATIENT_REPRESENTATIVE, ARRIVAL_REPORT, OWN_PATIENT),
+            // P1-16 (D-E): milestones by the case's Consultant or its Operations person (then countersigned by the Consultant);
+            // change orders proposed by the Consultant and priced by Finance (the case's, or any while its money is open). The
+            // patient's acceptance is PATIENT_DECIDE; the staff treatment view is ADMISSION_READ.
+            g(CONSULTANT, MILESTONE_RECORD, CASE_ASSIGNED), g(OPERATIONS, MILESTONE_RECORD, CASE_ASSIGNED), g(CONSULTANT, MILESTONE_COUNTERSIGN, CASE_ASSIGNED),
+            g(CONSULTANT, CHANGE_ORDER_PROPOSE, CASE_ASSIGNED), g(FINANCE, CHANGE_ORDER_PRICE, CASE_ASSIGNED), g(FINANCE, CHANGE_ORDER_PRICE, CASE_MONEY_OPEN),
+            // P1-17 (D-F): the discharge pack by the case's Consultant (Operations records the final invoice, the return and the
+            // departure under ADMISSION_MANAGE); Finance reconciles (the case's, or any while its money is open); a Finance Manager
+            // countersigns a variance above the band and settles a facility dispute (no case access beyond the settlement view);
+            // the e-invoice reference is Finance's on any statement, since it arrives after the case's money has closed.
+            g(CONSULTANT, DISCHARGE_RECORD, CASE_ASSIGNED),
+            g(FINANCE, RECONCILE, CASE_ASSIGNED), g(FINANCE, RECONCILE, CASE_MONEY_OPEN), g(FINANCE_MANAGER, RECONCILE_COUNTERSIGN, PLATFORM),
+            g(FINANCE, SETTLEMENT_READ, CASE_ASSIGNED), g(FINANCE, SETTLEMENT_READ, CASE_MONEY_OPEN), g(FINANCE_MANAGER, SETTLEMENT_READ, PLATFORM),
+            g(COORDINATOR, SETTLEMENT_READ, CASE_ASSIGNED), g(OPERATIONS, SETTLEMENT_READ, CASE_ASSIGNED),
+            g(FINANCE, STATEMENT_ISSUE, PLATFORM),
+            // P1-18 (D-G): follow-up by the case's Consultant (contacts, complication review) and coordinator (check-ins); the
+            // patient and their representative answer the outcome questions. The staff follow-up view (the outcome answers are health
+            // data) is the Consultant's and the coordinator's (and their lead's), not Finance's or Operations'.
+            g(CONSULTANT, FOLLOW_UP_RECORD, CASE_ASSIGNED), g(COORDINATOR, CHECK_IN_RECORD, CASE_ASSIGNED),
+            g(CONSULTANT, FOLLOW_UP_READ, CASE_ASSIGNED), g(COORDINATOR, FOLLOW_UP_READ, CASE_ASSIGNED), g(COORDINATOR, FOLLOW_UP_READ, SUPERVISED),
+            g(PATIENT, OUTCOME_REPORT, OWN_PATIENT), g(PATIENT_REPRESENTATIVE, OUTCOME_REPORT, OWN_PATIENT),
             // Other function managers: hierarchy and staffing only; no execution, clinical or decision authority.
             g(OPERATIONS_MANAGER, TEAM_MANAGE, PLATFORM), g(OPERATIONS_MANAGER, STAFFING_REQUEST, PLATFORM),
             g(FINANCE_MANAGER, TEAM_MANAGE, PLATFORM), g(FINANCE_MANAGER, STAFFING_REQUEST, PLATFORM),

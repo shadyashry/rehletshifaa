@@ -35,7 +35,7 @@ export const copy={
  * unseen, so a drawer action would otherwise end with no visible result. A drawer clears them when it opens, so it only
  * shows what happened while it was open.
  */
-export type Feedback={notice:string;error:string;clear:()=>void;clearNotice:()=>void};
+export type Feedback={notice:string;error:string;/** A refusal the form or proposal explains itself (not shown as the page error), with the request path it answered. */errorCode?:string;errorPath?:string;clear:()=>void;clearNotice:()=>void};
 
 export const FeedbackContext=createContext<Feedback>({notice:"",error:"",clear:()=>{},clearNotice:()=>{}});
 

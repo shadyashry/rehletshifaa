@@ -36,4 +36,18 @@ describe("CaseWorkflowActions facility pickers", () => {
     expect(screen.getByText(/No active facility is set up yet/)).toBeVisible();
     expect(screen.queryByPlaceholderText("Facility")).not.toBeInTheDocument();
   });
+
+  // P1-15: a cleared patient's first episode carries the hospital's admission number (pay to admit; the backend refuses without it).
+  it("records the treatment episode of a cleared patient with the hospital admission number", async () => {
+    const mutate = vi.fn().mockResolvedValue({ id: "e1" });
+    render(<CaseWorkflowActions locale="en" role="doctor" caseSummary={{ id: "c1", status: "ADMISSION_READY", version: 1 }} mutate={mutate} facilities={facilities}
+                                admissionNumberCopy={{ label: "Hospital admission number", hint: "Needed before treatment starts." }}/>);
+    fireEvent.change(screen.getByLabelText("Facility"), { target: { value: "f1" } });
+    fireEvent.change(screen.getByLabelText("Treatment starts"), { target: { value: "2026-10-20T09:00" } });
+    const number = screen.getByLabelText(/Hospital admission number/);
+    expect(number).toHaveAccessibleDescription("Needed before treatment starts.");
+    fireEvent.change(number, { target: { value: " ADM-5521 " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(mutate).toHaveBeenCalledWith("/doctor/cases/c1/treatment-episodes", expect.objectContaining({ facilityId: "f1", admissionNumber: "ADM-5521" }));
+  });
 });

@@ -31,7 +31,9 @@ public class CaseExitReason extends AssignedIdEntity {
         // the Consultant recorded that no follow-up is needed (DISCHARGED -> CLOSED)
         NO_FOLLOW_UP_NEEDED,
         // P1-6: the patient left an information request unanswered for 30 days (INFORMATION_REQUIRED -> CANCELLED)
-        INFORMATION_NOT_PROVIDED
+        INFORMATION_NOT_PROVIDED,
+        // P1-18 (D-G): the follow-up window ended with every contact and check-in done (FOLLOW_UP -> CLOSED, the scheduler)
+        FOLLOW_UP_COMPLETED
     }
 
     @Column(name = "case_id", nullable = false) private UUID caseId;

@@ -1,9 +1,12 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useContext, useId, useRef, useState, type ReactNode } from "react";
 
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
+import { ACCEPTANCE_HOLD_ID, AcceptanceHold, ScopeChangeNotice } from "@/components/PriceTransparency";
+import { FeedbackContext } from "@/components/portal/portal-ui";
+import { FIELD_HANDLED_CODES, finalQuoteState, isPlatformFee, useNow } from "@/lib/price-transparency";
 import { ARABIC_PENDING_NOTICE, ARABIC_TERMS_APPROVED, finalQuoteTerms } from "@/lib/commercial-terms";
 import { fillTemplate } from "@/lib/portal-labels";
 import { formatMoney } from "@/lib/money";
@@ -12,7 +15,7 @@ import { intlLocale, type Locale } from "@/lib/i18n";
 
 export type ProposalCopy = Dictionary["portalProposal"];
 type Mutate = (path: string, body?: unknown, method?: string) => Promise<unknown>;
-type Item = { id: string; description: string; quantity: number; unitPrice: number; optional: boolean };
+type Item = { id: string; category?: string; description: string; quantity: number; unitPrice: number; optional: boolean };
 /** The assisted-decision facts the backend keeps per version (Arabic terms path); absent when there are none. */
 export type ProposalAssistance = {
   requestedAt?: string | null; decisionSource?: string | null; recordedByName?: string | null; channel?: string | null;
@@ -21,6 +24,12 @@ export type ProposalAssistance = {
 export type PatientProposalData = {
   versionId: string; status: string; currency: string; validUntil?: string; documentType?: string;
   items: Item[]; coordinatorNotes?: string; assistance?: ProposalAssistance | null;
+  /** Why the Consultant changed the plan, when they did (final quote). */
+  scopeChangeReason?: string | null;
+  /** When a final quote above the estimate's maximum can be accepted (end of its cooling period); null otherwise. */
+  acceptableFrom?: string | null;
+  /** Finance is checking the exchange rate before this final quote can be accepted: null | PENDING | CONFIRMED. */
+  fxReapprovalStatus?: string | null;
 };
 
 const longDate = (iso: string, locale: Locale) => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(iso));
@@ -73,6 +82,11 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
   const hasRecommendation = !!(recommendation?.treatment || recommendation?.risks);
   const hasOptional = proposal.items.some((item) => item.optional);
   const termsId = useId();
+  const price = copy.price;
+  const feedback = useContext(FeedbackContext);
+  // Cooling period or Finance's rate check, from the version's facts or from a decision the server just refused.
+  const refusedHere = feedback.errorPath?.includes(proposal.versionId) ? feedback.errorCode : null;
+  const hold = finalQuoteState(proposal, useNow(proposal.acceptableFrom), refusedHere);
 
   return (
     <div className="space-y-6">
@@ -89,6 +103,9 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
         )}
       </header>
 
+      {quote && <ScopeChangeNotice copy={price} reason={proposal.scopeChangeReason} id="proposal-scope-change" />}
+      {quote && hold.acceptBlocked && <AcceptanceHold copy={price} locale={locale} state={hold} />}
+
       <section aria-labelledby="proposal-total-label">
         <p id="proposal-total-label" className="text-[0.875rem] text-ink-500">{copy.totalLabel}</p>
         <p className="mt-1 text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-brand-900 tabular-nums rtl:tracking-normal">
@@ -103,7 +120,7 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
           {proposal.items.map((item) => (
             <li key={item.id} className="flex items-baseline justify-between gap-4 py-3 text-[0.9375rem]">
               <span className="min-w-0 break-words text-ink-800">
-                <bdi>{item.description}</bdi>
+                {isPlatformFee(item) ? <><span>{price.feeLabel}</span><span className="block text-[0.875rem] leading-5 text-ink-600">{price.feeNote}</span></> : <bdi>{item.description}</bdi>}
                 {item.quantity > 1 && <span className="text-ink-500"> {fill(copy.quantity, { count: item.quantity })}</span>}
                 {item.optional && <span className="text-ink-500"> ({copy.optional})</span>}
               </span>
@@ -114,6 +131,14 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
         {/* Priced but not in the total, and not something to tick here: say so, and who can add one. */}
         {hasOptional && <p className="mt-2 max-w-[60ch] text-[0.875rem] leading-6 text-ink-600">{copy.optionalNote}</p>}
       </section>
+
+      {/* The promise sits beside the estimate's range it protects; a final quote is already past it. */}
+      {!quote && (
+        <section aria-labelledby="proposal-protection-title">
+          <h3 id="proposal-protection-title" className="text-[0.9375rem] font-semibold text-brand-900">{price.how.protectTitle}</h3>
+          <p className="mt-1 max-w-[60ch] text-[0.9375rem] leading-7 text-ink-700">{price.guarantee}</p>
+        </section>
+      )}
 
       {hasRecommendation && (
         <section aria-labelledby="proposal-recommendation-title">
@@ -181,7 +206,7 @@ export function PatientProposal({ locale, copy, proposal, recommendation, decisi
  * quiet secondary route.
  */
 export function PatientProposalDecision({ locale, copy, caseId, proposal, coordinatorName, englishHref, mutate, onRequestAssistance, onMessage }: {
-  locale: Locale; copy: ProposalCopy; caseId: string; proposal: { versionId: string; documentType?: string; assistance?: ProposalAssistance | null }; mutate: Mutate;
+  locale: Locale; copy: ProposalCopy; caseId: string; proposal: { versionId: string; documentType?: string; assistance?: ProposalAssistance | null; acceptableFrom?: string | null; fxReapprovalStatus?: string | null }; mutate: Mutate;
   coordinatorName?: string | null; englishHref?: string;
   /** Sends the request without closing the drawer, so the page can show that it was made. */
   onRequestAssistance?: (path: string) => Promise<unknown>;
@@ -214,10 +239,16 @@ export function PatientProposalDecision({ locale, copy, caseId, proposal, coordi
   const assisted = locale === "ar" && !ARABIC_TERMS_APPROVED;
   const t = copy.assisted;
   const requestedAt = proposal.assistance?.requestedAt;
+  // The cooling period and Finance's rate check hold only the acceptance; asking for changes and declining stay open.
+  const feedback = useContext(FeedbackContext);
+  const refusedHere = feedback.errorPath?.includes(proposal.versionId) ? feedback.errorCode : null;
+  const hold = finalQuoteState(proposal, useNow(proposal.acceptableFrom), refusedHere);
+  const acceptBlocked = quote && hold.acceptBlocked;
   // The drawer is a modal dialog, so the page's own error banner is inert behind it: a failed decision is reported here.
   const decide = async (decision: string) => {
     setFailed(false);
     const result = await mutate(`/patient/cases/${caseId}/proposals/${proposal.versionId}/decision`, { decision, selectedOptionalItemIds: [], comment: comment.trim() || undefined });
+    // A hold the proposal explains itself is not a lost connection: the note above says what is happening.
     if (result === undefined) setFailed(true);
   };
   const requestAssistance = async () => {
@@ -297,7 +328,7 @@ export function PatientProposalDecision({ locale, copy, caseId, proposal, coordi
       {noteMissing && <p id={noteErrorId} role="alert" className="error-text">{copy.noteRequired}</p>}
       <div className="flex flex-wrap items-center gap-3">
         {!assisted && (
-          <button type="button" className="btn-primary" disabled={!acknowledged} aria-describedby={acknowledged ? undefined : termsHintId}
+          <button type="button" className="btn-primary" disabled={!acknowledged || acceptBlocked} aria-describedby={acceptBlocked ? ACCEPTANCE_HOLD_ID : acknowledged ? undefined : termsHintId}
             onClick={() => void decide(quote ? "ACCEPTED" : "ACKNOWLEDGED")}>
             {quote ? copy.primaryQuote : copy.primaryEstimate}
           </button>
@@ -321,7 +352,7 @@ export function PatientProposalDecision({ locale, copy, caseId, proposal, coordi
           {copy.declineQuiet}
         </button>
       )}
-      {failed && <p role="alert" className="error-text">{copy.decisionFailed}</p>}
+      {failed && !(feedback.errorCode && FIELD_HANDLED_CODES.includes(feedback.errorCode)) && <p role="alert" className="error-text">{copy.decisionFailed}</p>}
     </section>
   );
 }

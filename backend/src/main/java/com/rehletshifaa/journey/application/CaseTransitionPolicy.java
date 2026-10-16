@@ -29,6 +29,14 @@ import java.util.*;
  *       reminder cycle ends unpaid, and ACCEPTED through FOLLOW_UP cancel with a typed reason — a coordinator's
  *       action, or the patient's own withdrawal while travel is not yet confirmed ({@link CaseExitService}).
  *       DISCHARGED closes directly when the Consultant records that no follow-up is needed.</li>
+ *   <li>CLOSED reopens into FOLLOW_UP (P1-13, A-06) with a typed reason, through {@link CaseReopenService}.</li>
+ *   <li>Pay to admit (P1-15, owner decisions D-C and D-D): ARRIVAL_CONFIRMED moves only to ADMISSION_READY, entered once the
+ *       final quote, the procedure consent and the balance are evidenced (or the Consultant's emergency admission override is
+ *       on file); only ADMISSION_READY opens treatment, and only with the hospital's admission number.</li>
+ *   <li>Discharge (P1-17, D-F): TREATMENT_IN_PROGRESS moves to DISCHARGED only with the treatment evidence, the discharge pack, the
+ *       follow-up plan and the hospital's final invoice on file; DISCHARGED moves on only once that invoice is reconciled.</li>
+ *   <li>Follow-up (P1-18, D-G): FOLLOW_UP closes only once the free window is over and nothing is still owed
+ *       ({@link FollowUpReadiness}); the scheduler closes it ({@link CaseExitService#closeAfterFollowUp}).</li>
  * </ul>
  */
 @Component
@@ -50,15 +58,26 @@ public class CaseTransitionPolicy {
         Map.entry("EXPIRED", Set.of("PROPOSAL_PREPARATION")),
         Map.entry("ACCEPTED", Set.of("TRAVEL_COORDINATION", "EXPIRED", "CANCELLED")),
         Map.entry("TRAVEL_COORDINATION", Set.of("ARRIVAL_CONFIRMED", "CANCELLED")),
-        Map.entry("ARRIVAL_CONFIRMED", Set.of("TREATMENT_IN_PROGRESS", "CANCELLED")),
+        // P1-15 (D-D): an arrived patient is cleared for admission once the quote, the consent and the balance are evidenced
+        // (AdmissionReadiness); the admission number then opens treatment. An emergency walks the same two edges.
+        Map.entry("ARRIVAL_CONFIRMED", Set.of("ADMISSION_READY", "CANCELLED")),
+        Map.entry("ADMISSION_READY", Set.of("TREATMENT_IN_PROGRESS", "CANCELLED")),
+        // P1-17 (D-F): discharge once the pack, the treatment evidence and the final invoice are in (DischargeReadiness); a
+        // discharged case moves on (follow-up, or closed with none needed) once its final invoice is reconciled.
         Map.entry("TREATMENT_IN_PROGRESS", Set.of("DISCHARGED", "CANCELLED")),
         Map.entry("DISCHARGED", Set.of("FOLLOW_UP", "CLOSED", "CANCELLED")),
-        Map.entry("FOLLOW_UP", Set.of("CLOSED", "CANCELLED")));
-    /** Stages a case never leaves (EXPIRED is not one: it re-enters proposal preparation as a recovery path). */
-    public static final Set<String> TERMINAL = Set.of("CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE");
+        Map.entry("FOLLOW_UP", Set.of("CLOSED", "CANCELLED")),
+        // P1-13 (A-06): a complication or a concern after closing brings the case back, with the same Consultant, through
+        // CaseReopenService only (the coordinator's generic transition refuses FOLLOW_UP).
+        Map.entry("CLOSED", Set.of("FOLLOW_UP")));
+    /**
+     * Stages a case never leaves (EXPIRED is not one: it re-enters proposal preparation as a recovery path; CLOSED is not one
+     * either since P1-13: it reopens into FOLLOW_UP).
+     */
+    public static final Set<String> TERMINAL = Set.of("CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE");
     /** Stages where a cancellation is an exit from a committed journey and therefore needs a typed reason. */
     public static final Set<String> TYPED_CANCELLATION_STAGES = Set.of("ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED",
-            "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP");
+            "ADMISSION_READY", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP");
     /** Stages the patient may still withdraw from on their own; after that the coordinator cancels for them. */
     private static final Set<String> PATIENT_WITHDRAWAL_STAGES = Set.of("ACCEPTED", "TRAVEL_COORDINATION");
     /** Travel plan statuses past the point of no return: the patient is asked to contact their coordinator instead. */
@@ -84,13 +103,18 @@ public class CaseTransitionPolicy {
     }
     /** Forward stages: none may be entered while blocking work is still open on the case. */
     private static final Set<String> ADVANCING = Set.of("CLINICAL_RECOMMENDATION_READY", "PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL",
-            "PATIENT_DECISION", "ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED");
+            "PATIENT_DECISION", "ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "ADMISSION_READY", "TREATMENT_IN_PROGRESS", "DISCHARGED",
+            "FOLLOW_UP", "CLOSED");
 
     private final PaymentService payment;
     private final CaseActionService caseActions;
+    private final AdmissionReadiness admission;
+    private final DischargeReadiness discharge;
+    private final FollowUpReadiness followUp;
 
-    public CaseTransitionPolicy(PaymentService payment, CaseActionService caseActions, ProposalVersionRepository proposalVersions, CaseTaskRepository tasks) { this.tasks = tasks; this.proposalVersions = proposalVersions;
-        this.payment = payment; this.caseActions = caseActions;
+    public CaseTransitionPolicy(PaymentService payment, CaseActionService caseActions, ProposalVersionRepository proposalVersions, CaseTaskRepository tasks,
+                                AdmissionReadiness admission, DischargeReadiness discharge, FollowUpReadiness followUp) { this.tasks = tasks; this.proposalVersions = proposalVersions;
+        this.payment = payment; this.caseActions = caseActions; this.admission = admission; this.discharge = discharge; this.followUp = followUp;
     }
 
     /** Refuses a move the lifecycle or a stage's entry invariant does not allow. Conflicts are 409s the client can act on. */
@@ -100,9 +124,24 @@ public class CaseTransitionPolicy {
         if (!ADVANCING.contains(target)) return;
         if (blockingWorkOpen(caseId))
             throw new ApiException(409, "BLOCKING_TASKS_OPEN", "Complete or cancel blocking tasks before advancing this case");
+        // P1-17: a discharged patient moves on (follow-up, or closed) only once the hospital's final invoice is reconciled.
+        if ("DISCHARGED".equals(current)) {
+            List<String> settlement = discharge.settlementBlockers(caseId).stream().map(DischargeReadiness::label).toList();
+            if (!settlement.isEmpty()) throw new ApiException(409, "SETTLEMENT_PENDING", "The case cannot move on from discharge yet: " + String.join("; ", settlement));
+        }
+        // P1-18 (D-G): follow-up closes once the window is over and every contact, check-in and complication review is done.
+        if ("FOLLOW_UP".equals(current) && "CLOSED".equals(target)) {
+            List<String> open = followUp.closureBlockers(caseId).stream().map(FollowUpReadiness::label).toList();
+            if (!open.isEmpty()) throw new ApiException(409, "FOLLOW_UP_NOT_COMPLETE", "The case cannot close yet: " + String.join("; ", open));
+        }
         List<String> gate = entryBlockers(caseId, target);
-        if (!gate.isEmpty())
-            throw new ApiException(409, "COORDINATION_NOT_READY", "Treatment coordination cannot start yet: " + String.join("; ", gate));
+        if (gate.isEmpty()) return;
+        switch (target) {
+            case "ADMISSION_READY" -> throw new ApiException(409, "ADMISSION_NOT_READY", "The patient cannot be cleared for admission yet: " + String.join("; ", gate));
+            case "TREATMENT_IN_PROGRESS" -> throw new ApiException(409, "ADMISSION_NUMBER_REQUIRED", "Treatment cannot start yet: " + String.join("; ", gate));
+            case "DISCHARGED" -> throw new ApiException(409, "DISCHARGE_NOT_READY", "The patient cannot be discharged yet: " + String.join("; ", gate));
+            default -> throw new ApiException(409, "COORDINATION_NOT_READY", "Treatment coordination cannot start yet: " + String.join("; ", gate));
+        }
     }
 
     /** True when the move would pass {@link #assertAllowed}; for callers that continue quietly rather than fail. */
@@ -111,12 +150,16 @@ public class CaseTransitionPolicy {
     }
 
     /**
-     * What still stands between the case and the target stage; empty when it may enter. Only
-     * TRAVEL_COORDINATION carries entry invariants today: an accepted proposal, a settled deposit where one
-     * is due, and no gating readiness step outstanding — a profile step owed by the patient, or an onboarding staff
-     * have not started. Every case needs current onboarding evidence; there is no deposit-only gate (CL3).
+     * What still stands between the case and the target stage; empty when it may enter. TRAVEL_COORDINATION needs an accepted
+     * proposal, a settled deposit where one is due, and no gating readiness step outstanding — a profile step owed by the
+     * patient, or an onboarding staff have not started. Every case needs current onboarding evidence; there is no deposit-only
+     * gate (CL3). ADMISSION_READY and TREATMENT_IN_PROGRESS read the evidence ledger ({@link AdmissionReadiness}, P1-15), DISCHARGED too
+     * ({@link DischargeReadiness}, P1-17).
      */
     public List<String> entryBlockers(UUID caseId, String target) {
+        if ("ADMISSION_READY".equals(target)) return admission.admissionBlockers(caseId).stream().map(AdmissionReadiness::label).toList();
+        if ("TREATMENT_IN_PROGRESS".equals(target)) return admission.treatmentBlockers(caseId).stream().map(AdmissionReadiness::label).toList();
+        if ("DISCHARGED".equals(target)) return discharge.dischargeBlockers(caseId).stream().map(DischargeReadiness::label).toList();
         if (!"TRAVEL_COORDINATION".equals(target)) return List.of();
         List<String> out = new ArrayList<>();
         if (!proposalVersions.hasAcceptedForCase(caseId)) out.add("no accepted proposal is on record");

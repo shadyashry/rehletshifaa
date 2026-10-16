@@ -35,7 +35,9 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  *   <li>{@link #expireUnpaidDeposit}: the deposit reminder cycle ended unpaid ({@link DepositPaymentReminders});
  *       the case expires and may be re-prepared later like any expired estimate.</li>
  *   <li>{@link #closeWithoutFollowUp}: the Consultant records that the discharged patient needs no follow-up.</li>
+ *   <li>{@link #closeAfterFollowUp}: the follow-up window is over and nothing is still owed ({@link FollowUpService}, P1-18).</li>
  * </ul>
+ * A case that closes either way publishes {@link CaseEvents.CaseClosed} (the closure statement, the review request).
  * Every exit cancels the open work on the case (staff items and patient actions; a governance review such as the
  * emergency-override review survives, see {@link StaffWorkService#SURVIVES_EXIT}), clears who the case waits on, and is
  * audited. The exit's note lives only in the encrypted exit row: history and audit carry the typed reason alone.
@@ -55,10 +57,15 @@ public class CaseExitService {
     private final StaffWorkService work;
     private final AuditTrail auditTrail;
     private final Clock clock;
+    private final com.rehletshifaa.journey.infrastructure.FacilityAdmissionRepository admissions;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public CaseExitService(Authority authority, MedicalCaseRepository cases, CaseStatusLog statusLog, CaseExitReasonRepository exits,
                            TravelPlanRepository travelPlans, DepositRepository deposits, PaymentService payment,
-                           DepositTransferService transfers, CaseTransitionPolicy policy, StaffWorkService work, AuditTrail auditTrail, Clock clock) {
+                           DepositTransferService transfers, CaseTransitionPolicy policy, StaffWorkService work, AuditTrail auditTrail, Clock clock,
+                           com.rehletshifaa.journey.infrastructure.FacilityAdmissionRepository admissions,
+                           org.springframework.context.ApplicationEventPublisher events) {
+        this.admissions = admissions; this.events = events;
         this.authority = authority; this.cases = cases; this.statusLog = statusLog; this.exits = exits; this.travelPlans = travelPlans;
         this.deposits = deposits; this.payment = payment; this.transfers = transfers; this.policy = policy; this.work = work;
         this.auditTrail = auditTrail; this.clock = clock;
@@ -102,6 +109,19 @@ public class CaseExitService {
             throw new ApiException(409, "CASE_STATE_CONFLICT", "This operation is not available while the case is " + current.status());
         exit(caseId, current, "CLOSED", Reason.NO_FOLLOW_UP_NEEDED, note, actor.subject(), actor.label());
         return new IdResponse(caseId, "CLOSED");
+    }
+
+    /**
+     * P1-18 (D-G): the follow-up is over — the window closed, every contact and check-in done, no complication waiting — and the
+     * case closes (the scheduler, through the policy's closure gate). Quietly false when the case is not in FOLLOW_UP or the gate
+     * does not pass.
+     */
+    @Transactional
+    public boolean closeAfterFollowUp(UUID caseId) {
+        State current = state(caseId);
+        if (!"FOLLOW_UP".equals(current.status()) || !policy.mayEnter(caseId, "FOLLOW_UP", "CLOSED")) return false;
+        exit(caseId, current, "CLOSED", Reason.FOLLOW_UP_COMPLETED, null, "SYSTEM", "SYSTEM");
+        return true;
     }
 
     /**
@@ -152,9 +172,15 @@ public class CaseExitService {
             auditTrail.event("CASE_EXIT_RECORDED").actor(actorSubject, actorLabel).caseId(caseId).entity("CaseExitReason", recorded.getId())
                     .action(reason.name()).outcome("SUCCESS").record();
         }
+        // P1-15: a hospital admission not yet admitted is cancelled with the case (its voucher stays on record for Finance).
+        if ("CANCELLED".equals(target)) admissions.findByCaseId(caseId)
+                .filter(a -> a.getStatus() == com.rehletshifaa.journey.domain.FacilityAdmission.Status.RESERVED
+                        || a.getStatus() == com.rehletshifaa.journey.domain.FacilityAdmission.Status.CONFIRMED)
+                .ifPresent(a -> { a.cancel(actorSubject, now); admissions.saveAndFlush(a); });
         work.closeOpenWork(caseId, "The case left its journey (" + target + (reason == null ? "" : ": " + reason.name()) + ")");
         work.refreshWaitingOn(caseId, StaffWorkService.stageDefault(target), null);
         work.changed(caseId);
+        if ("CLOSED".equals(target)) events.publishEvent(new CaseEvents.CaseClosed(caseId));
     }
 
     private State state(UUID caseId) {

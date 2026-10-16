@@ -40,6 +40,9 @@ public class PatientOnboarding extends AssignedIdEntity {
         this.startedAt = micros(now); this.expiresAt = micros(expiresAt); this.createdAt = micros(now); this.updatedAt = micros(now);
     }
 
+    /** An onboarding whose subject is fixed from the start (a minor's is always a GUARDIAN: P1-13). */
+    public PatientOnboarding startingAs(String subjectType) { this.subjectType = subjectType; return this; }
+
     public String getState() { return state; }
     public String getSubjectType() { return subjectType; }
 }

@@ -10,7 +10,7 @@ import type { WorkCopy } from "@/lib/portal-labels";
 /** The same staff work copy the portal page builds on the server, for component tests. */
 export function workCopyFor(locale: Locale): WorkCopy {
   const d = getDictionary(locale);
-  return { ...d.portalWork, careAreas: Object.fromEntries(careAreaAtlas(locale, d).map((area) => [area.slug, area.title])) };
+  return { ...d.portalWork, careAreas: Object.fromEntries(careAreaAtlas(locale, d).map((area) => [area.slug, area.title])), guardianConsent: d.guardianConsent.text };
 }
 
 /** Renders inside the work-copy provider; `rerender` keeps the provider. */

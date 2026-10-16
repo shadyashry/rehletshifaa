@@ -106,7 +106,7 @@ test("operations may draft before the gate, cannot advance the journey, and the 
 
   const created = await call<{ caseId: string; caseNumber: string; intakeGrant: string }>(null, "POST", "/cases", {
     caseFor: "MYSELF", givenName: "Playwright", familyName: "Ops Gate", country: "Kenya", whatsappNumber: whatsapp, conditionDescription: "Synthetic case for the Operations gate check.",
-    preferredLanguage: "en", consent: true, turnstileToken: null, email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: true,
+    preferredLanguage: "en", consent: true, turnstileToken: null, ageBand: "AGE_18_64", email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: true,
   }, 201);
   const caseId = created.body.caseId;
   await call(null, "POST", `/cases/${caseId}/submit`, undefined, 200,{"X-Case-Grant":created.body.intakeGrant});

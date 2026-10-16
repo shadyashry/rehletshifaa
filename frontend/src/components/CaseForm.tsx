@@ -4,7 +4,7 @@ import Script from "next/script";
 import { ArrowLeft, ArrowRight, CheckCircle2, FileUp, FileText, LockKeyhole, ChevronDown, Search, Check, X, Trash2, Plus, UserRound, Users } from "lucide-react";
 import type { Dictionary } from "@/lib/dictionary";
 import { intlLocale, type Locale } from "@/lib/i18n";
-import { buildCaseSchema, filesAreValid, RELATIONSHIPS, type Relationship } from "@/lib/case-form-schema";
+import { AGE_BANDS, buildCaseSchema, filesAreValid, RELATIONSHIPS, type AgeBand, type Relationship } from "@/lib/case-form-schema";
 import { track } from "@/lib/analytics";
 import { whatsappEntry } from "@/lib/links";
 import { COUNTRIES, flagEmoji, type Country } from "@/lib/countries";
@@ -18,7 +18,7 @@ import { EmergencyGuidance } from "@/components/EmergencyGuidance";
 type CaseFor = "MYSELF" | "SOMEONE_ELSE";
 type FormValues = {
   caseFor: CaseFor; givenName: string; familyName: string; singleLegalName: boolean;
-  representativeName: string; representativeRelationship: Relationship | "";
+  representativeName: string; representativeRelationship: Relationship | ""; ageBand: AgeBand | "";
   country: string; whatsappNumber: string; email: string; conditionDescription: string; consent: boolean;
 };
 type CareAreaKey = "" | "cardiology" | "rheumatology-rehabilitation" | "orthopedics" | (typeof ADDITIONAL_CARE_AREAS)[number]["slug"];
@@ -34,7 +34,7 @@ const NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M} .'-]*$/u;
 export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const ar = locale === "ar";
   const { user, roles, loading: authLoading } = useAuth();
-  const [values, setValues] = useState<FormValues>({ caseFor: "MYSELF", givenName: "", familyName: "", singleLegalName: false, representativeName: "", representativeRelationship: "", country: "", whatsappNumber: "", email: "", conditionDescription: "", consent: false });
+  const [values, setValues] = useState<FormValues>({ caseFor: "MYSELF", givenName: "", familyName: "", singleLegalName: false, representativeName: "", representativeRelationship: "", ageBand: "", country: "", whatsappNumber: "", email: "", conditionDescription: "", consent: false });
   const [country, setCountry] = useState<Country | null>(null);
   // The WhatsApp number may belong to a representative in another country, so its dialling code follows the
   // patient's country only until someone chooses a different one.
@@ -71,6 +71,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const isPatient = !!user && roles.includes("PATIENT");
   const someoneElse = values.caseFor === "SOMEONE_ELSE";
+  const ageId = useId();
 
   // The flow's own words, from the message files like the rest of the form.
   const t = d.form.flow;
@@ -113,17 +114,18 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     familyName: values.singleLegalName ? values.familyName.trim() === "" || NAME_RE.test(values.familyName.trim()) : NAME_RE.test(values.familyName.trim()),
     representativeName: !someoneElse || values.representativeName.trim().length >= 1,
     representativeRelationship: !someoneElse || values.representativeRelationship !== "",
+    ageBand: values.ageBand !== "",
     country: !!country,
     whatsappNumber: !!dialCountry && digits.length >= 6 && digits.length <= 15,
     email: emailTrimmed === "" || EMAIL_RE.test(emailTrimmed),
     consent: values.consent === true,
     files: filesAreValid(files),
-  }), [values.givenName, values.familyName, values.singleLegalName, values.representativeName, values.representativeRelationship, someoneElse, country, dialCountry, digits.length, emailTrimmed, values.consent, files]);
-  const contactValid = valid.givenName && valid.familyName && valid.representativeName && valid.representativeRelationship && valid.country && valid.whatsappNumber && valid.email;
+  }), [values.givenName, values.familyName, values.singleLegalName, values.representativeName, values.representativeRelationship, values.ageBand, someoneElse, country, dialCountry, digits.length, emailTrimmed, values.consent, files]);
+  const contactValid = valid.givenName && valid.familyName && valid.representativeName && valid.representativeRelationship && valid.ageBand && valid.country && valid.whatsappNumber && valid.email;
 
   function nextStep() {
     if (step === 1 && !contactValid) {
-      setTouched(current => ({ ...current, givenName: true, familyName: true, representativeName: true, representativeRelationship: true, country: true, whatsappNumber: true, email: true }));
+      setTouched(current => ({ ...current, givenName: true, familyName: true, representativeName: true, representativeRelationship: true, ageBand: true, country: true, whatsappNumber: true, email: true }));
       return;
     }
     setStep(current => Math.min(3, current + 1));
@@ -143,6 +145,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
     if (key === "givenName" && !valid.givenName) return values.givenName.trim() ? d.form.errors.nameCharacters : d.form.errors.name;
     if (key === "familyName" && !valid.familyName) return values.familyName.trim() ? d.form.errors.nameCharacters : d.form.errors.familyName;
     if ((key === "representativeName" && !valid.representativeName) || (key === "representativeRelationship" && !valid.representativeRelationship)) return d.form.errors.representative;
+    if (key === "ageBand" && !valid.ageBand) return d.form.errors.ageBand;
     if (key === "country" && !valid.country) return t.selectCountryFirst;
     if (key === "whatsappNumber" && !valid.whatsappNumber) return dialCountry ? d.form.errors.phone : d.form.dialCodeChoose;
     if (key === "email" && !valid.email) return d.form.errors.email;
@@ -187,10 +190,10 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    setTouched({ givenName: true, familyName: true, representativeName: true, representativeRelationship: true, country: true, whatsappNumber: true, email: true, consent: true, files: true });
+    setTouched({ givenName: true, familyName: true, representativeName: true, representativeRelationship: true, ageBand: true, country: true, whatsappNumber: true, email: true, consent: true, files: true });
     setErrors({});
     const candidate: FormValues = { ...values, country: country?.name ?? "", whatsappNumber: fullPhone };
-    const result = buildCaseSchema({ ...d.form.errors, representative: d.form.errors.representative }).safeParse(candidate);
+    const result = buildCaseSchema(d.form.errors).safeParse(candidate);
     const nextErrors: Errors = {};
     if (!result.success) for (const issue of result.error.issues) nextErrors[issue.path[0] as FieldKey] = issue.message;
     if (!country) nextErrors.country = t.selectCountryFirst;
@@ -209,7 +212,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
           representative: data.caseFor === "SOMEONE_ELSE" ? { name: data.representativeName, relationship: data.representativeRelationship } : null,
           country: data.country, whatsappNumber: data.whatsappNumber, email: data.email || null,
           conditionDescription: describedCase(data.conditionDescription), preferredLanguage: locale, consent: true,
-          careArea: careArea || null, turnstileToken,
+          careArea: careArea || null, ageBand: data.ageBand, turnstileToken,
         };
         const createResponse = await fetch(apiUrl(`/cases`), { method: "POST", headers: { "Content-Type": "application/json", "X-Request-ID": crypto.randomUUID() }, body: JSON.stringify(payload) });
         if (!createResponse.ok) throw new SubmitFailure("server");
@@ -236,11 +239,11 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
   async function submitReturning(event: React.FormEvent) {
     event.preventDefault();
     if (!user) return;
-    const personValid = !someoneElse || (valid.givenName && valid.familyName && valid.country && valid.representativeRelationship);
-    setTouched({ consent: true, files: true, ...(someoneElse ? { givenName: true, familyName: true, country: true, representativeRelationship: true } : {}) }); setErrors({});
+    const personValid = valid.ageBand && (!someoneElse || (valid.givenName && valid.familyName && valid.country && valid.representativeRelationship));
+    setTouched({ consent: true, files: true, ageBand: true, ...(someoneElse ? { givenName: true, familyName: true, country: true, representativeRelationship: true } : {}) }); setErrors({});
     if (!personValid || !values.consent || !filesAreValid(files)) { setErrors({ ...(values.consent ? {} : { consent: d.form.errors.consent }), ...(filesAreValid(files) ? {} : { files: d.form.errors.file }) }); return; }
     const body = JSON.stringify({
-      conditionDescription: describedCase(values.conditionDescription.trim()), careArea: careArea || null, consent: true, caseFor: values.caseFor,
+      conditionDescription: describedCase(values.conditionDescription.trim()), careArea: careArea || null, consent: true, caseFor: values.caseFor, ageBand: values.ageBand,
       someoneElse: someoneElse ? { givenName: values.givenName.trim(), familyName: values.familyName.trim() || null, singleLegalName: values.singleLegalName, country: country?.name ?? "", relationship: values.representativeRelationship } : null,
     });
     setBusy(true);
@@ -296,6 +299,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
           {patientFields()}
           <div className="mt-6 sm:max-w-[50%] sm:pe-3">{relationshipField()}</div>
         </>}
+        {!someoneElse && ageBandField()}
         <fieldset className="mt-8 min-w-0 border-0 p-0">
           <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.aboutThisCase : (ar ? "عن حالتك الجديدة" : "About your new case")}</legend>
           {caseFields()}
@@ -347,7 +351,25 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
             </Field>
           </div>
         </fieldset>
+        {ageBandField()}
     </>;
+  }
+  /** P1-13 (A-05): one required question; a child's case is then followed by a parent or legal guardian. */
+  function ageBandField() {
+    const error = fieldError("ageBand");
+    return <fieldset className="mt-6 min-w-0 border-0 p-0" aria-describedby={`${ageId}-help`}>
+      <legend className="flex items-center gap-2 text-sm font-bold text-ink-800">{someoneElse ? t.ageTitle : t.ageTitleSelf}<span className="font-bold text-alert-700"><span aria-hidden className="text-base leading-none">*</span><span className="sr-only"> {t.requiredMark}</span></span></legend>
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {AGE_BANDS.map(band => {
+          const selected = values.ageBand === band;
+          return <label key={band} className={`flex min-h-11 cursor-pointer items-center justify-center rounded-md border px-3 py-2 text-center text-sm font-semibold transition has-[:focus-visible]:outline has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600 ${selected ? "border-brand-600 bg-brand-50 text-brand-900" : error ? "border-alert-700 bg-white text-ink-700" : "border-[var(--field-border)] bg-white text-ink-700 hover:border-brand-600"}`}>
+            <input type="radio" name="ageBand" className="sr-only" value={band} checked={selected} onChange={() => { update("ageBand", band); touch("ageBand"); }} />
+            {t.ageBands[band]}
+          </label>;
+        })}
+      </div>
+      {error ? <p id={`${ageId}-help`} className="error-text mt-2 flex items-center gap-1"><X size={13} aria-hidden />{error}</p> : <p id={`${ageId}-help`} className="mt-2 text-xs leading-5 text-ink-500">{t.ageHelp}</p>}
+    </fieldset>;
   }
   function relationshipField() {
     return <>
@@ -440,7 +462,7 @@ export function CaseForm({ locale, d }: { locale: Locale; d: Dictionary }) {
       </fieldset>}
 
       {/* Section 3 — review, options & consent */}
-      {step===3&&<><div className="rounded-2xl border border-brand-200 bg-brand-50 p-5"><h2 className="title">{t.review}</h2><p className="mt-2 text-sm leading-6 text-ink-600">{t.reviewHelp}</p><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-ink-500">{t.forName}</dt><dd className="font-bold text-ink-900">{[values.givenName.trim(), values.familyName.trim()].filter(Boolean).join(" ")}</dd></div>{someoneElse && <div><dt className="text-ink-500">{t.submittedBy}</dt><dd className="font-bold text-ink-900">{values.representativeName.trim()} <span className="font-normal text-ink-500">({values.representativeRelationship ? t.relationships[values.representativeRelationship] : ""})</span></dd></div>}<div><dt className="text-ink-500">{t.countryLabel}</dt><dd className="font-bold text-ink-900">{country?.name}</dd></div><div><dt className="text-ink-500">{d.form.phone}</dt><dd dir="ltr" className="font-bold text-ink-900">{fullPhone}</dd></div><div><dt className="text-ink-500">{d.form.files}</dt><dd className="font-bold text-ink-900">{files.length}</dd></div></dl></div>
+      {step===3&&<><div className="rounded-2xl border border-brand-200 bg-brand-50 p-5"><h2 className="title">{t.review}</h2><p className="mt-2 text-sm leading-6 text-ink-600">{t.reviewHelp}</p><dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-ink-500">{t.forName}</dt><dd className="font-bold text-ink-900">{[values.givenName.trim(), values.familyName.trim()].filter(Boolean).join(" ")}</dd></div><div><dt className="text-ink-500">{t.ageLabel}</dt><dd className="font-bold text-ink-900">{values.ageBand ? t.ageBands[values.ageBand] : ""}</dd></div>{someoneElse && <div><dt className="text-ink-500">{t.submittedBy}</dt><dd className="font-bold text-ink-900">{values.representativeName.trim()} <span className="font-normal text-ink-500">({values.representativeRelationship ? t.relationships[values.representativeRelationship] : ""})</span></dd></div>}<div><dt className="text-ink-500">{t.countryLabel}</dt><dd className="font-bold text-ink-900">{country?.name}</dd></div><div><dt className="text-ink-500">{d.form.phone}</dt><dd dir="ltr" className="font-bold text-ink-900">{fullPhone}</dd></div><div><dt className="text-ink-500">{d.form.files}</dt><dd className="font-bold text-ink-900">{files.length}</dd></div></dl></div>
       {consentField()}
 
       {siteKey && <div className="cf-turnstile mt-6" data-sitekey={siteKey} data-callback="onRehletShifaaTurnstile" />}

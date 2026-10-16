@@ -66,7 +66,9 @@ public final class JourneyDtos {
     public record OperationsPlanRequest(@NotBlank @Size(max=30000)String plan) {}
     public record ProposalDecisionRequest(@NotBlank @Pattern(regexp="ACCEPTED|ACKNOWLEDGED|DECLINED|REVISION_REQUESTED")String decision,List<UUID>selectedOptionalItemIds,@Size(max=10000)String comment) {}
     public record TravelPlanRequest(Instant plannedArrival,Instant confirmedArrival,@Size(max=80)String visaStatus,@Size(max=5000)String flightDetails,@Size(max=5000)String airportReception,@Size(max=5000)String accommodation,@Size(max=5000)String localTransport,@Size(max=5000)String companionDetails,UUID facilityId,@Size(max=5000)String exceptions,@NotBlank @Pattern(regexp="PLANNING|CONFIRMED|ARRIVED")String status) {}
-    public record TreatmentRequest(@NotNull UUID facilityId,UUID practitionerId,@NotNull Instant startAt,Instant endAt,@NotBlank @Pattern(regexp="PLANNED|IN_PROGRESS|COMPLETED")String status,@Size(max=20000)String plannedProcedures,@Size(max=20000)String actualProcedures,@Size(max=20000)String milestones,@Size(max=20000)String complications,boolean dischargeReady,UUID dischargeDocumentId) {}
+    public record TreatmentRequest(@NotNull UUID facilityId,UUID practitionerId,@NotNull Instant startAt,Instant endAt,@NotBlank @Pattern(regexp="PLANNED|IN_PROGRESS|COMPLETED")String status,@Size(max=20000)String plannedProcedures,@Size(max=20000)String actualProcedures,@Size(max=20000)String milestones,@Size(max=20000)String complications,boolean dischargeReady,UUID dischargeDocumentId,
+        /** P1-15: the hospital's admission number; required (here or recorded by Operations) before the first episode opens treatment. */
+        @Size(max=80) String admissionNumber) {}
     public record FinalAssessmentRequest(@Size(max=20000)String recommendedTreatment,@Size(max=20000)String risksAndLimitations,@Size(max=50)List<@Valid CostEstimateItem>costEstimates) {}
     public record FinalQuoteRequest(@NotNull UUID clinicalReviewId,@Pattern(regexp="[A-Z]{3}")String currency,@Size(max=20000)String scopeChangeReason,@Size(max=20000)String excludedServices,@Size(max=20000)String paymentTerms,@Size(max=20000)String refundTerms,@Size(max=20000)String disclaimers,@Future Instant validUntil,@Size(max=20000)String coordinatorNotes) {}
     public record ProcedureConsentRequest(@NotBlank @Size(max=20000)String exactText,@Pattern(regexp="en|ar")String language,@Size(max=40)String policyVersion,UUID relatedProposalVersionId,UUID evidenceDocumentId,@Size(max=300)String evidenceReference) {}
@@ -80,7 +82,7 @@ public final class JourneyDtos {
      * {@code waitingOn} answers "who must act next", which is deliberately not the same as the stage. {@code viewer} is set
      * only on the patient's own case list: SELF for their own case, REPRESENTATIVE for a relative's (null for staff).
      */
-    public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested,String waitingOn,String waitingReason,String viewer,String urgency) {}
+    public record CaseView(UUID id,String caseNumber,String status,String patientName,String country,String preferredLanguage,String careCategory,Instant createdAt,Instant updatedAt,long version,String coordinatorSubject,String doctorSubject,String coordinatorName,String doctorName,boolean travelPackageRequested,String waitingOn,String waitingReason,String viewer,String urgency,String ageBand) {}
     /**
      * Operational signals for a case card. All derived read-only from open work items — the case itself
      * carries no priority or attention status, so nothing here is persisted for the UI's benefit.
@@ -146,7 +148,9 @@ public final class JourneyDtos {
     /** The version's commercial calculation for Finance: base total, margin (rate, amount, policy), patient total in EGP and in the proposal currency. */
     public record ProposalCommercialView(UUID versionId,String currency,BigDecimal fxRate,java.time.LocalDate fxRateDate,boolean requiresFinanceApproval,
             String policyName,String policyCareArea,Integer policyVersion,BigDecimal marginRate,BigDecimal baseTotalEgp,BigDecimal marginEgp,
-            BigDecimal patientTotalEgp,BigDecimal displayTotal,List<ProposalCommercialLine> lines) {}
+            BigDecimal patientTotalEgp,BigDecimal displayTotal,List<ProposalCommercialLine> lines,
+            /** P1-10: while Finance re-approves a final quote's rate, the rate that was in force when the patient tried to accept and the quote total at it (null otherwise). */
+            BigDecimal fxReapprovalRate,BigDecimal fxReapprovalTotal) {}
     /** {@code assigneeName} is resolved server-side so no interface ever renders an identity subject. */
     /** {@code offerExpiresAt}: P1-6, when a pending Consultant offer expires; null on every other assignment. */
     public record AssignmentView(UUID id,String assigneeSubject,String assigneeName,String assigneeRole,String assignmentType,String status,Instant assignedAt,Instant offerExpiresAt,long version) {}
@@ -239,11 +243,29 @@ public final class JourneyDtos {
     public record FxOverrideRequest(@NotNull @DecimalMin("0.00000001")BigDecimal rate,LocalDate date) {}
     /** providerCredentialing: the practitioner is enrolled under provider credentialing (ProviderCredentialEligibility.adopted), so Direct approval writes are refused. */
     public record PractitionerSummaryView(UUID id,String displayName,String specialty,String subspecialty,String careCategory,String credentialingStatus,String availabilityStatus,String email,String accountStatus,Instant invitedAt) {}
-    public record CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,boolean active,int version,String createdBy,LocalDate validFrom,int finalQuoteValidityDays,BigDecimal fxToleranceRate) {}
-    /** P1-10: {@code finalQuoteValidityDays} and {@code fxToleranceRate} left out keep the care area's current values (default 14 days, 0.03). */
-    public record CommercialPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal marginRate,@DecimalMin("0.0")BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate) {
+    public record CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,boolean active,int version,String createdBy,LocalDate validFrom,int finalQuoteValidityDays,BigDecimal fxToleranceRate,
+                                       BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp,int fitToFlyHours,int followUpFreeDays) {}
+    /**
+     * P1-10: {@code finalQuoteValidityDays} and {@code fxToleranceRate} left out keep the care area's current values (default 14 days, 0.03).
+     * P1-16 (D-E): so do {@code changeOrderBandRate} and {@code changeOrderBandEgp} (default 0.10 of the facility package, capped at EGP 15,000).
+     * P1-17 (D-F): and {@code fitToFlyHours} (default 72, 24 to 168).
+     * P1-18 (D-G): and {@code followUpFreeDays} (default 30, 7 to 90).
+     */
+    public record CommercialPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal marginRate,@DecimalMin("0.0")BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate,
+                                          BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp,Integer fitToFlyHours,Integer followUpFreeDays) {
         public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate){this(name,careCategory,marginRate,null);}
         public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp){this(name,careCategory,marginRate,manualBandEgp,null,null);}
+        public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate){
+            this(name,careCategory,marginRate,manualBandEgp,finalQuoteValidityDays,fxToleranceRate,null,null);
+        }
+        public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate,
+                                       BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp){
+            this(name,careCategory,marginRate,manualBandEgp,finalQuoteValidityDays,fxToleranceRate,changeOrderBandRate,changeOrderBandEgp,null);
+        }
+        public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate,
+                                       BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp,Integer fitToFlyHours){
+            this(name,careCategory,marginRate,manualBandEgp,finalQuoteValidityDays,fxToleranceRate,changeOrderBandRate,changeOrderBandEgp,fitToFlyHours,null);
+        }
     }
     // Deposit + payment sub-workflow (offline record-only in this build).
     public record DepositComponentView(String beneficiary,String purpose,BigDecimal amountEgp,BigDecimal amountDisplay,String refundability,String cancellationTerms,boolean creditedToFinal) {}
@@ -302,7 +324,11 @@ public final class JourneyDtos {
     // Intake details become the initial account profile. Corrections require a separately verified,
     // audited workflow rather than silently rewriting identity or contact data.
     public record PatientProfileSummary(String fullName,String country,String whatsappNumber,String email,boolean phoneVerified,boolean emailVerified) {}
-    public record OnboardingSubjectRequest(@NotBlank @Pattern(regexp="PATIENT|GUARDIAN|REPRESENTATIVE|PAYER")String subjectType,@Size(max=80)String relationship,@Size(max=500)String permissionScope,Instant expiresAt,@NotNull Long expectedVersion) {}
+    public record OnboardingSubjectRequest(@NotBlank @Pattern(regexp="PATIENT|GUARDIAN|REPRESENTATIVE|PAYER")String subjectType,@Size(max=80)String relationship,@Size(max=500)String permissionScope,Instant expiresAt,@NotNull Long expectedVersion,
+        /** P1-13: a GUARDIAN names the legal basis of their authority and, optionally, the evidence document already uploaded to the case. */
+        @Pattern(regexp="PARENT|LEGAL_GUARDIAN|COURT_ORDER")String legalBasis,UUID evidenceDocumentId) {
+        public OnboardingSubjectRequest(String subjectType,String relationship,String permissionScope,Instant expiresAt,Long expectedVersion){this(subjectType,relationship,permissionScope,expiresAt,expectedVersion,null,null);}
+    }
     public record OnboardingConsentRequest(@NotBlank @Size(max=60)String consentType,@NotBlank @Size(max=20000)String exactText,@Size(max=40)String policyVersion,@Pattern(regexp="en|ar")String language,@Size(max=500)String purpose,@Size(max=500)String scope) {}
     public record OnboardingSubmitRequest(@NotNull Long expectedVersion) {}
     // Patient-facing identity verification view — never exposes encrypted legal name/DOB or document content.

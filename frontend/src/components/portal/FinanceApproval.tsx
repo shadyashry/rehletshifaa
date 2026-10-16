@@ -9,8 +9,10 @@ import type { ProposalCommercial } from "@/components/portal/portal-model";
  * Consultant's approved list or was entered by hand (the reason Finance is asked), with the Consultant's EGP base price beside
  * the patient's price; then the margin the policy adds and the totals. The approve button is here and nowhere else.
  */
-export function FinanceApproval({ locale, commercial, busy, approveLabel, onApprove }: {
+export function FinanceApproval({ locale, commercial, busy, approveLabel, feeLabel, onApprove }: {
   locale: Locale; commercial: ProposalCommercial; busy: boolean; approveLabel: string; onApprove: () => void;
+  /** The patient-facing name of the platform's fee line (its stored description is English). */
+  feeLabel?: string;
 }) {
   const t = copy[locale];
   const egp = (n?: number | null) => (n == null ? "—" : formatMoney(n, "EGP", locale));
@@ -41,10 +43,11 @@ export function FinanceApproval({ locale, commercial, busy, approveLabel, onAppr
           <tbody>
             {commercial.lines.map(line => (
               <tr key={line.id} className="border-b border-line align-baseline">
-                <td className="py-2 pe-3 text-ink-800">{line.description}{line.quantity > 1 ? ` × ${line.quantity}` : ""}</td>
+                <td className="py-2 pe-3 text-ink-800">{line.source === "PLATFORM" ? feeLabel ?? line.description : line.description}{line.quantity > 1 ? ` × ${line.quantity}` : ""}</td>
                 <td className="py-2 pe-3">
                   {line.source === "MANUAL"
                     ? <span className="rounded bg-status-warning-surface px-1.5 py-0.5 text-[0.8125rem] font-bold text-status-warning-fg">{t.manual}</span>
+                    : line.source === "PLATFORM" ? <span className="text-[0.8125rem] text-ink-600">{t.platform}</span>
                     : line.source === "FACILITY_PACKAGE" ? <span className="text-[0.8125rem] text-ink-600">{t.facilityPackage}{line.facilityName ? ` · ${line.facilityName}` : ""}</span>
                     : <span className="text-[0.8125rem] text-ink-600">{t.catalogue}</span>}
                 </td>
@@ -84,7 +87,7 @@ const copy = {
     introManual: "{count} lines are priced by the Consultant outside their approved list — check their prices before you approve.",
     caption: "Proposal lines with the Consultant's base price and the patient's price",
     service: "Service", source: "Price source", base: "Consultant price (EGP)", patient: "Patient price (EGP)", inCurrency: "In {currency}",
-    manual: "Manual — needs your approval", catalogue: "Approved list", facilityPackage: "Approved facility package",
+    platform: "Platform fee", manual: "Manual — needs your approval", catalogue: "Approved list", facilityPackage: "Approved facility package",
     baseTotal: "Consultant price total", margin: "Platform margin", patientTotal: "Patient total (EGP)",
     policy: "Policy: {name} (version {version})", noPolicy: "No margin policy applies to this care area — no margin is added.",
     rateLater: "At today's rate; the rate is fixed when the proposal is sent to the patient.",
@@ -96,7 +99,7 @@ const copy = {
     introManual: "بنود سعّرها الاستشاري خارج قائمته المعتمدة ({count}) — راجع أسعارها قبل الموافقة.",
     caption: "بنود العرض بسعر الاستشاري وسعر المريض",
     service: "الخدمة", source: "مصدر السعر", base: "سعر الاستشاري (ج.م)", patient: "سعر المريض (ج.م)", inCurrency: "بعملة {currency}",
-    manual: "يدوي — يحتاج موافقتك", catalogue: "القائمة المعتمدة", facilityPackage: "باقة منشأة معتمدة",
+    platform: "رسوم المنصة", manual: "يدوي — يحتاج موافقتك", catalogue: "القائمة المعتمدة", facilityPackage: "باقة منشأة معتمدة",
     baseTotal: "إجمالي سعر الاستشاري", margin: "هامش المنصة", patientTotal: "إجمالي المريض (ج.م)",
     policy: "السياسة: {name} (الإصدار {version})", noPolicy: "لا تنطبق سياسة هامش على مجال الرعاية هذا — لا يُضاف هامش.",
     rateLater: "بسعر صرف اليوم؛ ويُثبَّت السعر عند إرسال العرض إلى المريض.",

@@ -102,7 +102,7 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   // --- 1. Intake: the routing policy hands the request to an eligible coordinator on submit ------------------
   const created = await call<{ caseId: string; caseNumber: string; intakeGrant: string }>(null, "POST", "/cases", {
     caseFor: "MYSELF", givenName: "Playwright", familyName: "UAT Pass", country: "Kenya", whatsappNumber: whatsapp, conditionDescription: "Synthetic case for the UAT defect-correction walkthrough.",
-    preferredLanguage: "en", consent: true, turnstileToken: null, email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: false,
+    preferredLanguage: "en", consent: true, turnstileToken: null, ageBand: "AGE_18_64", email, timeZone: "Africa/Nairobi", careArea: "cardiology", travelPackageRequested: false,
   }, 201);
   const caseId = created.body.caseId, caseNumber = created.body.caseNumber;
   // The stack is shared: other runs mail the same mailboxes, so every "nothing else was sent" check is about this case.

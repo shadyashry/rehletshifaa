@@ -60,6 +60,8 @@ public class CaseActionService {
     /** Stages in which "prepare the proposal" is still real work; anywhere else the item is obsolete. */
     private static final Set<String> PROPOSAL_WORK_STAGES = Set.of("CLINICAL_RECOMMENDATION_READY", "REVISION_REQUESTED", "EXPIRED");
     private static final Set<String> TERMINAL = Set.of("DRAFT", "CLOSED", "CANCELLED", "DECLINED", "CLINICALLY_NOT_SUITABLE", "EXPIRED");
+    /** P1-18: where the patient may be asked the follow-up outcome questions. */
+    private static final Set<String> FOLLOW_UP_QUESTION_STAGES = Set.of("DISCHARGED", "FOLLOW_UP", "CLOSED");
     private static final Set<String> CONSULTANT_ASSIGNABLE = Set.of("INTAKE_REVIEW", "INFORMATION_REQUIRED", "READY_FOR_CONSULTANT");
     /**
      * Stages where the case — and the next move — belongs to the consultant. The coordinator keeps the
@@ -67,7 +69,7 @@ public class CaseActionService {
      * take the case back or push it forward; the endpoints refuse those independently.
      */
     public static final Set<String> CONSULTANT_OWNED = Set.of("CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW");
-    private static final Set<String> TRAVEL_PACKAGE_LOCKED = Set.of("PATIENT_DECISION", "ACCEPTED", "DECLINED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED", "CANCELLED");
+    private static final Set<String> TRAVEL_PACKAGE_LOCKED = Set.of("PATIENT_DECISION", "ACCEPTED", "DECLINED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "ADMISSION_READY", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP", "CLOSED", "CANCELLED");
     /** Readiness steps the onboarding link completes in one go; shown as a single "activate your profile" blocker. */
     private static final Set<String> PROFILE_CODES = Set.of("ACCOUNT_NOT_ACTIVATED", "CONSENTS_INCOMPLETE", "ONBOARDING_INCOMPLETE", "REPRESENTATIVE_AUTH_MISSING");
 
@@ -85,11 +87,20 @@ public class CaseActionService {
     private final CaseExitReasonRepository exitReasons;
     private final TravelPlanRepository travelPlans;
     private final CaseStatusChangeRepository statusChanges;
+    private final AdmissionReadiness admission;
+    private final com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders;
+    private final DischargeReadiness discharge;
+    private final EvidenceLedger ledger;
+    private final com.rehletshifaa.journey.infrastructure.CaseOutcomeRepository outcomes;
 
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
                              StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock,
                              com.rehletshifaa.workforce.application.WorkforceDirectory workforce, CaseExitReasonRepository exitReasons,
-                             TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla) {
+                             TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla, AdmissionReadiness admission,
+                             com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders, DischargeReadiness discharge, EvidenceLedger ledger,
+                             com.rehletshifaa.journey.infrastructure.CaseOutcomeRepository outcomes) {
+        this.outcomes = outcomes;
+        this.admission = admission; this.changeOrders = changeOrders; this.discharge = discharge; this.ledger = ledger;
         this.exitReasons = exitReasons; this.travelPlans = travelPlans; this.statusChanges = statusChanges; this.sla = sla;
         this.workforce = workforce;
         this.queries = queries; this.readiness = readiness; this.payment = payment; this.work = work;
@@ -140,7 +151,8 @@ public class CaseActionService {
     private static final Set<String> CONSULTANT_STAGES = Set.of("CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW", "CLINICAL_RECOMMENDATION_READY");
     private static final Set<String> PROPOSAL_STAGES = Set.of("PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL", "REVISION_REQUESTED", "PATIENT_DECISION", "EXPIRED");
     /** Readiness steps only the signed-in patient can finish, in the order they should be asked for. */
-    private static final List<String> PATIENT_STEPS = List.of("PROFILE_NOT_ACTIVATED", "CONTACT_NOT_VERIFIED", "REPRESENTATIVE_AUTH_MISSING", "CONSENTS_INCOMPLETE", "IDENTITY_NOT_VERIFIED");
+    private static final List<String> PATIENT_STEPS = List.of("PROFILE_NOT_ACTIVATED", "CONTACT_NOT_VERIFIED", "REPRESENTATIVE_AUTH_MISSING", "MINOR_REQUIRES_GUARDIAN",
+            "GUARDIAN_AUTH_MISSING", "GUARDIAN_EVIDENCE_MISSING", "CONSENTS_INCOMPLETE", "IDENTITY_NOT_VERIFIED");
 
     /**
      * What the patient sees as "the current step": one authoritative answer, resolved here and rendered by
@@ -186,6 +198,9 @@ public class CaseActionService {
             Optional<BlockerView> step = mine.stream().filter(b -> code.equals(b.code())).findFirst();
             if (step.isPresent()) return new CurrentActionView(code.equals("IDENTITY_NOT_VERIFIED") ? "VERIFY_IDENTITY" : "COMPLETE_PROFILE", "FOCUS", null, null, null, null, null, null, false, code);
         }
+        // P1-18: the day-30 / day-90 outcome questions, while open, come first after discharge (also on a closed case).
+        if (FOLLOW_UP_QUESTION_STAGES.contains(status) && outcomes.findFirstByCaseIdAndReportedAtIsNullAndRequestedAtAfterOrderByRequestedAtAsc(caseId,
+                clock.instant().minus(java.time.Duration.ofDays(FollowUpService.OUTCOME_OPEN_DAYS))).isPresent()) return simple("REPORT_OUTCOME", "FOCUS");
         String exit = exitWord(caseId, status);
         if (exit != null) return new CurrentActionView("NONE", "NONE", null, null, null, null, null, null, false, null, null, exit);
         if (TERMINAL.contains(status) && !"EXPIRED".equals(status)) return none(); // an expired estimate is re-prepared, not closed
@@ -199,10 +214,22 @@ public class CaseActionService {
             if (payment.transferPending(caseId)) return simple("WAIT_PAYMENT_CHECK", "WAIT");
             return simple("WAIT_COORDINATION", "WAIT");
         }
-        if ("TRAVEL_COORDINATION".equals(status)) return simple("WAIT_COORDINATION", "WAIT");
-        if ("ARRIVAL_CONFIRMED".equals(status)) return simple("WAIT_TREATMENT", "WAIT");
-        if ("TREATMENT_IN_PROGRESS".equals(status)) return simple("IN_TREATMENT", "WAIT");
-        if (Set.of("DISCHARGED", "FOLLOW_UP").contains(status)) return simple("FOLLOW_UP", "WAIT");
+        // P1-15: the patient says when they have arrived (travel confirmed, arrival within a day); then pays the hospital balance
+        // at the cashier against the voucher (phase 1) and any platform fee balance; then waits to be admitted.
+        if ("TRAVEL_COORDINATION".equals(status)) return admission.arrivalDue(caseId) ? simple("CONFIRM_ARRIVAL", "FOCUS") : simple("WAIT_COORDINATION", "WAIT");
+        if ("ARRIVAL_CONFIRMED".equals(status)) {
+            var voucher = admission.currentVoucher(caseId).orElse(null);
+            if (voucher == null || admission.paidToAdmit(caseId)) return simple("WAIT_TREATMENT", "WAIT");
+            if (admission.feeBalanceOwed(caseId, voucher).signum() == 0 && admission.balanceAwaitingCountersign(caseId)) return simple("WAIT_BALANCE_CHECK", "WAIT");
+            return simple("PAY_BALANCE", "FOCUS");
+        }
+        if ("ADMISSION_READY".equals(status)) return simple("CLEARED_FOR_ADMISSION", "WAIT");
+        // P1-16: a change order above the band waits for the patient's decision (My Care, fresh sign-in).
+        if ("TREATMENT_IN_PROGRESS".equals(status))
+            return changeOrders.existsByCaseIdAndStatusIn(caseId, Set.of("AWAITING_PATIENT")) ? simple("REVIEW_CHANGE_ORDER", "FOCUS") : simple("IN_TREATMENT", "WAIT");
+        // P1-17: discharged, the patient reads "Going home" (the pack, the statement, the follow-up date) until follow-up starts.
+        if ("DISCHARGED".equals(status)) return simple("GOING_HOME", "WAIT");
+        if ("FOLLOW_UP".equals(status)) return simple("FOLLOW_UP", "WAIT");
         return none();
     }
 
@@ -245,8 +272,23 @@ public class CaseActionService {
             return none();
         }
         if (role == Role.CONSULTANT && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
+        // P1-16: in treatment the Consultant records the milestones (their RECORD_MILESTONE item carries the due date).
+        // P1-17: once the discharge is planned, the Consultant completes the discharge pack instead.
+        if (role == Role.CONSULTANT && "TREATMENT_IN_PROGRESS".equals(s))
+            return ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.MILESTONE_DISCHARGE_PLANNED).isPresent()
+                    && !discharge.packBlockers(caseId).isEmpty() ? simple("COMPLETE_DISCHARGE_PACK", "FOCUS") : simple("RECORD_MILESTONE", "FOCUS");
         if (role == Role.OPERATIONS) {
             if (Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
+            // P1-15: after arrival Operations records the cashier's receipt against the voucher; once cleared, the admission number.
+            if ("ARRIVAL_CONFIRMED".equals(s) && admission.currentVoucher(caseId).isPresent() && !admission.paidToAdmit(caseId)
+                    && !admission.balanceAwaitingCountersign(caseId)) return simple("RECORD_HOSPITAL_BALANCE", "FOCUS");
+            if ("ADMISSION_READY".equals(s)) return simple("RECORD_ADMISSION_NUMBER", "FOCUS");
+            // P1-17: the hospital's final invoice once the discharge is planned; after discharge the return travel, then the departure.
+            if ("TREATMENT_IN_PROGRESS".equals(s) && ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.MILESTONE_DISCHARGE_PLANNED).isPresent()
+                    && ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.FINAL_INVOICE).isEmpty()) return simple("RECORD_FINAL_INVOICE", "FOCUS");
+            if (Set.of("DISCHARGED", "FOLLOW_UP").contains(s) && ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.DEPARTURE_CONFIRMED).isEmpty())
+                return ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.RETURN_CONFIRMED).isEmpty()
+                        ? simple("CONFIRM_RETURN", "FOCUS") : simple("CONFIRM_DEPARTURE", "FOCUS");
             // Before release Operations prices and plans the travel package for the proposal (QA #27); arranging travel
             // and arrival (UPDATE_TRAVEL_PLAN) only starts once the deposit is settled.
             if ("PROPOSAL_PREPARATION".equals(s) && f.travelPackage() && proposal != null && !proposal.operationsDone()
@@ -311,7 +353,7 @@ public class CaseActionService {
     private String exitWord(UUID caseId, String status) {
         return switch (status) {
             case "CANCELLED" -> latestExit(caseId) == CaseExitReason.Reason.PATIENT_WITHDREW ? "WITHDRAWN" : "CANCELLED";
-            case "CLOSED" -> latestExit(caseId) == CaseExitReason.Reason.NO_FOLLOW_UP_NEEDED ? "COMPLETED" : "CLOSED";
+            case "CLOSED" -> Set.of(CaseExitReason.Reason.NO_FOLLOW_UP_NEEDED, CaseExitReason.Reason.FOLLOW_UP_COMPLETED).contains(latestExit(caseId)) ? "COMPLETED" : "CLOSED";
             case "EXPIRED" -> exitReasons.findFirstByCaseIdOrderByRecordedAtDesc(caseId)
                     .filter(exit -> exit.getReason() == CaseExitReason.Reason.DEPOSIT_UNPAID && isCurrentMove(caseId, exit))
                     .map(exit -> "EXPIRED").orElse(null);
@@ -396,6 +438,8 @@ public class CaseActionService {
                 // Onboarding starts when the patient acknowledges the estimate; a case without it needs staff to start it.
                 case "ONBOARDING_NOT_STARTED" -> out.add(new BlockerView(b.code(), "Onboarding not started", "لم يبدأ التسجيل", "STAFF", true));
                 case "CONTACT_NOT_VERIFIED" -> out.add(new BlockerView(b.code(), "Contact channel verification", "تأكيد وسيلة التواصل", "PATIENT", true));
+                // P1-13: the guardian provided evidence; the coordinator owes the check, and the case waits on it.
+                case "GUARDIAN_EVIDENCE_UNVERIFIED" -> out.add(new BlockerView(b.code(), "Guardian evidence check", "التحقق من مستند الوصي", "STAFF", true));
                 case "IDENTITY_NOT_VERIFIED" -> out.add(queries.identityUnderReview(caseId)
                         ? new BlockerView(b.code(), "Identity review", "مراجعة الهوية", "STAFF", false)
                         : new BlockerView(b.code(), "Identity verification", "التحقق من الهوية", "PATIENT", false));
@@ -542,6 +586,13 @@ public class CaseActionService {
             work.closeWorkItems(caseId, "TRAVEL", "Superseded — treatment coordination is already under way", false);
         if (!"ACCEPTED".equals(status))
             work.closeWorkItems(caseId, CaseHandoffService.DEPOSIT_RECORD_WORK, "Superseded — the case is past the deposit stage", false);
+        // P1-16: the milestone clock runs only while the patient is in treatment.
+        if (!"TREATMENT_IN_PROGRESS".equals(status)) {
+            work.closeWorkItems(caseId, TreatmentMilestoneService.RECORD_MILESTONE, "Superseded — the patient is no longer in treatment", false);
+            // P1-17: the pack and the final invoice are owed only before discharge.
+            work.closeWorkItems(caseId, DischargeService.PACK_WORK, "Superseded — the patient is no longer in treatment", false);
+            work.closeWorkItems(caseId, DischargeService.FINAL_INVOICE_WORK, "Superseded — the patient is no longer in treatment", false);
+        }
     }
 
     /** My work on the case: an item I own, else unowned work in my role's pool (Finance: the deposit to record). */

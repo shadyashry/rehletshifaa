@@ -34,6 +34,17 @@ created under the same template name.
 | `rs_deposit_payment_reminder` | `deposit-payment-reminder` | Pay deposit / دفع الوديعة → portal (as above) |
 | `rs_deposit_transfer_rejected` | `deposit-transfer-rejected` | Check my payment / مراجعة دفعتي → portal (as above) |
 | `rs_deposit_balance_due` | `deposit-balance-due` | Pay the balance / دفع المتبقي → portal (as above) |
+| `rs_document_cleared` | `document-cleared` | See my documents / عرض مستنداتي → portal (as above). **New, to be created and approved in WhatsApp Manager**; until it exists Meta refuses the send and the outbox retries it into a dead letter (email to patients without WhatsApp still works) |
+| `rs_admission_voucher` | `admission-balance-due` | See what to pay / ما عليّ دفعه → portal (as above). **New (P1-15), to be created and approved in WhatsApp Manager** |
+| `rs_cleared_for_admission` | `cleared-for-admission` | My admission / دخولي إلى المستشفى → portal (as above). **New (P1-15), to be created and approved in WhatsApp Manager** |
+| `rs_treatment_update` | `treatment-update` | My treatment / علاجي → portal (as above). **New (P1-16), to be created and approved in WhatsApp Manager** |
+| `rs_change_order_review` | `change-order-review` | Review the change / مراجعة التغيير → portal (as above). **New (P1-16), to be created and approved in WhatsApp Manager** |
+| `rs_change_order_applied` | `change-order-applied` | My treatment / علاجي → portal (as above). **New (P1-16), to be created and approved in WhatsApp Manager** |
+| `rs_discharge_pack_ready` | `discharge-pack-ready` | Going home / العودة إلى البلد → portal (as above). **New (P1-17), to be created and approved in WhatsApp Manager** |
+| `rs_statement_ready` | `statement-ready` | My statement / كشف حسابي → portal (as above). **New (P1-17), to be created and approved in WhatsApp Manager** |
+| `rs_follow_up_reminder` | `follow-up-reminder` | My follow-up / متابعتي → portal (as above). **New (P1-18), bound in `application.yml`; to be created and approved in WhatsApp Manager** |
+| `rs_outcome_request` | `outcome-request` | Answer securely / الإجابة بأمان → `status` (the OUTCOME secure link). **New (P1-18), bound; to be created and approved** |
+| `rs_closure_review` | `closure-review` | My journey / رحلتي → portal (as above). **New (P1-18), bound; to be created and approved** |
 | `rs_decision_recorded` | `proposal-decision-recorded` | none (3 body variables) |
 | `rs_followup_window_closed` | `intake-followup` | none |
 | `rs_coordinator_intro` | `coordinator-intro` | none (1 body variable: the coordinator's name) |
@@ -87,6 +98,50 @@ Each binding can be renamed with `WHATSAPP_TEMPLATE_*` environment variables (se
 **`rs_deposit_balance_due`** (DEP-3: part of the deposit received)
 - en: We received part of your coordination deposit. The remaining amount is on your case page: pay it by bank transfer and enter the new transaction reference there using the button below.
 - ar: استلمنا جزءًا من وديعة التنسيق. المبلغ المتبقي موضّح في صفحة حالتك: ادفعه بتحويل بنكي وأدخل الرقم المرجعي الجديد للعملية هناك عبر الزر أدناه.
+
+**`rs_document_cleared`** (a file uploaded while the virus check was down passed it later, in the sweep; no file name in the message)
+- en: A file you sent us could not be checked for viruses at the time. It has now passed the check and is on your case. See it on your case page using the button below.
+- ar: تعذّر فحص ملف أرسلته إلينا من الفيروسات في حينه. وقد اجتاز الفحص الآن وأصبح ضمن حالتك. اطّلع عليه في صفحة حالتك عبر الزر أدناه.
+
+**`rs_admission_voucher`** (P1-15, D-B: the platform issued the hospital its admission voucher; the patient pays the balance at the hospital cashier)
+- en: Your hospital has your admission voucher. Pay the balance at the hospital cashier before admission: the amount and your voucher number are on your case page, using the button below.
+- ar: تسلّم المستشفى قسيمة دخولك. ادفع الرصيد المتبقي في خزينة المستشفى قبل الدخول: المبلغ ورقم القسيمة في صفحة حالتك عبر الزر أدناه.
+
+**`rs_cleared_for_admission`** (P1-15, D-C/D-D: the balance is evidenced and the case entered ADMISSION_READY)
+- en: Your payment is confirmed and you are cleared for admission. Your admission details are on your case page, using the button below.
+- ar: تأكّد سدادك وأصبحت جاهزًا للدخول إلى المستشفى. تفاصيل دخولك في صفحة حالتك عبر الزر أدناه.
+
+**`rs_treatment_update`** (P1-16: a treatment milestone was recorded; never sent for a complication)
+- en: Your care team has added an update to your treatment timeline. See it on your case page, using the button below.
+- ar: أضاف فريق رعايتك تحديثًا إلى سجل علاجك. اطّلع عليه في صفحة حالتك عبر الزر أدناه.
+
+**`rs_change_order_review`** (P1-16, D-E: a change order above the band waits for the patient's decision)
+- en: Your doctor proposes a change to your treatment that is outside your accepted quote. Review the reason and the price, then accept or decline it on your case page, using the button below.
+- ar: يقترح طبيبك تغييرًا في علاجك خارج عرض السعر الذي قبلته. راجِع السبب والسعر، ثم اقبله أو ارفضه في صفحة حالتك عبر الزر أدناه.
+
+**`rs_change_order_applied`** (P1-16: a change within the band was accepted by Finance, or an emergency change was made)
+- en: Your care team made a change to your treatment. The reason and, once priced, the cost are on your case page, using the button below.
+- ar: أجرى فريق رعايتك تغييرًا في علاجك. السبب والتكلفة بعد تسعيرها في صفحة حالتك عبر الزر أدناه.
+
+**`rs_discharge_pack_ready`** (P1-17: the patient was discharged; the pack is on their case page)
+- en: You have been discharged. Your discharge documents, your medicines, the warning signs to watch for and your follow-up date are on your case page, using the button below.
+- ar: تمّ خروجك من المستشفى. وثائق الخروج وأدويتك وعلامات الخطر التي يجب الانتباه لها وموعد متابعتك في صفحة حالتك عبر الزر أدناه.
+
+**`rs_statement_ready`** (P1-17: the hospital's final invoice is reconciled and the DISCHARGE statement is issued; no amount in the message)
+- en: Your statement is ready: what you were charged, what you paid and any balance or credit. See it on your case page, using the button below.
+- ar: كشف حسابك جاهز: ما احتُسب عليك وما دفعته وأي رصيد مستحق أو مبلغ مسترد. اطّلع عليه في صفحة حالتك عبر الزر أدناه.
+
+**`rs_follow_up_reminder`** (P1-18: the day before a follow-up contact; no time or doctor in the message)
+- en: Your follow-up with your doctor is tomorrow. The time and how it will happen are on your case page, using the button below.
+- ar: موعد متابعتك مع طبيبك غدًا. الوقت وطريقة المتابعة في صفحة حالتك عبر الزر أدناه.
+
+**`rs_outcome_request`** (P1-18: day 30 and day 90 after discharge; the answers are given on the secure page, never in WhatsApp)
+- en: Your care team would like to know how you are since your treatment: four short questions about pain, daily activities, satisfaction and any problem since you went home. Answer securely using the button below; you will confirm a one-time code first.
+- ar: يودّ فريق رعايتك أن يعرف كيف حالك بعد العلاج: أربعة أسئلة قصيرة عن الألم والأنشطة اليومية والرضا وأي مشكلة منذ عودتك. أجب بأمان عبر الزر أدناه؛ ستؤكّد رمزًا لمرة واحدة أولًا.
+
+**`rs_closure_review`** (P1-18: the case closed; the review request and the final statement)
+- en: Your follow-up with RehletShifaa is complete and your case is closed. We would value a few words on your journey; your final statement is on your case page, using the button below.
+- ar: اكتملت متابعتك مع رحلة شفاء وأُغلقت حالتك. يسعدنا أن تشاركنا كلمات قليلة عن رحلتك؛ كشف حسابك الختامي في صفحة حالتك عبر الزر أدناه.
 
 **`rs_followup_window_closed`** (S3: sent once after WhatsApp's 24-hour window has closed)
 - en: Your RehletShifaa coordinator has an update for you. Reply to this message to continue the conversation.

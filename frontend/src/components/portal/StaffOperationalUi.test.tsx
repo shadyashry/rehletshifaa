@@ -162,6 +162,47 @@ describe("CurrentActionPanel", () => {
     expect(screen.getByRole("button", { name: /التحقق من التحويل/ })).toBeTruthy();
   });
 
+  // P1-15: Operations' admission steps and Finance's admission work read in the team's words, in English and Arabic.
+  it("words the admission steps and Finance's admission work (P1-15)", () => {
+    const onFocusAction = vi.fn();
+    renderWithWork(<CurrentActionPanel locale="en" role="operations" onFocusAction={onFocusAction} action={{ code: "RECORD_HOSPITAL_BALANCE", kind: "FOCUS" }}/>);
+    expect(screen.getByRole("heading", { name: "Record the hospital receipt" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /record the receipt/i }));
+    expect(onFocusAction).toHaveBeenCalled();
+    cleanup();
+    renderWithWork(<CurrentActionPanel locale="en" role="operations" onFocusAction={vi.fn()} action={{ code: "RECORD_ADMISSION_NUMBER", kind: "FOCUS" }}/>);
+    expect(screen.getByRole("heading", { name: "Record the admission number" })).toBeTruthy();
+    cleanup();
+    const work: CurrentActionView = { code: "WORK_ITEM", kind: "FOCUS", workItemId: "w9", workItemVersion: 0, workType: "PRICE_VARIANCE", title: "Hospital price above the accepted estimate",
+      copy: { code: "PRICE_VARIANCE", params: { caseNumber: "RS-2026-000123" } } };
+    renderWithWork(<CurrentActionPanel locale="en" role="finance" action={work} onFocusAction={vi.fn()}/>);
+    expect(screen.getByRole("heading", { name: /Hospital price above the estimate on .*RS-2026-000123/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /decide on the price/i })).toBeTruthy();
+    cleanup();
+    renderWithWork(<CurrentActionPanel locale="ar" role="finance" action={{ ...work, workType: "COUNTERSIGN_BALANCE", copy: { code: "COUNTERSIGN_BALANCE", params: { caseNumber: "RS-2026-000123" } } }} onFocusAction={vi.fn()}/>, "ar");
+    expect(screen.getByRole("heading", { name: /وقّع على إيصال المستشفى للحالة/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /راجع الإيصال/ })).toBeTruthy();
+  });
+
+  // P1-16: the Consultant's milestone step and the six treatment work types read in the team's words, in English and Arabic.
+  it("words the treatment milestone step and the treatment work (P1-16)", () => {
+    const onFocusAction = vi.fn();
+    renderWithWork(<CurrentActionPanel locale="en" role="doctor" onFocusAction={onFocusAction} action={{ code: "RECORD_MILESTONE", kind: "FOCUS" }}/>);
+    expect(screen.getByRole("heading", { name: "Record the next treatment milestone" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /record a milestone/i }));
+    expect(onFocusAction).toHaveBeenCalled();
+    cleanup();
+    const work: CurrentActionView = { code: "WORK_ITEM", kind: "FOCUS", workItemId: "w9", workItemVersion: 0, workType: "PRICE_CHANGE_ORDER", title: "Price a change order",
+      copy: { code: "PRICE_CHANGE_ORDER", params: { caseNumber: "RS-2026-000123" } } };
+    renderWithWork(<CurrentActionPanel locale="en" role="finance" action={work} onFocusAction={vi.fn()}/>);
+    expect(screen.getByRole("heading", { name: /Price the change order on .*RS-2026-000123/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /price the change order/i })).toBeTruthy();
+    cleanup();
+    renderWithWork(<CurrentActionPanel locale="ar" role="finance" action={{ ...work, workType: "COUNTERSIGN_INTERIM_BILL", copy: { code: "COUNTERSIGN_INTERIM_BILL", params: { caseNumber: "RS-2026-000123" } } }} onFocusAction={vi.fn()}/>, "ar");
+    expect(screen.getByRole("heading", { name: /وقّع على الفاتورة المرحلية للحالة/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /راجع الفاتورة/ })).toBeTruthy();
+  });
+
   it("reads right-to-left with Arabic copy for the same contract", () => {
     renderWithWork(<CurrentActionPanel locale="ar" role="coordinator" action={{ code: "WAIT_PATIENT_READINESS", kind: "WAIT", blockerCode: "PROFILE_NOT_ACTIVATED" }}/>, "ar");
     // A waiting step is not the viewer's to take: it reads "This case now", never "Your step".

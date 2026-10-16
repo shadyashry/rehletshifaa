@@ -5,6 +5,11 @@ import { createContext, use, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import dynamic from "next/dynamic";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Gauge, MessageSquare, MoreHorizontal, Plus, X } from "lucide-react";
 import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
+import { AdmissionPanel, ADMISSION_STAGES, ADMISSION_WORK, type AdmissionRole } from "@/components/portal/AdmissionPanel";
+import { TreatmentPanel, TREATMENT_WORK } from "@/components/portal/TreatmentPanel";
+import { DischargePanel, DISCHARGE_STAGES, DISCHARGE_WORK, type DischargeRole } from "@/components/portal/DischargePanel";
+import { ReconciliationPanel, SETTLEMENT_STAGES, SETTLEMENT_WORK, type SettlementRole } from "@/components/portal/ReconciliationPanel";
+import { FollowUpPanel, FOLLOW_UP_STAGES, FOLLOW_UP_WORK } from "@/components/portal/FollowUpPanel";
 import { FacilityPackagePicker, facilityPackageLines, facilityPackages, packageEstimate } from "@/components/portal/FacilityPackagePicker";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
@@ -18,6 +23,9 @@ import { CurrentActionPanel, actionTitle, focusCurrentAction, isOwnStep, stepLab
 import type { WorkItem } from "@/components/portal/MyWork";
 import { patientStepText } from "@/components/portal/patient-step";
 import { FinanceApproval } from "@/components/portal/FinanceApproval";
+import { FxReapproval } from "@/components/portal/FxReapproval";
+import type { PriceCopy } from "@/components/PriceTransparency";
+import { isPlatformFee, QUOTE_VALIDITY_TOO_LONG, SCOPE_CHANGE_REASON_REQUIRED } from "@/lib/price-transparency";
 import type { CareView, PatientProposalState } from "@/components/portal/MyCare";
 import { RequestInformationDialog } from "@/components/portal/RequestInformationDialog";
 import { useWorkCopy } from "@/components/portal/portal-copy";
@@ -31,14 +39,16 @@ import { countryName } from "@/lib/countries";
 import { PROPOSAL_PAYMENT_TERMS_RECORD } from "@/lib/commercial-terms";
 import { type CaseView, type CatalogService, type DirectoryFacility, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
 import { useShortcutsEnabled, useStaffShortcut } from "@/components/portal/StaffShortcuts";
-import { copy, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, LockedSection } from "@/components/portal/portal-ui";
+import { copy, FeedbackContext, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, LockedSection } from "@/components/portal/portal-ui";
 
 const ClinicalReviewPanel=dynamic(()=>import("@/components/portal/ClinicalReview").then(m=>m.ClinicalReviewPanel));
 const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAssignmentDialog").then(m=>m.DeclineAssignmentDialog));
 const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnership").then(m=>m.TransferOwnership));
+const GuardianReview=dynamic(()=>import("@/components/portal/GuardianReview").then(m=>m.GuardianReview));
+const ReopenCase=dynamic(()=>import("@/components/portal/ReopenCase").then(m=>m.ReopenCase));
 const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatientResponse").then(m=>m.RecordPatientResponse));
 
-export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];/** P0-5: active facilities with their approved packages, for the travel/treatment pickers and the consultant's package lines. */facilities?:DirectoryFacility[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null;
+export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];/** P0-5: active facilities with their approved packages, for the travel/treatment pickers and the consultant's package lines. */facilities?:DirectoryFacility[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;/** A call with a method and body (the portal api); the patient side uploads with it. */send?:<T>(path:string,init:RequestInit)=>Promise<T>;/** Reloads the open case's documents (after a patient upload). */reloadDocuments?:(caseId:string)=>Promise<void>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null;/** P1-13: holds CASE_REOPEN on the platform (a Care Coordination Manager); a Consultant's own case is checked by the backend. */canReopen?:boolean;
  /** UX area 2: the viewer's open My work items in My work's own order (the backend's), for "Next in My work" and "Also open on this case". */
  workItems?:WorkItem[];
  /** The back control's name: the view this case was opened from ("Back to My work"). */
@@ -48,7 +58,7 @@ export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalC
  * What every part of the staff case page shares — the viewer, the case and the one way to change it — provided once by
  * `StaffCaseView` so the proposal, deposit, delivery and assessment pieces stop taking the same props one by one.
  */
-type CaseWorkspace={locale:Locale;t:typeof copy.en;role:RoleKey;c:CaseView;busy:boolean;mutate:Mutate;fxRates:FxRate[];catalog:CatalogService[];/** P0-5: active facilities with Finance-approved packages, for the final assessment's package lines. */facilities:DirectoryFacility[];mySubject?:string};
+type CaseWorkspace={locale:Locale;t:typeof copy.en;role:RoleKey;c:CaseView;busy:boolean;mutate:Mutate;/** The price wording (fee line, quote hold, final-quote form, rate re-approval). */price:PriceCopy;fxRates:FxRate[];catalog:CatalogService[];/** P0-5: active facilities with Finance-approved packages, for the final assessment's package lines. */facilities:DirectoryFacility[];mySubject?:string};
 const CaseWorkspaceContext=createContext<CaseWorkspace|null>(null);
 
 export function CaseWorkspaceProvider({value,children}:{value:CaseWorkspace;children:ReactNode}){
@@ -74,10 +84,10 @@ type CaseOverlay="journey"|"messages"|"reply"|"more"|"transfer"|"requestInfo"|"p
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
  * Patients never load this module (`PatientCaseView` renders My Care instead).
  */
-export function StaffCaseView({locale,t,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref,workItems=[],backLabel,openCaseById}:CaseViewProps){
+export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref,canReopen=false,workItems=[],backLabel,openCaseById}:CaseViewProps){
  const work=useWorkCopy();const cover=work.caseCover;const cv=work.caseView;
  const c=value.caseSummary;
- const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,fxRates,catalog,facilities,mySubject}),[locale,t,role,c,busy,mutate,fxRates,catalog,facilities,mySubject]);
+ const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,price:proposalCopy.price,fxRates,catalog,facilities,mySubject}),[locale,t,role,c,busy,mutate,proposalCopy.price,fxRates,catalog,facilities,mySubject]);
  const approved=value.clinicalReviews.find(r=>r.status==="APPROVED");
  const isCoordinator=role==="coordinator";const owned=!!mySubject&&c.coordinatorSubject===mySubject;
  const doctorPhase=["CONSULTANT_ASSIGNMENT_PENDING","CONSULTANT_REVIEW"].includes(c.status);
@@ -103,7 +113,20 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   // here printed the same person twice under two labels, one of them the internal word "assignee".
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
  // Operations and consultants keep their stage forms; the coordinator's work is driven by the current action.
- const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired} travelPlan={value.travelPlan??null}/></div>:null;
+ const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired} travelPlan={value.travelPlan??null} admissionNumberCopy={{label:work.admission.forms.numberField,hint:work.admission.forms.numberHint}}/></div>:null;
+ // P1-15: the reservation, the voucher, the balance and its evidence, for every staff role on the case from travel coordination to treatment.
+ const admissionRole=(["operations","finance","coordinator","doctor"] as string[]).includes(role)?role as AdmissionRole:null;
+ const admissionPanel=admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview?<AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load}/>:null;
+ // P1-16: milestones, change orders, the running money and the evidence checklist while the patient is in treatment (and for an
+ // open Treatment work item afterwards, such as Finance's emergency change-order review, which survives the case's exit).
+ const treatmentPanel=admissionRole&&!value.preview&&(c.status==="TREATMENT_IN_PROGRESS"||TREATMENT_WORK.has(current.workType??""))?<TreatmentPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/>:null;
+ // P1-17: the discharge pack, the final invoice and the journey home, from treatment until the patient has left (Finance reads the
+ // invoice in the reconciliation instead); and the reconciliation and statements once discharged, or for an open Finance item.
+ const dischargePanel=admissionRole&&admissionRole!=="finance"&&!value.preview&&(DISCHARGE_STAGES.has(c.status)||DISCHARGE_WORK.has(current.workType??""))?<DischargePanel key={c.id} locale={locale} role={admissionRole as DischargeRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/>:null;
+ const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/>:null;
+ // P1-18: the follow-up window, contacts, check-ins, outcomes and what holds the case open, for the case's Consultant and coordinator
+ // (never Finance or Operations), from discharge to a closed case, or for an open follow-up item (a review outlives the exit).
+ const followUpPanel=(isDoctor||isCoordinator)&&!value.preview&&(FOLLOW_UP_STAGES.has(c.status)||FOLLOW_UP_WORK.has(current.workType??""))?<FollowUpPanel key={c.id} locale={locale} role={isDoctor?"doctor":"coordinator"} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/>:null;
  // P0-5: the destination and the treatment episodes read back with their facility named, for every staff role on the case.
  const when=(v?:string|null)=>v?new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
  const episodes=value.treatmentEpisodes??[];
@@ -148,7 +171,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   const newestDocument=documents.length?documents[documents.length-1]:undefined;
   // The clinical review form lives in the Clinical tab, so send a consultant there rather than to an
   // overview panel that does not exist for them.
-  const focusAction=()=>{setTab(isDoctor&&!workflowBlock?"clinical":"overview");requestAnimationFrame(()=>{const target=(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel");scrollIntoView(target,{behavior:"smooth",block:"center"});(target?.querySelector("button,select,input,textarea") as HTMLElement|null)?.focus();});};
+  const focusAction=()=>{setTab(isDoctor&&!workflowBlock?"clinical":"overview");requestAnimationFrame(()=>{const target=(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(current.workType??current.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel");scrollIntoView(target,{behavior:"smooth",block:"center"});(target?.querySelector("button,select,input,textarea") as HTMLElement|null)?.focus();});};
   const completeWork=(evidence:string)=>{if(current.workItemId!=null)void mutate(`/tasks/${current.workItemId}/cases/${c.id}/complete`,{evidence,expectedVersion:current.workItemVersion??0});};
   const openMessages=()=>setOverlay("messages");
   // When the step is the patient's reply (the backend's action, never the stage) and this viewer is the one who answers the
@@ -228,7 +251,7 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
    respondBy={myPending?.offerExpiresAt??null}
    onAcceptAssignment={()=>{if(!myPending)return;void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:true}).then(result=>{if(result&&isDoctor)setTab("clinical");});}}
    onDeclineAssignment={()=>setOverlay("decline")}
-   form={financeApproval&&value.proposal&&value.commercial?<FinanceApproval locale={locale} commercial={value.commercial} busy={busy} approveLabel={t.financeApprove}
+   form={financeApproval&&value.proposal&&value.commercial?<FinanceApproval locale={locale} commercial={value.commercial} busy={busy} approveLabel={t.financeApprove} feeLabel={proposalCopy.price.feeLabel}
      onApprove={()=>void mutate(`/finance/cases/${c.id}/proposals/${value.proposal!.versionId}/approve`)}/>
     :formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref} proposal={value.proposal} representatives={value.representatives}/>:undefined}/>
    </div>
@@ -236,6 +259,9 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
   </section>
   {/* Once the cover has scrolled away, the case and its step stay in one slim line under the site header. */}
   {line.gone&&<CaseLine top={line.top} action={current} title={actionTitle(current,role,work)} next={nextItem&&openNext?{item:nextItem,onOpen:openNext}:null}/>}
+
+  {/* P1-13: a closed case is reopened into follow-up by a manager or the case's own Consultant; one quiet line, never on another stage. */}
+  {c.status==="CLOSED"&&!value.preview&&(isDoctor||(isCoordinator&&canReopen))&&<ReopenCase locale={locale} caseId={c.id} side={isDoctor?"doctor":"coordinator"} busy={busy} mutate={mutate} load={load}/>}
 
   {isCoordinator&&<CaseBlockers locale={locale} blockers={actions.blockers} deposit={value.deposit}/>}
 
@@ -273,11 +299,20 @@ export function StaffCaseView({locale,t,role,value,documents,doctors,categories,
        {banners}
        {logistics}
        {workflowBlock}
+       {admissionPanel}
+       {treatmentPanel}
+       {dischargePanel}
+       {reconciliationPanel}
+       {followUpPanel}
        {/* The proposal is the work while it is being prepared or released; afterwards it is reference. */}
        {isCoordinator&&(proposalIsWork?<div id={current.kind==="FOCUS"&&!formAction?"case-actions":undefined}>{proposalPanel}</div>
          :(value.proposal||value.deposit)?<ProposalSummary proposal={value.proposal} deposit={value.deposit} delivery={value.delivery} available={available} onView={()=>setOverlay("proposal")}/>:null)}
+       {role==="finance"&&value.proposal?.fxReapprovalStatus==="PENDING"&&<FxReapproval locale={locale} copy={proposalCopy.price.fxReapproval} caseId={c.id} versionId={value.proposal.versionId} currency={value.proposal.currency} commercial={value.commercial}
+         total={value.proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0)} busy={busy} mutate={mutate}/>}
        {!isCoordinator&&!isDoctor&&(value.proposal||value.deposit)&&proposalPanel}
        {/* The case brief: the facts a coordinator decides ownership on, and the operational context once they own it. */}
+       {/* P1-13 (A-05): the age band (the owner corrects it) and, for a minor, the guardian and the evidence decision. */}
+       {isCoordinator&&!value.preview&&<GuardianReview key={c.id} locale={locale} caseId={c.id} ageBand={c.ageBand} canEdit={owned} busy={busy} mutate={mutate} load={load} viewDoc={viewDoc}/>}
        {isCoordinator&&<CoordinatorBrief documents={documents} preview={!!value.preview} intakeSummary={value.intakeSummary} onClinical={()=>setTab("clinical")} onDocuments={()=>setTab("documents")}/>}
       </div>
 
@@ -613,15 +648,21 @@ export function FinalAssessment(){
  </div>;
 }
 
-function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;proposal?:Proposal;gates?:ProposalGates|null}){
- const {locale,c:{id:caseId},busy,mutate,fxRates}=useCaseWorkspace();
- const[currency,setCurrency]=useState("EGP");const[scope,setScope]=useState("");
+export function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;proposal?:Proposal;gates?:ProposalGates|null}){
+ const {locale,c:{id:caseId},busy,mutate,fxRates,price}=useCaseWorkspace();
+ const[currency,setCurrency]=useState("EGP");const[scope,setScope]=useState("");const[validUntil,setValidUntil]=useState("");
+ // The server's answers to this form, shown next to the field they are about (the page banner stays quiet for them).
+ const feedback=use(FeedbackContext);const mine=feedback.errorPath===`/coordinator/cases/${caseId}/final-quotes`;
+ const scopeError=mine&&feedback.errorCode===SCOPE_CHANGE_REASON_REQUIRED;const dateError=mine&&feedback.errorCode===QUOTE_VALIDITY_TOO_LONG;
+ const scopeRef=useRef<HTMLTextAreaElement>(null);const dateRef=useRef<HTMLInputElement>(null);
+ useEffect(()=>{if(scopeError)scopeRef.current?.focus();else if(dateError)dateRef.current?.focus();},[scopeError,dateError]);
+ const today=new Date().toLocaleDateString("en-CA");
  const g=useWorkCopy().caseView.finalQuote;
  const currencyOptions=["EGP",...fxRates.filter(f=>f.currency!=="EGP").map(f=>f.currency)];
  const isFinalDraft=proposal?.documentType==="FINAL_TREATMENT_QUOTE"&&["CLINICALLY_APPROVED","FINANCE_APPROVED"].includes(proposal.status);
  if(isFinalDraft&&proposal)return <div className="mt-4 border-t border-line pt-4"><h4 className="font-bold text-brand-800">{g.title}</h4>{gates?.financeRequired&&!gates.financeCompleted?<p className="mt-2 text-sm text-alert-700">{g.financeWait}</p>:null}<button className="btn-primary mt-3" disabled={busy||!gates?.readyForRelease} onClick={()=>void mutate(`/coordinator/cases/${caseId}/final-quotes/${proposal.versionId}/release`)}>{g.release}</button><p className="mt-2 text-[0.8125rem] text-ink-500">{g.releaseHint}</p></div>;
  if(proposal?.documentType==="FINAL_TREATMENT_QUOTE")return null;
- return <div className="mt-4 border-t border-line pt-4"><h4 className="font-bold text-brand-800">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.createIntro}</p>{!reviewId?<p className="mt-2 text-sm text-ink-500">{g.needReview}</p>:<><label className="mt-3 block text-sm font-bold">{g.currency}<select className="field mt-1 w-auto" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></label><label className="mt-3 block text-sm font-bold">{g.scope}<textarea className="field mt-1" rows={2} value={scope} onChange={e=>setScope(e.target.value)}/></label><button className="btn-primary mt-3" disabled={busy} onClick={()=>{const validUntil=validUntilInDays(14);void mutate(`/coordinator/cases/${caseId}/final-quotes`,{clinicalReviewId:reviewId,currency,scopeChangeReason:scope||undefined,validUntil});}}>{g.create}</button></>}</div>;
+ return <div className="mt-4 border-t border-line pt-4"><h4 className="font-bold text-brand-800">{g.title}</h4><p className="mt-1 text-sm text-ink-500">{g.createIntro}</p>{!reviewId?<p className="mt-2 text-sm text-ink-500">{g.needReview}</p>:<><label className="mt-3 block text-sm font-bold">{g.currency}<select className="field mt-1 w-auto" value={currency} onChange={e=>setCurrency(e.target.value)}>{currencyOptions.map(code=><option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale]??code}</option>)}</select></label><label className="mt-3 block text-sm font-bold">{g.scope}<textarea ref={scopeRef} className={`field mt-1 ${scopeError?"field-error":""}`} rows={2} value={scope} aria-invalid={scopeError||undefined} aria-describedby={scopeError?"final-quote-scope-error":undefined} onChange={e=>setScope(e.target.value)}/></label>{scopeError&&<p id="final-quote-scope-error" role="alert" className="error-text mt-1">{price.coordinator.scopeRequired}</p>}<label className="mt-3 block text-sm font-bold">{price.coordinator.validUntil}<input ref={dateRef} type="date" className={`field mt-1 w-auto ${dateError?"field-error":""}`} min={today} value={validUntil} aria-invalid={dateError||undefined} aria-describedby={dateError?"final-quote-validity-hint final-quote-validity-error":"final-quote-validity-hint"} onChange={e=>setValidUntil(e.target.value)}/></label><p id="final-quote-validity-hint" className="mt-1 text-[0.8125rem] text-ink-500">{price.coordinator.validUntilHint}</p>{dateError&&<p id="final-quote-validity-error" role="alert" className="error-text mt-1">{price.coordinator.validityTooLong}</p>}<button className="btn-primary mt-3" disabled={busy} onClick={()=>{void mutate(`/coordinator/cases/${caseId}/final-quotes`,{clinicalReviewId:reviewId,currency,scopeChangeReason:scope.trim()||undefined,validUntil:validUntil?new Date(`${validUntil}T23:59:59`).toISOString():undefined});}}>{g.create}</button></>}</div>;
 }
 
 /**
@@ -702,7 +743,7 @@ export function RoleActions({role,t,c,proposal,gates,availableActions,mutate,app
  return null;
 }
 
-function ProposalCard({proposal}:{proposal:Proposal}){const work=useWorkCopy();const cv=work.caseView;const {locale,t}=useCaseWorkspace();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="border-y border-line py-4"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong><bdi dir="ltr">{money(total,proposal.currency,locale)}</bdi></strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{item.description}{item.quantity>1?` × ${new Intl.NumberFormat(intlLocale(locale)).format(item.quantity)}`:""}{item.optional?` ${cv.optional}`:""}</span><strong className="whitespace-nowrap"><bdi dir="ltr">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</bdi></strong></li>)}</ul>{proposal.coordinatorNotes&&<div className="mt-3 border-t border-line pt-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{fillTemplate(cv.validUntil,{date:new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))})}</p>}</div>}
+function ProposalCard({proposal}:{proposal:Proposal}){const work=useWorkCopy();const cv=work.caseView;const {locale,t,price}=useCaseWorkspace();const total=proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0);return <div className="border-y border-line py-4"><div className="flex justify-between gap-3"><strong>{fillTemplate(work.proposalVersion,{number:new Intl.NumberFormat(intlLocale(locale)).format(proposal.versionNumber)})} · {statusLabel(proposal.status,locale)}</strong><strong><bdi dir="ltr">{money(total,proposal.currency,locale)}</bdi></strong></div><ul className="mt-3 space-y-1">{proposal.items.map(item=><li key={item.id} className="flex justify-between gap-3"><span>{isPlatformFee(item)?price.feeLabel:item.description}{item.quantity>1?` × ${new Intl.NumberFormat(intlLocale(locale)).format(item.quantity)}`:""}{item.optional?` ${cv.optional}`:""}</span><strong className="whitespace-nowrap"><bdi dir="ltr">{money(item.quantity*item.unitPrice,proposal.currency,locale)}</bdi></strong></li>)}</ul>{proposal.fxReapprovalStatus==="PENDING"&&<p role="status" className="mt-3 text-sm font-semibold text-status-warning-fg">{price.staff.fxPending}</p>}{proposal.acceptableFrom&&<p className="mt-3 text-sm text-ink-700">{fillTemplate(price.staff.cooling,{time:new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(proposal.acceptableFrom))})}</p>}{proposal.coordinatorNotes&&<div className="mt-3 border-t border-line pt-3 text-sm"><p className="font-bold text-brand-700">{t.proposalNotesLabel}</p><p className="mt-1 whitespace-pre-line text-ink-700">{proposal.coordinatorNotes}</p></div>}{proposal.validUntil&&<p className="mt-3 text-sm">{fillTemplate(cv.validUntil,{date:new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(proposal.validUntil))})}</p>}</div>}
 
 /** A business label from the messages files (`portalWork.caseView`), with the code itself as the fallback for a new one. */
 const label=(table:Record<string,string>,key:string)=>Object.hasOwn(table,key)?table[key]:key;

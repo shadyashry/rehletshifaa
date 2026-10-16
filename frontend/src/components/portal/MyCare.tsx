@@ -19,7 +19,9 @@ import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { CareAreaMark, CaseSwitcher, phaseIndex, takeArrivalFocus } from "@/components/portal/CaseSwitcher";
 import { formatMoney } from "@/lib/money";
 import type { CaseActions } from "@/components/portal/CurrentAction";
-import { patientStepText } from "@/components/portal/patient-step";
+import { patientStepText, type StepText } from "@/components/portal/patient-step";
+import { isGuardianStep } from "@/lib/guardian";
+import { ADMISSION_STEPS, DISCHARGE_STEPS, FOLLOW_UP_STEPS, TREATMENT_STEPS } from "@/components/portal/admission-steps";
 /** The backend's one answer to "may the patient see a proposal, and which one" — rendered, never re-derived from the stage. */
 export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null; releasedAt?: string | null;
   /** PRELIMINARY_ESTIMATE or FINAL_TREATMENT_QUOTE: which noun the step uses (one noun per document). */
@@ -58,14 +60,29 @@ export type CareView = "care" | "documents" | "messages";
 /** The steps whose subject is the deposit: its facts belong inside the current step, not in a second block. Paying it is the payment step's own panel. */
 const MONEY_STEPS = new Set(["PAY_DEPOSIT", "WAIT_PAYMENT_CHECK"]);
 
-export function MyCare({ locale, caseSummary, actions, milestones, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, paymentStep, messagesPanel, newCaseHref = null, onWithdraw }: {
+export function MyCare({ locale, caseSummary, actions, milestones, patientAction, patientProposal, proposal, deposit, documents, unreadMessages, cases, view, onView, onOpenCase, onOpenProposal, identityStep, guardianStep, paymentStep, admissionStep, treatmentStep, dischargeStep, followUpStep, messagesPanel, concerns, documentUpload, newCaseHref = null, onWithdraw }: {
   locale: Locale; caseSummary: CaseSummary; actions: CaseActions; milestones?: CaseMilestones | null; patientAction?: PatientAction | null; patientProposal?: PatientProposalState | null;
   proposal?: ProposalSummaryData | null; deposit?: DepositSummaryData | null; documents: CaseDocument[]; unreadMessages: number;
   /** Every case the account can open, this one included; the switcher shows from two. */
   cases: CaseSummary[]; view: CareView; onView: (view: CareView) => void;
   onOpenCase: (id: string) => void; onOpenProposal: () => void; identityStep?: ReactNode;
+  /** P1-13: the guardian's step (legal basis, evidence, consent), rendered when the backend's step is a guardian blocker. */
+  guardianStep?: ReactNode;
+  /** P1-13: "Raise a concern" and the patient's own concerns; one quiet line on the page. */
+  concerns?: ReactNode;
+  /** Adds a file to the case from the Documents tab; absent where the portal cannot upload. */
+  documentUpload?: ReactNode;
   /** The deposit payment step (DEP-3), rendered when the backend says the patient owes it. */
-  paymentStep?: ReactNode; messagesPanel: ReactNode;
+  paymentStep?: ReactNode;
+  /** P1-15: arrival, the voucher and the hospital balance, rendered when the backend's step is one of the admission steps. */
+  admissionStep?: ReactNode;
+  /** P1-16: the treatment timeline and, on REVIEW_CHANGE_ORDER, the change awaiting the patient's decision. */
+  treatmentStep?: ReactNode;
+  /** P1-17: going home (the medicines, warning signs, follow-up, return, documents and letter) and the statement, on GOING_HOME and FOLLOW_UP. */
+  dischargeStep?: ReactNode;
+  /** P1-18: the outcome questions on REPORT_OUTCOME, the next contact in FOLLOW_UP, and the closing statement once completed. */
+  followUpStep?: ReactNode;
+  messagesPanel: ReactNode;
   /** Where the account holder sends a new case of their own; null when it is not theirs to send from here. */
   newCaseHref?: string | null;
   /** Withdraws from the journey (P0-2); rendered as one quiet action only while the backend offers WITHDRAW. */
@@ -75,9 +92,14 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
   const t = work.myCare;
   const c = caseSummary;
   const code = actions.currentAction.code;
+  // P1-13: a guardian blocker is its own step in words (the backend still says COMPLETE_PROFILE; the blocker names which part).
+  const guardianCode = code === "COMPLETE_PROFILE" && isGuardianStep(actions.currentAction.blockerCode) ? actions.currentAction.blockerCode : null;
+  const guardianCopy = work.safety.guardian;
   // A final quote is reviewed as a quote, never called an estimate, and carries no estimate stamp.
   const finalQuote = patientProposal?.documentType === "FINAL_TREATMENT_QUOTE";
-  const step = patientStepText(code, t.steps, { proposalState: patientProposal?.state ?? null, status: c.status, exit: actions.currentAction.exit ?? null, documentType: patientProposal?.documentType });
+  const step: StepText = guardianCode
+    ? (guardianCode === "GUARDIAN_EVIDENCE_MISSING" ? { title: guardianCopy.evidenceTitle, body: guardianCopy.evidenceBody } : { title: guardianCopy.stepTitle, body: guardianCopy.stepBody })
+    : patientStepText(code, t.steps, { proposalState: patientProposal?.state ?? null, status: c.status, exit: actions.currentAction.exit ?? null, documentType: patientProposal?.documentType });
   const body = code === "PROVIDE_INFORMATION" ? patientAction?.message?.trim() || step.body : step.body;
   // A case closed or cancelled says nothing about how far it got, so its journey shows no step as reached or current.
   const phase = c.status === "CLOSED" || c.status === "CANCELLED" ? -1 : phaseIndex(c.status);
@@ -87,6 +109,8 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
   // The patient's own way out, offered by the backend until travel is confirmed; a confirmation, then the one call.
   const canWithdraw = !!onWithdraw && actions.availableActions.includes("WITHDRAW");
   const [withdrawing, setWithdrawing] = useState(false);
+  // A REJECTED row is an upload that never arrived (or did not match what was announced): there is no file to show.
+  const shared = useMemo(() => documents.filter(doc => doc.status !== "REJECTED"), [documents]);
   const dateFormat = useMemo(() => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }), [locale]);
   const date = (iso: string) => dateFormat.format(new Date(iso));
   // The backend's expected total (UX 1c-0) when it sent one, else the sum of the lines that count (optional ones never do).
@@ -157,15 +181,21 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
         <section aria-labelledby="documents-title" className="card mt-5 p-5 sm:p-6">
           <h2 id="documents-title" className="text-[1.0625rem] font-bold text-brand-900">{t.documents.title}</h2>
           <p className="mt-1 text-[0.9375rem] text-ink-600">{t.documents.hint}</p>
-          {documents.length === 0 ? <p className="mt-4 text-[0.9375rem] text-ink-500">{t.documents.empty}</p>
+          {documentUpload}
+          {shared.length === 0 ? <p className="mt-4 text-[0.9375rem] text-ink-500">{t.documents.empty}</p>
             : <ul className="mt-4 divide-y divide-line">
-                {documents.map(doc => (
-                  <li key={doc.documentId} className="flex items-center gap-3 py-3">
-                    <FileText size={17} aria-hidden className="flex-none text-brand-600"/>
-                    <span className="min-w-0 flex-1 truncate font-semibold text-ink-800" dir="auto">{doc.fileName}</span>
-                    <span className="text-[0.8125rem] text-ink-500">{date(doc.createdAt)}</span>
-                  </li>
-                ))}
+                {shared.map(doc => {
+                  // A file still being checked, or one the scanner condemned (it was deleted), says so; a clean one says nothing.
+                  const state = doc.status === "CLEAN" ? null : doc.status === "SCAN_FAILED" ? t.documents.status.failed : t.documents.status.checking;
+                  return (
+                    <li key={doc.documentId} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3">
+                      <FileText size={17} aria-hidden className="flex-none text-brand-600"/>
+                      <span className={`min-w-0 flex-1 truncate font-semibold ${doc.status === "SCAN_FAILED" ? "text-ink-500" : "text-ink-800"}`} dir="auto">{doc.fileName}</span>
+                      {state && <span className={`text-[0.8125rem] font-semibold ${doc.status === "SCAN_FAILED" ? "text-alert-800" : "text-ink-600"}`}>{state}</span>}
+                      <span className="text-[0.8125rem] text-ink-500">{date(doc.createdAt)}</span>
+                    </li>
+                  );
+                })}
               </ul>}
         </section>
       )}
@@ -203,7 +233,8 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
                 ))}
               </ul>
             )}
-            {code === "COMPLETE_PROFILE" && actions.blockers.length > 0 && (
+            {code === "COMPLETE_PROFILE" && guardianCode && guardianStep && <div className="mt-6">{guardianStep}</div>}
+            {code === "COMPLETE_PROFILE" && !(guardianCode && guardianStep) && actions.blockers.length > 0 && (
               <ul className="mt-4 list-disc space-y-1 ps-5 text-[0.9375rem] text-ink-800">
                 {actions.blockers.map(b => <li key={b.code}>{locale === "ar" ? b.labelAr : b.labelEn}</li>)}
               </ul>
@@ -212,6 +243,14 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
             {/* The money this step is about, inside the step: one place for the amount, on the facts panel. */}
             {depositInStep && deposit && !(code === "PAY_DEPOSIT" && paymentStep) && <DepositFacts deposit={deposit} locale={locale} level={3} className="mt-5 border-t border-line pt-4"/>}
             {code === "PAY_DEPOSIT" && focus && paymentStep}
+            {/* P1-15: where and when, the voucher and what to pay at the hospital; on CONFIRM_ARRIVAL, the step's one action. */}
+            {ADMISSION_STEPS.has(code) && admissionStep}
+            {/* P1-16: what has happened in treatment; on REVIEW_CHANGE_ORDER, the change to decide is the step's one action. */}
+            {TREATMENT_STEPS.has(code) && treatmentStep}
+            {/* P1-18: the outcome questions (the step's one action), the next contact and who to turn to, or the closing statement. */}
+            {(FOLLOW_UP_STEPS.has(code) || actions.currentAction.exit === "COMPLETED") && followUpStep}
+            {/* P1-17: what to watch for, what to take and when the follow-up is; then the statement. Nothing to do here. */}
+            {DISCHARGE_STEPS.has(code) && dischargeStep}
 
             {/* Exactly one primary action, and only when the backend says the patient owes something. */}
             {focus && code === "REVIEW_PROPOSAL" && (
@@ -314,6 +353,8 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
               <a href={newCaseHref} className="link-cta inline-flex min-h-11 items-center gap-2 text-[0.9375rem]"><Plus size={16} aria-hidden/>{t.cases.sendNew}</a>
             </p>
           )}
+
+          {concerns && <div className="lg:col-start-1">{concerns}</div>}
 
           {/* WITHDRAW — one quiet way out, in words, away from the step's own action; never a second call to action. */}
           {canWithdraw && (

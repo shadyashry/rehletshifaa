@@ -33,6 +33,7 @@ import type { ConversationDetail } from "@/components/portal/ConversationsView";
 import { type CaseView, type StaffCaseResponse, type CatalogService, type DirectoryFacility, type FxRate, type CaseDocument, type VerifiedDoctor, type DoctorProfile, type StaffProfile, type CareCategory, type StaffMember, type Task, type Workspace, type MutationResult, refreshAfterRejectedAction, normalizeCases, STAFF_ROLES, terminalStatuses, roleLabel } from "@/components/portal/portal-model";
 import { copy, FeedbackContext } from "@/components/portal/portal-ui";
 import { Check, CircleAlert } from "lucide-react";
+import { refusalExplainedInPlace } from "@/lib/price-transparency";
 
 /** The portal with its staff work copy (from the server page) available to every queue, work list and case view. */
 // Role-specific panels, loaded on demand: a coordinator never downloads My Care, a patient never the clinical review.
@@ -126,7 +127,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const CaseViewFor=useCaseView(!caseRole?null:caseRole==="patient"?"patient":"staff");
   const api=useCallback(async<T,>(path:string,init?:RequestInit):Promise<T>=>{const token=accessToken.current;if(!signedInSubject||!token)throw new Error("AUTHENTICATION_REQUIRED");const response=await apiFetchAs(token,path,init);if(!response.ok){const body=await response.json().catch(()=>({message:t.error}));// A2b: a privileged change wants the passkey — explain and offer it (or its setup) instead of re-signing-in blindly.
       if(body.code===PASSKEY_REQUIRED){const method=(init?.method??"GET").toUpperCase();throw Object.assign(new Error(reauthenticationCopy[locale].passkeyRequired),{passkeyPending:method==="GET"?null:{path,method,body:typeof init?.body==="string"?init.body:undefined}});}
-      if(body.code===REAUTHENTICATION_REQUIRED){const method=(init?.method??"GET").toUpperCase();await requestReauthentication(signIn,method==="GET"?undefined:{path,method,body:typeof init?.body==="string"?init.body:undefined});throw new Error(reauthenticationCopy[locale].required);}throw new Error(body.message??t.error);}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn,locale]);
+      if(body.code===REAUTHENTICATION_REQUIRED){const method=(init?.method??"GET").toUpperCase();await requestReauthentication(signIn,method==="GET"?undefined:{path,method,body:typeof init?.body==="string"?init.body:undefined});throw new Error(reauthenticationCopy[locale].required);}throw Object.assign(new Error(body.message??t.error),{code:typeof body.code==="string"?body.code:undefined});}return response.status===204?undefined as T:response.json();},[signedInSubject,t.error,signIn,locale]);
   // Busy counts the operations in flight, so one finishing cannot clear it while another still runs. A refresh answers
   // only if it is still the latest one for this role: an older one, or one from before a role switch, is dropped.
   const refreshing=useRef(0);
@@ -199,6 +200,8 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     }catch(e){if(request===opening.current){setWorkspace(null);setError(e instanceof Error?e.message:t.error);void refresh();}}
     finally{if(!managedBusy)setBusyCount(n=>n-1);}
   }
+  /** The open case's documents again (a patient upload); dropped if another case was opened meanwhile. */
+  async function reloadDocuments(caseId:string){const request=opening.current;try{const docs=await api<CaseDocument[]>(`/cases/${caseId}/documents`);if(request===opening.current)setDocuments(docs);}catch{if(request===opening.current)setDocumentError(true);}}
   /** Open a case by id (from My Work or a notification), even before the queue has loaded it. */
   async function openCaseById(caseId:string){
     const known=cases.find(item=>item.id===caseId);if(known){await openCase(known);return;}
@@ -243,9 +246,12 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     if(back)setReauthReturn({pending:back==="completed"?pending:null,abandoned:back==="abandoned"});},[]); // eslint-disable-line react-hooks/exhaustive-deps
   // A2b: a privileged change the backend refused for want of a passkey (with the change, to send again after confirming).
   const[passkeyNeeded,setPasskeyNeeded]=useState<{pending:PendingChange|null}|null>(null);
+  // A refusal the proposal pages explain themselves (cooling period, rate check, quote validity): its code and where it came
+  // from, kept apart from the page banner so they can answer next to the field or in the proposal's own note.
+  const[refusal,setRefusal]=useState<{code:string;path:string}|null>(null);
   async function mutate(path:string,body?:unknown,method="POST"):Promise<MutationResult|null|undefined>{
     // Another action is still running: nothing was sent, which is not a failure (null, not undefined).
-    if(mutationPending.current)return null;mutationPending.current=true;setBusyCount(n=>n+1);setError("");setNotice("");
+    if(mutationPending.current)return null;mutationPending.current=true;setBusyCount(n=>n+1);setError("");setNotice("");setRefusal(null);
     const origin=document.activeElement instanceof HTMLElement&&document.activeElement!==document.body?document.activeElement:null;
     try{const result=await api<MutationResult>(path,{method,body:body===undefined?undefined:JSON.stringify(body)});setNotice(t.success);setReauthReturn(null);
       await Promise.all([refresh(true),workspace?openCase(path.endsWith("/claim")?{...workspace.caseSummary,coordinatorSubject:user?.profile.sub}:workspace.caseSummary,undefined,true):undefined]);
@@ -253,7 +259,10 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
       requestAnimationFrame(()=>rebaseline(origin));
       return result??{status:"SAVED"};
     }catch(e){const message=e instanceof Error?e.message:t.error;if(path.endsWith("/claim"))setWorkspace(null);
-      if(e instanceof Error&&"passkeyPending" in e){setPasskeyNeeded({pending:(e as Error&{passkeyPending:PendingChange|null}).passkeyPending});return undefined;}await refreshAfterRejectedAction(path,workspace,refresh,openCase);setError(message);return undefined;}
+      if(e instanceof Error&&"passkeyPending" in e){setPasskeyNeeded({pending:(e as Error&{passkeyPending:PendingChange|null}).passkeyPending});return undefined;}await refreshAfterRejectedAction(path,workspace,refresh,openCase);
+      const code=e instanceof Error&&"code" in e?String((e as Error&{code?:string}).code??""):"";
+      // A code the copy words (P1-16 onward) reads in the viewer's language; any other keeps the backend's message.
+      if(code&&refusalExplainedInPlace(code,path))setRefusal({code,path});else setError((code&&Object.hasOwn(work.errorCodes,code)?work.errorCodes[code as keyof typeof work.errorCodes]:null)??message);return undefined;}
     finally{mutationPending.current=false;setBusyCount(n=>n-1);}
   }
   // Staff views (My work, My cases, Team queue) in one place: the header navigation, the inline phone navigation and
@@ -321,7 +330,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   function changeRole(role:RoleKey){setActive(role);setWorkspace(null);setCases([]);setMyTasks([]);restored.current=false;const url=new URL(window.location.href);url.searchParams.delete("case");url.searchParams.delete("view");url.searchParams.set("role",role);window.history.replaceState({},"",url);}
   function switchRole(role:RoleKey){guardLeave(()=>changeRole(role));}
   const clinicLink=hasClinic?{href:virtualClinicHref(locale),label:work.nav.clinic}:null;
-  const clearFeedback=useCallback(()=>{setNotice("");setError("");},[]);const clearNotice=useCallback(()=>setNotice(""),[]);
+  const clearFeedback=useCallback(()=>{setNotice("");setError("");setRefusal(null);},[]);const clearNotice=useCallback(()=>setNotice(""),[]);
   if(loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
   if(controlCenterOnly)return <PortalFrame title={t.title} subtitle={work.portal.openingControlCenter}/>;
   if(user&&!workforce&&!careEntry&&clinicAccess.loading)return <PortalFrame title={t.title} subtitle={t.loading}/>;
@@ -342,7 +351,7 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
   const viewName=staffViews?.items.find(item=>item.id===staffView)?.label;
   const pageTitle=isPatientRole?work.myCare.nav.care:inWorkspace&&staffViews?fillTemplate(work.portal.title.case,{caseNumber:`\u2066${workspace.caseSummary.caseNumber}\u2069`}):viewName??(currentRole?roleLabel(currentRole,locale):t.title);
   const pageSubtitle=inWorkspace||isPatientRole||(staffViews&&staffView!=="work")?"":currentRole?descriptions[currentRole]??"":t.subtitle;
-  return <FeedbackContext.Provider value={{notice,error,clear:clearFeedback,clearNotice}}><PortalFrame title={pageTitle} titleHidden={inWorkspace&&!!staffViews} subtitle={pageSubtitle} nav={staffViews?<StaffViewLinks locale={locale} label={work.nav.label} items={staffViews.items} current={workspace?null:staffView} clinic={clinicLink} onSelect={selectStaffView} hrefFor={viewHref} variant="inline"/>:null}>
+  return <FeedbackContext.Provider value={{notice,error,errorCode:refusal?.code,errorPath:refusal?.path,clear:clearFeedback,clearNotice}}><PortalFrame title={pageTitle} titleHidden={inWorkspace&&!!staffViews} subtitle={pageSubtitle} nav={staffViews?<StaffViewLinks locale={locale} label={work.nav.label} items={staffViews.items} current={workspace?null:staffView} clinic={clinicLink} onSelect={selectStaffView} hrefFor={viewHref} variant="inline"/>:null}>
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<NotificationBell locale={locale} api={api} onOpenCase={caseId=>workspace&&workspace.caseSummary.id!==caseId?guardLeave(()=>void openCaseById(caseId)):void openCaseById(caseId)}/>}
     {staffViews&&<StaffNav locale={locale} label={work.nav.label} items={staffViews.items} current={workspace?null:staffView} clinic={clinicLink} onSelect={selectStaffView} hrefFor={viewHref}/>}
     {isPatientRole&&workspace&&<PatientNav caseId={workspace.caseSummary.id} view={careView} unread={workspace.messages.filter(m=>m.senderRole!=="PATIENT"&&!m.read).length} onView={changeCareView}/>}
@@ -363,13 +372,15 @@ function PortalView({locale,proposalCopy}:{locale:Locale;proposalCopy:ProposalCo
     {workspace
         // Keyed by case: opening another case straight from a notification or My Work must not carry this case's
         // drafts, tab or open dialogs into it (or let them be submitted against the wrong patient's case).
-        ? !caseRole||!CaseViewFor ? (meFailed?null:<p role="status" className="text-sm text-ink-500">{t.loading}</p>) : <div ref={workspaceRoot}><RoleCaseView view={CaseViewFor} key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={caseRole} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} facilities={facilities} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} loadIntakeHistory={loadIntakeHistory} load={api} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} sendProposal={sendProposal} busy={busy} back={()=>guardLeave(backToQueue)} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={id=>id!==workspace.caseSummary.id?guardLeave(()=>void openCaseById(id)):undefined} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null} workItems={myTasks as unknown as WorkItem[]} backLabel={fillTemplate(work.caseCover.backTo,{view:staffViews?.items.find(item=>item.id===staffView)?.label??work.nav.work})}/></div>
+        ? !caseRole||!CaseViewFor ? (meFailed?null:<p role="status" className="text-sm text-ink-500">{t.loading}</p>) : <div ref={workspaceRoot}><RoleCaseView view={CaseViewFor} key={workspace.caseSummary.id} locale={locale} t={t} proposalCopy={proposalCopy} role={caseRole} value={workspace} documents={documents} doctors={doctors} categories={categories} staff={staff} catalog={catalog} fxRates={fxRates} facilities={facilities} canRebalance={leadsTeam(me,"CARE_COORDINATION")} loadAssignmentHistory={loadAssignmentHistory} loadIntakeHistory={loadIntakeHistory} load={api} send={api} reloadDocuments={reloadDocuments} downloadDoc={downloadDoc} viewDoc={viewDoc} mySubject={user?.profile?.sub} sendProposal={sendProposal} busy={busy} back={()=>guardLeave(backToQueue)} mutate={mutate} careView={careView} onCareView={changeCareView} otherCases={cases} openCaseById={id=>id!==workspace.caseSummary.id?guardLeave(()=>void openCaseById(id)):undefined} consultantsHref={holds(me,"CREDENTIAL_READ")?ccHref(locale,"/consultants"):null} canReopen={holds(me,"CASE_REOPEN")} workItems={myTasks as unknown as WorkItem[]} backLabel={fillTemplate(work.caseCover.backTo,{view:staffViews?.items.find(item=>item.id===staffView)?.label??work.nav.work})}/></div>
         : isPatientRole ? (queueLoading||(!landed&&patientView)||(cases.length>0&&!error)
           ? <p role="status" className="text-sm text-ink-500">{t.loading}</p>
           : <PatientNoCase locale={locale}/>)
         : null}
     {currentRole&&!["admin","identity","patient"].includes(currentRole)&&<div id="staff-view" hidden={!!workspace}><Queue views={staffViews?.items??[]} view={staffView??"work"} onSelectView={selectStaffView} loading={queueLoading||queueFor!==currentRole} queueState={queueState} changeQueue={changeQueue} locale={locale} role={currentRole} openCaseById={openCaseById} cases={cases} tasks={myTasks} busy={busy||queueLoading} mySubject={user?.profile?.sub} coordinatorLead={leadsTeam(me,"CARE_COORDINATION")} staff={staff??[]} replyCovers={replyCovers} openCase={openCase} mutate={mutate} fetchJson={api}/></div>}
 
+    {/* P1-13: a Care Coordination Manager works incidents in the Control Center; one quiet way there from the work list. */}
+    {currentRole==="coordinator"&&!workspace&&holds(me,"INCIDENT_MANAGE")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/incidents")}>{work.safety.incidents.title}</a> — {work.safety.incidents.inControlCenter}</p>}
     {currentRole==="finance"&&!workspace&&holds(me,"COMMERCIAL_POLICY_READ")&&<p className="mt-8 text-sm text-ink-600"><a className="font-semibold text-brand-700 underline underline-offset-4" href={ccHref(locale,"/commercial/margin-deposit")}>{work.portal.financePolicies}</a>{work.portal.inControlCenter}</p>}
     {staffViews&&<StaffShortcuts views={staffViews.items} caseOpen={!!workspace} onView={selectStaffView}/>}
   </PortalFrame></FeedbackContext.Provider>;

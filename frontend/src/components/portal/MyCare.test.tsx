@@ -227,6 +227,22 @@ describe("MyCare", () => {
     expect(steps).toEqual([null, null, null, null, "step", null, null]);
   });
 
+  it("on Documents offers the upload and says which files are still being checked or failed the check", () => {
+    renderCare({ view: "documents", documentUpload: <p>upload control</p>, documents: [
+      { documentId: "d1", fileName: "Echo_Report.pdf", status: "CLEAN", createdAt: "2026-09-08T09:00:00Z" },
+      { documentId: "d2", fileName: "Scan.pdf", status: "PENDING", createdAt: "2026-09-09T09:00:00Z" },
+      { documentId: "d3", fileName: "Bad.pdf", status: "SCAN_FAILED", createdAt: "2026-09-09T09:00:00Z" },
+      { documentId: "d4", fileName: "Never-arrived.pdf", status: "REJECTED", createdAt: "2026-09-09T09:00:00Z" }] });
+    expect(screen.getByText("upload control")).toBeTruthy();
+    expect(screen.queryByText(/secure link/)).toBeNull();
+    const rows = screen.getAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(within(rows[0]).queryByText("Being checked")).toBeNull();
+    expect(within(rows[1]).getByText("Being checked")).toBeTruthy();
+    expect(within(rows[2]).getByText("Did not pass the virus check")).toBeTruthy();
+    expect(screen.queryByText("Never-arrived.pdf")).toBeNull();
+  });
+
   it("switches between My Care, Documents and Messages without leaving the case", () => {
     const { onView } = renderCare({ view: "documents", documents: [{ documentId: "d1", fileName: "Echo_Report.pdf", status: "CLEAN", createdAt: "2026-09-08T09:00:00Z" }] });
     expect(screen.getByText("Echo_Report.pdf")).toBeTruthy();

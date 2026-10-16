@@ -33,7 +33,8 @@ public interface PatientRepresentativeRepository extends BaseRepository<PatientR
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update PatientRepresentative r set r.relationship = :relationship, r.permissions = :permissions, r.effectiveFrom = :from,
-                r.expiresAt = :expiresAt, r.revokedAt = null
+                r.expiresAt = :expiresAt, r.revokedAt = null, r.delegationType = 'REPRESENTATIVE', r.legalBasis = null,
+                r.evidenceDocumentId = null, r.evidenceVerifiedAt = null, r.evidenceVerifiedBy = null
             where r.patientId = :patientId and r.representativeSubject = :subject""")
     int regrant(@Param("patientId") UUID patientId, @Param("subject") String subject, @Param("relationship") String relationship,
                 @Param("permissions") String permissions, @Param("from") Instant from, @Param("expiresAt") Instant expiresAt);
@@ -55,6 +56,14 @@ public interface PatientRepresentativeRepository extends BaseRepository<PatientR
     int revokeAll(@Param("from") UUID from, @Param("now") Instant now);
 
     boolean existsByPatientId(UUID patientId);
+
+    java.util.Optional<PatientRepresentative> findByPatientIdAndRepresentativeSubject(UUID patientId, String representativeSubject);
+
+    /** The guardian delegations in force for the patient, newest first (P1-13). */
+    @Query("""
+            select r from PatientRepresentative r where r.patientId = :patientId and r.delegationType = 'GUARDIAN' and r.revokedAt is null
+                and (r.expiresAt is null or r.expiresAt > :now) order by r.effectiveFrom desc""")
+    java.util.List<PatientRepresentative> findActiveGuardians(@Param("patientId") UUID patientId, @Param("now") Instant now);
 
     /** New people an account has started acting for since {@code after} (the daily cap on cases sent for others). */
     long countByRepresentativeSubjectAndCreatedAtAfter(String representativeSubject, Instant after);

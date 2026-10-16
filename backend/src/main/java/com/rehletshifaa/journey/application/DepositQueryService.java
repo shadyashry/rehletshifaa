@@ -126,6 +126,12 @@ public class DepositQueryService {
         return d == null ? BigDecimal.ZERO : totalsOf(d.getId()).netEgp();
     }
 
+    /** P1-17: EGP recorded as paid and as refunded on the case's active deposit (the statement's lines); zeros without one. */
+    Totals activeTotals(UUID caseId) {
+        DepositRepository.Quoted d = activeDeposit(caseId);
+        return d == null ? new Totals(BigDecimal.ZERO, BigDecimal.ZERO) : totalsOf(d.getId());
+    }
+
     Totals totalsOf(UUID depositId) {
         PaymentEventRepository.Totals t = ledger.findTotalsOf(depositId);
         return new Totals(zeroIfNull(t == null ? null : t.getPaidEgp()), zeroIfNull(t == null ? null : t.getRefundedEgp()));

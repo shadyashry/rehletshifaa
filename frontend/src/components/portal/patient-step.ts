@@ -20,7 +20,8 @@ export function patientStepText(code: string, steps: LocalizedWorkCopy["myCare"]
     // A final quote is reviewed as a quote, never called an estimate.
     case "REVIEW_PROPOSAL": return ctx.documentType === "FINAL_TREATMENT_QUOTE" ? s.REVIEW_FINAL_QUOTE : s.REVIEW_PROPOSAL;
     case "PROVIDE_INFORMATION": case "COMPLETE_PROFILE": case "VERIFY_IDENTITY": case "WAIT_CONSULTANT_REVIEW":
-    case "PAY_DEPOSIT": case "WAIT_PAYMENT_CHECK": case "WAIT_COORDINATION": case "WAIT_TREATMENT": case "IN_TREATMENT": case "FOLLOW_UP": return s[code];
+    case "PAY_DEPOSIT": case "WAIT_PAYMENT_CHECK": case "WAIT_COORDINATION": case "WAIT_TREATMENT": case "IN_TREATMENT": case "GOING_HOME": case "FOLLOW_UP":
+    case "CONFIRM_ARRIVAL": case "PAY_BALANCE": case "WAIT_BALANCE_CHECK": case "CLEARED_FOR_ADMISSION": case "REVIEW_CHANGE_ORDER": case "REPORT_OUTCOME": return s[code];
     default:
       // A journey that ended after acceptance says so with the backend's word for how (withdrawn, cancelled, expired, completed).
       if (ctx.exit && s[ctx.exit]) return s[ctx.exit];

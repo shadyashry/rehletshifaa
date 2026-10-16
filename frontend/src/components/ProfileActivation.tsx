@@ -78,7 +78,7 @@ function stageFor(action: PatientAction): Stage {
   return "done";
 }
 
-export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; token: string; copy: ActivationCopy }) {
+export function ProfileActivation({ locale, token, copy: t, guardianConsent }: { locale: Locale; token: string; copy: ActivationCopy; /** P1-13: the GUARDIAN_AUTHORIZATION wording, from `guardianConsent.text`. */ guardianConsent?: string }) {
 
   const [stage, setStage] = useState<Stage>("loading");
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -298,6 +298,7 @@ export function ProfileActivation({ locale, token, copy: t }: { locale: Locale; 
   }
 
   function consentWords(type: string): string | null {
+    if (type === "GUARDIAN_AUTHORIZATION" && guardianConsent) return guardianConsent;
     return type === "DEPOSIT_CANCELLATION_TERMS" ? DEPOSIT_CONSENT[locale] : (t.consents as Record<string, string>)[type] ?? null;
   }
 

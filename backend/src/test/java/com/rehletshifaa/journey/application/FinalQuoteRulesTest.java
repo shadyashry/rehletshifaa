@@ -43,6 +43,7 @@ import com.rehletshifaa.shared.api.ApiException;
 class FinalQuoteRulesTest {
     @Autowired CaseService cases;
     @Autowired JourneyService journey;
+    @Autowired ProposalQueryService proposalQueries;
     @Autowired JdbcTemplate jdbc;
     @Autowired CryptoService crypto;
     @Autowired EntityManager entityManager;
@@ -282,6 +283,10 @@ class FinalQuoteRulesTest {
         assertThat(jdbc.queryForObject("SELECT status FROM proposal_versions WHERE id=?", String.class, fq.versionId())).isEqualTo("RELEASED");
         assertThat(openTasks(fq.caseId(), "FX_REAPPROVAL")).isEqualTo(1);
         assertThat(audits(fq.caseId(), "FINAL_QUOTE_FX_REAPPROVAL_REQUESTED")).isEqualTo(1);
+        // Finance's commercial view carries the rate that tripped the band and the quote total at it, beside the frozen total.
+        var commercial = proposalQueries.commercial(fq.versionId());
+        assertThat(commercial.fxReapprovalRate()).isEqualByComparingTo("0.0190");
+        assertThat(commercial.fxReapprovalTotal()).isNotNull().isLessThan(commercial.displayTotal());
         // A second attempt while Finance checks opens nothing new.
         asPatient();
         assertThat(catchThrowableOfType(() -> journey.decideProposal(fq.caseId(), fq.versionId(), new ProposalDecisionRequest("ACCEPTED", List.of(), null)), ApiException.class).code()).isEqualTo("FX_REAPPROVAL_REQUIRED");
@@ -291,6 +296,7 @@ class FinalQuoteRulesTest {
         assertThat(journey.confirmFinalQuoteFxRate(fq.caseId(), fq.versionId()).fxReapprovalStatus()).isEqualTo("CONFIRMED");
         assertThat(openTasks(fq.caseId(), "FX_REAPPROVAL")).isZero();
         assertThat(audits(fq.caseId(), "FINAL_QUOTE_FX_RATE_CONFIRMED")).isEqualTo(1);
+        assertThat(proposalQueries.commercial(fq.versionId()).fxReapprovalRate()).isNull();
         asPatient();
         assertThat(journey.decideProposal(fq.caseId(), fq.versionId(), new ProposalDecisionRequest("ACCEPTED", List.of(), null)).status()).isEqualTo("ACCEPTED");
         assertThat(jdbc.queryForObject("SELECT fx_rate FROM proposal_versions WHERE id=?", BigDecimal.class, fq.versionId())).isEqualByComparingTo("0.02");
