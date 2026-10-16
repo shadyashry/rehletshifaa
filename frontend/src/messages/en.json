@@ -58,6 +58,7 @@
   "home": {
     "eyebrow": "Specialist care in Egypt — one coordinator, every step of the way",
     "title": "Understand your treatment options before you travel",
+    "titleAccent": "before you travel",
     "intro": "Send the medical information you already have. We prepare your case for a Consultant in the right specialty, then explain the recommendation, the likely cost and what comes next.",
     "primaryAction": "Send my case",
     "watchJourney": "See how it works",
@@ -87,10 +88,10 @@
         "coordinator": "Your coordinator",
         "coordinatorMessage": "Your file is complete. A Consultant review starts now.",
         "files": [
-          { "name": "Discharge summary", "kind": "PDF", "lang": "en" },
-          { "name": "Scans · 24 images", "kind": "SCAN", "lang": "en" },
-          { "name": "Photo of blood tests", "kind": "PHOTO", "lang": "en" },
-          { "name": "تقرير الطبيب المعالج", "kind": "PDF", "lang": "ar" }
+          { "name": "Discharge summary", "kind": "document" },
+          { "name": "Scans · 24 images", "kind": "scan" },
+          { "name": "Photo of blood tests", "kind": "photo" },
+          { "name": "Your doctor’s letter", "kind": "document" }
         ],
         "caseFile": "Your case file",
         "private": "Private to your care team",
@@ -127,6 +128,7 @@
         "estimate": "Preliminary estimate",
         "estimateValue": "A price range in",
         "currencyLabel": "your currency",
+        "currencies": ["USD", "SAR", "EGP"],
         "includes": ["Consultant & procedure", "Hospital stay", "Tests on arrival", "Coordination"]
       },
       "decide": {

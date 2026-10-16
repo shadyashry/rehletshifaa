@@ -23,14 +23,15 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
 
   return (
     <section className="home-hero bg-surface-pearl">
-      <div className="container-site grid gap-8 py-8 sm:gap-9 sm:py-10 lg:grid-cols-[minmax(0,53fr)_minmax(0,47fr)] lg:items-center lg:gap-16 lg:py-16">
+      <div className="container-site grid gap-8 py-8 sm:gap-9 sm:py-10 lg:grid-cols-[minmax(0,53fr)_minmax(0,47fr)] lg:items-start lg:gap-16 lg:py-16">
+        {/* Top-aligned with the story card: the eyebrow sits level with the card's step bar. */}
         <div className="max-w-[34rem]">
           <p className="flex items-start gap-2 text-[0.9375rem] font-semibold leading-6 text-brand-700">
             {/* Aligned to the first line, so a label that wraps on a phone keeps its dot at the start of the text. */}
             <span aria-hidden className="mt-[0.5625rem] h-1.5 w-1.5 flex-none rounded-full bg-brand-400" />
             {d.home.eyebrow}
           </p>
-          <h1 className="display mt-2.5 [text-wrap:balance] sm:mt-3">{d.home.title}</h1>
+          <h1 className="display home-title mt-2.5 [text-wrap:balance] sm:mt-3"><HeroTitle title={d.home.title} accent={d.home.titleAccent} /></h1>
           <p className="lead mt-4 max-w-[52ch] sm:mt-5">{d.home.intro}</p>
 
           {/* On a phone the secondary action is a quiet link beside the button — one primary control, one row. */}
@@ -68,5 +69,26 @@ export function Hero({ locale, d }: { locale: Locale; d: Dictionary }) {
         </ul>
       </div>
     </section>
+  );
+}
+
+/**
+ * The promise's turn — "before you travel" — in petrol, underlined once by hand with the journey line in coral (the
+ * coral is a mark, never the text). Without motion the line is simply there.
+ */
+function HeroTitle({ title, accent }: { title: string; accent: string }) {
+  const at = title.lastIndexOf(accent);
+  if (!accent || at < 0) return title;
+  return (
+    <>
+      {title.slice(0, at)}
+      <span className="home-title-accent">
+        {accent}
+        <svg aria-hidden focusable="false" className="home-title-line" viewBox="0 0 200 12" preserveAspectRatio="none">
+          <path d="M2 8C50 2.5 120 11.5 198 4.5" pathLength={1} vectorEffect="non-scaling-stroke" />
+        </svg>
+      </span>
+      {title.slice(at + accent.length)}
+    </>
   );
 }

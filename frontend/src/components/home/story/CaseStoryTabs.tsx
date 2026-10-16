@@ -1,9 +1,12 @@
 "use client";
 
-import { Pause, Play } from "lucide-react";
+import { Check, ClipboardCheck, FileUp, HeartPulse, Pause, Play, Signpost, Stethoscope } from "lucide-react";
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 type Step = { label: string };
+
+/** One picture per step of How It Works, in order: send, review, the plan, the decision, care and follow-up. */
+const STEP_ICONS = [FileUp, Stethoscope, ClipboardCheck, Signpost, HeartPulse];
 
 /**
  * The only client part of the hero story: which scene is showing. Every scene is server-rendered and stays mounted;
@@ -11,9 +14,10 @@ type Step = { label: string };
  * and nothing below it shifts as the story moves on. A scene's motion runs only while it carries `data-active`, so
  * showing it again replays it.
  *
- * Timing lives in CSS: the active step's progress line fills over the scene's duration and its `animationend` moves
- * the story on. Pausing (the button, hover or keyboard focus inside) pauses that line, and with reduced motion the
- * line does not animate at all, so the story never advances by itself.
+ * The steps read as one journey: icon nodes on a line that fills petrol up to where the story is. Timing lives in CSS:
+ * the current step's coral ring draws itself around its icon over the scene's duration and its `animationend` moves
+ * the story on. Pausing (the button, hover or keyboard focus inside) pauses the ring, and with reduced motion the ring
+ * is simply whole, so the story never advances by itself.
  */
 export function CaseStoryTabs({ label, steps, scenes, pauseLabel, playLabel }: {
   label: string;
@@ -61,6 +65,8 @@ export function CaseStoryTabs({ label, steps, scenes, pauseLabel, playLabel }: {
       <div role="tablist" aria-label={label} className="case-story-tabs" onKeyDown={onKeyDown}>
         {steps.map((step, index) => {
           const selected = index === active;
+          const done = index < active;
+          const Icon = STEP_ICONS[index] ?? FileUp;
           return (
             <button
               key={step.label}
@@ -71,20 +77,29 @@ export function CaseStoryTabs({ label, steps, scenes, pauseLabel, playLabel }: {
               aria-selected={selected}
               aria-controls={`${id}-panel-${index}`}
               tabIndex={selected ? 0 : -1}
-              data-state={selected ? "active" : index < active ? "done" : "next"}
+              data-state={selected ? "active" : done ? "done" : "next"}
               className="case-story-tab"
               onClick={() => select(index)}
             >
-              <span aria-hidden className="case-story-tab-number">{index < active ? "✓" : index + 1}</span>
+              <span aria-hidden className="case-story-node">
+                <Icon size={17} strokeWidth={2} />
+                {selected ? (
+                  <svg className="case-story-ring" viewBox="0 0 44 44" focusable="false">
+                    <circle className="case-story-ring-track" cx="22" cy="22" r="20" />
+                    <circle
+                      key={`ring-${active}`}
+                      className="case-story-ring-fill"
+                      cx="22"
+                      cy="22"
+                      r="20"
+                      pathLength={1}
+                      onAnimationEnd={(event) => { if (event.target === event.currentTarget) select(active + 1); }}
+                    />
+                  </svg>
+                ) : null}
+                {done ? <span className="case-story-node-done"><Check size={9} strokeWidth={3.4} /></span> : null}
+              </span>
               <span className="case-story-tab-label">{step.label}</span>
-              {selected ? (
-                <span
-                  aria-hidden
-                  key={`progress-${active}`}
-                  className="case-story-progress"
-                  onAnimationEnd={(event) => { if (event.target === event.currentTarget) select(active + 1); }}
-                />
-              ) : null}
             </button>
           );
         })}

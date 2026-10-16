@@ -1,4 +1,4 @@
-import { Camera, Check, House, Lock, MessageCircle, Stethoscope } from "lucide-react";
+import { Camera, Check, FileText, House, Images, Lock, MessageCircle, Stethoscope } from "lucide-react";
 import Image from "next/image";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -118,7 +118,7 @@ export function SendScene({ s, step, dir, locale, receivedOn }: { s: Story; step
           {t.files.map((file, index) => {
             const [slide, fillAt, fillFor, tick] = timings[index];
             return (
-              <li key={file.name} lang={file.lang} dir={file.lang === "ar" ? "rtl" : "ltr"} className="s-slide flex items-center gap-2.5 rounded-[0.5625rem] border border-line px-2.5 py-1.5" style={at(slide)}>
+              <li key={file.name} className="s-slide flex items-center gap-2.5 rounded-[0.5625rem] border border-line px-2.5 py-1.5" style={at(slide)}>
                 <FileBadge kind={file.kind} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[0.8125rem] font-semibold text-brand-900">{file.name}</span>
@@ -151,14 +151,13 @@ export function SendScene({ s, step, dir, locale, receivedOn }: { s: Story; step
   );
 }
 
+/** What kind of file it is, as a picture only: no format words to translate. */
 function FileBadge({ kind }: { kind: string }) {
-  if (kind === "PHOTO") {
-    return <span aria-hidden className="grid h-[1.875rem] w-[1.625rem] flex-none place-items-center rounded-[0.25rem] border border-line bg-surface-pearl text-ink-500"><Camera size={14} /></span>;
-  }
-  const dark = kind === "SCAN";
+  const Icon = kind === "photo" ? Camera : kind === "scan" ? Images : FileText;
+  const dark = kind === "scan";
   return (
-    <span aria-hidden dir="ltr" className={`grid h-[1.875rem] w-[1.625rem] flex-none place-items-center rounded-[0.25rem] text-[0.5rem] font-bold ${dark ? "bg-brand-900 text-brand-100" : "bg-brand-50 text-brand-600"}`}>
-      {kind}
+    <span aria-hidden className={`grid h-[1.875rem] w-[1.625rem] flex-none place-items-center rounded-[0.25rem] ${dark ? "bg-brand-900 text-brand-100" : kind === "photo" ? "border border-line bg-surface-pearl text-ink-500" : "bg-brand-50 text-brand-600"}`}>
+      <Icon size={14} />
     </span>
   );
 }
@@ -266,8 +265,8 @@ export function RecommendationScene({ s, step, dir, validUntil }: { s: Story; st
             <span className="flex items-baseline gap-1.5 text-[0.8125rem] font-bold text-brand-900">
               {t.estimateValue}
               <span className="sr-only">{t.currencyLabel}</span>
-              <span aria-hidden dir="ltr" className="inline-grid text-[0.6875rem] text-brand-600">
-                {["USD", "SAR", "EGP"].map((code, index) => (
+              <span aria-hidden className="inline-grid text-[0.6875rem] text-brand-600">
+                {t.currencies.map((code, index) => (
                   <span key={code} className={`s-currency s-currency-${index} rounded-[0.3rem] bg-brand-50 px-1.5 [grid-area:1/1]`} style={at(2)}>{code}</span>
                 ))}
               </span>
