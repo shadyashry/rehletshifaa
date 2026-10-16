@@ -149,7 +149,7 @@ class JourneyHappyPathParityTest {
         UUID id = UUID.randomUUID(); String subject = id.toString();
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,created_at,updated_at,version) VALUES(?,?,?,?,'VERIFIED','CONSULTANT','AVAILABLE',?,?,?,0)",
                 id, subject, subject, subject, careCategory, past, past);
-        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,created_at) VALUES(?,?,'MEDICAL_LICENSE','VERIFIED',?)", UUID.randomUUID(), id, past);
+        jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,created_at) VALUES(?,?,'MEDICAL_LICENSE','VERIFIED',?)", UUID.randomUUID(), id, past); com.rehletshifaa.clinic.ClinicTestData.declareAll(jdbc);
         return id;
     }
     /** An active, priced catalog service for a Consultant — the same "pre-approved" path that makes a clinical cost estimate finance-exempt. */

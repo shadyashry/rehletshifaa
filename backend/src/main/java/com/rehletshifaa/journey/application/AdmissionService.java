@@ -5,6 +5,7 @@ import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.clinic.application.ConsultantAffiliationService;
 import com.rehletshifaa.casemanagement.application.CaseStatusLog;
 import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
 import com.rehletshifaa.casemanagement.domain.CaseStatus;
@@ -86,6 +87,8 @@ public class AdmissionService {
     public static final String CHECK_PROFORMA = "CHECK_PROFORMA", PRICE_VARIANCE = "PRICE_VARIANCE", REVISE_LETTER = "REVISE_ADMISSION_LETTER",
             COUNTERSIGN_BALANCE = "COUNTERSIGN_BALANCE", APPROVE_PNR = "APPROVE_POINT_OF_NO_RETURN", EMERGENCY_REVIEW = "EMERGENCY_ADMISSION_REVIEW",
             VOUCHER_BLOCKED = "ADMISSION_VOUCHER_BLOCKED";
+    /** P1-19: the notice to the Consultant when a case is reserved at a facility they have not declared. */
+    public static final String UNDECLARED_FACILITY = "UNDECLARED_FACILITY";
     /** Stages a reservation can be made or changed in. */
     private static final Set<String> RESERVABLE = Set.of("TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED");
     static final String WITHIN = "WITHIN_ESTIMATE", VARIANCE_OPEN = "VARIANCE_OPEN", VARIANCE_ACCEPTED = "VARIANCE_ACCEPTED",
@@ -113,19 +116,26 @@ public class AdmissionService {
     private final ApplicationEventPublisher events;
     private final ObjectMapper json;
     private final FinanceWork financeWork;
+    private final ConsultantAffiliationService affiliations;
 
     public AdmissionService(Authority authority, Clock clock, AuditTrail auditTrail, EvidenceLedger ledger, AdmissionReadiness readiness,
                             FacilityAdmissionRepository admissions, AdmissionVoucherRepository vouchers, ProposalVersionRepository proposalVersions,
                             TravelPlanRepository travelPlans, MedicalCaseRepository cases,
                             CaseStatusLog statusLog, FacilityDirectory facilities, PaymentService payment, StaffWorkService work, SlaPolicy sla,
                             CaseTransitionPolicy policy, DepositPaymentNotices notices, NotificationOutbox outbox,
-                            IntakeLifecycleService intake, ApplicationEventPublisher events, ObjectMapper json, FinanceWork financeWork) {
-        this.financeWork = financeWork;
+                            IntakeLifecycleService intake, ApplicationEventPublisher events, ObjectMapper json, FinanceWork financeWork,
+                            ConsultantAffiliationService affiliations) {
+        this.financeWork = financeWork; this.affiliations = affiliations;
         this.authority = authority; this.clock = clock; this.auditTrail = auditTrail; this.ledger = ledger; this.readiness = readiness;
         this.admissions = admissions; this.vouchers = vouchers; this.proposalVersions = proposalVersions; this.travelPlans = travelPlans;
         this.cases = cases; this.statusLog = statusLog; this.facilities = facilities;
         this.payment = payment; this.work = work; this.sla = sla; this.policy = policy; this.notices = notices;
         this.outbox = outbox; this.intake = intake; this.events = events; this.json = json;
+    }
+
+    /** The facility the case is reserved at (not cancelled), if any. No authorization: the caller's case action was. */
+    public Optional<UUID> reservedFacility(UUID caseId) {
+        return admissions.findByCaseId(caseId).filter(a -> a.getStatus() != FacilityAdmission.Status.CANCELLED).map(FacilityAdmission::getFacilityId);
     }
 
     // ---- reservation and letter (Operations; Finance checks) ----
@@ -150,6 +160,12 @@ public class AdmissionService {
         }
         admissions.saveAndFlush(admission);
         audit("ADMISSION_RESERVED", actor.subject(), actor.label(), caseId, "FacilityAdmission", admission.getId(), "RESERVE", null);
+        // P1-19 (D-H): a facility the case's Consultant has not declared is flagged to Compliance; the reservation stands.
+        affiliations.checkReservation(caseId, request.facilityId()).filter(ConsultantAffiliationService.UndeclaredFacility::newlyRaised)
+                .ifPresent(u -> work.notifyStaff(u.consultantSubject(), caseId, null, UNDECLARED_FACILITY, "Declare your relationship with " + u.facilityName(),
+                        "This case is reserved at a facility your affiliation declaration does not name. Add it to your declaration on your Virtual Clinic.",
+                        "undeclared-facility:" + caseId + ":" + request.facilityId(), true,
+                        WorkCopy.of(UNDECLARED_FACILITY, "caseNumber", caseNumber(caseId), "facility", u.facilityName())));
         work.changed(caseId);
         return view(caseId, admission);
     }

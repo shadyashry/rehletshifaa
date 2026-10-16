@@ -32,10 +32,20 @@ class RolePolicyTest {
                     .as(role.name()).doesNotContainAnyElementsOf(CASE_AND_CLINICAL);
     }
 
+    /**
+     * The auditor reads. Its one write (P1-19, design §7) is its own review record: the review of a declaration or a sampled case
+     * and drawing a sample. It changes no case, clinical, money or workflow state, and nobody else holds it. Shrink-only.
+     */
+    private static final Set<Permission> AUDITOR_REVIEW_RECORD = EnumSet.of(Permission.COMPLIANCE_REVIEW);
+
     @Test
     void theAuditorOnlyReads() {
         assertThat(RolePolicy.grants()).filteredOn(g -> g.role() == Role.COMPLIANCE_AUDITOR)
-                .allSatisfy(g -> assertThat(g.permission().name()).matches(".*_READ"));
+                .allSatisfy(g -> assertThat(g.permission().name().endsWith("_READ") || AUDITOR_REVIEW_RECORD.contains(g.permission()))
+                        .as(g.permission().name()).isTrue());
+        for (Permission p : AUDITOR_REVIEW_RECORD)
+            assertThat(RolePolicy.grantsFor(p)).extracting(RolePolicy.Grant::role).containsOnly(Role.COMPLIANCE_AUDITOR);
+        assertThat(CASE_AND_CLINICAL).doesNotContainAnyElementsOf(AUDITOR_REVIEW_RECORD);
     }
 
     @Test

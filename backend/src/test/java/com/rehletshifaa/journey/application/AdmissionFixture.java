@@ -76,6 +76,7 @@ abstract class AdmissionFixture {
             jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",
                     UUID.randomUUID(), practitionerId, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now());
         } else practitionerId = practitioners.get(0);
+        com.rehletshifaa.clinic.ClinicTestData.declareAll(jdbc);
         UUID service = UUID.randomUUID();
         BigDecimal price = new BigDecimal("100000.00");
         jdbc.update("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,0)",

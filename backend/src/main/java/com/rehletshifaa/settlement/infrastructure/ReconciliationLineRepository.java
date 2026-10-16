@@ -11,4 +11,6 @@ public interface ReconciliationLineRepository extends BaseRepository<Reconciliat
     List<ReconciliationLine> findByReconciliationIdOrderByLineNoAsc(UUID reconciliationId);
 
     void deleteByReconciliationId(UUID reconciliationId);
+
+    long countByReconciliationIdAndVarianceCode(UUID reconciliationId, String varianceCode);
 }

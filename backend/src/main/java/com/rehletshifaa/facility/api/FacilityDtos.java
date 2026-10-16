@@ -46,7 +46,18 @@ public final class FacilityDtos {
     public record FacilityView(UUID id, String name, String city, String kind, String status, String accreditationStatus,
                                String contactName, String contactEmail, String contactPhone, String settlementTerms, String settlementNotes,
                                String createdBy, Instant createdAt, String updatedBy, Instant updatedAt,
-                               List<AccreditationView> accreditations, List<PackageView> packages) {}
+                               List<AccreditationView> accreditations, List<PackageView> packages, SuspensionView packageSuspension,
+                               List<SuspensionView> suspensions) {}
+
+    /**
+     * P1-19 (design §7.5): the facility's packages suspended pending review after repeated unapproved extras ({@code reason}), the
+     * quarter and how many final invoices carried one, the case that tipped it; lifted by a Finance Manager with a note.
+     */
+    public record SuspensionView(UUID id, String reason, String quarter, int occurrences, UUID triggerCaseId, Instant suspendedAt,
+                                 String liftedBy, Instant liftedAt, String liftNote) {}
+
+    /** A Finance Manager lifts the suspension after the review: what was found and agreed with the facility. */
+    public record LiftSuspensionRequest(@jakarta.validation.constraints.NotBlank @Size(max = 2000) String note) {}
 
     public record CareAreaView(String slug, String nameEn, String nameAr) {}
 

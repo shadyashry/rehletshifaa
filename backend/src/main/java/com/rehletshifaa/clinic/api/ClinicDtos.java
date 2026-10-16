@@ -1,5 +1,6 @@
 package com.rehletshifaa.clinic.api;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
@@ -76,5 +77,31 @@ public final class ClinicDtos {
                                     @NotBlank @Size(max = 120) @Pattern(regexp = "[A-Za-z0-9._-]+") String code,
                                     @NotBlank @Size(max = 200) String label) {}
     public record CapabilityAdminView(UUID id, String type, String code, String label, String status, Instant approvedAt, long version) {}
+    // ---------- P1-19 (D-H): affiliation declarations ----------
+    /** One relationship with one facility. {@code note} is required for a FINANCIAL_INTEREST (what it is). */
+    public record AffiliationLineRequest(@NotNull UUID facilityId,
+                                         @NotBlank @Pattern(regexp = "PRIVILEGES|EMPLOYMENT|FINANCIAL_INTEREST|NONE_DECLARED") String kind,
+                                         @Size(max = 2000) String note) {}
+    /**
+     * The yearly declaration: every facility the Consultant uses (an empty list declares that they use none and have no relationship
+     * with any), {@code attested} = "this is complete and true", given under {@code attestationVersion}.
+     */
+    public record DeclarationRequest(@NotNull @Size(max = 100) List<@Valid AffiliationLineRequest> lines, boolean attested,
+                                     @NotBlank @Size(max = 40) String attestationVersion) {}
+    public record AffiliationLineView(UUID facilityId, String facilityName, String kind, String note) {}
+    /** A declaration; the review ({@code reviewStatus}, {@code reviewedAt}, {@code reviewNote}) is shown to Compliance and Consultant Operations, never to the Consultant. */
+    public record DeclarationView(UUID id, UUID practitionerId, String consultantName, Instant declaredAt, Instant validUntil, boolean current,
+                                  Instant supersededAt, String attestationVersion, String reviewStatus, Instant reviewedAt, String reviewNote,
+                                  List<AffiliationLineView> lines) {}
+    public record AffiliationFlagView(UUID id, UUID caseId, String caseNumber, UUID practitionerId, String consultantName, UUID facilityId,
+                                      String facilityName, String code, Instant raisedAt, Instant clearedAt) {}
+    /**
+     * The Consultant's own page: the current declaration (null when none holds), whether a current one exists (without it no new case
+     * can be assigned), the attestation version to send, earlier declarations, and the facilities used before they were declared.
+     */
+    public record AffiliationsView(UUID practitionerId, boolean declarationCurrent, Instant renewBy, String attestationVersion,
+                                   DeclarationView current, List<DeclarationView> history, List<AffiliationFlagView> flags) {}
+    /** Compliance's review of a declaration: CLEARED, or FINDING with what was found. */
+    public record DeclarationReviewRequest(@NotBlank @Pattern(regexp = "CLEARED|FINDING") String outcome, @Size(max = 4000) String note) {}
     public record IdResult(UUID id, String status) {}
 }

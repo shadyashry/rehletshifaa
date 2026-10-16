@@ -387,7 +387,7 @@ class ConsultantVirtualClinicTest {
         jdbc.update("INSERT INTO practitioner_profiles(id,external_subject,legal_name,display_name,credentialing_status,practitioner_type,availability_status,care_category,expected_review_hours,created_at,updated_at,version) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)",
                 id, subject, name, name, "VERIFIED", "CONSULTANT", "AVAILABLE", area, 72, Instant.now(), Instant.now());
         jdbc.update("INSERT INTO practitioner_credentials(id,practitioner_id,credential_type,status,expires_at,created_at) VALUES(?,?,?,?,?,?)",
-                UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now());
+                UUID.randomUUID(), id, "LICENSE", "VERIFIED", Instant.now().plusSeconds(86400), Instant.now()); com.rehletshifaa.clinic.ClinicTestData.declareAll(jdbc);
         return id;
     }
 

@@ -5,6 +5,7 @@ import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.application.Resource;
 import com.rehletshifaa.authority.domain.Permission;
+import com.rehletshifaa.facility.application.FacilityCatalogService;
 import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
 import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
 import com.rehletshifaa.journey.application.CaseEvents;
@@ -72,6 +73,11 @@ import java.util.stream.Collectors;
 @Service
 public class ReconciliationService {
     /** Work types: Finance reconciles (opened by the final invoice) and refunds a credit; a Finance Manager countersigns and settles a dispute. */
+    /** P1-19: the notice to Finance Managers and Consultant Operations when a facility's packages are suspended. */
+    public static final String PACKAGES_SUSPENDED = "FACILITY_PACKAGES_SUSPENDED";
+    /** Design §7.5: "twice in a quarter". */
+    static final int SUSPEND_AFTER = 2;
+    private static final java.time.ZoneId CAIRO = java.time.ZoneId.of("Africa/Cairo");
     public static final String RECONCILE_WORK = DischargeService.RECONCILE_WORK, COUNTERSIGN_WORK = "COUNTERSIGN_RECONCILIATION",
             DISPUTE_WORK = "FACILITY_DISPUTE", REFUND_WORK = "REFUND_CREDIT";
     private static final String MANAGER = "FINANCE_MANAGER";
@@ -89,10 +95,13 @@ public class ReconciliationService {
     private final WorkforceDirectory workforce;
     private final ApplicationEventPublisher events;
     private final ObjectMapper json;
+    private final FacilityCatalogService facilities;
 
     public ReconciliationService(Authority authority, Clock clock, AuditTrail auditTrail, SettlementBasis basis, EvidenceLedger ledger,
                                  ReconciliationRepository reconciliations, ReconciliationLineRepository lines, StatementService statements, StaffWorkService work,
-                                 FinanceWork financeWork, WorkforceDirectory workforce, ApplicationEventPublisher events, ObjectMapper json) {
+                                 FinanceWork financeWork, WorkforceDirectory workforce, ApplicationEventPublisher events, ObjectMapper json,
+                                 FacilityCatalogService facilities) {
+        this.facilities = facilities;
         this.authority = authority; this.clock = clock; this.auditTrail = auditTrail; this.basis = basis; this.ledger = ledger;
         this.reconciliations = reconciliations; this.lines = lines; this.statements = statements; this.work = work; this.financeWork = financeWork;
         this.workforce = workforce; this.events = events; this.json = json;
@@ -316,7 +325,36 @@ public class ReconciliationService {
             financeWork.open(caseId, REFUND_WORK, "Refund the patient's credit",
                     "The patient paid EGP " + credit.toPlainString() + " more than they were charged. Refund it to the original method; the hospital refunds any part it collected.",
                     null, "refund-credit:" + statement.getId(), WorkCopy.of(REFUND_WORK, "caseNumber", caseNumber));
+        suspendOnRepeatedExtras(caseId, r);
         events.publishEvent(new CaseEvents.DischargeEvidenceChanged(caseId));
+    }
+
+    /**
+     * P1-19 (design §7.5): an unapproved extra on the facility's final invoices twice in a calendar quarter (Cairo) suspends its
+     * packages pending review; the Finance Managers and Consultant Operations are told once, when the suspension opens.
+     */
+    private void suspendOnRepeatedExtras(UUID caseId, Reconciliation r) {
+        if (r.getSettledAt() == null || lines.countByReconciliationIdAndVarianceCode(r.getId(), Code.UNAPPROVED_EXTRA.name()) == 0) return;
+        UUID facilityId = basis.facilityId(caseId).orElse(null);
+        if (facilityId == null) return;
+        java.time.ZonedDateTime settled = r.getSettledAt().atZone(CAIRO);
+        int q = (settled.getMonthValue() - 1) / 3;
+        java.time.ZonedDateTime start = java.time.LocalDate.of(settled.getYear(), q * 3 + 1, 1).atStartOfDay(CAIRO);
+        long occurrences = reconciliations.countSettledWithUnapprovedExtras(facilityId, start.toInstant(), start.plusMonths(3).toInstant());
+        if (occurrences < SUSPEND_AFTER) return;
+        String quarter = settled.getYear() + "-Q" + (q + 1);
+        if (!facilities.suspendPackages(facilityId, caseId, quarter, (int) occurrences)) return;
+        String facility = basis.facilityName(caseId);
+        String caseNumber = basis.caseNumber(caseId);
+        java.util.Set<String> told = new java.util.TreeSet<>();
+        for (String role : List.of(MANAGER, "CONSULTANT_OPERATIONS_MANAGER"))
+            workforce.activeHolders(role).forEach(m -> told.add(m.subject()));
+        for (String subject : told)
+            work.notifyStaff(subject, caseId, null, PACKAGES_SUSPENDED, "Packages suspended at " + (facility == null ? "a facility" : facility),
+                    occurrences + " final invoices from this facility carried an unapproved extra in " + quarter
+                            + ". Its packages no longer price proposal lines without Finance until a Finance Manager lifts the suspension.",
+                    "facility-packages-suspended:" + facilityId + ":" + quarter + ":" + subject, true,
+                    WorkCopy.of(PACKAGES_SUSPENDED, "caseNumber", caseNumber, "facility", facility, "quarter", quarter, "count", String.valueOf(occurrences)));
     }
 
     /** What authorises the invoice: the facility package plus the case's counted change orders. */

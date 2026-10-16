@@ -23,6 +23,8 @@ public class ClinicalReviewCostEstimate extends AssignedIdEntity {
     @Column(name = "price_egp_min") private BigDecimal priceEgpMin;
     @Column(name = "price_egp_max") private BigDecimal priceEgpMax;
     @Column(name = "facility_package_id") private UUID facilityPackageId;
+    /** P1-19: CONSULTANT, FACILITY or OTHER; null on a line saved without one (it then follows its source). */
+    @Column(length = 20) private String payee;
 
     protected ClinicalReviewCostEstimate() {}
 
@@ -41,4 +43,9 @@ public class ClinicalReviewCostEstimate extends AssignedIdEntity {
         this(clinicalReviewId, serviceDescription, estimatedCost, currency, sortOrder, catalogServiceId, priceEgp, requiresFinanceApproval);
         this.facilityPackageId = facilityPackageId; this.priceEgpMin = priceEgpMin; this.priceEgpMax = priceEgpMax;
     }
+
+    /** P1-19 (design §7.4): who is paid for the line. */
+    public ClinicalReviewCostEstimate payee(String payee) { this.payee = payee; return this; }
+
+    public String getPayee() { return payee; }
 }

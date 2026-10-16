@@ -81,7 +81,10 @@ public class IncidentService {
 
     // ---- raising ----
 
-    /** The patient's own concern, from My Care. A complaint is MEDIUM, a health problem after treatment HIGH. */
+    /**
+     * The patient's own concern, from My Care. A complaint or a money dispute (P1-19: a charge not on the quote, a payment asked for
+     * outside it) is MEDIUM, a health problem after treatment HIGH. Compliance reads every one (INCIDENT_READ) and the scorecards count them.
+     */
     @Transactional
     public ConcernView raiseConcern(UUID caseId, ConcernRequest request) {
         Actor actor = authority.authorize(Permission.INCIDENT_REPORT, Resource.ofCase(caseId));

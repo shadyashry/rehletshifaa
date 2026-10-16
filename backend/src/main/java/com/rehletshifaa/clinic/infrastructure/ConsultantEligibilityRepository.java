@@ -11,7 +11,8 @@ import java.util.UUID;
 
 /**
  * The single eligibility rule, as a query: an active, available, verified consultant with a current verified
- * credential, whose primary care area is the area or who holds an APPROVED CARE_AREA capability for it.
+ * credential and a current affiliation declaration (P1-19, D-H), whose primary care area is the area or who holds an APPROVED
+ * CARE_AREA capability for it.
  */
 public interface ConsultantEligibilityRepository extends Repository<PractitionerProfile, UUID> {
     String ELIGIBLE = """
@@ -20,7 +21,9 @@ public interface ConsultantEligibilityRepository extends Repository<Practitioner
             and (p.careCategory = :area or exists (select 1 from ConsultantCapability k where k.practitionerId = p.id
                  and k.capabilityType = 'CARE_AREA' and k.capabilityCode = :area and k.status = 'APPROVED'))
             and exists (select 1 from PractitionerCredential c where c.practitionerId = p.id and c.status = 'VERIFIED'
-                 and (c.expiresAt is null or c.expiresAt > :now))""";
+                 and (c.expiresAt is null or c.expiresAt > :now))
+            and exists (select 1 from AffiliationDeclaration d where d.practitionerId = p.id and d.supersededAt is null
+                 and d.validUntil > :now)""";
 
     @Query("select p from PractitionerProfile p where " + ELIGIBLE + " order by p.displayName")
     List<PractitionerProfile> findEligible(@Param("area") String area, @Param("now") Instant now);

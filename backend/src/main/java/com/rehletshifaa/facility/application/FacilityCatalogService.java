@@ -1,5 +1,9 @@
 package com.rehletshifaa.facility.application;
 
+import com.rehletshifaa.facility.api.FacilityDtos.LiftSuspensionRequest;
+import com.rehletshifaa.facility.api.FacilityDtos.SuspensionView;
+import com.rehletshifaa.facility.infrastructure.FacilityPackageSuspensionRepository;
+import com.rehletshifaa.facility.domain.FacilityPackageSuspension;
 import com.rehletshifaa.authority.application.Actor;
 import com.rehletshifaa.authority.application.Authority;
 import com.rehletshifaa.authority.domain.Permission;
@@ -50,11 +54,13 @@ public class FacilityCatalogService {
     private final Authority authority;
     private final AuditTrail audit;
     private final Clock clock;
+    private final FacilityPackageSuspensionRepository suspensions;
 
     public FacilityCatalogService(FacilityRepository facilities, FacilityAccreditationRepository accreditations, FacilityPackageRepository packages,
-                                  CareCategoryRepository careAreas, Authority authority, AuditTrail audit, Clock clock) {
+                                  CareCategoryRepository careAreas, Authority authority, AuditTrail audit, Clock clock,
+                                  FacilityPackageSuspensionRepository suspensions) {
         this.facilities = facilities; this.accreditations = accreditations; this.packages = packages; this.careAreas = careAreas;
-        this.authority = authority; this.audit = audit; this.clock = clock;
+        this.authority = authority; this.audit = audit; this.clock = clock; this.suspensions = suspensions;
     }
 
     // ---- reads ---------------------------------------------------------------------------------------------------
@@ -68,7 +74,9 @@ public class FacilityCatalogService {
                 .collect(Collectors.groupingBy(FacilityAccreditation::getFacilityId));
         Map<UUID, List<FacilityPackage>> packagesByFacility = packages.findByFacilities(ids).stream()
                 .collect(Collectors.groupingBy(FacilityPackage::getFacilityId));
-        return all.stream().map(f -> view(f, byFacility.getOrDefault(f.getId(), List.of()), packagesByFacility.getOrDefault(f.getId(), List.of()))).toList();
+        Map<UUID, List<FacilityPackageSuspension>> open = suspensions.findByLiftedAtIsNull().stream().collect(Collectors.groupingBy(FacilityPackageSuspension::getFacilityId));
+        return all.stream().map(f -> view(f, byFacility.getOrDefault(f.getId(), List.of()), packagesByFacility.getOrDefault(f.getId(), List.of()),
+                open.getOrDefault(f.getId(), List.of()))).toList();
     }
 
     public FacilityView get(UUID facilityId) {
@@ -264,6 +272,42 @@ public class FacilityCatalogService {
         return facilities.findById(id).orElseThrow(() -> new ApiException(404, "FACILITY_NOT_FOUND", "This facility does not exist"));
     }
 
+    // ---- P1-19 (design §7.5): package suspension after repeated unapproved extras --------------------------------------
+
+    /**
+     * The settlement module found an unapproved extra on this facility's final invoices twice (or more) in the quarter: suspend its
+     * packages pending review, once (an open suspension stays the one). No authorization: Finance's reconciliation was the act.
+     * @return true when this call opened the suspension.
+     */
+    @Transactional
+    public boolean suspendPackages(UUID facilityId, UUID triggerCaseId, String quarter, int occurrences) {
+        lockFacility(facilityId);
+        if (suspensions.existsByFacilityIdAndLiftedAtIsNull(facilityId)) return false;
+        Instant now = clock.instant();
+        FacilityPackageSuspension s = suspensions.saveAndFlush(new FacilityPackageSuspension(facilityId, triggerCaseId, quarter, occurrences, now));
+        audit.event("FACILITY_PACKAGES_SUSPENDED").actor("SYSTEM", "SYSTEM").caseId(triggerCaseId).entity("FacilityPackageSuspension", s.getId())
+                .action("SUSPEND").reason("facility=" + facilityId + " quarter=" + quarter + " unapprovedExtras=" + occurrences).at(now).record();
+        return true;
+    }
+
+    /** True while the facility's packages are suspended pending review. */
+    public boolean packagesSuspended(UUID facilityId) { return suspensions.existsByFacilityIdAndLiftedAtIsNull(facilityId); }
+
+    /** A Finance Manager lifts the suspension after the review (fresh sign-in), with what was found and agreed. */
+    @Transactional
+    public FacilityView liftPackageSuspension(UUID facilityId, LiftSuspensionRequest request) {
+        Actor actor = authority.authorize(Permission.FACILITY_PACKAGE_APPROVE);
+        Facility facility = lockFacility(facilityId);
+        FacilityPackageSuspension open = suspensions.findByFacilityIdAndLiftedAtIsNull(facilityId).stream().findFirst()
+                .orElseThrow(() -> new ApiException(409, "PACKAGES_NOT_SUSPENDED", "This facility's packages are not suspended"));
+        Instant now = clock.instant();
+        open.lift(actor.subject(), request.note().trim(), now);
+        suspensions.saveAndFlush(open);
+        audit.event("FACILITY_PACKAGES_SUSPENSION_LIFTED").actor(actor.subject(), actor.label()).entity("FacilityPackageSuspension", open.getId())
+                .action("LIFT").reason("facility=" + facilityId).at(now).record();
+        return view(facility);
+    }
+
     private Facility lockFacility(UUID id) {
         return facilities.lockById(id).orElseThrow(() -> new ApiException(404, "FACILITY_NOT_FOUND", "This facility does not exist"));
     }
@@ -299,15 +343,24 @@ public class FacilityCatalogService {
     private static BigDecimal scale(BigDecimal value) { return value.setScale(2, java.math.RoundingMode.HALF_UP); }
 
     private FacilityView view(Facility facility) {
-        return view(facility, accreditations.findByFacilityIdOrderByExpiresOnDesc(facility.getId()), packages.findByFacility(facility.getId()));
+        return view(facility, accreditations.findByFacilityIdOrderByExpiresOnDesc(facility.getId()), packages.findByFacility(facility.getId()),
+                suspensions.findByFacilityIdOrderBySuspendedAtDesc(facility.getId()));
     }
 
-    private static FacilityView view(Facility f, List<FacilityAccreditation> records, List<FacilityPackage> catalogue) {
+    /** The facility record; {@code suspensions} newest first (the list view passes the open one only). */
+    private static FacilityView view(Facility f, List<FacilityAccreditation> records, List<FacilityPackage> catalogue, List<FacilityPackageSuspension> suspensions) {
         return new FacilityView(f.getId(), f.getName(), f.getCity(), f.getKind().name(), f.getStatus().name(), f.getAccreditationStatus().name(),
                 f.getContactName(), f.getContactEmail(), f.getContactPhone(), f.getSettlementTerms().name(), f.getSettlementNotes(),
                 f.getCreatedBy(), f.getCreatedAt(), f.getUpdatedBy(), f.getUpdatedAt(),
                 records.stream().map(FacilityCatalogService::view).toList(),
-                catalogue.stream().map(p -> view(p, f.getName())).toList());
+                catalogue.stream().map(p -> view(p, f.getName())).toList(),
+                suspensions.stream().filter(FacilityPackageSuspension::isOpen).findFirst().map(FacilityCatalogService::view).orElse(null),
+                suspensions.stream().map(FacilityCatalogService::view).toList());
+    }
+
+    private static SuspensionView view(FacilityPackageSuspension s) {
+        return new SuspensionView(s.getId(), s.getReason(), s.getQuarter(), s.getOccurrences(), s.getTriggerCaseId(), s.getSuspendedAt(),
+                s.getLiftedBy(), s.getLiftedAt(), s.getLiftNote());
     }
 
     private static AccreditationView view(FacilityAccreditation a) {

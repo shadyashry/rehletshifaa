@@ -68,7 +68,7 @@ class SchedulerLeaseTest {
             "ConsultantOfferExpiryService.expireOffers", "CredentialExpiryService.expireCredentials", "DepositPaymentReminders.sweep",
             "InformationRequestReminders.sweep", "PoolWorkDepartureService.releaseDepartedOwners",
             "ProposalExpiryService.expireReleasedProposals", "StaffWorkService.raiseWorkDueSoon", "PiiKeyRotationService.rotate",
-            "PendingDocumentSweeper.sweep");
+            "PendingDocumentSweeper.sweep", "ConsultantAffiliationService.remindRenewals");
 
     @TestConfiguration
     static class SkewedClock {

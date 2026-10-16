@@ -16,7 +16,8 @@ import static com.rehletshifaa.authority.domain.Scope.*;
  * A decision passes when any grant of an effective role for the permission has a matching scope.
  *
  * <p>Deliberately absent (SOD-07/08, INV-22): System Administrators have no case, clinical, credential or commercial
- * power; the Compliance and Audit Reviewer mutates nothing; Support never sees cases; there is no lead role, only the
+ * power; the Compliance and Audit Reviewer mutates nothing but its own review record ({@link Permission#COMPLIANCE_REVIEW});
+ * Support never sees cases; there is no lead role, only the
  * {@link Scope#SUPERVISED} scope of the base role.</p>
  */
 public final class RolePolicy {
@@ -117,6 +118,13 @@ public final class RolePolicy {
             g(CONSULTANT, FOLLOW_UP_RECORD, CASE_ASSIGNED), g(COORDINATOR, CHECK_IN_RECORD, CASE_ASSIGNED),
             g(CONSULTANT, FOLLOW_UP_READ, CASE_ASSIGNED), g(COORDINATOR, FOLLOW_UP_READ, CASE_ASSIGNED), g(COORDINATOR, FOLLOW_UP_READ, SUPERVISED),
             g(PATIENT, OUTCOME_REPORT, OWN_PATIENT), g(PATIENT_REPRESENTATIVE, OUTCOME_REPORT, OWN_PATIENT),
+            // P1-19 (D-H): the Consultant declares their own affiliations (never a practice manager: it is a personal attestation);
+            // Consultant Operations and Compliance read them. Scorecards for Compliance and Consultant Operations; the samples and the
+            // auditor's own review record (COMPLIANCE_REVIEW: see Permission) for Compliance only.
+            g(CONSULTANT, AFFILIATION_DECLARE, OWN_CLINIC), g(CONSULTANT, AFFILIATION_READ, OWN_CLINIC),
+            g(CONSULTANT_OPERATIONS_MANAGER, AFFILIATION_READ, PLATFORM), g(COMPLIANCE_AUDITOR, AFFILIATION_READ, PLATFORM),
+            g(CONSULTANT_OPERATIONS_MANAGER, SCORECARD_READ, PLATFORM), g(COMPLIANCE_AUDITOR, SCORECARD_READ, PLATFORM),
+            g(COMPLIANCE_AUDITOR, AUDIT_SAMPLE_READ, PLATFORM), g(COMPLIANCE_AUDITOR, COMPLIANCE_REVIEW, PLATFORM),
             // Other function managers: hierarchy and staffing only; no execution, clinical or decision authority.
             g(OPERATIONS_MANAGER, TEAM_MANAGE, PLATFORM), g(OPERATIONS_MANAGER, STAFFING_REQUEST, PLATFORM),
             g(FINANCE_MANAGER, TEAM_MANAGE, PLATFORM), g(FINANCE_MANAGER, STAFFING_REQUEST, PLATFORM),

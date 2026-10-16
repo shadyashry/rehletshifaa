@@ -1613,6 +1613,76 @@ phases.
 - Files: `clinic` affiliation service and Virtual Clinic page; new `compliance` module (read-only); Control Center
   Compliance screens; `V100__affiliations_and_audit_samples.sql`.
 - Sessions: 1–2. Model: Opus 5.5 fast, medium; eligibility change reviewed by Fable.
+- **Status (2026-10-16, session 1 of 2 = backend, Opus 5.5; committed on `claude/admiring-blackburn-317165`, cut from `b112bce` =
+  `claude/trusting-lamarr-b82819`):** delivered; no screen. Flyway **V103** (`V103__affiliations_and_audit_samples.sql`; the `V100` name above was
+  stale) is now the newest; V104 is the next free. Session 2 does the screens and copy.
+  - Decision recorded (owner's standing rule: decide by the recommendation, do not ask): **D-H applied as recommended**: a current yearly
+    affiliation declaration is a condition of Consultant eligibility (`ConsultantEligibilityRepository.ELIGIBLE`: filed within the year, not replaced),
+    with Compliance review. Choices made here, each the design's best-practice reading: the declaration's **content and Compliance's review do not
+    decide eligibility** (never block care on paperwork; the auditor changes nothing operational); a declaration with no facility is valid ("I use none
+    and have no relationship"); only new assignments and referrals are affected, never a case already held; a Compliance **FINDING** goes to
+    Consultant Operations, who act through the existing governance. The P1-15 money rule (deposit covers the fee first) is untouched and still awaits
+    the owner.
+  - Delivered: **(1) Declarations** (`clinic`: `affiliation_declarations`, `consultant_affiliations`; `ConsultantAffiliationService`): the Consultant
+    files their own (own clinic, never a practice manager: a personal attestation) for every facility they use, with kinds PRIVILEGES / EMPLOYMENT /
+    FINANCIAL_INTEREST / NONE_DECLARED (no relationship, never combined), a note required for a financial interest (encrypted), attested under
+    `affiliation-attestation-2026-10`; it holds a calendar year and replaces the one before it (practitioner row lock); one reminder 30 days before the
+    end (`affiliation-declaration-due`, staff email, daily leased job). Compliance reviews each once: CLEARED or FINDING with a note (encrypted); the
+    Consultant never sees the review, Consultant Operations and Compliance see everything. **(2) Undeclared facility**: `AdmissionService.reserve`
+    asks `checkReservation`; a facility the case's primary Consultant has not declared raises `UNDECLARED_FACILITY` (`affiliation_flags`, one open flag
+    per case and facility, under the practitioner lock) and tells the Consultant (`UNDECLARED_FACILITY` notice); the reservation stands; declaring the
+    facility clears the flag, which stays as the record. **(3) Separate lines** (design §7.4, with P1-10): every estimate and quote line names its
+    payee (`clinical_review_cost_estimates.payee`, `proposal_items.payee`: CONSULTANT, FACILITY, OTHER, PLATFORM; a catalogue line is the Consultant's, a
+    package line the facility's, the fee line the platform's, schema-checked; `LINE_PAYEE_CONFLICT`); proposal views carry `payee` per line and
+    `payeeTotals`; once a hospital is reserved a final quote without a hospital line is refused at creation and release (`FACILITY_LINE_REQUIRED`).
+    **(4) Package suspension** (design §7.5): when a settled reconciliation carried an unapproved extra and it is the facility's second in the calendar
+    quarter (Cairo), `ReconciliationService` suspends the facility's packages (`facility_package_suspensions`, one open per facility): they price no
+    proposal line without Finance and leave the directory; care already reserved goes on; Finance Managers and Consultant Operations are told
+    (`FACILITY_PACKAGES_SUSPENDED`); a Finance Manager lifts it with a note (`POST /admin/facilities/{id}/package-suspension/lift`, fresh sign-in).
+    **(5) Scorecards** (new read-only `compliance` module, `ScorecardService`; Compliance and Consultant Operations, `SCORECARD_READ`) per Consultant and
+    per facility over the cases discharged in a period (default 90 days, at most a year): final quote against the accepted estimate's maximum, change
+    orders, reconciliations with variance, unapproved extras and billing errors, outcome complications, adverse-event cases, reopenings, patient
+    concerns and money disputes, follow-up contacts held, undeclared-facility flags, the facility's suspension, and the day-30/90 **outcome aggregates
+    only** (counts and averages, never a row or free text; answers given by a representative counted apart as `byRepresentative`; averages withheld
+    below 5 answers; `smallCohort` below 5 cases). Patient rating is `NOT_COLLECTED` (the closure review is a message). Not cached (AGENTS.md keeps the
+    cache for reference data). **(6) Sampling audit** (`SamplingAuditService`): on the first of each month a leased job samples (5 by default) the cases
+    closed in the month before that went to a facility; Compliance can draw more; each sampled case keeps its assembled money record (statement, final
+    invoice, receipts, final-quote lines by payee, reconciliation: amounts and references only, AUD-05) and the mismatches found (`STATEMENT_MISSING`,
+    `FINAL_INVOICE_MISSING`, `RECONCILIATION_NOT_SETTLED`, `CHARGED_NOT_ON_STATEMENT`, `PAID_AT_FACILITY_ABOVE_RECEIPTS`, `FINAL_QUOTE_NOT_SEPARATED`,
+    `UNAPPROVED_EXTRA`, `UNDECLARED_FACILITY`, `FACILITY_DISPUTE_OPEN`); Compliance reviews each once: no finding, or a finding (note encrypted) that
+    becomes a P1-13 incident (`DISPUTE`, MEDIUM, origin `AUDIT_SAMPLE`, owned by a Care Coordination Manager). **(7) Raise a concern** (P1-13 built it):
+    the patient can now raise a money `DISPUTE` (a charge not on the quote, a payment asked for outside it); Compliance reads every concern and the
+    scorecards count them. **(8) Permissions**: `AFFILIATION_DECLARE` (Consultant, own clinic), `AFFILIATION_READ` (Consultant own; Consultant
+    Operations, Compliance), `SCORECARD_READ`, `AUDIT_SAMPLE_READ`, and **`COMPLIANCE_REVIEW`** (fresh sign-in), the auditor's one write: its own review
+    record of a declaration or a sampled case and drawing a sample, which changes no case, clinical, money or workflow state.
+    `RolePolicyTest.theAuditorOnlyReads` and `PlatformUsersDeepQaTest` now allow exactly that one, shrink-only, held by Compliance alone.
+    **API**: `GET/POST /clinics/{practitionerId}/affiliations`; `/compliance/affiliations/declarations` (+ `/{id}/review`), `/compliance/affiliations/flags`,
+    `/compliance/scorecards/consultants/{id}`, `/compliance/scorecards/facilities/{id}`, `/compliance/audit-samples` (GET list, POST draw,
+    `/{id}`, `/{id}/cases/{caseId}/review`).
+  - Review: the eligibility change was reviewed by a Fable 5.1 sub-agent (read-only). Applied: the reservation check now takes the practitioner's row
+    lock before it looks (a declaration filed at the same moment could have left a stale flag open); only an open flag counts as already raised, so a
+    later lapse raises a new one (`uq_affiliation_flags` includes `raised_at`); a bad review-status filter is a 400 (`REVIEW_STATUS_INVALID`); the
+    renewal reminder is marked sent only when an email went out; `COMPLIANCE_REVIEW` needs a fresh sign-in; a FINDING notifies Consultant Operations
+    (`AFFILIATION_FINDING`, `DeclarationReviewService`); the DTO javadoc says who sees the review. Not taken here (follow-ups below): a prompt for a
+    newly onboarded Consultant who has never declared, and the "why not assignable" reason on the Virtual Clinic.
+  - Tests and numbers: new `HospitalAgreementAuditTest` (7: eligibility needs a current declaration, the validation, replacement, lapse and another
+    Consultant refused; Compliance's review once with Consultant Operations told and eligibility unchanged; the undeclared-facility flag and notice,
+    cleared by declaring, none once declared; the payee lines, `LINE_PAYEE_CONFLICT`, `FACILITY_LINE_REQUIRED` and the schema check on the fee line; the
+    suspension after the second extra in the quarter, pricing withheld and lifted by a Finance Manager; the scorecards with the representative answer
+    flagged and suppressed, a money concern counted, period checked, Finance refused; a sample with its mismatches, a finding becoming an encrypted
+    incident, once only, the monthly sample once per month). Test fixtures that insert consultants directly now give them a current declaration
+    (`ClinicTestData.declareAll`, about 30 call sites); `LocalDemoDataSeeder` does the same for the demo consultants. Backend `mvn -o -q test`:
+    944 tests, 0 failures, 3 skips (937 before, 7 new; JVM in UTC, the known 00:00-04:00 facility-package zone flake avoided). `ArchitectureRulesTest` and `RolePolicyTest` green (JPA only, no native query, no module cycle: `compliance` depends on clinic,
+    journey, settlement and facility and nothing depends on it; facility implements clinic's `FacilityNames` port). `PostgresJpaMappingTest`:
+    green on a disposable PostgreSQL 17 (V103 applied, Hibernate validated, every repository query executed, the eight new repositories included).
+  - Not done here (session 2 and later): **no screens or copy**: the Consultant's affiliations page on the Virtual Clinic, the Control Center Compliance
+    screens (declarations queue and review, flags, scorecards, samples and their review), the facility suspension banner and lift, the final quote's
+    Consultant and hospital lines apart (My Care, link, staff, document) and the payee choice on manual lines, the money option on "Raise a concern", the
+    three new notice codes, the D-I credential label `LIABILITY_FUND_SUBSCRIPTION`. Later: a prompt for a Consultant with no declaration at onboarding
+    and the reason on the Virtual Clinic's "assignable"; a patient rating store (the closure review is a message); counsel on the attestation wording.
+  - Next exact action: owner fast-forwards `feat/review-p0` to this commit (it contains `b112bce`) and rebuilds the dev backend for V103 (every
+    existing dev consultant needs a declaration before new assignments: the local seeder adds one); then P1-19 session 2 (UI and copy, started in a new
+    session; contract in the shared notes folder, `p1-19-session-1-handover.md`).
 
 ### UI/UX work is planned separately (decided 2026-10-15)
 - Every user-interface slice (the public-site trust pass, Consultant public profile rendering, signature moments,
@@ -1677,7 +1747,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | 7 | P1-12 Payouts, payer organisations, partners | 3 | Opus 5.5; settlement maths by Fable | Owner: payer terms, partner commission |
 | 8 | **P1-17 Discharge pack, reconciliation, statements** | 2 | Fable 5.1, high | D-F; P1-12 settlement statement |
 | 9 | **P1-18 Follow-up execution and outcomes** | 1–2 | Opus 5.5; data classification by Fable | D-G; P1-13 |
-| 10 | **P1-19 Hospital-agreement audit** | 1–2 | Opus 5.5; eligibility change by Fable | D-H |
+| 10 | **P1-19 Hospital-agreement audit** | 1–2 (session 1 done 2026-10-16, V103) | Opus 5.5; eligibility change by Fable | D-H applied as recommended |
 | 11 | P1-7 Retention, purge, erasure, draft clean-up | 2 | Fable 5.1, high | Decide retention of plaintext WhatsApp sender digits; evidence and statements as `LEGAL_RECORD` class |
 | 12 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-18, so the extracted code is final |
 | 13 | ~~P1-9 Backups and restore drill~~ | **done**: 1 session (2026-10-15); local drill PASS in 135 s | Opus 5.5 | Production drill on the chosen host (managed PITR restore time, region failover) adds its row to `docs/deployment.md` before real patient data |
@@ -1709,7 +1779,8 @@ the licence now; the credential type is a one-line addition in P1-19.
       session 1): the lower of 10% of the facility package and EGP 15,000, cumulative over the case's change orders; Finance alone within
       it, the patient (fresh sign-in or verified secure link) above it, emergency path with a Finance review. Finance Managers can change
       the rate and cap per care area. The owner may still object.
-- [ ] D-F…D-H from `docs/post-deposit-journey-design.md` §12 (fit-to-fly window, free follow-up window, affiliations as eligibility).
+- [ ] D-F…D-H from `docs/post-deposit-journey-design.md` §12 (fit-to-fly window, free follow-up window, affiliations as eligibility): all three
+      **applied as recommended** under the owner's standing rule (D-F P1-17, D-G P1-18, D-H P1-19 session 1); the owner may still object.
 - [ ] D-I: start the PDPL licence application and the Law 13/2025 liability-fund subscription (owner action).
 - [x] P1-10: final-quote validity 14 days and FX band 3% (owner, 2026-10-15); guarantee wording ships as a placeholder.
 - [ ] P1-10: counsel approves the guarantee wording and the VAT rate on the platform fee; owner decides whether the
