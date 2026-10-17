@@ -31,7 +31,7 @@ Names that were not obvious demo data (coordinator, Consultant and hospital name
 Fonts: the page asks for Alexandria and Plus Jakarta Sans and falls back to system fonts when they are not installed. Colours follow the Petrol & Paper tokens in `DESIGN.md`.
 
 ## Motion inside the slides
-Every screenshot slide moves: a cursor travels to each highlighted element and clicks (a ripple), the element gets a one-second coral border flash, stamps slam into place (Received, Estimate ready), and masked dots type into the one-time-code field (never a real code). All of it is CSS keyed to start times, so the page and the video share one animation. Video frames are rendered by `tools/frames.js` and assembled by `tools/build_video.py`.
+Every screenshot slide moves: each highlighted element gets a one-second coral border flash, stamps slam into place (Received, Estimate ready), and masked dots type into the one-time-code field (never a real code). All of it is CSS keyed to start times, so the page and the video share one animation. Video frames are rendered by `tools/frames.js` and assembled by `tools/build_video.py`.
 
 ## Music
 `assets/audio/music.mp3` is a calm ambient bed synthesised for this demo (soft pads and sparse bell notes, no third-party material; `tools/music.py`). In the video it sits well under the voice and is ducked while the voice speaks. On the page it plays quietly during "Play with Arabic voice-over".

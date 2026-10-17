@@ -472,32 +472,21 @@ function closing(){
 </ul></div>
 <div class="cta"><button class="btn ghost" data-go="${total}">Back</button><button class="btn" data-go="0">Restart</button></div></section>`}
 function fxLayer(i,s){
- const START=.6,STEP=2.6,MOVE=.9;let T=0;
+ let T=0;
  const hs=s.hs||[],fx=s.fx||{};
  let out='',arr=[];
- hs.forEach((q,k)=>{arr.push(START+k*STEP+MOVE)});
+ hs.forEach((q,k)=>{arr.push(1.1+k*2.4)});
  (fx.stamps||[]).forEach(t=>{
   out+=`<div class="patch" style="left:${t.px}%;top:${t.py}%;width:${t.pw}%;height:${t.ph}%;--s:${t.s}"></div>`;
   out+=`<div class="stamp" style="left:${t.x}%;top:${t.y}%;width:${t.w}%;height:${t.h}%;--s:${t.s}">${t.lines.map((l,j)=>j===t.lines.length-1&&t.lines.length>1?`<hr><span>${l}</span>`:`<b>${l}</b>`).join('')}</div>`;
   T=Math.max(T,t.s+1.2)});
  if(fx.type){const t=fx.type,s0=(arr[0]||1.5)+.3;out+=`<div class="dots6" style="left:${t.x}%;top:${t.y}%;width:${t.w}%;height:${t.h}%">${[0,1,2,3,4,5].map(j=>`<i style="--s:${(s0+j*.22).toFixed(2)}"></i>`).join('')}</div>`;T=Math.max(T,s0+1.6)}
- if(hs.length){
-  const pts=hs.map(q=>[q.x+q.w*.6,q.y+q.h*.5]);
-  const x0=Math.min(96,pts[0][0]+26),y0=108;
-  const kf=[[0,x0,y0,0,1],[START,x0,y0,1,1]];let prev=[x0,y0];
-  pts.forEach((pt,k)=>{const m=START+k*STEP,a=arr[k];kf.push([m,prev[0],prev[1],1,1],[a,pt[0],pt[1],1,1],[a+.08,pt[0],pt[1],1,.82],[a+.28,pt[0],pt[1],1,1]);prev=pt;
-   out+=`<span class="rip" style="left:${pt[0]}%;top:${pt[1]}%;--s:${a.toFixed(2)}"></span>`});
-  const end=arr[arr.length-1]+2.0;T=Math.max(T,end);
-  kf.push([end-.4,prev[0],prev[1],1,1],[end,prev[0],prev[1],0,1]);
-  const tot=end;
-  out+=`<style>@keyframes curK${i}{${kf.map(([t,x,y,o,sc])=>`${(t/tot*100).toFixed(3)}%{left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;opacity:${o};transform:scale(${sc})}`).join('')}}</style>`;
-  out+=`<svg class="cur" viewBox="0 0 24 24" style="--T:${tot.toFixed(2)}s;animation-name:curK${i}" aria-hidden="true"><path d="M5 3l14 8-6 1.8-2.4 6z" fill="#13292e" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
- }
+ if(hs.length){T=Math.max(T,arr[arr.length-1]+1.6)}
  window.fxEnd=T;
  return out?`<div class="fx" aria-hidden="true">${out}</div>`:''}
 function step(i){
  const s=steps[i-1];
- const hs=s.hs.map((h,k)=>`<button class="hs" data-n="${k+1}" aria-label="${esc(h.t)}" style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;--s:${(.6+k*2.6+.9).toFixed(2)}"></button>`).join('');
+ const hs=s.hs.map((h,k)=>`<button class="hs" data-n="${k+1}" aria-label="${esc(h.t)}" style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;--s:${(1.1+k*2.4).toFixed(2)}"></button>`).join('');
  return `<div class="layout"><div class="frame"><div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="addr">${esc(s.view)}</span><span class="sp"></span></div>
  <div class="scroller">${s.kind==='anim'?visual(s.anim):`<div class="shot">${s.video?`<video id="heroVid" src="${IMG}${s.video}" poster="${IMG}${s.img}" width="${s.w}" height="${s.h}" muted loop playsinline autoplay aria-label="${esc(s.alt)}"></video>`:`<img src="${IMG}${s.img}" width="${s.w}" height="${s.h}" alt="${esc(s.alt)}">`}${fxLayer(i,s)}${hs}</div>`}</div></div>
  <aside class="cap" aria-live="polite"><span class="rule"></span>
