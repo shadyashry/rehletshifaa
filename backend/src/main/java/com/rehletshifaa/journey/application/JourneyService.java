@@ -1,1048 +1,332 @@
 package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.authority.application.Actor;
-import com.rehletshifaa.authority.application.Authority;
-import com.rehletshifaa.authority.application.Resource;
-import com.rehletshifaa.authority.domain.Permission;
 import com.rehletshifaa.authority.domain.Role;
-import com.rehletshifaa.casemanagement.application.CaseStatusLog;
-import com.rehletshifaa.casemanagement.application.IntakeLifecycleService;
-import com.rehletshifaa.casemanagement.domain.CaseAssignment;
-import com.rehletshifaa.casemanagement.domain.CaseStatus;
-import com.rehletshifaa.casemanagement.domain.CaseTask;
-import com.rehletshifaa.casemanagement.domain.ConsentRecord;
-import com.rehletshifaa.casemanagement.domain.MedicalCase;
-import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
-import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
-import com.rehletshifaa.casemanagement.infrastructure.ConsentRecordRepository;
-import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.clinic.api.ClinicDtos.EligibleConsultantView;
-import com.rehletshifaa.clinic.application.ConsultantEligibilityService;
-import com.rehletshifaa.clinic.application.ConsultantOperationsOwnershipService;
-import com.rehletshifaa.clinic.application.VirtualClinicService;
-import com.rehletshifaa.clinic.infrastructure.CatalogEntryRepository;
-import com.rehletshifaa.directory.domain.PractitionerProfile;
-import com.rehletshifaa.directory.infrastructure.PatientProfileRepository;
-import com.rehletshifaa.directory.infrastructure.PractitionerProfileRepository;
-import com.rehletshifaa.document.domain.DocumentStatus;
-import com.rehletshifaa.document.infrastructure.MedicalDocumentRepository;
+import com.rehletshifaa.document.application.CaseDocumentAccessPolicy;
 import com.rehletshifaa.journey.api.JourneyDtos.*;
 import com.rehletshifaa.journey.api.ReferralDtos.ConsultantAssignmentRequest;
 import com.rehletshifaa.journey.api.WorkDtos.InformationRequestCommand;
-import com.rehletshifaa.journey.api.WorkDtos.NewWorkItem;
 import com.rehletshifaa.journey.api.WorkDtos.OnBehalfRequest;
-import com.rehletshifaa.journey.api.WorkDtos.WaitingReason;
-import com.rehletshifaa.journey.api.WorkDtos.WorkCopy;
-import com.rehletshifaa.journey.domain.CaseMessage;
-import com.rehletshifaa.journey.domain.CaseMessageRead;
-import com.rehletshifaa.journey.domain.ClinicalReviewCostEstimate;
-import com.rehletshifaa.journey.domain.ClinicalReviewVersion;
-import com.rehletshifaa.journey.domain.FollowUpPlan;
-import com.rehletshifaa.journey.domain.Proposal;
-import com.rehletshifaa.journey.domain.ProposalAccessChallenge;
-import com.rehletshifaa.journey.domain.ProposalDecision;
-import com.rehletshifaa.journey.domain.ProposalItem;
-import com.rehletshifaa.journey.domain.ProposalShareToken;
-import com.rehletshifaa.journey.domain.ProposalVersion;
-import com.rehletshifaa.journey.domain.TravelPlan;
-import com.rehletshifaa.journey.domain.TreatmentEpisode;
-import com.rehletshifaa.journey.infrastructure.CaseMessageReadRepository;
-import com.rehletshifaa.journey.infrastructure.CaseMessageRepository;
-import com.rehletshifaa.journey.infrastructure.ClinicalReviewCostEstimateRepository;
-import com.rehletshifaa.journey.infrastructure.ClinicalReviewVersionRepository;
-import com.rehletshifaa.journey.infrastructure.FollowUpPlanRepository;
-import com.rehletshifaa.journey.infrastructure.ProposalAccessChallengeRepository;
-import com.rehletshifaa.journey.infrastructure.ProposalDecisionRepository;
-import com.rehletshifaa.journey.infrastructure.ProposalItemRepository;
-import com.rehletshifaa.journey.infrastructure.ProposalRepository;
-import com.rehletshifaa.journey.infrastructure.ProposalShareTokenRepository;
-import com.rehletshifaa.journey.infrastructure.ProposalVersionRepository;
-import com.rehletshifaa.journey.infrastructure.TravelPlanRepository;
-import com.rehletshifaa.journey.infrastructure.TreatmentEpisodeRepository;
-import com.rehletshifaa.notification.application.NotificationOutbox;
-import com.rehletshifaa.notification.infrastructure.QueuedNotificationRepository;
 import com.rehletshifaa.shared.api.ApiException;
-import com.rehletshifaa.shared.audit.AuditTrail;
-
-import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
-import java.time.*;
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
 
-import static com.rehletshifaa.shared.persistence.SqlValues.micros;
-
+/**
+ * Compatibility facade for the journey API.
+ *
+ * <p>Workflow behavior lives in responsibility-specific application services. Keeping this facade avoids
+ * changing controllers, action handlers and integration fixtures in the same refactor.</p>
+ */
 @Service
-public class JourneyService implements com.rehletshifaa.document.application.CaseDocumentAccessPolicy {
-    private final ProposalAccessChallengeRepository accessChallenges;
-    private final ProposalShareTokenRepository shareTokens;
-    private final ProposalDecisionRepository proposalDecisions;
-    private final ProposalItemRepository proposalItems;
-    private final ProposalVersionRepository proposalVersions;
-    private final ProposalRepository proposalRecords;
-    private final ClinicalReviewCostEstimateRepository costEstimates;
-    private final ClinicalReviewVersionRepository clinicalReviews;
-    private final FollowUpPlanRepository followUps;
-    private final TreatmentEpisodeRepository episodes;
-    private final AdmissionService admissions;
-    private final AdmissionReadiness admissionReadiness;
-    private final TravelPlanRepository travelPlans;
-    private final CaseMessageReadRepository messageReads;
-    private final CaseMessageRepository messages;
-    private final ConsentRecordRepository consents;
-    private final CaseStatusLog statusLog;
-    private final CaseExitService exits;
-    private final CaseTaskRepository tasks;
-    private final CaseAssignmentRepository assignments;
-    private final MedicalCaseRepository cases;
-    private final JourneyMetrics metrics;
-    private final ProposalExpiryService expiry;
-    private final PatientProfileRepository patients;
-    private final QueuedNotificationRepository outboxMessages;
-    private final NotificationOutbox notificationOutbox;
-    private final AuditTrail auditTrail;
-    private final ReplyCoverService replyCovers;
-    private final JourneyCaseQueryService caseQueries; private final CaseWorkspaceQueryService workspaces; private final ProposalQueryService proposalQueries;
-    private final PractitionerProfileRepository practitioners; private final CatalogEntryRepository catalog; private final MedicalDocumentRepository documents;
-    private final Authority authority; private final IntakeLifecycleService intake; private final Clock clock; private final com.rehletshifaa.shared.crypto.CryptoService crypto; private final PublicCaseAccessService publicCases; private final PricingCatalogService pricingCatalog; private final com.rehletshifaa.shared.currency.CurrencyService currency; private final CommercialPolicyService commercialPolicy; private final com.rehletshifaa.facility.application.FacilityPackagePricing facilityPackages; private final com.rehletshifaa.facility.application.FacilityDirectory facilityDirectory; private final PaymentService payment; private final OnboardingService onboarding; private final CustomerReadinessService readiness; private final PatientActionService patientActions; private final StaffWorkService work; private final CareCategoryCatalog careCategories; private final CaseActionService caseActions; private final CaseTransitionPolicy transitions; private final org.springframework.context.ApplicationEventPublisher events;
-    /** Work-item types for the assignment lifecycle, shared by creation and completion. */
-    private static final String ASSIGNMENT_WORK="CONSULTANT_ASSIGNMENT",CLINICAL_WORK="CLINICAL_REVIEW",CLINICAL_OUTCOME_WORK="CLINICAL_OUTCOME_REVIEW";
-    /**
-     * Which acknowledgement wording was in force when a patient continued, following the policy_version
-     * convention used by consent_records. Stamped by the server and never taken from the request, so the
-     * evidence cannot be shaped by whatever the caller claims it displayed. Bump it when the wording changes.
-     */
-    // 2026-09-25: deposit/refund/cancellation terms shown before acknowledgement; final-quote wording made factual.
-    private static final String ACKNOWLEDGEMENT_VERSION="proposal-ack-2026-09-25";
-    /** A recorded decision: the terms were explained in Arabic by the coordinator, not read on the page (owner GATE P2-1). */
-    private static final String ASSISTED_ACKNOWLEDGEMENT_VERSION="proposal-ack-assisted-ar-2026-10-08";
-    private final com.rehletshifaa.workforce.application.WorkforceDirectory workforceDirectory;
-    private final PortalExperienceService portalExperience; private final CaseContactResolver caseContacts; private final ProposalAccessService proposalAccess;
-    private final ConsultantEligibilityService consultants; private final ConsultantReferralService referrals; private final VirtualClinicService clinics; private final ConsultantOperationsOwnershipService consultantOwnership; private final CoordinatorRoutingPort coordinatorRouting;
-    private final SecureRandom random = new SecureRandom();
-    // The case lifecycle and its entry invariants live in CaseTransitionPolicy — one copy, validated by every path that moves a case.
+public class JourneyService implements CaseDocumentAccessPolicy {
+    static final String FX_REAPPROVAL_WORK = CommercialProposalService.FX_REAPPROVAL_WORK;
 
-    public JourneyService(JourneyCaseQueryService caseQueries,CaseWorkspaceQueryService workspaces,ProposalQueryService proposalQueries,PractitionerProfileRepository practitioners,CatalogEntryRepository catalog,MedicalDocumentRepository documents,Authority authority,IntakeLifecycleService intake,Clock clock,com.rehletshifaa.shared.crypto.CryptoService crypto,PublicCaseAccessService publicCases,PricingCatalogService pricingCatalog,com.rehletshifaa.shared.currency.CurrencyService currency,CommercialPolicyService commercialPolicy,com.rehletshifaa.facility.application.FacilityPackagePricing facilityPackages,com.rehletshifaa.facility.application.FacilityDirectory facilityDirectory,PaymentService payment,OnboardingService onboarding,CustomerReadinessService readiness,PatientActionService patientActions,StaffWorkService work,PortalExperienceService portalExperience,CareCategoryCatalog careCategories,CaseActionService caseActions,CaseTransitionPolicy transitions,CaseContactResolver caseContacts,ProposalAccessService proposalAccess,org.springframework.context.ApplicationEventPublisher events,ConsultantEligibilityService consultants,ConsultantReferralService referrals,VirtualClinicService clinics,ConsultantOperationsOwnershipService consultantOwnership,com.rehletshifaa.workforce.application.WorkforceDirectory workforceDirectory,CoordinatorRoutingPort coordinatorRouting, AuditTrail auditTrail, NotificationOutbox notificationOutbox, QueuedNotificationRepository outboxMessages, PatientProfileRepository patients, MedicalCaseRepository cases, CaseAssignmentRepository assignments, CaseTaskRepository tasks, CaseStatusLog statusLog, ConsentRecordRepository consents, CaseMessageRepository messages, CaseMessageReadRepository messageReads, TravelPlanRepository travelPlans, TreatmentEpisodeRepository episodes, FollowUpPlanRepository followUps, ClinicalReviewVersionRepository clinicalReviews, ClinicalReviewCostEstimateRepository costEstimates, ProposalRepository proposalRecords, ProposalVersionRepository proposalVersions, ProposalItemRepository proposalItems, ProposalDecisionRepository proposalDecisions, ProposalShareTokenRepository shareTokens, ProposalAccessChallengeRepository accessChallenges, ReplyCoverService replyCovers, CaseExitService exits, JourneyMetrics metrics, ProposalExpiryService expiry, AdmissionService admissions, AdmissionReadiness admissionReadiness){ this.admissions = admissions; this.admissionReadiness = admissionReadiness; this.expiry = expiry; this.metrics = metrics; this.exits = exits; this.replyCovers = replyCovers; this.accessChallenges = accessChallenges; this.shareTokens = shareTokens; this.proposalDecisions = proposalDecisions; this.proposalItems = proposalItems; this.proposalVersions = proposalVersions; this.proposalRecords = proposalRecords; this.costEstimates = costEstimates; this.clinicalReviews = clinicalReviews; this.followUps = followUps; this.episodes = episodes; this.travelPlans = travelPlans; this.messageReads = messageReads; this.messages = messages; this.consents = consents; this.statusLog = statusLog; this.tasks = tasks; this.assignments = assignments; this.cases = cases; this.patients = patients; this.outboxMessages = outboxMessages; this.notificationOutbox = notificationOutbox; this.auditTrail = auditTrail;this.workforceDirectory=workforceDirectory;this.consultantOwnership=consultantOwnership;this.consultants=consultants;this.referrals=referrals;this.clinics=clinics;this.transitions=transitions;this.caseContacts=caseContacts;this.proposalAccess=proposalAccess;this.events=events;this.caseActions=caseActions;this.careCategories=careCategories;this.patientActions=patientActions;this.work=work;this.portalExperience=portalExperience;this.caseQueries=caseQueries;this.workspaces=workspaces;this.proposalQueries=proposalQueries;this.practitioners=practitioners;this.catalog=catalog;this.documents=documents;this.authority=authority;this.intake=intake;this.clock=clock;this.crypto=crypto;this.publicCases=publicCases;this.pricingCatalog=pricingCatalog;this.currency=currency;this.commercialPolicy=commercialPolicy;this.facilityPackages=facilityPackages;this.facilityDirectory=facilityDirectory;this.payment=payment;this.onboarding=onboarding;this.readiness=readiness;this.coordinatorRouting=coordinatorRouting;}
-    @Transactional(readOnly=true) public CustomerReadiness customerReadiness(UUID caseId){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));return readiness.compute(caseId);}
-    @Transactional(readOnly=true) public DepositView depositView(UUID caseId){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));return payment.depositForCase(caseId);}
+    private final JourneyReadService reads;
+    private final CaseCoordinationService coordination;
+    private final CaseAssignmentService assignments;
+    private final ClinicalRecommendationService clinicalRecommendations;
+    private final CaseConversationService conversations;
+    private final CaseTaskService tasks;
+    private final CasePatientInformationService patientInformation;
+    private final CommercialProposalService commercialProposals;
+    private final PublicProposalSessionService publicProposalSessions;
+    private final ProposalDecisionService proposalDecisions;
+    private final TreatmentDeliveryService treatmentDelivery;
 
-    /** The signed-in person's own cases. An account not bound to a patient record yet (and representing nobody) has none: an empty list, not a refusal. */
-    public List<CaseView> patientCases(){if(!authority.allowed(Permission.PATIENT_SELF_SERVICE,Resource.platform())){authority.authorize(Permission.ACCOUNT_BINDING);return List.of();}var actor=authority.authorize(Permission.PATIENT_SELF_SERVICE);return caseQueries.patientCases(actor.subject(),clock.instant());}
-    public List<CaseView> coordinatorQueue(){
-        var actor=authority.authorize(Permission.COORDINATION_QUEUE);
-        Set<String> visible=new HashSet<>();visible.add(actor.subject());
-        visible.addAll(portalExperience.reports(actor.subject()));
-        visible.addAll(replyCovers.ownersCoveredBy(actor.subject())); // covering a colleague: their cases, to answer their patients
-        // Ownership identity is resolved after the rows are read, then withheld again for unowned cases.
-        return caseQueries.coordinatorQueue(visible).stream().map(view->view.coordinatorSubject()==null?routingSummary(view):view).toList();
-    }
-    // Pre-ownership triage exposes the patient name and routing facts (name requested visible from intake),
-    // but still withholds coordinator/doctor assignment identity until ownership is taken.
-    private CaseView routingSummary(CaseView view){return new CaseView(view.id(),view.caseNumber(),view.status(),view.patientName(),view.country(),view.preferredLanguage(),view.careCategory(),view.createdAt(),view.updatedAt(),view.version(),null,null,null,null,view.travelPackageRequested(),view.waitingOn(),view.waitingReason(),null,view.urgency(),view.ageBand());}
-    @Transactional public IntakePreview intakePreview(UUID caseId){
-        var actor=authority.authorize(Permission.COORDINATION_QUEUE);
-        // Only this explicit read-only preview permits pre-ownership intake review.
-        cases.lockById(caseId).orElseThrow(()->new ApiException(404,"CASE_NOT_FOUND","Case was not found"));
-        CaseView view=caseView(caseId);
-        if(!"RECEIVED".equals(view.status())||view.coordinatorSubject()!=null)throw new ApiException(409,"CASE_ALREADY_ASSIGNED","This case is no longer available for ownership. Refresh the queue.");
-        String summary=cases.findConditionDescription(caseId).orElse(null);
-        audit("CASE_INTAKE_PREVIEWED",actor,caseId,"MedicalCase",caseId.toString(),"READ","SUCCESS",null);
-        return new IntakePreview(routingSummary(view),summary,caseActions.resolve(caseId,actor));
-    }
-    /** My cases: accepted clinical involvement. A pending assignment is work, not yet a case (see My Work). */
-    /** Work the person holds under a staffing role, plus (WF-08) work of members of teams they lead in that function. */
-    public List<CaseView> assignedCases(Role role){var actor=authority.authorize(Permission.WORK_QUEUE_VIEW);if(!actor.has(role))throw new ApiException(403,"PERMISSION_NOT_HELD","This workspace belongs to another role");Set<String>visible=new HashSet<>();visible.add(actor.subject());if(role.function()!=null)visible.addAll(portalExperience.reports(actor.subject(),role.function()));List<CaseView>held=caseQueries.assignedCases(visible,role.caseAssignmentRole());
-        if(role!=Role.FINANCE)return held;
-        // Payments are Finance-wide work (PAYMENT_RECORD): every case with an open deposit is listed, held by Finance or not.
-        Set<UUID>listed=held.stream().map(CaseView::id).collect(java.util.stream.Collectors.toSet());List<CaseView>due=caseQueries.openDepositCases().stream().filter(c->!listed.contains(c.id())).toList();
-        if(due.isEmpty())return held;List<CaseView>all=new ArrayList<>(held);all.addAll(due);return all;}
-    public List<StaffCaseCardView> coordinatorCaseCards(){authority.authorize(Permission.COORDINATION_QUEUE);return staffCaseCards(coordinatorQueue(),Role.COORDINATOR);}
-    public List<StaffCaseCardView> assignedCaseCards(Role role){return staffCaseCards(assignedCases(role),role);}
-    /** Case cards with the operational signals the queue orders by, for the signed-in staff member's role. */
-    private List<StaffCaseCardView> staffCaseCards(List<CaseView> cases,Role role){return caseQueries.staffCaseCards(cases,com.rehletshifaa.authority.application.Principal.current().subject(),role.caseAssignmentRole(),clock.instant());}
-    public StaffProfileView myCoordinatorProfile(){var actor=authority.authorize(Permission.COORDINATION_QUEUE);String role="COORDINATOR";return workforceDirectory.contact(actor.subject()).map(c->new StaffProfileView(c.displayName(),role)).orElse(new StaffProfileView(null,null));}
-    public DoctorProfileView myDoctorProfile(){var actor=authority.authorize(Permission.WORK_QUEUE_VIEW);if(!actor.has(Role.CONSULTANT))throw new ApiException(403,"PERMISSION_NOT_HELD","Only consultants have a consultant profile");return practitioners.findByExternalSubject(actor.subject()).map(p->new DoctorProfileView(p.getDisplayName(),p.getSpecialty(),p.getSubspecialty(),p.getCareCategory(),p.getAvailabilityStatus(),p.getCredentialingStatus())).orElse(new DoctorProfileView(null,null,null,null,null,null));}
-    public List<VerifiedDoctorView> verifiedDoctors(){authority.authorize(Permission.COORDINATION_QUEUE);return practitioners.findAvailableVerifiedConsultants().stream().filter(p->consultants.isEligible(p.getId(),p.getCareCategory())).map(p->new VerifiedDoctorView(p.getExternalSubject(),p.getDisplayName(),p.getSpecialty(),p.getSubspecialty(),p.getAvailabilityStatus(),p.getCareCategory())).toList();}
-    /** Eligible consultants for a case's care area (or a corrected one), with the facts the coordinator chooses on. No identity-provider subjects. */
-    public List<EligibleConsultantView> eligibleConsultants(UUID caseId,String careArea){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));String area=hasText(careArea)?careArea.trim():cases.findCareCategory(caseId).orElse(null);return consultants.eligible(area);}
-    /** Assign a named consultant by practitioner id: the same eligibility, ownership and state rules as {@link #assign}. */
-    @Transactional public IdResponse assignConsultant(UUID caseId,ConsultantAssignmentRequest request){String subject=Optional.ofNullable(request.practitionerId()).flatMap(practitioners::findById).filter(p->"CONSULTANT".equals(p.getPractitionerType())).map(PractitionerProfile::getExternalSubject).orElseThrow(()->new ApiException(409,"CONSULTANT_CATEGORY_MISMATCH","Select an available verified consultant who matches the case care area"));return assign(caseId,new AssignmentRequest(subject,"DOCTOR","PRIMARY",null,hasText(request.reason())?request.reason().trim():"Assigned to consultant"));}
-    /** Authorization stays here; the cached reference read lives in {@link CareCategoryCatalog}. */
-    public List<CareCategoryView> careCategories(){authority.authorize(Permission.COORDINATION_QUEUE);return careCategories.all();}
-    public List<StaffDirectoryView> staffDirectory(String requestedRole){var actor=authority.authorize(Permission.COORDINATION_QUEUE);String role=requestedRole==null?"":requestedRole.trim().toUpperCase(java.util.Locale.ROOT);if("COORDINATOR".equals(role)){Set<String> visible=new HashSet<>();visible.add(actor.subject());visible.addAll(portalExperience.reports(actor.subject()));return workforceDirectory.activeHolders("COORDINATOR").stream().filter(member->visible.contains(member.subject())).map(member->new StaffDirectoryView(member.subject(),member.displayName(),member.role())).toList();}if(!Set.of("OPERATIONS","FINANCE").contains(role))throw new ApiException(400,"INVALID_DIRECTORY_ROLE","Select a supported staff directory");return workforceDirectory.activeHolders(role).stream().map(member->new StaffDirectoryView(member.subject(),member.displayName(),member.role())).toList();}
-    public void assertCanRead(UUID caseId){authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));}
-    /** Documents follow case read, plus the unclaimed-intake preview a coordinator uses before claiming. */
-    @Override public void assertCanReadDocument(UUID caseId){if(authority.allowed(Permission.CASE_INTAKE,Resource.ofCase(caseId)))return;authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));}
-
-    /** The case page; assembled by {@link CaseWorkspaceQueryService}, which also authorizes. */
-    public CaseWorkspace workspace(UUID caseId){return workspaces.workspace(caseId);}
-
-    @Transactional public CaseView transition(UUID caseId,TransitionRequest request){var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));if(!Set.of("INTAKE_REVIEW","INFORMATION_REQUIRED","READY_FOR_CONSULTANT","CANCELLED").contains(request.targetStatus()))throw new ApiException(403,"DEDICATED_OPERATION_REQUIRED","This state can only be entered through its dedicated authorized operation");if("CANCELLED".equals(request.targetStatus())){exits.cancel(caseId,actor,request.cancellationReason(),request.reason(),request.expectedVersion());return caseView(caseId);}transitionInternal(caseId,request.targetStatus(),request.reason(),request.expectedVersion(),actor);if("INFORMATION_REQUIRED".equals(request.targetStatus()))requestPatientInformation(caseId,request.reason(),actor);return caseView(caseId);}
-
-    @Transactional public CaseView updateCareCategory(UUID caseId,CareCategoryUpdateRequest request){var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));CaseState current=state(caseId);if(!Set.of("INTAKE_REVIEW","INFORMATION_REQUIRED","READY_FOR_CONSULTANT").contains(current.status()))throw new ApiException(409,"CARE_CATEGORY_LOCKED","The care area can only be changed before consultant assignment");if(current.version()!=request.expectedVersion())throw new ApiException(409,"CASE_VERSION_CONFLICT","The case was updated by another user");if(!careCategories.exists(request.careCategory()))throw new ApiException(400,"INVALID_CARE_CATEGORY","Select a managed care area");int changed=cases.changeCareCategoryAtVersion(caseId,request.expectedVersion(),request.careCategory(),micros(clock.instant()));if(changed!=1)throw new ApiException(409,"CASE_VERSION_CONFLICT","The case was updated by another user");audit("CASE_CARE_CATEGORY_UPDATED",actor,caseId,"MedicalCase",caseId.toString(),"UPDATE","SUCCESS",request.reason());return caseView(caseId);}
-
-    @Transactional public IdResponse claimCoordinatorCase(UUID caseId,String ignoredPod){UUID id=coordinatorRouting.claimCoordinatorCase(caseId);transitionWithoutVersion(caseId,"INTAKE_REVIEW","Eligible Coordinator accepted intake",authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId)));return new IdResponse(id,"ACTIVE");}
-
-    @Transactional public IdResponse reassignCoordinator(UUID caseId,CoordinatorReassignmentRequest request){return new IdResponse(coordinatorRouting.reassignCoordinator(caseId,request.assigneeSubject(),request.reason()),"ACTIVE");}
-
-    /** Every authoritative responsibility record on the case, newest first, ended ones included; on a shared assigned_at (clock granularity) the still-open record precedes the one it replaced. Routing evaluations are not here: they are Control Center diagnostics. */
-    public List<AssignmentHistoryEntry> assignmentHistory(UUID caseId){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));return caseQueries.assignmentHistory(caseId);}
-    @Transactional public IdResponse assign(UUID caseId,AssignmentRequest request){var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));String role=request.assigneeRole()==null?"":request.assigneeRole();if(!Set.of("DOCTOR","OPERATIONS","FINANCE").contains(role))throw new ApiException(400,"INVALID_ASSIGNMENT_ROLE","Only doctor, operations, and finance assignments are supported");String currentStatus=state(caseId).status();if("DOCTOR".equals(role)){String caseCategory=cases.findCareCategory(caseId).orElse(null);if(caseCategory==null)throw new ApiException(409,"CASE_CARE_CATEGORY_REQUIRED","Select the case care area before assigning a consultant");var candidate=practitioners.findByExternalSubjectAndPractitionerType(request.assigneeSubject(),"CONSULTANT").stream().findFirst().map(PractitionerProfile::getId);if(candidate.isEmpty()||!consultants.isEligible(candidate.get(),caseCategory))throw new ApiException(409,"CONSULTANT_CATEGORY_MISMATCH","Select an available verified consultant who matches the case care area");if("INTAKE_REVIEW".equals(currentStatus)||"INFORMATION_REQUIRED".equals(currentStatus))transitionWithoutVersion(caseId,"READY_FOR_CONSULTANT","Ready for consultant assignment",actor);String readyStatus=state(caseId).status();if(!"READY_FOR_CONSULTANT".equals(readyStatus)&&!"CONSULTANT_ASSIGNMENT_PENDING".equals(readyStatus))throw new ApiException(409,"CASE_NOT_READY_FOR_CONSULTANT","The case cannot be assigned to a consultant from its current status");}else{
-        // Finance is only ever needed for the internal approval; Operations follows the shared gate the case
-        // page renders from, so a state the page would not offer is refused here too.
-        if("FINANCE".equals(role)){if(!"PROPOSAL_PREPARATION".equals(currentStatus))throw new ApiException(409,"CASE_NOT_READY_FOR_ASSIGNMENT","This role is not needed at the current journey stage");}
-        else caseActions.assertOperationsAssignable(caseId);
-        if(!workforceDirectory.holds(request.assigneeSubject(),role))throw new ApiException(409,"STAFF_NOT_ELIGIBLE","Select an active staff member from the staff directory");}Instant now=clock.instant();UUID id=UUID.randomUUID();assignments.endOpen(caseId,role,request.assignmentType(),micros(now));String status="PENDING";
-        // P1-6: a Consultant offer has a deadline (SlaPolicy working hours, halved on an URGENT case); ConsultantOfferExpiryService declines it when it passes.
-        Instant offerExpiresAt="DOCTOR".equals(role)?work.offerDeadline(caseId,now):null;
-        assignments.saveAndFlush(CaseAssignment.offered(id,caseId,request.assigneeSubject(),role,request.assignmentType(),request.pod(),request.reason(),actor.subject(),now,offerExpiresAt));if("DOCTOR".equals(role))transitionWithoutVersion(caseId,"CONSULTANT_ASSIGNMENT_PENDING","Verified consultant assigned",actor);
-        // An assignment is real work for the person receiving it: one work item, one unread notification
-        // and one work email, all idempotent. A reassignment closes the superseded item first.
-        work.closeWorkItems(caseId,ASSIGNMENT_WORK,"Assignment superseded");work.closeWorkItems(caseId,"REASSIGN_CONSULTANT","Consultant reassigned");
-        // Handing the case to Operations is how the coordinator starts treatment coordination.
-        if("OPERATIONS".equals(role))work.closeWorkItems(caseId,"TRAVEL","Operations assigned to arrange travel and arrival");
-        String caseNumber=cases.findCaseNumber(caseId).orElse("");
-        work.openWorkItem(new NewWorkItem(caseId,ASSIGNMENT_WORK,"DOCTOR".equals(role)?"New clinical assignment":"New case assignment",
-            "You have been assigned case "+caseNumber+" for "+("DOCTOR".equals(role)?"clinical review":"review")+". Accept it to start, or decline so the coordinator can reassign.",
-            request.assigneeSubject(),role,false,offerExpiresAt,actor.subject(),"ASSIGNMENT_CREATED","assignment:"+id,true,
-            WorkCopy.of("DOCTOR".equals(role)?"NEW_ASSIGNMENT_CLINICAL":"NEW_ASSIGNMENT","caseNumber",caseNumber)));
-        if("DOCTOR".equals(role))work.refreshWaitingOn(caseId,"CONSULTANT",WaitingReason.of("AWAITING_CONSULTANT_ACCEPTANCE","Awaiting the consultant to accept the assignment"));
-        audit("CASE_ASSIGNED",actor,caseId,"CaseAssignment",id.toString(),"ASSIGN","SUCCESS",request.reason());return new IdResponse(id,status);}
-
-    @Transactional public CaseView reviewDecision(UUID caseId,ReviewDecisionRequest request){var actor=authority.authorize("ACCEPT".equals(request.decision())?Permission.CLINICAL_APPROVE:Permission.CLINICAL_REVIEW,Resource.ofCase(caseId));requireState(caseId,"CONSULTANT_REVIEW");String treatment=request.recommendedTreatment();String risks=request.risksAndLimitations();String decision=request.decision()==null?"":request.decision();
-    // Every outcome has to say why. The normal path needs the clinical recommendation itself; the
-    // exceptional ones need a reason the coordinator can act on — either field carries it.
-    if("ACCEPT".equals(decision)&&!hasText(treatment))throw new ApiException(400,"CLINICAL_RECOMMENDATION_REQUIRED","Record your clinical recommendation before submitting");
-    String reason=hasText(treatment)?treatment.trim():hasText(risks)?risks.trim():null;
-    if(!"ACCEPT".equals(decision)&&!hasText(reason))throw new ApiException(400,"REVIEW_REASON_REQUIRED","Give the reason for this clinical outcome");
-    switch(decision){
-        case "ACCEPT"->{UUID practitionerId=practitionerId(actor.subject());String proposalCurrency=requireIssuableCurrency(request.proposalCurrency());clinicalReviews.supersedeCurrent(caseId);int version=clinicalReviews.nextVersionNumber(caseId);Instant now=clock.instant();UUID reviewVersionId=UUID.randomUUID();clinicalReviews.saveAndFlush(ClinicalReviewVersion.approvedSuitable(reviewVersionId,caseId,practitionerId,version,treatment,risks,proposalCurrency,actor.subject(),now));saveCostEstimates(reviewVersionId,practitionerId,request.costEstimates());transitionWithoutVersion(caseId,"CLINICAL_RECOMMENDATION_READY","Consultant accepted the case",actor);}
-        case "INFO"->{transitionWithoutVersion(caseId,"INFORMATION_REQUIRED",reason,actor);requestPatientInformation(caseId,reason,actor);}
-        case "NOT_SUITABLE"->transitionWithoutVersion(caseId,"CLINICALLY_NOT_SUITABLE",reason,actor);
-        case "RETURN_TO_COORDINATOR"->transitionWithoutVersion(caseId,"INTAKE_REVIEW",reason,actor);
-        case "REASSIGN"->{assignments.releaseConsultant(caseId,actor.subject(),micros(clock.instant()));transitionWithoutVersion(caseId,"READY_FOR_CONSULTANT",reason,actor);}
-        default->throw new ApiException(400,"INVALID_DECISION","Unknown review decision");
-    }
-    // The consultant has recorded their decision: the clinical work item is done, whatever the outcome.
-    work.closeWorkItems(caseId,CLINICAL_WORK,"Clinical decision recorded");
-    referrals.withdrawOpenTransfers(caseId,actor);
-    handBackToCoordinator(caseId,decision,reason,actor);
-    audit("CONSULTANT_REVIEW_DECISION",actor,caseId,"MedicalCase",caseId.toString(),decision,"SUCCESS",
-        "ACCEPT".equals(decision)?"Proposal currency: "+requireIssuableCurrency(request.proposalCurrency())+(hasText(reason)?" — "+reason:""):reason);
-    return caseView(caseId);}
-
-    /**
-     * The currency a recommendation — and therefore the patient's proposal — will be issued in.
-     *
-     * <p>Validated at submission rather than at proposal time on purpose: a consultant who picked USD
-     * must be told immediately if USD cannot be quoted, not have the amounts silently reappear in EGP in
-     * front of the patient. {@link com.rehletshifaa.shared.currency.CurrencyService} rejects unsupported
-     * codes and raises FX_RATE_UNAVAILABLE when no rate exists, so both failures surface here.
-     */
-    private String requireIssuableCurrency(String requested){
-        String code=hasText(requested)?requested.trim().toUpperCase(Locale.ROOT):com.rehletshifaa.shared.currency.CurrencyService.BASE;
-        currency.effectiveRate(code,java.time.LocalDate.now(clock)); // throws 400 unsupported / 503 no rate
-        return code;
+    public JourneyService(
+            JourneyReadService reads,
+            CaseCoordinationService coordination,
+            CaseAssignmentService assignments,
+            ClinicalRecommendationService clinicalRecommendations,
+            CaseConversationService conversations,
+            CaseTaskService tasks,
+            CasePatientInformationService patientInformation,
+            CommercialProposalService commercialProposals,
+            PublicProposalSessionService publicProposalSessions,
+            ProposalDecisionService proposalDecisions,
+            TreatmentDeliveryService treatmentDelivery) {
+        this.reads = reads;
+        this.coordination = coordination;
+        this.assignments = assignments;
+        this.clinicalRecommendations = clinicalRecommendations;
+        this.conversations = conversations;
+        this.tasks = tasks;
+        this.patientInformation = patientInformation;
+        this.commercialProposals = commercialProposals;
+        this.publicProposalSessions = publicProposalSessions;
+        this.proposalDecisions = proposalDecisions;
+        this.treatmentDelivery = treatmentDelivery;
     }
 
-    /**
-     * A consultant outcome is never just a status change: the coordinator gets the ball back as real,
-     * actionable work with an unread notification and a work email — automatically, so the consultant
-     * never has to press a second "return to coordinator" button after a successful submission.
-     *
-     * <p>Idempotent by construction: {@link StaffWorkService#openWorkItem} reuses an already-open item of
-     * the same type on the case, and the notification is keyed per case and outcome. A repeated decision
-     * is rejected earlier anyway — the case has already left {@code CONSULTANT_REVIEW}.
-     */
-    private void handBackToCoordinator(UUID caseId,String decision,String reason,Actor actor){
-        String coordinator=primaryCoordinator(caseId);
-        String who=caseQueries.actorName(actor.subject(),actor.label());String consultant=who==null?"The consultant":who;
-        String detail=hasText(reason)?": "+reason.trim():".";
-        // "Information required" is owed by the patient, not the coordinator — they get told, not tasked.
-        if("INFO".equals(decision)){
-            work.notifyStaff(coordinator,caseId,null,"CONSULTANT_REQUESTED_INFORMATION","Consultant needs more information from the patient",
-                consultant+" asked for more information before recommending"+detail,"consultant-outcome:INFO:"+caseId,true,
-                WorkCopy.of("CONSULTANT_NEEDS_INFORMATION","consultant",who,"said",reason));
-            return;
-        }
-        String type,title,context,code;
-        switch(decision){
-            case "ACCEPT"->{type="PREPARE_PROPOSAL";code="RECOMMENDATION_READY";title="Clinical recommendation ready — prepare the proposal";
-                context=consultant+" submitted a clinical recommendation and the recommended services. Review them and prepare the patient proposal.";}
-            case "REASSIGN"->{type="REASSIGN_CONSULTANT";code="SECOND_OPINION_REQUESTED";title="Second opinion requested — assign another consultant";
-                context=consultant+" asked for a second opinion"+detail+" Choose the additional consultant.";}
-            case "NOT_SUITABLE"->{type=CLINICAL_OUTCOME_WORK;code="CLINICALLY_UNSUITABLE";title="Case marked clinically unsuitable";
-                context=consultant+" assessed this case as not clinically suitable"+detail;}
-            default->{type=CLINICAL_OUTCOME_WORK;code="RETURNED_WITHOUT_RECOMMENDATION";title="Case returned without a clinical recommendation";
-                context=consultant+" returned the case without a recommendation"+detail;}
-        }
-        work.openWorkItem(new NewWorkItem(caseId,type,title,context,coordinator,"COORDINATOR",false,null,
-            actor.subject(),"CONSULTANT_OUTCOME_RECORDED","consultant-outcome:"+decision+":"+caseId,true,
-            WorkCopy.of(code,"consultant",who,"said","ACCEPT".equals(decision)?null:reason)));
-        // The clinical work item is closed by now, so responsibility genuinely sits with our team again —
-        // except for a terminal clinical outcome, where the stage already decided nobody is waiting.
-        if(!"NOT_SUITABLE".equals(decision))work.refreshWaitingOn(caseId,"STAFF",WaitingReason.work(code,title));
-    }
-    private void saveCostEstimates(UUID reviewId,UUID practitionerId,List<CostEstimateItem>estimates){if(estimates==null)return;int order=0;for(CostEstimateItem item:estimates){if(item==null||item.serviceDescription()==null||item.serviceDescription().isBlank()||item.estimatedCost()==null||item.currency()==null||item.currency().isBlank())continue;UUID catalogId=item.catalogServiceId();
-        // Amounts arrive in the consultant's chosen display currency; the EGP base (used for all margin/policy
-        // math) is the amount for EGP, or converted back from the display currency at today's rate. If no rate is
-        // available the base stays null (finance must resolve it) — matching the pre-existing manual-item path.
-        BigDecimal priceEgp;
-        if("EGP".equals(item.currency())){priceEgp=item.estimatedCost();}
-        else{BigDecimal fx=null;try{fx=currency.effectiveRate(item.currency(),java.time.LocalDate.now(clock));}catch(ApiException ignored){}priceEgp=fx==null?null:item.estimatedCost().divide(fx,2,java.math.RoundingMode.HALF_UP);}
-        BigDecimal storedCost=item.estimatedCost();String storedCurrency=item.currency();
-        boolean requiresFinance=true;UUID packageId=item.facilityPackageId();BigDecimal priceEgpMin=null,priceEgpMax=null;
-        if(catalogId!=null){
-            // The catalogue price is authoritative. Whatever amount or display currency the client sent is
-            // discarded here: a consultant may view a converted estimate, never redefine their approved price.
-            priceEgp=catalog.findActivePrice(catalogId,practitionerId,java.time.LocalDate.now(clock)).orElseThrow(()->new ApiException(409,"CATALOG_SERVICE_INVALID","A selected service is not on the consultant's active price list"));
-            storedCost=priceEgp;storedCurrency=com.rehletshifaa.shared.currency.CurrencyService.BASE;requiresFinance=false;
-        }else if(packageId!=null){
-            // P0-5 (B-02): a Finance-approved facility package is a pre-approved price source. The expected figure must be an EGP
-            // amount inside the approved range; the range travels with the line and the package is re-checked when the proposal is built.
-            var pkg=facilityPackages.approved(packageId,java.time.LocalDate.now(clock)).orElseThrow(()->new ApiException(409,"FACILITY_PACKAGE_INVALID","A selected facility package is not approved, not in validity, or its facility is suspended"));
-            if(priceEgp==null||priceEgp.compareTo(pkg.minEgp())<0||priceEgp.compareTo(pkg.maxEgp())>0)throw new ApiException(409,"FACILITY_PACKAGE_RANGE","The expected price must be an EGP figure inside the approved package range");
-            storedCost=priceEgp;storedCurrency=com.rehletshifaa.shared.currency.CurrencyService.BASE;priceEgpMin=pkg.minEgp();priceEgpMax=pkg.maxEgp();requiresFinance=false;
-        }
-        // P1-19 (design §7.4): a catalogue line is the Consultant's, a package line the facility's; a manual line says whose it is.
-        String source=lineSource(catalogId,packageId),payee=payeeOf(source,item.payee());
-        if(item.payee()!=null&&!item.payee().equals(payee))throw new ApiException(400,"LINE_PAYEE_CONFLICT","A catalogue service is the Consultant's and a facility package is the facility's");
-        costEstimates.saveAndFlush(new ClinicalReviewCostEstimate(reviewId,item.serviceDescription().trim(),storedCost,storedCurrency,order++,catalogId,priceEgp,requiresFinance,packageId,priceEgpMin,priceEgpMax).payee(payee));}}
-    @Transactional public CaseView setTravelPackage(UUID caseId,boolean requested){var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));String status=state(caseId).status();if(Set.of("PATIENT_DECISION","ACCEPTED","DECLINED","TRAVEL_COORDINATION","ARRIVAL_CONFIRMED","ADMISSION_READY","TREATMENT_IN_PROGRESS","DISCHARGED","FOLLOW_UP","CLOSED","CANCELLED").contains(status))throw new ApiException(409,"TRAVEL_PACKAGE_LOCKED","The travel package choice can only be changed before the proposal is sent to the patient");cases.requestTravelPackage(caseId,requested,micros(clock.instant()));audit("CASE_TRAVEL_PACKAGE_SET",actor,caseId,"MedicalCase",caseId.toString(),"UPDATE","SUCCESS",requested?"requested":"not-requested");work.changed(caseId);return caseView(caseId);}
-    @Transactional public IdResponse acceptDoctorAssignment(UUID caseId,UUID assignmentId,AssignmentDecisionRequest request){return decideAssignment(caseId,assignmentId,request,Role.CONSULTANT);}
+    @Transactional(readOnly = true)
+    public CustomerReadiness customerReadiness(UUID caseId) { return reads.customerReadiness(caseId); }
 
-    /**
-     * Accept or decline an assignment. Accepting completes the assignment work item and opens the real
-     * clinical work; declining hands responsibility back to the coordinator with an actionable notification.
-     * Idempotent: a repeated accept on an assignment this actor already holds changes nothing.
-     */
-    @Transactional public IdResponse decideAssignment(UUID caseId,UUID assignmentId,AssignmentDecisionRequest request,Role requiredRole){
-        // A transfer or second-opinion offer is decided by the referral flow: it must never flip the case's stage.
-        if(requiredRole==Role.CONSULTANT&&referrals.handles(assignmentId))return referrals.decide(caseId,assignmentId,request.accept(),request.reason());
-        // A repeated decline by the same assignee is a replay: they no longer relate to the case, and nothing changes.
-        if(!request.accept()&&"DECLINED".equals(assignments.findStatusFor(assignmentId,caseId,com.rehletshifaa.authority.application.Principal.current().subject(),requiredRole.caseAssignmentRole()).orElse(null)))return new IdResponse(assignmentId,"DECLINED");
-        var actor=authority.authorize(Permission.ASSIGNMENT_RESPOND,Resource.ofCase(caseId));if(!actor.has(requiredRole))throw new ApiException(403,"PERMISSION_NOT_HELD","This assignment belongs to another role");boolean accept=request.accept();Instant now=clock.instant();
-        String current=assignments.findStatusFor(assignmentId,caseId,actor.subject(),requiredRole.caseAssignmentRole())
-            .orElseThrow(()->new ApiException(409,"ASSIGNMENT_NOT_PENDING","The assignment is not available for this account"));
-        if(accept&&"ACTIVE".equals(current))return new IdResponse(assignmentId,"ACTIVE"); // already accepted; no repeated side effects
-        if(!accept&&"DECLINED".equals(current))return new IdResponse(assignmentId,"DECLINED");
-        int changed=assignments.respond(assignmentId,caseId,actor.subject(),requiredRole.caseAssignmentRole(),accept?"ACTIVE":"DECLINED",accept?micros(now):null,accept?null:micros(now));
-        if(changed!=1)throw new ApiException(409,"ASSIGNMENT_NOT_PENDING","The assignment is not available for this account");
-        work.closeWorkItems(caseId,ASSIGNMENT_WORK,accept?"Assignment accepted":"Assignment declined");
-        if(requiredRole==Role.CONSULTANT){
-            transitionWithoutVersion(caseId,accept?"CONSULTANT_REVIEW":"READY_FOR_CONSULTANT",accept?"Consultant accepted assignment":"Consultant declined assignment",actor);
-            if(accept){
-                work.openWorkItem(new NewWorkItem(caseId,CLINICAL_WORK,"Review case and provide clinical recommendation",
-                    "Review the intake summary and documents, then record your recommendation.",actor.subject(),"DOCTOR",
-                    false,null,actor.subject(),"CLINICAL_REVIEW_DUE","clinical-review:"+assignmentId,false,WorkCopy.of("CLINICAL_REVIEW_DUE")));
-                work.refreshWaitingOn(caseId,"CONSULTANT",WaitingReason.of("AWAITING_RECOMMENDATION","Awaiting the clinical recommendation"));
-            } else {
-                returnToCoordinator(caseId,actor,request.reason());
-            }
-        } else if(!accept) returnToCoordinator(caseId,actor,request.reason());
-        audit("ASSIGNMENT_DECISION",actor,caseId,"CaseAssignment",assignmentId.toString(),accept?"ACCEPT":"DECLINE","SUCCESS",request.reason());
-        return new IdResponse(assignmentId,accept?"ACTIVE":"DECLINED");
+    @Transactional(readOnly = true)
+    public DepositView depositView(UUID caseId) { return reads.depositView(caseId); }
+
+    public List<CaseView> patientCases() { return reads.patientCases(); }
+    public List<CaseView> coordinatorQueue() { return reads.coordinatorQueue(); }
+
+    @Transactional
+    public IntakePreview intakePreview(UUID caseId) { return reads.intakePreview(caseId); }
+
+    public List<CaseView> assignedCases(Role role) { return reads.assignedCases(role); }
+    public List<StaffCaseCardView> coordinatorCaseCards() { return reads.coordinatorCaseCards(); }
+    public List<StaffCaseCardView> assignedCaseCards(Role role) { return reads.assignedCaseCards(role); }
+    public StaffProfileView myCoordinatorProfile() { return reads.myCoordinatorProfile(); }
+    public DoctorProfileView myDoctorProfile() { return reads.myDoctorProfile(); }
+    public List<VerifiedDoctorView> verifiedDoctors() { return reads.verifiedDoctors(); }
+
+    public List<EligibleConsultantView> eligibleConsultants(UUID caseId, String careArea) {
+        return reads.eligibleConsultants(caseId, careArea);
     }
 
-    /** A declined assignment is the coordinator's problem again: real work, a notification and an email. */
-    private void returnToCoordinator(UUID caseId,Actor actor,String reason){
-        String coordinator=primaryCoordinator(caseId);
-        String who=caseQueries.actorName(actor.subject(),actor.label());
-        work.openWorkItem(new NewWorkItem(caseId,"REASSIGN_CONSULTANT","Assignment declined — reassign the case",
-            (who==null?"The assignee":who)+" declined this assignment"+(hasText(reason)?": "+reason.trim():".")+" Choose another consultant.",
-            coordinator,"COORDINATOR",false,null,"SYSTEM","ASSIGNMENT_DECLINED","assignment-declined:"+caseId+":"+actor.subject(),true,
-            WorkCopy.of("ASSIGNMENT_DECLINED","assignee",who,"said",reason)));
-        work.refreshWaitingOn(caseId,"STAFF",WaitingReason.of("ASSIGNMENT_DECLINED_REASSIGN","Assignment declined — awaiting reassignment"));
+    @Transactional
+    public IdResponse assignConsultant(UUID caseId, ConsultantAssignmentRequest request) {
+        return assignments.assignConsultant(caseId, request);
     }
 
-    /** Thread membership (the role's threads) is defined once, beside the case page that lists the threads. */
-    private Set<String> allowedThreads(Actor actor){return CaseWorkspaceQueryService.allowedThreads(actor);}
+    public List<CareCategoryView> careCategories() { return reads.careCategories(); }
+    public List<StaffDirectoryView> staffDirectory(String requestedRole) { return reads.staffDirectory(requestedRole); }
+    public void assertCanRead(UUID caseId) { reads.assertCanRead(caseId); }
 
-    /**
-     * Posts to one of the case's threads. Internal threads are the case team's. The patient thread has one staff voice: the
-     * case's primary coordinator, or their active reply cover instead of them (so an owner who is covered reads only). The
-     * case row is locked and the right re-checked under it, so a reply never interleaves with a reassignment.
-     */
-    @Transactional public IdResponse message(UUID caseId,MessageRequest request){Resource resource=Resource.ofCase(caseId);boolean patientThreadRequested="PATIENT_COORDINATOR".equals(request.threadType());
-        var actor=patientThreadRequested&&authority.allowed(Permission.CASE_PATIENT_REPLY,resource)?authority.authorize(Permission.CASE_PATIENT_REPLY,resource):authority.authorize(Permission.CASE_MESSAGE,resource);
-        boolean patient=actor.role()==Role.PATIENT||actor.role()==Role.PATIENT_REPRESENTATIVE;String thread=patient?"PATIENT_COORDINATOR":request.threadType();if(!allowedThreads(actor).contains(thread))throw new ApiException(403,"THREAD_ACCESS_DENIED","This account may not post to the requested conversation");
-        if(!patient&&"PATIENT_COORDINATOR".equals(thread)){cases.lockById(caseId);if(!authority.allowed(Permission.CASE_PATIENT_REPLY,resource))throw new ApiException(403,"PATIENT_REPLY_NOT_YOURS","Only the case's coordinator, or their cover while they are away, can reply to the patient");}
-        boolean internal=!"PATIENT_COORDINATOR".equals(thread);UUID id=UUID.randomUUID();String language=request.language()==null?"en":request.language();messages.saveAndFlush(new CaseMessage(id,caseId,thread,actor.subject(),actor.label(),"enc:"+crypto.encrypt(request.body().trim()),language,internal,clock.instant()));if(!patient&&!internal)publicCases.issueStatusLink(caseId,language,"secure-message","message:"+id);if(patient)events.publishEvent(new PatientConversationEvents.PatientWrote(caseId,clock.instant()));else if(!internal)events.publishEvent(new PatientConversationEvents.PatientAnswered(caseId));audit("CASE_MESSAGE_CREATED",actor,caseId,"CaseMessage",id.toString(),"CREATE","SUCCESS",null);return new IdResponse(id,"SENT");}
+    @Override
+    public void assertCanReadDocument(UUID caseId) { reads.assertCanReadDocument(caseId); }
 
-    @Transactional public IdResponse markMessageRead(UUID caseId,UUID messageId){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));Set<String> threads=allowedThreads(actor);if(threads.isEmpty()||!messages.existsByIdAndCaseIdAndThreadTypeIn(messageId,caseId,threads))throw new ApiException(404,"MESSAGE_NOT_FOUND","Message was not found");messages.lockById(messageId).filter(m->m.getCaseId().equals(caseId)).orElseThrow();if(!messageReads.existsById(new CaseMessageRead.Key(messageId,actor.subject())))messageReads.saveAndFlush(new CaseMessageRead(messageId,actor.subject(),clock.instant()));return new IdResponse(messageId,"READ");}
+    public CaseWorkspace workspace(UUID caseId) { return reads.workspace(caseId); }
 
-    @Transactional public IdResponse task(UUID caseId,TaskRequest request){var actor=authority.authorize(Permission.TASK_CREATE,Resource.ofCase(caseId));validateTask(request);UUID id=UUID.randomUUID();Instant now=clock.instant();String ownerRole=request.ownerRole()==null||request.ownerRole().isBlank()?actor.label():request.ownerRole();String ownerSubject=request.ownerSubject()==null||request.ownerSubject().isBlank()?("PATIENT".equals(ownerRole)?null:actor.subject()):request.ownerSubject();validateTaskOwner(caseId,ownerSubject,ownerRole);String visibility="PATIENT".equals(ownerRole)?"PATIENT_ACTION":"INTERNAL";tasks.saveAndFlush(new CaseTask(id,caseId,request.taskType(),"enc:"+crypto.encrypt(request.title().trim()),encryptNullable(request.description()),ownerSubject,ownerRole,visibility,request.priority(),request.blocking(),request.dueAt(),actor.subject(),now));audit("CASE_TASK_CREATED",actor,caseId,"CaseTask",id.toString(),"CREATE","SUCCESS",null);return new IdResponse(id,"OPEN");}
-    public List<TaskView> myTasks(){var actor=authority.authorize(Permission.TASK_WORK);return workspaces.openTasksOf(actor.subject());}
-    @Transactional public IdResponse startTask(UUID caseId,UUID taskId,TaskVersionRequest request){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));int changed=tasks.start(taskId,caseId,actor.subject(),request.expectedVersion(),micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_STARTED",actor,caseId,"CaseTask",taskId.toString(),"START","SUCCESS",null);return new IdResponse(taskId,"IN_PROGRESS");}
-    @Transactional public IdResponse completeTask(UUID caseId,UUID taskId,CompleteTaskRequest request){var actor=authority.authorize(Permission.CASE_READ,Resource.ofCase(caseId));int changed=tasks.completeOwned(taskId,caseId,request.expectedVersion(),actor.subject(),"enc:"+crypto.encrypt(request.evidence()),micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_COMPLETED",actor,caseId,"CaseTask",taskId.toString(),"COMPLETE","SUCCESS",null);
-        work.changed(caseId);
-        return new IdResponse(taskId,"COMPLETED");}
-    /**
-     * A supervisor of the task's owner cancels it. Pool work (Finance's deposit to record) is never cancelled: the stage owes
-     * it until the deposit is recorded or waived, which closes it; a supervisor releases or reassigns it instead (QA A3).
-     */
-    @Transactional public IdResponse cancelTask(UUID caseId,UUID taskId,CancelTaskRequest request){
-        var pooled=openPoolTask(caseId,taskId);
-        if(pooled.isPresent()){authorizePoolTask(caseId,pooled.get());throw new ApiException(409,"POOL_WORK_NOT_CANCELLABLE","This work closes when the deposit is recorded or waived; release it to the team or reassign it instead");}
-        var actor=authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,taskOwner(caseId,taskId)));int changed=tasks.cancel(taskId,caseId,request.expectedVersion(),request.reason(),micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_CANCELLED",actor,caseId,"CaseTask",taskId.toString(),"CANCEL","SUCCESS",request.reason());work.changed(caseId);return new IdResponse(taskId,"CANCELLED");}
-
-    // ---- Patient action requests (structured "we need something from you") ----
-    /**
-     * Complete "Request more information" operation: one authorization, one domain command, one secure
-     * link. Every trigger — this button, the doctor's INFO decision, a status transition — goes through
-     * {@link PatientActionService} so a request can never again be only a status change.
-     */
-    @Transactional public IdResponse requestInformation(UUID caseId,InformationRequestCommand command){
-        var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));
-        // While the case is with the consultant, asking the patient for more is the consultant's call (their
-        // INFO outcome): a coordinator request here would pull responsibility back to the patient mid-review.
-        if(CaseActionService.CONSULTANT_OWNED.contains(state(caseId).status()))throw new ApiException(409,"CASE_WITH_CONSULTANT","The case is with the consultant; they request further information through their clinical decision");
-        String language=hasText(command.language())?command.language():caseView(caseId).preferredLanguage();
-        UUID id=patientActions.request(caseId,new InformationRequestCommand(command.message(),command.items(),command.blocking(),command.dueAt(),language),actor.subject(),actor.label());
-        publicCases.issueInformationLink(caseId,language);
-        audit("PATIENT_INFORMATION_REQUEST_SENT",actor,caseId,"CaseTask",id.toString(),"REQUEST","SUCCESS",command.blocking()?"blocking":"non-blocking");
-        return new IdResponse(id,"REQUESTED");
+    @Transactional
+    public CaseView transition(UUID caseId, TransitionRequest request) {
+        return coordination.transition(caseId, request);
     }
 
-    /**
-     * Resend the secure "complete your profile" link. A utility, not a workflow step: valid only while the
-     * profile is still unactivated, which is exactly when the page offers it.
-     */
-    @Transactional public IdResponse resendOnboardingLink(UUID caseId){
-        var actor=authorizePatientWrite(caseId);
-        requireOneOfStates(caseId,Set.of("ACCEPTED","TRAVEL_COORDINATION"));
-        if(readiness.compute(caseId).accountActivated())throw new ApiException(409,"PROFILE_ALREADY_ACTIVATED","The patient has already activated their profile");
-        publicCases.reissueOnboardingLink(caseId,caseView(caseId).preferredLanguage());
-        audit("PATIENT_ONBOARDING_LINK_RESENT",actor,caseId,"MedicalCase",caseId.toString(),"RESEND","SUCCESS",null);
-        return new IdResponse(caseId,"SENT");
+    @Transactional
+    public CaseView updateCareCategory(UUID caseId, CareCategoryUpdateRequest request) {
+        return coordination.updateCareCategory(caseId, request);
     }
 
-    /** Record what the patient supplied over WhatsApp/phone. Provenance is preserved by the domain service. */
-    @Transactional public IdResponse recordPatientInformation(UUID caseId,OnBehalfRequest request){
-        var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));
-        patientActions.recordOnBehalf(caseId,request,actor.subject(),actor.label());
-        audit("PATIENT_INFORMATION_RECORDED",actor,caseId,"MedicalCase",caseId.toString(),"RECORD","SUCCESS",request.channel());
-        return new IdResponse(caseId,"RECORDED");
+    @Transactional
+    public IdResponse claimCoordinatorCase(UUID caseId, String ignoredPod) {
+        return coordination.claimCoordinatorCase(caseId, ignoredPod);
     }
 
-    /** Other triggers (status transition, consultant INFO decision) reuse the same structured operation. */
-    private void requestPatientInformation(UUID caseId,String message,Actor actor){
-        String language=caseView(caseId).preferredLanguage();
-        String text=hasText(message)?message:"Your coordinator needs additional information to continue your case.";
-        patientActions.request(caseId,new InformationRequestCommand(text,List.of(),true,null,language),actor.subject(),actor.label());
-        publicCases.issueInformationLink(caseId,language);
-    }
-    @Transactional public IdResponse reassignTask(UUID caseId,UUID taskId,ReassignTaskRequest request){
-        var pooled=openPoolTask(caseId,taskId);if(pooled.isPresent())return reassignPoolTask(caseId,pooled.get(),request);
-        var actor=authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,taskOwner(caseId,taskId)));if(!authority.allowed(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,request.ownerSubject())))throw new ApiException(403,"OUT_OF_SCOPE","Reassign work only to a member of a team you lead");validateTaskOwner(caseId,request.ownerSubject(),request.ownerRole());int changed=tasks.reassign(taskId,caseId,request.expectedVersion(),request.ownerSubject(),request.ownerRole(),"PATIENT".equals(request.ownerRole())?"PATIENT_ACTION":"INTERNAL",micros(clock.instant()));if(changed!=1)throw taskConflict();audit("CASE_TASK_REASSIGNED",actor,caseId,"CaseTask",taskId.toString(),"REASSIGN","SUCCESS",null);work.changed(caseId);return new IdResponse(taskId,"OPEN");}
-
-    /**
-     * Who may hear anything about pool work beyond "not found": a supervisor of its owner, or for an unowned item a holder of
-     * its role (it is in their queue). Checked before any pool-specific answer, so the answers reveal nothing to anyone else.
-     */
-    private void authorizePoolTask(UUID caseId,com.rehletshifaa.casemanagement.domain.CaseTask task){
-        if(task.getOwnerSubject()!=null){authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,task.getOwnerSubject()));return;}
-        if(authority.authorize(Permission.TASK_WORK).roles().stream().noneMatch(r->task.getOwnerRole().equals(r.caseAssignmentRole())))
-            throw new ApiException(404,"TASK_NOT_FOUND","Task was not found");
+    @Transactional
+    public IdResponse reassignCoordinator(UUID caseId, CoordinatorReassignmentRequest request) {
+        return coordination.reassignCoordinator(caseId, request);
     }
 
-    /** An open task of the case that is a role's pool work ({@link StaffWorkService#poolOf}), owned or not. */
-    private Optional<com.rehletshifaa.casemanagement.domain.CaseTask> openPoolTask(UUID caseId,UUID taskId){
-        return tasks.findById(taskId).filter(t->caseId.equals(t.getCaseId())&&Set.of("OPEN","IN_PROGRESS").contains(t.getStatus())
-            &&StaffWorkService.isPoolWork(t.getOwnerRole(),t.getTaskType()));
+    public List<AssignmentHistoryEntry> assignmentHistory(UUID caseId) { return reads.assignmentHistory(caseId); }
+
+    @Transactional
+    public IdResponse assign(UUID caseId, AssignmentRequest request) { return assignments.assign(caseId, request); }
+
+    @Transactional
+    public CaseView reviewDecision(UUID caseId, ReviewDecisionRequest request) {
+        return clinicalRecommendations.reviewDecision(caseId, request);
     }
 
-    /**
-     * Pool work (Finance's deposit to record) moves only within its function, while the case is still at the deposit stage
-     * (QA A3, B3 follow-up). No owner in the request releases it to the pool: a supervisor of its owner may. A named owner
-     * takes it: they must hold the pool's role and be supervised by the caller, who for an unowned item must hold that role
-     * themselves (it is in their queue) and otherwise supervise its owner too. Audited either way.
-     */
-    private IdResponse reassignPoolTask(UUID caseId,com.rehletshifaa.casemanagement.domain.CaseTask task,ReassignTaskRequest request){
-        String poolRole=task.getOwnerRole(),owner=task.getOwnerSubject(),target=hasText(request.ownerSubject())?request.ownerSubject().trim():null;
-        // Decided on the owner read here: a change since then (another move bumps the version) is a conflict, never a pass.
-        if(task.getVersion()!=request.expectedVersion())throw taskConflict();
-        Actor actor;
-        if(target==null){
-            authorizePoolTask(caseId,task);
-            if(owner==null)throw new ApiException(409,"TASK_ALREADY_IN_POOL","This work is already with the team");
-            actor=authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,owner));
-        }else{
-            actor=authority.authorize(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,target));
-            if(!poolRole.equals(request.ownerRole()))throw new ApiException(400,"INVALID_TASK_OWNER","This work stays with its team");
-            if(owner==null?actor.roles().stream().noneMatch(r->poolRole.equals(r.caseAssignmentRole())):!authority.allowed(Permission.TASK_SUPERVISE,Resource.ofCase(caseId,owner)))
-                throw new ApiException(403,"OUT_OF_SCOPE","Reassign work only within a team you lead");
-            if(!workforceDirectory.holds(target,poolRole))throw new ApiException(409,"STAFF_NOT_ELIGIBLE","Select an active member of the team");
-        }
-        if(!"ACCEPTED".equals(state(caseId).status()))throw new ApiException(409,"CASE_STATE_CONFLICT","This work is no longer owed at the case's current stage");
-        int changed=tasks.reassign(task.getId(),caseId,request.expectedVersion(),target,poolRole,"INTERNAL",micros(clock.instant()));
-        if(changed!=1)throw taskConflict();
-        audit(target==null?"CASE_TASK_RELEASED_TO_POOL":"CASE_TASK_REASSIGNED",actor,caseId,"CaseTask",task.getId().toString(),target==null?"RELEASE":"REASSIGN","SUCCESS",
-            "from="+(owner==null?"pool":owner)+"; to="+(target==null?"pool":target));
-        work.changed(caseId);
-        return new IdResponse(task.getId(),"OPEN");
+    @Transactional
+    public CaseView setTravelPackage(UUID caseId, boolean requested) {
+        return coordination.setTravelPackage(caseId, requested);
     }
 
-    @Transactional public IdResponse saveClinicalReview(UUID caseId,ClinicalReviewRequest request){var actor=authority.authorize(Permission.CLINICAL_REVIEW,Resource.ofCase(caseId));requireState(caseId,"CONSULTANT_REVIEW");UUID practitionerId=practitionerId(actor.subject());int version=clinicalReviews.nextVersionNumber(caseId);UUID id=UUID.randomUUID();clinicalReviews.supersedeDrafts(caseId);clinicalReviews.saveAndFlush(ClinicalReviewVersion.draft(id,caseId,practitionerId,version,new ClinicalReviewVersion.Content(request.caseSummary(),request.suitability(),request.missingInformation(),request.recommendedInvestigations(),request.recommendedTreatment(),request.alternatives(),request.risksAndLimitations(),request.expectedSequence(),request.expectedDuration(),request.followUpRecommendation()),requireIssuableCurrency(request.proposalCurrency()),actor.subject(),clock.instant()));
-        // A draft keeps the services picked so far, at authoritative catalogue prices. It deliberately does
-        // not close the clinical work item, transition the case, or hand anything to the coordinator.
-        saveCostEstimates(id,practitionerId,request.costEstimates());
-        audit("CLINICAL_REVIEW_VERSION_CREATED",actor,caseId,"ClinicalReview",id.toString(),"CREATE","SUCCESS",null);return new IdResponse(id,"DRAFT");}
-    @Transactional public IdResponse approveClinicalReview(UUID caseId,UUID reviewId){var actor=authority.authorize(Permission.CLINICAL_APPROVE,Resource.ofCase(caseId));requireState(caseId,"CONSULTANT_REVIEW");int changed=clinicalReviews.approve(reviewId,caseId,practitionerId(actor.subject()),actor.subject(),micros(clock.instant()));if(changed!=1)throw new ApiException(409,"REVIEW_NOT_APPROVABLE","The review is not an approvable draft");clinicalReviews.supersedeOtherApproved(caseId,reviewId);transitionWithoutVersion(caseId,"CLINICAL_RECOMMENDATION_READY","Clinical recommendation approved",actor);audit("CLINICAL_REVIEW_APPROVED",actor,caseId,"ClinicalReview",reviewId.toString(),"APPROVE","SUCCESS",null);return new IdResponse(reviewId,"APPROVED");}
-
-    @Transactional public ProposalView createProposal(UUID caseId,ProposalDraftRequest request){
-        var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("CLINICAL_RECOMMENDATION_READY","REVISION_REQUESTED","EXPIRED"));
-        if(!clinicalReviews.existsByIdAndCaseIdAndStatus(request.clinicalReviewId(),caseId,"APPROVED"))throw new ApiException(409,"CLINICAL_APPROVAL_REQUIRED","An approved clinical review is required");
-        record EstRow(String description,BigDecimal cost,String currency,UUID catalogServiceId,BigDecimal priceEgp,BigDecimal priceEgpMin,BigDecimal priceEgpMax,boolean requiresFinance,UUID facilityPackageId,String payee){}
-        List<EstRow> consultantItems=costEstimates.findPricedLinesOf(request.clinicalReviewId()).stream().map(e->new EstRow(e.getServiceDescription(),e.getEstimatedCost(),e.getCurrency(),e.getCatalogServiceId(),e.getPriceEgp(),e.getPriceEgpMin(),e.getPriceEgpMax(),Boolean.TRUE.equals(e.getRequiresFinanceApproval()),e.getFacilityPackageId(),payeeOf(lineSource(e.getCatalogServiceId(),e.getFacilityPackageId()),e.getPayee()))).toList();
-        if(consultantItems.isEmpty())throw new ApiException(409,"CONSULTANT_COST_ESTIMATES_REQUIRED","The consultant must approve at least one medical service and cost before a patient proposal can be created");
-        if(consultantItems.stream().anyMatch(item->item.priceEgp()==null))throw new ApiException(409,"CONSULTANT_PRICE_BASE_REQUIRED","Every consultant service must carry an EGP base price");
-        boolean requiresFinance=false; // decided per line below, once the care area policy (and its manual band) is known
-        // Prices are held in EGP; the proposal is issued in the currency the consultant prepared the
-        // recommendation in, and amounts are converted (frozen at release). The coordinator may state a
-        // currency explicitly to override it, but silence must never reset an explicit clinical choice
-        // back to the base currency — that is how a USD recommendation used to reach the patient in EGP.
-        String recommendedCurrency=clinicalReviews.findProposalCurrency(request.clinicalReviewId()).orElse(null);
-        String displayCurrency=requireIssuableCurrency(hasText(request.currency())?request.currency():recommendedCurrency);
-        java.time.LocalDate rateDate=java.time.LocalDate.now(clock);
-        BigDecimal rate=com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(displayCurrency)?BigDecimal.ONE:currency.effectiveRate(displayCurrency,rateDate);
-        // Central commercial policy: the margin rate is snapshotted on the version and charged as one disclosed line (P1-10, D-A).
-        String careArea=cases.findCareCategory(caseId).orElse(null);
-        var policy=commercialPolicy.activePolicyFor(careArea);
-        BigDecimal marginRate=policy!=null?policy.marginRate():BigDecimal.ZERO;
-        if(policy==null)requiresFinance=true; // a missing applicable policy forces finance review
-        // P0-5 (B-02 / A-07): catalogue lines, still-approved facility packages and manual lines inside the pre-approved band release without Finance.
-        {java.time.LocalDate gateDate=java.time.LocalDate.now(clock);BigDecimal manualBand=policy!=null?policy.manualBandEgp():null;requiresFinance=requiresFinance||consultantItems.stream().anyMatch(i->lineNeedsFinance(i.requiresFinance(),i.catalogServiceId(),i.facilityPackageId(),i.priceEgp(),manualBand,gateDate));}
-        // P1-10 (D-A): each medical line at the provider's own price; the fee is marginRate x the provider totals (ProposalPricing).
-        List<ProposalPricing.ProviderLine> providerLines=consultantItems.stream().map(i->ProposalPricing.ProviderLine.of(i.priceEgp(),i.priceEgpMin(),i.priceEgpMax())).toList();
-        ProposalPricing.Totals priced=ProposalPricing.of(providerLines,marginRate);
-        BigDecimal providerNet=priced.providerExpected(),marginAmount=priced.feeExpected();
-        UUID policyId=policy!=null?policy.id():null;Integer policyVersion=policy!=null?policy.version():null;
-        UUID proposalId=proposalRecords.findIdByCaseId(caseId).orElseGet(()->{UUID id=UUID.randomUUID();Instant now=clock.instant();proposalRecords.saveAndFlush(new Proposal(id,caseId,now));return id;});
-        int version=nextProposalVersion(proposalId);UUID versionId=UUID.randomUUID();Instant now=clock.instant();
-        proposalVersions.supersedeLive(proposalId,micros(now));
-        String includedServices=consultantItems.stream().map(EstRow::description).collect(java.util.stream.Collectors.joining("; "));
-        createVersion(new ProposalVersion.Document(proposalId,version,"PRELIMINARY_ESTIMATE",null,request.language()==null?"en":request.language(),request.clinicalReviewId()),versionId,new ProposalVersion.Terms(request.operationalPlan(),displayCurrency,includedServices,request.excludedServices(),request.paymentTerms(),request.refundTerms(),request.disclaimers(),request.coordinatorNotes(),request.validUntil()),new ProposalVersion.Pricing(requiresFinance,providerNet,policyId,policyVersion,marginRate,marginAmount,priced.patientMin(),priced.patientExpected(),priced.patientMax()),actor.subject(),now);
-        saveLines(versionId,consultantItems.stream().map(i->new PricedLine(i.description(),lineSource(i.catalogServiceId(),i.facilityPackageId()),i.catalogServiceId(),i.facilityPackageId(),i.payee())).toList(),providerLines,priced,rate);
-        proposalRecords.advanceTo(proposalId,version,micros(now));transitionWithoutVersion(caseId,"PROPOSAL_PREPARATION","Proposal draft created from consultant-approved services",actor);
-        // The coordinator's "prepare the proposal" work is done the moment the draft exists; a revision request
-        // is answered the same way. Closing it here is what stops a finished item from driving the page later.
-        work.closeWorkItems(caseId,"PREPARE_PROPOSAL","Proposal draft created");work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Superseded — a new proposal version is being prepared");work.closeWorkItems(caseId,"PROPOSAL_REVISION","Revised proposal draft created");
-        audit("PROPOSAL_VERSION_CREATED",actor,caseId,"ProposalVersion",versionId.toString(),"CREATE","SUCCESS",null);return proposal(versionId);
-    }
-    // --- Secure pre-acceptance proposal access: link validity + OTP are BOTH required before any
-    // clinical recommendation, risk, pricing, or document is exposed, and before any decision. ---
-    private static final Duration ACCESS_CODE_TTL=Duration.ofMinutes(15);
-    private static final int ACCESS_MAX_ATTEMPTS=5;
-    private static final Duration ACCESS_GRANT_TTL=Duration.ofMinutes(30);
-    private static final int ACCESS_RESEND_MAX_PER_HOUR=5;
-
-    /** Minimal, non-sensitive summary for a valid link: enough to start verification, nothing more. */
-    @Transactional(readOnly=true) public PublicProposalSummary publicProposalSummary(String token){ShareToken share=findShareToken(token);Contact c=proposalContact(share.caseId());String channel=hasText(c.whatsapp())?"WHATSAPP":"EMAIL";String destination=channel.equals("WHATSAPP")?c.whatsapp():c.email();return new PublicProposalSummary(c.caseNumber(),channel,maskContact(destination),hasText(c.whatsapp())?maskContact(c.whatsapp()):null,hasText(c.email())?maskContact(c.email()):null);}
-
-    /** Mints and delivers a one-time OTP to the already-verified contact. Rate limited; neutral output. */
-    @Transactional public PublicProposalSummary requestProposalAccess(String token){return requestProposalAccess(token,null);}
-    /**
-     * Mints and delivers a one-time OTP to the patient's own registered contact. When both a WhatsApp
-     * number and an email are on file the patient may pick either channel (default WhatsApp); the
-     * destination is ALWAYS taken from the profile — never a caller-supplied value. Resending or switching
-     * channels revokes the previous active challenge and mints a fresh, independent one. Neutral output.
-     */
-    @Transactional public PublicProposalSummary requestProposalAccess(String token,String requestedChannel){ShareToken share=findShareToken(token);requireDecidableProposal(share.versionId());Instant now=clock.instant();long recent=accessChallenges.countByShareTokenIdAndCreatedAtAfter(share.shareId(),micros(now.minus(Duration.ofHours(1))));if(recent>=ACCESS_RESEND_MAX_PER_HOUR)throw new ApiException(429,"TOO_MANY_REQUESTS","Too many verification requests. Please try again later.");accessChallenges.revokeOpen(share.shareId(),micros(now));Contact c=proposalContact(share.caseId());String channel=chooseChannel(requestedChannel,c.whatsapp(),c.email());String destination="WHATSAPP".equals(channel)?c.whatsapp():c.email();String hint=maskContact(destination);UUID id=UUID.randomUUID();String code="%06d".formatted(random.nextInt(1_000_000));accessChallenges.saveAndFlush(new ProposalAccessChallenge(id,new ProposalAccessChallenge.Target(share.shareId(),share.versionId(),share.caseId()),intake.hash(code),channel,hint,now.plus(ACCESS_CODE_TTL),ACCESS_MAX_ATTEMPTS,now));notificationOutbox.enqueue("PROPOSAL_ACCESS", channel, destination, "proposal-access-code", intake.encryptedJson("{\"code\":\""+code+"\",\"lang\":\""+("ar".equals(c.language())?"ar":"en")+"\"}"), "proposal-access:"+id, now);auditPublic("PROPOSAL_ACCESS_REQUESTED",share.caseId(),share.versionId().toString(),"REQUEST_ACCESS");return new PublicProposalSummary(c.caseNumber(),channel,hint,hasText(c.whatsapp())?maskContact(c.whatsapp()):null,hasText(c.email())?maskContact(c.email()):null);}
-
-    /** Verifies the OTP and issues a short-lived, hashed view grant. Neutral errors; brute-force capped. */
-    @Transactional(noRollbackFor=ApiException.class) public ProposalAccessGrant verifyProposalAccess(String token,String code){ShareToken share=findShareToken(token);requireDecidableProposal(share.versionId());Instant now=clock.instant();AccessChallenge ch=accessChallenges.findLatest(share.shareId(),Limit.of(1)).stream().findFirst().map(c->new AccessChallenge(c.getId(),c.getCodeHash(),c.getExpiresAt(),c.getAttempts(),c.getMaxAttempts(),c.getConsumedAt(),c.getRevokedAt(),c.getDeliveryChannel())).orElseThrow(()->new ApiException(400,"VERIFICATION_INVALID","The verification code is invalid or has expired"));if(ch.consumedAt()!=null||ch.revokedAt()!=null||ch.expiresAt().isBefore(now)||ch.attempts()>=ch.maxAttempts())throw new ApiException(400,"VERIFICATION_INVALID","The verification code is invalid or has expired");boolean matches=java.security.MessageDigest.isEqual(ch.hash().getBytes(StandardCharsets.US_ASCII),intake.hash(code).getBytes(StandardCharsets.US_ASCII));if(!matches){int attempts=ch.attempts()+1;int updated=accessChallenges.recordFailedAttempt(ch.id(),ch.attempts(),attempts,micros(now));if(updated!=1)throw new ApiException(400,"VERIFICATION_INVALID","The verification code is invalid or has expired");auditPublic("PROPOSAL_ACCESS_FAILED",share.caseId(),share.versionId().toString(),"VERIFY");throw new ApiException(400,"VERIFICATION_INVALID","The verification code is invalid or has expired");}String grant=randomToken();Instant grantExp=now.plus(ACCESS_GRANT_TTL);int consumed=accessChallenges.consume(ch.id(),ch.attempts(),intake.hash(grant),micros(grantExp),micros(now));if(consumed!=1)throw new ApiException(400,"VERIFICATION_INVALID","The verification code is invalid or has expired");proposalVersions.markViewed(share.versionId(),micros(now));
-        // A verified OTP proves control of ONE registered contact channel (CONTACT_VERIFIED) — never legal
-        // identity. Stamp only the channel that was actually used, preserving any existing timestamps.
-        markContactVerified(share.caseId(),ch.channel(),now);auditPublic("PROPOSAL_ACCESS_VERIFIED",share.caseId(),share.versionId().toString(),"VERIFY");return new ProposalAccessGrant(grant,grantExp,share.versionId());}
-    /** Sets ONLY the timestamp for the channel that carried the OTP: WhatsApp -> phone_verified_at,
-     *  email -> email_verified_at. Never marks the other channel, never erases existing evidence. */
-    private void markContactVerified(UUID caseId,String channel,Instant now){
-        String column="WHATSAPP".equals(channel)?"phone_verified_at":"EMAIL".equals(channel)?"email_verified_at":null;
-        if(column==null)return;
-        // A code delivered to the SUBMITTER's channel proves their possession, not the patient's: stamp nothing.
-        if(!caseContacts.resolve(caseId).patientOwns(channel)){onboarding.markContactVerified(caseId,now);events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId));return;}
-        markPatientChannelVerified(caseId,channel,now);
-        onboarding.markContactVerified(caseId,now);
-        events.publishEvent(new CaseEvents.PatientReadinessChanged(caseId));
+    @Transactional
+    public IdResponse acceptDoctorAssignment(UUID caseId, UUID assignmentId, AssignmentDecisionRequest request) {
+        return assignments.acceptDoctorAssignment(caseId, assignmentId, request);
     }
 
-    /** Full sensitive view — only reachable with a valid link AND a valid grant from OTP verification. */
-    @Transactional(readOnly=true) public PublicProposalView viewProposal(String token,String grant){ShareToken share=requireGrant(token,grant);ProposalView view=proposal(share.versionId());
-        var m=proposalQueries.patientDocument(share.versionId());
-        // Totals are the EGP package converted at the SNAPSHOT rate frozen at release. A base-currency proposal has
-        // rate 1; a foreign-currency one always carries its snapshot (release refuses otherwise), so a missing rate
-        // is a data fault to surface, never a reason to show EGP figures under a foreign-currency label.
-        if(m.getFxRate()==null&&m.getCurrency()!=null&&!com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(m.getCurrency()))throw new ApiException(409,"PROPOSAL_FX_SNAPSHOT_MISSING","This proposal has no exchange-rate snapshot and cannot be shown");
-        BigDecimal fx=m.getFxRate()==null?BigDecimal.ONE:m.getFxRate();java.util.function.Function<BigDecimal,BigDecimal> conv=egp->egp==null?null:egp.multiply(fx).setScale(2,java.math.RoundingMode.HALF_UP);
-        boolean decided=!Set.of("RELEASED","VIEWED").contains(view.status());String decisionState=decided?view.status():null;
-        boolean isFinal="FINAL_TREATMENT_QUOTE".equals(m.getDocumentType());
-        BigDecimal depositDueDisplay=isFinal?null:payment.depositDueDisplay(share.caseId(),share.versionId());
-        BigDecimal depositPaidDisplay=isFinal?conv.apply(payment.netPaidEgp(share.caseId())):null;
-        var totals=proposalQueries.displayTotals(share.versionId(),fx); // QA #12: the totals are the sum of the lines shown
-        return new PublicProposalView(m.getCaseNumber(),m.getPatientName(),m.getDocumentType(),m.getVersionNumber(),m.getCurrency(),view.items(),totals.min(),totals.expected(),totals.max(),m.getAssumptions(),m.getIncludedServices(),m.getExcludedServices(),m.getScopeChangeReason(),m.getPaymentTerms(),m.getRefundTerms(),m.getDisclaimers(),m.getValidUntil(),decided,decisionState,m.getRecommendedTreatment(),m.getRisksAndLimitations(),view.coordinatorNotes(),depositDueDisplay,depositPaidDisplay,m.getConsultantName(),m.getFxRateDate(),proposalQueries.assistance(share.versionId()),view.acceptableFrom(),view.fxReapprovalStatus(),m.getReleasedAt(),view.payeeTotals());}
+    @Transactional
+    public IdResponse decideAssignment(
+            UUID caseId, UUID assignmentId, AssignmentDecisionRequest request, Role requiredRole) {
+        return assignments.decideAssignment(caseId, assignmentId, request, requiredRole);
+    }
 
-    /** Records the decision against the exact released version; on ACCEPTED, sends an activation invite. */
-    @Transactional(noRollbackFor=ApiException.class) public IdResponse decideProposalPublic(String token,String grant,PublicProposalDecisionRequest request){ShareToken share=requireGrant(token,grant);Instant now=clock.instant();ProposalView view=proposal(share.versionId());if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal can no longer be decided");if(view.validUntil()!=null&&!view.validUntil().isAfter(now)){expireProposal(share.caseId(),share.versionId());throw new ApiException(410,"PROPOSAL_EXPIRED","This proposal has expired");}
-        // A preliminary estimate is ACKNOWLEDGED (recorded as such), which sets the version status ACCEPTED and moves the macro case to ACCEPTED.
-        String decision=request.decision();boolean acceptish="ACCEPTED".equals(decision)||"ACKNOWLEDGED".equals(decision);String versionStatus=acceptish?"ACCEPTED":("DECLINED".equals(decision)?"DECLINED":"REVISION_REQUESTED");
-        // Continuing is the only decision that carries a commitment, so the acknowledgement is a server-side
-        // precondition rather than a checkbox the page happens to render: a direct API call must fail the same
-        // way. Declining or asking for changes commits the patient to nothing and needs no acknowledgement.
-        if(acceptish&&!Boolean.TRUE.equals(request.acknowledgementAccepted()))
-            throw new ApiException(400,"ACKNOWLEDGEMENT_REQUIRED","Confirm the acknowledgement before continuing");
-        if(acceptish&&isFinalQuote(share.versionId()))requireFinalQuoteAcceptable(share.caseId(),share.versionId(),now,"SECURE_LINK","PATIENT");
-        int decided=proposalVersions.decide(share.versionId(),versionStatus);if(decided!=1)throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal can no longer be decided");work.closeWorkItems(share.caseId(),ProposalAssistanceService.WORK_TYPE,"Superseded — the patient decided");proposalDecisions.saveAndFlush(new ProposalDecision(UUID.randomUUID(),share.versionId(),"SECURE_LINK",request.decision(),null,request.comment(),now,now).acknowledged(acceptish,acceptish?now:null,acceptish?ACKNOWLEDGEMENT_VERSION:null));shareTokens.consume(share.shareId(),micros(now));accessChallenges.revokeAll(share.shareId(),micros(now));if(acceptish&&isFinalQuote(share.versionId()))events.publishEvent(new CaseEvents.FinalQuoteAccepted(share.caseId(),share.versionId()));if(!isFinalQuote(share.versionId())){publicTransition(share.caseId(),versionStatus,"Patient proposal decision (secure link)");if(acceptish){onProposalAccepted(share.caseId());payment.createDepositForAcknowledgement(share.caseId(),share.versionId());onboarding.createForAcknowledgement(share.caseId(),share.versionId());
-            // The deposit stage opens with the patient's profile steps outstanding: the ball is theirs first,
-            // and only then the offline deposit becomes our team's move. Derived, never assumed from the stage.
-            caseActions.reconcileWaitingOn(share.caseId());}}
-        // A patient who asks for changes or declines is waiting on us, not the other way round: give the
-        // coordinator real work and a notification rather than a status the queue has to be polled for.
-        if(!acceptish)notifyCoordinatorOfPatientDecision(share.caseId(),share.versionId(),decision,request.comment());
-        auditPublic("PROPOSAL_DECIDED",share.caseId(),share.versionId().toString(),decision);return new IdResponse(share.versionId(),decision);}
+    @Transactional
+    public IdResponse message(UUID caseId, MessageRequest request) { return conversations.message(caseId, request); }
+
+    @Transactional
+    public IdResponse markMessageRead(UUID caseId, UUID messageId) {
+        return conversations.markMessageRead(caseId, messageId);
+    }
+
+    @Transactional
+    public IdResponse task(UUID caseId, TaskRequest request) { return tasks.task(caseId, request); }
+
+    public List<TaskView> myTasks() { return tasks.myTasks(); }
+
+    @Transactional
+    public IdResponse startTask(UUID caseId, UUID taskId, TaskVersionRequest request) {
+        return tasks.startTask(caseId, taskId, request);
+    }
+
+    @Transactional
+    public IdResponse completeTask(UUID caseId, UUID taskId, CompleteTaskRequest request) {
+        return tasks.completeTask(caseId, taskId, request);
+    }
+
+    @Transactional
+    public IdResponse cancelTask(UUID caseId, UUID taskId, CancelTaskRequest request) {
+        return tasks.cancelTask(caseId, taskId, request);
+    }
+
+    @Transactional
+    public IdResponse requestInformation(UUID caseId, InformationRequestCommand command) {
+        return patientInformation.requestInformation(caseId, command);
+    }
+
+    @Transactional
+    public IdResponse resendOnboardingLink(UUID caseId) { return patientInformation.resendOnboardingLink(caseId); }
+
+    @Transactional
+    public IdResponse recordPatientInformation(UUID caseId, OnBehalfRequest request) {
+        return patientInformation.recordPatientInformation(caseId, request);
+    }
+
+    @Transactional
+    public IdResponse reassignTask(UUID caseId, UUID taskId, ReassignTaskRequest request) {
+        return tasks.reassignTask(caseId, taskId, request);
+    }
+
+    @Transactional
+    public IdResponse saveClinicalReview(UUID caseId, ClinicalReviewRequest request) {
+        return clinicalRecommendations.saveClinicalReview(caseId, request);
+    }
+
+    @Transactional
+    public IdResponse approveClinicalReview(UUID caseId, UUID reviewId) {
+        return clinicalRecommendations.approveClinicalReview(caseId, reviewId);
+    }
+
+    @Transactional
+    public ProposalView createProposal(UUID caseId, ProposalDraftRequest request) {
+        return commercialProposals.createProposal(caseId, request);
+    }
+
+    @Transactional(readOnly = true)
+    public PublicProposalSummary publicProposalSummary(String token) {
+        return publicProposalSessions.publicProposalSummary(token);
+    }
+
+    @Transactional
+    public PublicProposalSummary requestProposalAccess(String token) {
+        return publicProposalSessions.requestProposalAccess(token);
+    }
+
+    @Transactional
+    public PublicProposalSummary requestProposalAccess(String token, String requestedChannel) {
+        return publicProposalSessions.requestProposalAccess(token, requestedChannel);
+    }
+
+    @Transactional(noRollbackFor = ApiException.class)
+    public ProposalAccessGrant verifyProposalAccess(String token, String code) {
+        return publicProposalSessions.verifyProposalAccess(token, code);
+    }
+
+    @Transactional(readOnly = true)
+    public PublicProposalView viewProposal(String token, String grant) {
+        return publicProposalSessions.viewProposal(token, grant);
+    }
+
+    @Transactional(noRollbackFor = ApiException.class)
+    public IdResponse decideProposalPublic(String token, String grant, PublicProposalDecisionRequest request) {
+        return proposalDecisions.decideProposalPublic(token, grant, request);
+    }
 
     public record ProposalGrantContext(UUID caseId, UUID patientId, UUID versionId) {}
-    /** Resolves an already-verified proposal grant to its canonical patient/case without exposing token internals. */
-    @Transactional(readOnly=true) public ProposalGrantContext requireProposalGrant(String token,String grant){
-        ShareToken share=requireGrant(token,grant);
-        UUID patientId=cases.findPatientId(share.caseId()).orElseThrow();
-        return new ProposalGrantContext(share.caseId(),patientId,share.versionId());
+
+    @Transactional(readOnly = true)
+    public ProposalGrantContext requireProposalGrant(String token, String grant) {
+        var context = publicProposalSessions.requireProposalGrant(token, grant);
+        return new ProposalGrantContext(context.caseId(), context.patientId(), context.versionId());
     }
 
-    private ShareToken requireGrant(String token,String grant){ShareToken share=findShareToken(token);if(!accessChallenges.hasLiveGrant(share.shareId(),intake.hash(grant),micros(clock.instant())))throw new ApiException(401,"VERIFICATION_REQUIRED","Please verify your identity to view this proposal");return share;}
-    private void onProposalAccepted(UUID caseId){String preferredLanguage=cases.findPatientPreferredLanguage(caseId).orElse(null);if(preferredLanguage==null)return;
-        // The accepted patient receives one continuation message. The identity holder authenticates with the
-        // provider and accepts the profile through PatientActivationService; no parallel account-binding token exists.
-        publicCases.issueOnboardingLink(caseId,preferredLanguage);}
-    /** The case's communication contact: the patient's own channels when present, else the submitter's. */
-    private Contact proposalContact(UUID caseId){var c=caseContacts.resolve(caseId);return new Contact(c.caseNumber(),c.whatsapp(),c.email(),c.preferredLanguage());}
-    private String randomToken(){return UUID.randomUUID().toString().replace("-","")+UUID.randomUUID().toString().replace("-","");}
-    private boolean hasText(String value){return value!=null&&!value.isBlank();}
-    /** Resolve the OTP channel from an optional patient choice, validating the destination is on file.
-     *  Default (no choice) is WhatsApp when available, else email — backward compatible with old clients. */
-    private String chooseChannel(String requested,String whatsapp,String email){
-        if(requested==null||requested.isBlank())return hasText(whatsapp)?"WHATSAPP":"EMAIL";
-        String c=requested.toUpperCase(Locale.ROOT);
-        if(!"WHATSAPP".equals(c)&&!"EMAIL".equals(c))throw new ApiException(400,"INVALID_CONTACT_CHANNEL","Choose WhatsApp or email");
-        String dest="WHATSAPP".equals(c)?whatsapp:email;
-        if(!hasText(dest))throw new ApiException(409,"CONTACT_CHANNEL_UNAVAILABLE","That contact method is not on file for this case");
-        return c;
-    }
-    private String maskContact(String value){return ProposalQueryService.maskContact(value);}
-    private record AccessChallenge(UUID id,String hash,Instant expiresAt,int attempts,int maxAttempts,Instant consumedAt,Instant revokedAt,String channel){}
-    private ShareToken findShareToken(String token){return shareTokens.findLive(intake.hash(token)).map(l->new ShareToken(l.getId(),l.getVersionId(),l.getCaseId(),l.getConsumedAt(),l.getRevokedAt(),l.getExpiresAt())).filter(s->s.expiresAt().isAfter(clock.instant())).orElseThrow(()->new ApiException(404,"PROPOSAL_LINK_INVALID","This proposal link is invalid or has expired"));}
-    private void publicTransition(UUID caseId,String target,String reason){CaseState current=state(caseId);validateTransition(caseId,current.status(),target);int changed=cases.moveStatusAtVersion(caseId,current.version(),CaseStatus.valueOf(target),micros(clock.instant()));if(changed!=1)throw new ApiException(409,"CASE_VERSION_CONFLICT","The case was updated by another user");statusLog.record(caseId,current.status(),target,"PUBLIC_LINK","PATIENT",reason, clock.instant());}
-    /**
-     * The coordinator's side of a patient turning a proposal down or asking for changes.
-     *
-     * <p>Idempotent like every other work handoff: {@link StaffWorkService#openWorkItem} reuses an open
-     * item of the same type, and the notification is keyed to the version and decision. A repeated
-     * decision cannot reach here anyway — the conditional status update above rejects it first.
-     */
-    private void notifyCoordinatorOfPatientDecision(UUID caseId,UUID versionId,String decision,String comment){notifyCoordinatorOfPatientDecision(caseId,versionId,decision,comment,true);}
-    private void notifyCoordinatorOfPatientDecision(UUID caseId,UUID versionId,String decision,String comment,boolean email){
-        boolean declined="DECLINED".equals(decision);
-        String coordinator=primaryCoordinator(caseId);
-        String title=declined?"Patient declined the proposal":"Patient asked for changes to the proposal";
-        String context=(declined?"The patient declined this proposal.":"The patient asked for changes before continuing.")
-            +(hasText(comment)?" They said: "+comment.trim():"");
-        work.openWorkItem(new NewWorkItem(caseId,declined?"PROPOSAL_DECLINED_REVIEW":"PROPOSAL_REVISION",title,context,coordinator,
-            "COORDINATOR",false,null,"SYSTEM","PATIENT_PROPOSAL_DECISION","proposal-decision:"+decision+":"+versionId,email,
-            WorkCopy.of(declined?"PROPOSAL_DECLINED":"PROPOSAL_CHANGES_REQUESTED","said",comment)));
-        work.refreshWaitingOn(caseId,"STAFF",WaitingReason.work(declined?"PROPOSAL_DECLINED":"PROPOSAL_CHANGES_REQUESTED",title));
+    @Transactional
+    public ProposalView completeOperations(UUID caseId, UUID versionId, String plan) {
+        return commercialProposals.completeOperations(caseId, versionId, plan);
     }
 
-    /**
-     * One message per version on the case's contact channel: what was recorded, with whom and when, and that the patient
-     * can tell their coordinator if it is not what was agreed. Carries no clinical detail and no link.
-     */
-    private void notifyPatientOfRecordedDecision(UUID caseId,UUID versionId,String decision,RecordedDecisionRequest request,Instant now){
-        Contact contact=proposalContact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";
-        String destination="WHATSAPP".equals(channel)?contact.whatsapp():contact.email();if(!hasText(destination))return;
-        String lang="ar".equals(cases.findPatientPreferredLanguage(caseId).orElse(null))?"ar":"en";
-        String date=request.conversationAt().atZone(ZoneId.of("Africa/Cairo")).toLocalDate().toString();
-        notificationOutbox.enqueueOnce("PROPOSAL_DECISION_RECORDED",channel,destination,"proposal-decision-recorded",
-            intake.encryptedJson("{\"decision\":"+jsonText(decision)+",\"confirmedBy\":"+jsonText(request.confirmedBy())+",\"date\":"+jsonText(date)+",\"lang\":"+jsonText(lang)+"}"),
-            "proposal-decision-recorded:"+versionId,now);
-    }
-    private static String jsonText(String value){return value==null?"null":"\""+value.replace("\\","\\\\").replace("\"","\\\"")+"\"";}
-    private void expireProposal(UUID caseId,UUID versionId){int changed=proposalVersions.expire(versionId);if(changed==1){work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Superseded — the proposal expired");shareTokens.revokeForVersion(versionId,micros(clock.instant()));
-        // P1-10 (B-05): a final quote expires as a commercial sub-workflow; the macro case stays where it is (ARRIVAL_CONFIRMED).
-        if(isFinalQuote(versionId))expiry.onFinalQuoteExpired(caseId,versionId,clock.instant());else publicTransition(caseId,"EXPIRED","Proposal expired");auditPublic("PROPOSAL_EXPIRED",caseId,versionId.toString(),"EXPIRE");}}
-    private void auditPublic(String type,UUID caseId,String entityId,String action){auditTrail.event(type).actor("SECURE_LINK", "PATIENT").caseId(caseId).entity("ProposalVersion", entityId).action(action).record();}
-    private record Contact(String caseNumber,String whatsapp,String email,String language){}
-    private record ShareToken(UUID shareId,UUID versionId,UUID caseId,Instant consumedAt,Instant revokedAt,Instant expiresAt){}
-    @Transactional public ProposalView completeOperations(UUID caseId,UUID versionId,String plan){var actor=authority.authorize(Permission.OPERATIONS_FULFIL,Resource.ofCase(caseId));requireState(caseId,"PROPOSAL_PREPARATION");if(!travelRequested(caseId))throw new ApiException(409,"OPERATIONS_NOT_REQUIRED","Operations is only engaged when the patient requested a travel package");ensureProposalBelongs(caseId,versionId);int changed=proposalVersions.completeOperations(versionId,plan,actor.subject(),micros(clock.instant()));if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal is not ready for operations");audit("PROPOSAL_OPERATIONS_COMPLETED",actor,caseId,"ProposalVersion",versionId.toString(),"COMPLETE_OPERATIONS","SUCCESS",null);work.changed(caseId);return proposal(versionId);}
-    @Transactional public ProposalView approveFinance(UUID caseId,UUID versionId){var actor=authority.authorize(Permission.FINANCE_SETTLE,Resource.ofCase(caseId));boolean finalQuote=isFinalQuote(versionId);requireOneOfStates(caseId,finalQuote?Set.of("ARRIVAL_CONFIRMED"):Set.of("PROPOSAL_PREPARATION"));ensureProposalBelongs(caseId,versionId);if(!requiresFinanceApproval(versionId))throw new ApiException(409,"FINANCE_NOT_REQUIRED","This proposal contains only pre-approved catalog services and does not need finance approval");if(!finalQuote&&travelRequested(caseId)&&!operationsCompleted(versionId))throw new ApiException(409,"OPERATIONS_REQUIRED_FIRST","Operations must complete the travel package before finance approval");int changed=proposalVersions.approveFinance(versionId,actor.subject(),micros(clock.instant()));if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal is not ready for finance approval");if(!finalQuote)transitionWithoutVersion(caseId,"PROPOSAL_INTERNAL_APPROVAL","Commercial proposal approved",actor);audit("PROPOSAL_FINANCE_APPROVED",actor,caseId,"ProposalVersion",versionId.toString(),"APPROVE_FINANCE","SUCCESS",null);return proposal(versionId);}
-    private boolean travelRequested(UUID caseId){return proposalQueries.travelRequested(caseId);}
-    private boolean requiresFinanceApproval(UUID versionId){return proposalQueries.requiresFinanceApproval(versionId);}
-    /**
-     * P0-5 (B-02 / A-07): whether one line keeps the Finance gate. A facility package line is re-checked now (approved, in validity,
-     * facility active), so a package retired since the consultant chose it falls back to Finance; a catalogue line keeps its stored
-     * answer; a manual line needs Finance unless its EGP price sits at or below the care area pre-approved band.
-     */
-    private boolean lineNeedsFinance(boolean stored,UUID catalogServiceId,UUID facilityPackageId,BigDecimal priceEgp,BigDecimal manualBandEgp,java.time.LocalDate today){
-        if(facilityPackageId!=null)return facilityPackages.approved(facilityPackageId,today).isEmpty();
-        if(catalogServiceId!=null)return stored;
-        return priceEgp==null||manualBandEgp==null||priceEgp.compareTo(manualBandEgp)>0;
-    }
-    /** P0-5 session 3: a travel plan or treatment record names a facility record, never free text; an unknown or suspended facility is refused. */
-    private void requireActiveFacility(UUID facilityId,boolean required){
-        if(facilityId==null){if(required)throw new ApiException(400,"FACILITY_REQUIRED","Choose the facility");return;}
-        if(facilityDirectory.active(facilityId).isEmpty())throw new ApiException(409,"FACILITY_INVALID","This facility does not exist or is suspended");
-    }
-    private record PricedLine(String description,String source,UUID catalogServiceId,UUID facilityPackageId,String payee){}
-    /**
-     * P1-10 (D-A): the medical lines at the provider's own price (the Consultant's and the facility's figures, unchanged), then the
-     * coordination and guarantee fee as the last line, never optional. Display prices are provisional until release fixes them.
-     */
-    private void saveLines(UUID versionId,List<PricedLine> lines,List<ProposalPricing.ProviderLine> prices,ProposalPricing.Totals priced,BigDecimal rate){
-        for(int order=0;order<lines.size();order++){PricedLine line=lines.get(order);ProposalPricing.ProviderLine price=prices.get(order);
-            proposalItems.saveAndFlush(ProposalItem.medical(versionId,line.description(),ProposalPricing.display(price.expected(),rate),order,line.source(),new ProposalItem.Prices(price.expected(),price.expected(),price.min(),price.max()),line.catalogServiceId(),line.facilityPackageId()).payee(line.payee()));}
-        proposalItems.saveAndFlush(ProposalItem.platformFee(versionId,ProposalPricing.FEE_DESCRIPTION,ProposalPricing.display(priced.feeExpected(),rate),lines.size(),priced.feeExpected(),priced.feeMin(),priced.feeMax()));
-    }
-    private static String lineSource(UUID catalogServiceId,UUID facilityPackageId){return facilityPackageId!=null?"FACILITY_PACKAGE":catalogServiceId!=null?"CATALOG":"MANUAL";}
-    /** P1-19 (design §7.4): a package line is the facility's, a catalogue line the Consultant's; a manual line keeps what it says, else OTHER. */
-    private static String payeeOf(String source,String stated){return "FACILITY_PACKAGE".equals(source)?ProposalItem.FACILITY:"CATALOG".equals(source)?ProposalItem.CONSULTANT:stated!=null?stated:ProposalItem.OTHER;}
-    /**
-     * P1-19 (design §7.4), separate lines, no blending: once the hospital is reserved, the final quote shows the hospital's charges as
-     * their own line (a facility package, or a manual line whose payee is the facility), apart from the Consultant's fee, even when
-     * the hospital collects both, so a blended "surgeon package" cannot hide a mark-up.
-     */
-    private void requireNoReservedFacility(UUID caseId){if(admissions.reservedFacility(caseId).isPresent())throw new ApiException(409,"FACILITY_LINE_REQUIRED","The hospital is reserved: the final quote needs the hospital's charges as a line of their own, apart from the Consultant's fee");}
-    private boolean operationsCompleted(UUID versionId){return proposalQueries.operationsCompleted(versionId);}
-    @Transactional public ProposalView releaseProposal(UUID caseId,UUID versionId){var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("PROPOSAL_PREPARATION","PROPOSAL_INTERNAL_APPROVAL"));ensureProposalBelongs(caseId,versionId);ProposalView view=proposal(versionId);if(!Set.of("CLINICALLY_APPROVED","OPERATIONS_COMPLETED","FINANCE_APPROVED").contains(view.status()))throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal is not ready for release");
-        // Conditional internal gates: Operations only when a travel package was requested;
-        // Finance only when the quote contains a manually-priced (non-catalog) service. A quote
-        // that is entirely pre-approved catalog services with no travel package releases directly.
-        if(travelRequested(caseId)&&!operationsCompleted(versionId))throw new ApiException(409,"OPERATIONS_REQUIRED","Operations must complete the travel package before release");
-        if(requiresFinanceApproval(versionId)&&!"FINANCE_APPROVED".equals(view.status()))throw new ApiException(409,"FINANCE_APPROVAL_REQUIRED","Finance must approve the manually-priced services before release");
-        Instant now=clock.instant();
-        // Snapshot the EGP->quote-currency rate and freeze every line to it, so the patient price is fixed and auditable.
-        String snapCurrency=view.currency();BigDecimal fxRate;String fxSource;java.time.LocalDate fxDate=java.time.LocalDate.now(clock);
-        // A foreign-currency proposal is released only with a real snapshot rate. Without one the release fails
-        // (503 FX_RATE_UNAVAILABLE) rather than sending the patient base-currency amounts under a USD label.
-        if(snapCurrency==null||com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(snapCurrency)){fxRate=BigDecimal.ONE;fxSource="BASE";}
-        else{fxRate=currency.effectiveRate(snapCurrency,fxDate);fxSource="SNAPSHOT";}
-        proposalItems.priceAt(versionId,fxRate);
-        String html=renderProposal(proposal(versionId));
-        int changed=proposalVersions.release(versionId,List.of("CLINICALLY_APPROVED","OPERATIONS_COMPLETED","FINANCE_APPROVED"),actor.subject(),html,fxRate,fxDate,fxSource,micros(now));if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Proposal changed before release");
-        // Releasing (and only releasing) mints the random, expiring, case-scoped secure link and
-        // moves the case to PATIENT_DECISION. The delivered notification carries only the link.
-        shareTokens.revokeOpenForCase(caseId,micros(now));String token=randomToken();shareTokens.saveAndFlush(new ProposalShareToken(UUID.randomUUID(),versionId,caseId,intake.hash(token),now.plus(Duration.ofDays(14)),now));Contact contact=proposalContact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination=channel.equals("WHATSAPP")?contact.whatsapp():contact.email();if(hasText(destination))notificationOutbox.enqueueOnce("PROPOSAL_READY", channel, destination, "proposal-ready", intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+view.language()+"\"}"), "proposal-ready:"+versionId, now);transitionWithoutVersion(caseId,"PATIENT_DECISION","Proposal released to patient",actor);metrics.proposalReleased(cases.findById(caseId).map(MedicalCase::getSubmittedAt).orElse(null),view.versionNumber(),now);audit("PROPOSAL_RELEASED",actor,caseId,"ProposalVersion",versionId.toString(),"RELEASE","SUCCESS",null);return proposal(versionId);}
-    @Transactional(noRollbackFor=ApiException.class) public ProposalView decideProposal(UUID caseId,UUID versionId,ProposalDecisionRequest request){var actor=authority.authorize(Permission.PATIENT_DECIDE,Resource.ofCase(caseId));ensureProposalBelongs(caseId,versionId);ProposalView view=proposal(versionId);if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal version can no longer be decided");Instant now=clock.instant();if(view.validUntil()!=null&&!view.validUntil().isAfter(now)){expireProposal(caseId,versionId);throw new ApiException(410,"PROPOSAL_EXPIRED","This proposal has expired");}validateSelectedOptionalItems(versionId,request.selectedOptionalItemIds());String decision=request.decision();boolean acceptish="ACCEPTED".equals(decision)||"ACKNOWLEDGED".equals(decision);String versionStatus=acceptish?"ACCEPTED":("DECLINED".equals(decision)?"DECLINED":"REVISION_REQUESTED");if(acceptish&&isFinalQuote(versionId))requireFinalQuoteAcceptable(caseId,versionId,now,actor.subject(),actor.label());int decided=proposalVersions.decide(versionId,versionStatus);if(decided!=1)throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal version can no longer be decided");work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Superseded — the patient decided");UUID id=UUID.randomUUID();proposalDecisions.saveAndFlush(new ProposalDecision(id,versionId,actor.subject(),request.decision(),request.selectedOptionalItemIds()==null?null:request.selectedOptionalItemIds().toString(),request.comment(),actor.authenticatedAt(),now));shareTokens.revokeForVersion(versionId,micros(now));if(acceptish&&isFinalQuote(versionId))events.publishEvent(new CaseEvents.FinalQuoteAccepted(caseId,versionId));if(!isFinalQuote(versionId)){transitionWithoutVersion(caseId,versionStatus,"Patient proposal decision",actor);if(acceptish){onProposalAccepted(caseId);payment.createDepositForAcknowledgement(caseId,versionId);onboarding.createForAcknowledgement(caseId,versionId);}}audit("PROPOSAL_DECIDED",actor,caseId,"ProposalVersion",versionId.toString(),decision,"SUCCESS",null);return proposal(versionId);}
-    /**
-     * A decision the owning coordinator records for the patient after going through the terms with them in Arabic
-     * ({@link ProposalAssistanceService} authorizes and validates first). The state change is exactly the patient's own:
-     * the version is decided once, the secure link is revoked, an estimate moves the case and opens the deposit and
-     * profile steps, a decline or change request becomes coordinator work. Only the row says who recorded it.
-     */
-    ProposalView applyRecordedDecision(UUID caseId,UUID versionId,RecordedDecisionRequest request,String representativeSubject,Actor actor){
-        ensureProposalBelongs(caseId,versionId);ProposalView view=proposal(versionId);
-        if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal version can no longer be decided");
-        Instant now=clock.instant();
-        if(view.validUntil()!=null&&!view.validUntil().isAfter(now)){expireProposal(caseId,versionId);throw new ApiException(410,"PROPOSAL_EXPIRED","This proposal has expired");}
-        Instant releasedAt=proposalVersions.findReleasedAt(versionId).orElse(null);
-        if(releasedAt!=null&&request.conversationAt().isBefore(releasedAt))throw new ApiException(400,"CONVERSATION_BEFORE_RELEASE","The conversation time is before this proposal was sent to the patient");
-        String decision=request.decision();boolean acceptish="ACCEPTED".equals(decision)||"ACKNOWLEDGED".equals(decision);
-        String versionStatus=acceptish?"ACCEPTED":("DECLINED".equals(decision)?"DECLINED":"REVISION_REQUESTED");
-        if(acceptish&&isFinalQuote(versionId))requireFinalQuoteAcceptable(caseId,versionId,now,actor.subject(),actor.label());
-        int decided=proposalVersions.decide(versionId,versionStatus);if(decided!=1)throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal version can no longer be decided");
-        String comment=hasText(request.comment())?request.comment().trim():null;
-        proposalDecisions.saveAndFlush(new ProposalDecision(UUID.randomUUID(),versionId,"COORDINATOR_RECORDED",decision,null,comment,actor.authenticatedAt(),now)
-            .acknowledged(acceptish,acceptish?request.conversationAt():null,acceptish?ASSISTED_ACKNOWLEDGEMENT_VERSION:null)
-            .recordedOnBehalf(actor.subject(),request.channel(),request.confirmedBy(),representativeSubject,request.conversationAt(),"ar"));
-        shareTokens.revokeForVersion(versionId,micros(now));
-        work.closeWorkItems(caseId,ProposalAssistanceService.WORK_TYPE,"Decision recorded with the patient");
-        if(acceptish&&isFinalQuote(versionId))events.publishEvent(new CaseEvents.FinalQuoteAccepted(caseId,versionId));
-        if(!isFinalQuote(versionId)){transitionWithoutVersion(caseId,versionStatus,"Patient proposal decision (recorded by coordinator)",actor);
-            if(acceptish){onProposalAccepted(caseId);payment.createDepositForAcknowledgement(caseId,versionId);onboarding.createForAcknowledgement(caseId,versionId);caseActions.reconcileWaitingOn(caseId);}}
-        // The follow-up work still opens, but the coordinator who just recorded it is not emailed about their own entry.
-        if(!acceptish)notifyCoordinatorOfPatientDecision(caseId,versionId,decision,comment,false);
-        // The patient is told, in their language, that a decision was recorded for them and how to dispute it.
-        notifyPatientOfRecordedDecision(caseId,versionId,decision,request,now);
-        audit("PROPOSAL_DECIDED_ON_BEHALF",actor,caseId,"ProposalVersion",versionId.toString(),decision,"SUCCESS",null);
-        return proposal(versionId);
-    }
-    // --- Final in-person assessment + final treatment quote (the macro case stays ARRIVAL_CONFIRMED) ---
-    private boolean isFinalQuote(UUID versionId){return proposalQueries.isFinalQuote(versionId);}
-    @Transactional public IdResponse saveFinalAssessment(UUID caseId,FinalAssessmentRequest request){
-        var actor=authority.authorize(Permission.CLINICAL_APPROVE,Resource.ofCase(caseId));requireState(caseId,"ARRIVAL_CONFIRMED");
-        UUID practitionerId=practitionerId(actor.subject());Instant now=clock.instant();
-        int version=clinicalReviews.nextVersionNumber(caseId);UUID reviewId=UUID.randomUUID();
-        // Carry the currency the case was already being quoted in, so the final quote cannot quietly
-        // revert to the base currency after a preliminary estimate was issued in, say, USD.
-        String carriedCurrency=clinicalReviews.findLatestProposalCurrency(caseId,Limit.of(1)).stream().findFirst().orElse(null);
-        clinicalReviews.saveAndFlush(ClinicalReviewVersion.approvedSuitable(reviewId,caseId,practitionerId,version,request.recommendedTreatment(),request.risksAndLimitations(),carriedCurrency,actor.subject(),now));
-        saveCostEstimates(reviewId,practitionerId,request.costEstimates());
-        audit("FINAL_ASSESSMENT_SAVED",actor,caseId,"ClinicalReview",reviewId.toString(),"CREATE","SUCCESS",null);return new IdResponse(reviewId,"APPROVED");
-    }
-    @Transactional public ProposalView createFinalQuote(UUID caseId,FinalQuoteRequest request){
-        var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));requireState(caseId,"ARRIVAL_CONFIRMED");
-        if(!clinicalReviews.existsByIdAndCaseIdAndStatus(request.clinicalReviewId(),caseId,"APPROVED"))throw new ApiException(409,"CLINICAL_APPROVAL_REQUIRED","An approved final assessment is required");
-        record EstRow(String description,UUID catalogServiceId,BigDecimal priceEgp,BigDecimal priceEgpMin,BigDecimal priceEgpMax,boolean requiresFinance,UUID facilityPackageId,String payee){}
-        List<EstRow> items=costEstimates.findPricedLinesOf(request.clinicalReviewId()).stream().map(e->new EstRow(e.getServiceDescription(),e.getCatalogServiceId(),e.getPriceEgp(),e.getPriceEgpMin(),e.getPriceEgpMax(),Boolean.TRUE.equals(e.getRequiresFinanceApproval()),e.getFacilityPackageId(),payeeOf(lineSource(e.getCatalogServiceId(),e.getFacilityPackageId()),e.getPayee()))).toList();
-        if(items.isEmpty())throw new ApiException(409,"CONSULTANT_COST_ESTIMATES_REQUIRED","The final assessment must include at least one service and cost");
-        if(items.stream().anyMatch(i->i.priceEgp()==null))throw new ApiException(409,"CONSULTANT_PRICE_BASE_REQUIRED","Every service must carry an EGP base price");
-        if(items.stream().noneMatch(i->ProposalItem.FACILITY.equals(i.payee())))requireNoReservedFacility(caseId);
-        boolean requiresFinance=false; // decided per line below (P0-5), after the margin source is known
-        // Same rule as the preliminary estimate: the final quote inherits the currency the assessment was
-        // prepared in unless the coordinator states a different one explicitly.
-        String finalRecommendedCurrency=clinicalReviews.findProposalCurrency(request.clinicalReviewId()).orElse(null);
-        String displayCurrency=requireIssuableCurrency(hasText(request.currency())?request.currency():finalRecommendedCurrency);java.time.LocalDate rateDate=java.time.LocalDate.now(clock);
-        BigDecimal rate=com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(displayCurrency)?BigDecimal.ONE:currency.effectiveRate(displayCurrency,rateDate);
-        // Reuse the SAME locked commercial policy rate captured on the preliminary estimate; recalc against the final scope.
-        record Locked(BigDecimal rate,UUID policyId,Integer policyVersion){}
-        Locked locked=proposalVersions.findLockedMargin(caseId,Limit.of(1)).stream().findFirst().map(l->new Locked(l.getMarginRate(),l.getCommercialPolicyId(),l.getCommercialPolicyVersion())).orElse(null);
-        BigDecimal marginRate;UUID policyId;Integer policyVersion;
-        if(locked!=null){marginRate=locked.rate();policyId=locked.policyId();policyVersion=locked.policyVersion();}
-        else{String careArea=cases.findCareCategory(caseId).orElse(null);var pol=commercialPolicy.activePolicyFor(careArea);marginRate=pol!=null?pol.marginRate():BigDecimal.ZERO;policyId=pol!=null?pol.id():null;policyVersion=pol!=null?pol.version():null;if(pol==null)requiresFinance=true;}
-        {java.time.LocalDate gateDate=java.time.LocalDate.now(clock);var bandPolicy=commercialPolicy.activePolicyFor(cases.findCareCategory(caseId).orElse(null));BigDecimal manualBand=bandPolicy!=null?bandPolicy.manualBandEgp():null;requiresFinance=requiresFinance||items.stream().anyMatch(i->lineNeedsFinance(i.requiresFinance(),i.catalogServiceId(),i.facilityPackageId(),i.priceEgp(),manualBand,gateDate));}
-        List<ProposalPricing.ProviderLine> providerLines=items.stream().map(i->ProposalPricing.ProviderLine.of(i.priceEgp(),i.priceEgpMin(),i.priceEgpMax())).toList();
-        ProposalPricing.Totals priced=ProposalPricing.of(providerLines,marginRate);
-        BigDecimal providerNet=priced.providerExpected(),marginAmount=priced.feeExpected();
-        // P1-10 (B-05): the policy's validity runs from release; the coordinator may ask for an earlier end, never a later one.
-        int validityDays=quoteValidityDays(caseId);
-        if(request.validUntil()!=null&&request.validUntil().isAfter(clock.instant().plus(Duration.ofDays(validityDays))))
-            throw new ApiException(400,"QUOTE_VALIDITY_TOO_LONG","A final quote stays open at most "+validityDays+" days after it is sent; choose an earlier date or leave it empty");
-        // P1-10 (A-08), the no-surprise cap: compared in EGP (provider lines plus the fee), so a currency move can never count as a
-        // scope change and a scope change can never hide behind one. Above the accepted estimate's maximum only with the reason.
-        BigDecimal estimateMaximum=proposalVersions.findAcceptedEstimateMaximum(caseId,Limit.of(1)).stream().findFirst()
-            .or(()->proposalVersions.findLatestEstimateMaximum(caseId,Limit.of(1)).stream().findFirst()).orElse(null);
-        boolean aboveMaximum=estimateMaximum!=null&&priced.patientExpected().compareTo(estimateMaximum)>0;
-        String scopeChangeReason=hasText(request.scopeChangeReason())?request.scopeChangeReason().trim():null;
-        if(aboveMaximum&&scopeChangeReason==null)
-            throw new ApiException(409,"SCOPE_CHANGE_REASON_REQUIRED","This final quote is above the maximum of the estimate the patient accepted; record the Consultant's reason for the change in treatment, which the patient will see");
-        UUID proposalId=proposalRecords.findIdByCaseId(caseId).orElseThrow();
-        int version=nextProposalVersion(proposalId);UUID versionId=UUID.randomUUID();Instant now=clock.instant();
-        proposalVersions.supersedeLiveFinalQuotes(proposalId,micros(now));
-        String includedServices=items.stream().map(EstRow::description).collect(java.util.stream.Collectors.joining("; "));
-        createVersion(new ProposalVersion.Document(proposalId,version,"FINAL_TREATMENT_QUOTE",scopeChangeReason,"en",request.clinicalReviewId()),versionId,new ProposalVersion.Terms(null,displayCurrency,includedServices,request.excludedServices(),request.paymentTerms(),request.refundTerms(),request.disclaimers(),request.coordinatorNotes(),request.validUntil()),new ProposalVersion.Pricing(requiresFinance,providerNet,policyId,policyVersion,marginRate,marginAmount,priced.patientMin(),priced.patientExpected(),priced.patientMax()),actor.subject(),now);
-        saveLines(versionId,items.stream().map(i->new PricedLine(i.description(),lineSource(i.catalogServiceId(),i.facilityPackageId()),i.catalogServiceId(),i.facilityPackageId(),i.payee())).toList(),providerLines,priced,rate);
-        if(aboveMaximum)proposalVersions.markAboveEstimateMaximum(versionId);
-        proposalRecords.advanceTo(proposalId,version,micros(now));
-        audit("FINAL_QUOTE_CREATED",actor,caseId,"ProposalVersion",versionId.toString(),"CREATE","SUCCESS",
-            aboveMaximum?"aboveEstimateMaximum=true; expectedEgp="+priced.patientExpected()+"; estimateMaximumEgp="+estimateMaximum:null);return proposal(versionId);
-    }
-    @Transactional public ProposalView releaseFinalQuote(UUID caseId,UUID versionId){
-        var actor=authority.authorize(Permission.CASE_COORDINATE,Resource.ofCase(caseId));requireState(caseId,"ARRIVAL_CONFIRMED");ensureProposalBelongs(caseId,versionId);
-        if(!isFinalQuote(versionId))throw new ApiException(409,"NOT_A_FINAL_QUOTE","This version is not a final treatment quote");
-        ProposalView view=proposal(versionId);if(!Set.of("CLINICALLY_APPROVED","FINANCE_APPROVED").contains(view.status()))throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Final quote is not ready for release");
-        if(requiresFinanceApproval(versionId)&&!"FINANCE_APPROVED".equals(view.status()))throw new ApiException(409,"FINANCE_APPROVAL_REQUIRED","Finance must approve the manually-priced services before release");
-        if(view.items().stream().noneMatch(i->ProposalItem.FACILITY.equals(i.payee())))requireNoReservedFacility(caseId);
-        Instant now=clock.instant();String snapCurrency=view.currency();BigDecimal fxRate;String fxSource;java.time.LocalDate fxDate=java.time.LocalDate.now(clock);
-        // P1-10 (B-05): validity is fixed now: the policy's days from release, or the coordinator's earlier date; never later.
-        Instant policyEnd=now.plus(Duration.ofDays(quoteValidityDays(caseId)));
-        Instant validUntil=view.validUntil()!=null&&view.validUntil().isBefore(policyEnd)?view.validUntil():policyEnd;
-        if(!validUntil.isAfter(now))throw new ApiException(409,"QUOTE_VALIDITY_PASSED","The date this final quote was to stay open until has passed; prepare it again with a later date");
-        // Same rule as the preliminary estimate: no snapshot rate, no release.
-        if(snapCurrency==null||com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(snapCurrency)){fxRate=BigDecimal.ONE;fxSource="BASE";}
-        else{fxRate=currency.effectiveRate(snapCurrency,fxDate);fxSource="SNAPSHOT";}
-        proposalItems.priceAt(versionId,fxRate);
-        String html=renderProposal(proposal(versionId));
-        int changed=proposalVersions.release(versionId,List.of("CLINICALLY_APPROVED","FINANCE_APPROVED"),actor.subject(),html,fxRate,fxDate,fxSource,micros(now));
-        if(changed!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Final quote changed before release");
-        proposalVersions.limitValidity(versionId,micros(validUntil));
-        mintShareAndNotify(caseId,versionId,view.language()==null?"en":view.language(),"final-quote-ready","FINAL_QUOTE_READY","final-quote-ready:"+versionId);
-        // The macro case intentionally stays ARRIVAL_CONFIRMED; the final quote is a commercial sub-workflow.
-        audit("FINAL_QUOTE_RELEASED",actor,caseId,"ProposalVersion",versionId.toString(),"RELEASE","SUCCESS",null);return proposal(versionId);
-    }
-    private void mintShareAndNotify(UUID caseId,UUID versionId,String lang,String templateKey,String notificationType,String idemKey){
-        Instant now=clock.instant();
-        shareTokens.revokeOpenForCase(caseId,micros(now));
-        // P1-10 (B-05): a final quote's link lives no longer than the quote itself.
-        Instant expires=now.plus(Duration.ofDays(14));
-        if(isFinalQuote(versionId)){Instant until=proposal(versionId).validUntil();if(until!=null&&until.isBefore(expires))expires=until;}
-        String token=randomToken();shareTokens.saveAndFlush(new ProposalShareToken(UUID.randomUUID(),versionId,caseId,intake.hash(token),expires,now));
-        Contact contact=proposalContact(caseId);String channel=hasText(contact.whatsapp())?"WHATSAPP":"EMAIL";String destination=channel.equals("WHATSAPP")?contact.whatsapp():contact.email();
-        if(hasText(destination))notificationOutbox.enqueueOnce(notificationType, channel, destination, templateKey, intake.encryptedJson("{\"token\":\""+token+"\",\"lang\":\""+lang+"\"}"), idemKey, now);
-    }
-    // --- P1-10: acceptance rules of a final quote (cooling period A-08, FX band B-05) and Finance's re-approval ---
-    static final String FX_REAPPROVAL_WORK="FX_REAPPROVAL";
-    private int quoteValidityDays(UUID caseId){var p=commercialPolicy.activePolicyFor(cases.findCareCategory(caseId).orElse(null));return p!=null?p.quoteValidityDays():com.rehletshifaa.journey.domain.CommercialPolicy.DEFAULT_FINAL_QUOTE_VALIDITY_DAYS;}
-    private BigDecimal fxTolerance(UUID caseId){var p=commercialPolicy.activePolicyFor(cases.findCareCategory(caseId).orElse(null));return p!=null?p.fxTolerance():com.rehletshifaa.journey.domain.CommercialPolicy.DEFAULT_FX_TOLERANCE_RATE;}
-    private static ApiException fxReapprovalRequired(){return new ApiException(409,"FX_REAPPROVAL_REQUIRED","The exchange rate has moved since your quote was prepared, so our Finance team is checking it. We will contact you shortly; there is nothing you need to do.");}
-    /**
-     * Whether a released final quote may be accepted now, on every decision path (signed in, secure link, recorded by the coordinator):
-     * <ul>
-     *   <li>A-08: above the accepted estimate's maximum, not before 24 hours after release ({@code COOLING_PERIOD}, with the time it opens);</li>
-     *   <li>B-05: in a currency other than EGP, the total re-priced at today's rate must stay within the policy's band of the frozen total,
-     *       in either direction. Outside it (or with no rate today) acceptance pauses: one Finance work item opens and the request is
-     *       recorded on the version ({@code FX_REAPPROVAL_REQUIRED}). Callers do not roll back on ApiException, so the pause persists.
-     *       Once Finance confirms the frozen rate, acceptance proceeds at it without a new check.</li>
-     * </ul>
-     */
-    private void requireFinalQuoteAcceptable(UUID caseId,UUID versionId,Instant now,String actorSubject,String actorLabel){
-        var terms=proposalVersions.findAcceptanceTerms(versionId).orElseThrow(()->new ApiException(404,"PROPOSAL_NOT_FOUND","Proposal version was not found"));
-        if(Boolean.TRUE.equals(terms.getAboveEstimateMaximum())&&terms.getReleasedAt()!=null){
-            Instant opens=terms.getReleasedAt().plus(ProposalQueryService.FINAL_QUOTE_COOLING_PERIOD);
-            if(now.isBefore(opens))throw new ApiException(409,"COOLING_PERIOD","Your treatment plan changed after your Consultant examined you, so you have at least 24 hours to decide. You can accept this quote from "+opens+".");
-        }
-        String quoted=terms.getCurrency();
-        if(quoted==null||com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(quoted)||"CONFIRMED".equals(terms.getFxReapprovalStatus()))return;
-        if("PENDING".equals(terms.getFxReapprovalStatus()))throw fxReapprovalRequired();
-        if(terms.getFxRate()==null)throw new ApiException(409,"PROPOSAL_FX_SNAPSHOT_MISSING","This proposal has no exchange-rate snapshot and cannot be accepted");
-        BigDecimal todayRate=null;
-        try{todayRate=currency.effectiveRate(quoted,java.time.LocalDate.now(clock));}catch(ApiException e){/* no rate today: Finance decides */}
-        BigDecimal band=fxTolerance(caseId);BigDecimal frozen=proposalQueries.displayTotals(versionId,terms.getFxRate()).expected();BigDecimal current=null;
-        if(todayRate!=null){current=proposalQueries.displayTotals(versionId,todayRate).expected();
-            if(frozen.signum()==0||current.subtract(frozen).abs().compareTo(frozen.multiply(band))<=0)return;}
-        if(proposalVersions.requestFxReapproval(versionId,todayRate,micros(now))==1){
-            work.openWorkItem(new NewWorkItem(caseId,FX_REAPPROVAL_WORK,"Re-approve the final quote's exchange rate",
-                "The patient tried to accept their final quote in "+quoted+", but at today's rate its total moves outside the "+band.movePointRight(2).stripTrailingZeros().toPlainString()
-                    +"% band. Confirm the frozen rate (the patient's acceptance then proceeds at it) or re-release the quote at today's rate.",
-                null,"FINANCE",true,null,"SYSTEM","FINAL_QUOTE_FX_REAPPROVAL","fx-reapproval:"+versionId+":"+now.toEpochMilli(),true));
-            auditTrail.event("FINAL_QUOTE_FX_REAPPROVAL_REQUESTED").actor(actorSubject,actorLabel).caseId(caseId).entity("ProposalVersion",versionId.toString()).action("PAUSE_ACCEPTANCE").outcome("SUCCESS")
-                .reason("currency="+quoted+"; frozenRate="+terms.getFxRate()+"; todayRate="+todayRate+"; frozenTotal="+frozen+"; todayTotal="+current+"; band="+band).record();
-        }
-        throw fxReapprovalRequired();
-    }
-    /** Finance keeps the rate frozen at release; the patient's next acceptance proceeds at it. */
-    @Transactional public ProposalView confirmFinalQuoteFxRate(UUID caseId,UUID versionId){
-        var actor=authority.authorize(Permission.FINANCE_SETTLE,Resource.ofCase(caseId));ensureProposalBelongs(caseId,versionId);
-        if(!isFinalQuote(versionId))throw new ApiException(409,"NOT_A_FINAL_QUOTE","This version is not a final treatment quote");
-        if(proposalVersions.confirmFxRate(versionId,actor.subject(),micros(clock.instant()))!=1)throw new ApiException(409,"FX_REAPPROVAL_NOT_PENDING","No exchange-rate re-approval is waiting on this quote");
-        work.closeWorkItems(caseId,FX_REAPPROVAL_WORK,"Finance kept the frozen exchange rate");
-        audit("FINAL_QUOTE_FX_RATE_CONFIRMED",actor,caseId,"ProposalVersion",versionId.toString(),"CONFIRM_FX_RATE","SUCCESS",null);return proposal(versionId);
-    }
-    /**
-     * Finance re-releases the final quote at today's rate: the lines and the document are fixed again at the new snapshot (the EGP figures,
-     * the cap and the validity do not change), the old link is replaced and the patient is sent the quote again.
-     */
-    @Transactional public ProposalView repriceFinalQuoteAtTodaysRate(UUID caseId,UUID versionId){
-        var actor=authority.authorize(Permission.FINANCE_SETTLE,Resource.ofCase(caseId));ensureProposalBelongs(caseId,versionId);
-        if(!isFinalQuote(versionId))throw new ApiException(409,"NOT_A_FINAL_QUOTE","This version is not a final treatment quote");
-        var terms=proposalVersions.findAcceptanceTerms(versionId).orElseThrow();
-        if(!"PENDING".equals(terms.getFxReapprovalStatus()))throw new ApiException(409,"FX_REAPPROVAL_NOT_PENDING","No exchange-rate re-approval is waiting on this quote");
-        Instant now=clock.instant();java.time.LocalDate today=java.time.LocalDate.now(clock);
-        BigDecimal rate=currency.effectiveRate(terms.getCurrency(),today);
-        proposalItems.priceAt(versionId,rate);
-        String html=renderProposal(proposal(versionId));
-        if(proposalVersions.repriceAtRate(versionId,rate,today,html,actor.subject(),micros(now))!=1)throw new ApiException(409,"PROPOSAL_STATE_CONFLICT","Final quote changed before it was re-released");
-        accessChallenges.revokeOpenForCase(caseId,micros(now));
-        ProposalView view=proposal(versionId);
-        mintShareAndNotify(caseId,versionId,view.language()==null?"en":view.language(),"final-quote-ready","FINAL_QUOTE_READY","final-quote-repriced:"+versionId+":"+now.toEpochMilli());
-        work.closeWorkItems(caseId,FX_REAPPROVAL_WORK,"Finance re-released the quote at today's rate");
-        audit("FINAL_QUOTE_REPRICED",actor,caseId,"ProposalVersion",versionId.toString(),"REPRICE","SUCCESS","fxRate="+terms.getFxRate()+" -> "+rate);return view;
-    }
-    /**
-     * A re-issued secure link is a WhatsApp/email message to the patient from the business number, so it follows the
-     * reply rule: only the case's primary coordinator, or their active cover instead of them. Checked under the case
-     * row lock, as a reply is, so it never interleaves with a reassignment or a cover change.
-     */
-    private Actor authorizePatientWrite(UUID caseId){
-        Resource resource=Resource.ofCase(caseId);cases.lockById(caseId);
-        if(!authority.allowed(Permission.CASE_PATIENT_REPLY,resource))throw new ApiException(403,"PATIENT_REPLY_NOT_YOURS","Only the case's coordinator, or their cover while they are away, can send to the patient");
-        return authority.authorize(Permission.CASE_PATIENT_REPLY,resource);
-    }
-    @Transactional public IdResponse resendProposalLink(UUID caseId,UUID versionId){
-        var actor=authorizePatientWrite(caseId);ensureProposalBelongs(caseId,versionId);
-        ProposalView view=proposal(versionId);if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"NOT_RESENDABLE","Only a released document can be resent");
-        Instant now=clock.instant();
-        // Revoke the current OTP challenges for this case's live links, then mint a fresh secure token.
-        accessChallenges.revokeOpenForCase(caseId,micros(now));
-        // Cancel any still-pending resend job for this version so a resend never piles up duplicate active jobs.
-        outboxMessages.cancelQueued("%:resend:"+versionId+":%");
-        boolean isFinal=isFinalQuote(versionId);String templateKey=isFinal?"final-quote-ready":"proposal-ready";String notifType=isFinal?"FINAL_QUOTE_READY":"PROPOSAL_READY";
-        mintShareAndNotify(caseId,versionId,view.language()==null?"en":view.language(),templateKey,notifType,templateKey+":resend:"+versionId+":"+now.toEpochMilli());
-        audit("PROPOSAL_LINK_RESENT",actor,caseId,"ProposalVersion",versionId.toString(),"RESEND","SUCCESS",null);return new IdResponse(versionId,"RESENT");
+    @Transactional
+    public ProposalView approveFinance(UUID caseId, UUID versionId) {
+        return commercialProposals.approveFinance(caseId, versionId);
     }
 
-    @Transactional public IdResponse upsertTravel(UUID caseId,TravelPlanRequest request){var actor=authority.authorize(Permission.OPERATIONS_FULFIL,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("ACCEPTED","TRAVEL_COORDINATION"));if("ARRIVED".equals(request.status())&&request.confirmedArrival()==null)throw new ApiException(400,"CONFIRMED_ARRIVAL_REQUIRED","An arrival timestamp is required before marking the patient arrived");if("CONFIRMED".equals(request.status())&&request.plannedArrival()==null)throw new ApiException(400,"PLANNED_ARRIVAL_REQUIRED","A planned arrival is required before confirming travel");// Confirming travel is the non-cancellable commitment. Administrative planning (status PLANNING) stays
-        // open; the confirmation requires full customer readiness (identity, consents, onboarding, deposit).
-        if("CONFIRMED".equals(request.status()))readiness.assertReadyForCommitment(caseId);
-        // P1-15: travel is not confirmed while the hospital quotes above the accepted estimate and Finance has not accepted it.
-        if("CONFIRMED".equals(request.status())&&admissions.priceVarianceOpen(caseId))throw new ApiException(409,"PRICE_VARIANCE_OPEN","The hospital quoted above the accepted estimate; Finance must accept or refuse the price before travel is confirmed");
-        requireActiveFacility(request.facilityId(),false);TravelPlan plan=travelPlans.findByCaseId(caseId).orElseGet(()->new TravelPlan(caseId));plan.record(new TravelPlan.Details(request.plannedArrival(),request.confirmedArrival(),request.visaStatus(),request.flightDetails(),request.airportReception(),request.accommodation(),request.localTransport(),request.companionDetails(),request.facilityId(),request.exceptions()),actor.subject(),request.status(),clock.instant());UUID id=travelPlans.saveAndFlush(plan).getId();
-        // Saving a plan is data entry: Operations may draft logistics while the deposit and profile are still
-        // pending, but the journey enters TRAVEL_COORDINATION only through the deposit handoff, under the
-        // shared transition policy. A confirmed arrival is a real stage change and is validated the same way.
-        if(request.confirmedArrival()!=null){transitionWithoutVersion(caseId,"ARRIVAL_CONFIRMED","Arrival confirmed",actor);admissions.arrivalAttested(caseId,request.confirmedArrival(),actor.subject());}audit("TRAVEL_PLAN_UPDATED",actor,caseId,"TravelPlan",id.toString(),"UPSERT","SUCCESS",null);return new IdResponse(id,request.status());}
-    @Transactional public IdResponse treatment(UUID caseId,TreatmentRequest request){var actor=authority.authorize(Permission.CLINICAL_REVIEW,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("ARRIVAL_CONFIRMED","ADMISSION_READY","TREATMENT_IN_PROGRESS"));
-        // Treatment-commencement gate: financial acceptance is not medical consent. Require an accepted
-        // final quote (when one exists) and procedure-specific consent, or an audited emergency override.
-        requireFinalQuoteAcceptedIfAny(caseId);
-        if(!hasTreatmentAuthorization(caseId))throw new ApiException(409,"CONSENT_REQUIRED","Procedure-specific consent (or an authorized emergency override) is required before treatment");
-        // P1-15 pay to admit (owner decision D-C): no first episode without the balance evidenced against the voucher (the
-        // hospital's receipt countersigned by Finance, and any fee balance received), or the Consultant's emergency admission.
-        if(!"TREATMENT_IN_PROGRESS".equals(state(caseId).status())&&!admissionReadiness.paidToAdmit(caseId))throw new ApiException(409,"BALANCE_EVIDENCE_REQUIRED","The hospital balance must be evidenced (the cashier's receipt countersigned by Finance) before treatment, or the Consultant records an emergency admission");
-        UUID actorPractitioner=practitionerId(actor.subject());if(request.practitionerId()!=null&&!request.practitionerId().equals(actorPractitioner))throw new ApiException(403,"PRACTITIONER_IDENTITY_MISMATCH","A doctor may only record treatment under their own verified practitioner profile");if(request.endAt()!=null&&request.endAt().isBefore(request.startAt()))throw new ApiException(400,"INVALID_TREATMENT_DATES","Treatment end time cannot be before its start time");if("COMPLETED".equals(request.status())&&request.endAt()==null)throw new ApiException(400,"TREATMENT_END_REQUIRED","A completed treatment episode requires an end time");if(!"COMPLETED".equals(request.status())&&request.endAt()!=null)throw new ApiException(400,"TREATMENT_STATUS_CONFLICT","Only a completed treatment episode may have an end time");if(request.dischargeDocumentId()!=null){if(!documents.existsByIdAndMedicalCaseIdAndStatus(request.dischargeDocumentId(),caseId,DocumentStatus.CLEAN))throw new ApiException(409,"INVALID_DISCHARGE_DOCUMENT","The discharge document must be a clean document from this case");}if(request.endAt()!=null&&(!request.dischargeReady()||request.dischargeDocumentId()==null))throw new ApiException(409,"DISCHARGE_REQUIREMENTS_MISSING","Discharge requires confirmation and a clean discharge document");requireActiveFacility(request.facilityId(),true);UUID id=UUID.randomUUID();Instant now=clock.instant();episodes.saveAndFlush(new TreatmentEpisode(id,caseId,actorPractitioner,new TreatmentEpisode.Record(request.facilityId(),request.startAt(),request.endAt(),request.status(),request.plannedProcedures(),request.actualProcedures(),request.milestones(),request.complications(),request.dischargeReady(),request.dischargeDocumentId()),now));
-        // The one path into treatment (D-D): cleared for admission, then the hospital's admission number opens treatment.
-        if("ARRIVAL_CONFIRMED".equals(state(caseId).status()))transitionWithoutVersion(caseId,"ADMISSION_READY","Cleared for admission at the start of treatment",actor);
-        if(request.admissionNumber()!=null&&!request.admissionNumber().isBlank())admissions.recordAdmissionNumber(caseId,request.admissionNumber(),actor.subject(),"CONSULTANT");
-        boolean started="ADMISSION_READY".equals(state(caseId).status());if(started)transitionWithoutVersion(caseId,"TREATMENT_IN_PROGRESS","Treatment started",actor);if(request.endAt()!=null)events.publishEvent(new CaseEvents.DischargeEvidenceChanged(caseId)); // P1-17: discharge waits for the pack and the final invoice
-        // P1-16: the ADMITTED milestone and the Consultant's milestone clock (none when the same episode already discharged).
-        if(started)events.publishEvent(new CaseEvents.TreatmentStarted(caseId,actor.subject()));audit("TREATMENT_EPISODE_CREATED",actor,caseId,"TreatmentEpisode",id.toString(),"CREATE","SUCCESS",null);return new IdResponse(id,request.status());}
-    // --- Procedure-specific consent + audited emergency override (treatment-commencement gate) ---
-    @Transactional public IdResponse captureProcedureConsent(UUID caseId,ProcedureConsentRequest request){
-        var actor=authority.authorize(Permission.CLINICAL_REVIEW,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("ARRIVAL_CONFIRMED","ADMISSION_READY","TREATMENT_IN_PROGRESS"));
-        if(request.evidenceDocumentId()==null&&(request.evidenceReference()==null||request.evidenceReference().isBlank()))throw new ApiException(400,"CONSENT_EVIDENCE_REQUIRED","A clean evidence document or a provider consent reference is required");
-        if(request.evidenceDocumentId()!=null){if(!documents.existsByIdAndMedicalCaseIdAndStatus(request.evidenceDocumentId(),caseId,DocumentStatus.CLEAN))throw new ApiException(409,"INVALID_CONSENT_DOCUMENT","The consent evidence must be a clean document from this case");}
-        UUID patientId=cases.findPatientId(caseId).orElseThrow();UUID id=UUID.randomUUID();Instant now=clock.instant();
-        consents.saveAndFlush(new ConsentRecord(id,patientId,caseId,new ConsentRecord.Terms("PROCEDURE_SPECIFIC",request.policyVersion()==null?"v1":request.policyVersion(),request.language()==null?"en":request.language(),request.exactText(),"Procedure-specific informed consent","Treatment procedures described in the final plan"),"IN_PERSON",actor.subject(),now).evidencedBy(request.relatedProposalVersionId(),request.evidenceDocumentId(),request.evidenceReference()));
-        audit("PROCEDURE_CONSENT_CAPTURED",actor,caseId,"ConsentRecord",id.toString(),"CREATE","SUCCESS",null);events.publishEvent(new CaseEvents.AdmissionEvidenceChanged(caseId));return new IdResponse(id,"PROCEDURE_SPECIFIC");
+    @Transactional
+    public ProposalView releaseProposal(UUID caseId, UUID versionId) {
+        return commercialProposals.releaseProposal(caseId, versionId);
     }
-    @Transactional public IdResponse emergencyOverride(UUID caseId,EmergencyOverrideRequest request){
-        var actor=authority.authorize(Permission.CLINICAL_REVIEW,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("ARRIVAL_CONFIRMED","ADMISSION_READY","TREATMENT_IN_PROGRESS"));
-        if(request.reason()==null||request.reason().isBlank())throw new ApiException(400,"OVERRIDE_REASON_REQUIRED","A reason is required for an emergency treatment override");
-        UUID patientId=cases.findPatientId(caseId).orElseThrow();UUID id=UUID.randomUUID();Instant now=clock.instant();
-        consents.saveAndFlush(new ConsentRecord(id,patientId,caseId,new ConsentRecord.Terms("EMERGENCY_TREATMENT_OVERRIDE","v1","en",request.reason(),"Emergency treatment override","Emergency care before formal consent"),"EMERGENCY",actor.subject(),now));
-        tasks.saveAndFlush(new CaseTask(UUID.randomUUID(),caseId,"EMERGENCY_OVERRIDE_REVIEW","enc:"+crypto.encrypt("Post-event review of emergency treatment override"),encryptNullable(request.reason()),actor.subject(),"DOCTOR","INTERNAL","HIGH",false,now.plus(Duration.ofDays(2)),actor.subject(),now));
-        audit("EMERGENCY_TREATMENT_OVERRIDE",actor,caseId,"ConsentRecord",id.toString(),"OVERRIDE","SUCCESS",request.reason());events.publishEvent(new CaseEvents.AdmissionEvidenceChanged(caseId));return new IdResponse(id,"EMERGENCY_OVERRIDE");
-    }
-    private boolean hasTreatmentAuthorization(UUID caseId){return consents.existsByCaseIdAndConsentTypeInAndRevokedAtIsNull(caseId,List.of("PROCEDURE_SPECIFIC","EMERGENCY_TREATMENT_OVERRIDE"));}
-    private void requireFinalQuoteAcceptedIfAny(UUID caseId){UUID latestFinal=proposalVersions.findLatestLiveFinalQuote(caseId,Limit.of(1)).stream().findFirst().orElse(null);if(latestFinal==null)return;if(!proposalDecisions.existsByProposalVersionIdAndDecision(latestFinal,"ACCEPTED"))throw new ApiException(409,"FINAL_QUOTE_NOT_ACCEPTED","The final treatment quote must be accepted before treatment");}
-    @Transactional public IdResponse followUp(UUID caseId,FollowUpRequest request){var actor=authority.authorize(Permission.CLINICAL_REVIEW,Resource.ofCase(caseId));requireOneOfStates(caseId,Set.of("TREATMENT_IN_PROGRESS","DISCHARGED"));UUID actorPractitioner=practitionerId(actor.subject());if(request.practitionerId()!=null&&!request.practitionerId().equals(actorPractitioner))throw new ApiException(403,"PRACTITIONER_IDENTITY_MISMATCH","A doctor may only create follow-up under their own verified practitioner profile");if(request.treatmentEpisodeId()!=null){if(!episodes.existsByIdAndCaseId(request.treatmentEpisodeId(),caseId))throw new ApiException(409,"INVALID_TREATMENT_EPISODE","The treatment episode does not belong to this case");}UUID id=UUID.randomUUID();Instant now=clock.instant();followUps.saveAndFlush(new FollowUpPlan(id,caseId,request.treatmentEpisodeId(),actorPractitioner,request.dueAt(),request.mode(),request.requiredTests(),request.instructions(),now));
-        // P1-17: the plan is part of the discharge pack, made before discharge; follow-up starts once the case is discharged and its final invoice reconciled.
-        events.publishEvent(new CaseEvents.DischargeEvidenceChanged(caseId));audit("FOLLOW_UP_CREATED",actor,caseId,"FollowUpPlan",id.toString(),"CREATE","SUCCESS",null);return new IdResponse(id,"PLANNED");}
 
-    private CaseView caseView(UUID caseId){return caseQueries.caseView(caseId);}
-    /** The case's active primary coordinator, by the most recent assignment. */
-    private String primaryCoordinator(UUID caseId){return assignments.findActivePrimaryCoordinator(caseId,Limit.of(1)).stream().findFirst().orElse(null);}
-    private String encryptNullable(String value){return value==null||value.isBlank()?null:"enc:"+crypto.encrypt(value.trim());}
-    private void validateTask(TaskRequest request){if(!Set.of("INFORMATION_REQUEST","DOCUMENT_REVIEW","CLINICAL_REVIEW","PROPOSAL","TRAVEL","TREATMENT","FOLLOW_UP","OTHER").contains(request.taskType()))throw new ApiException(400,"INVALID_TASK_TYPE","Select a supported task type");if(!Set.of("LOW","NORMAL","HIGH","URGENT").contains(request.priority()))throw new ApiException(400,"INVALID_TASK_PRIORITY","Select a supported task priority");}
-    private void validateTaskOwner(UUID caseId,String subject,String role){if(!Set.of("PATIENT","COORDINATOR","DOCTOR","OPERATIONS","FINANCE").contains(role))throw new ApiException(400,"INVALID_TASK_OWNER","Select a supported task owner role");if("PATIENT".equals(role)){if(subject==null||subject.isBlank())return;if(!cases.isPatientOf(caseId,subject))throw new ApiException(409,"TASK_OWNER_NOT_ON_CASE","The selected patient account is not linked to this case");return;}if(!assignments.existsByCaseIdAndAssigneeSubjectAndAssigneeRoleAndStatus(caseId,subject,role,"ACTIVE"))throw new ApiException(409,"TASK_OWNER_NOT_ON_CASE","The selected staff member does not have an active case assignment");}
-    private ApiException taskConflict(){return new ApiException(409,"TASK_CONFLICT","The task changed or is not assigned to this account");}
-    /** The owner of a task on this case — the person a supervisory action affects (WF-07). */
-    private String taskOwner(UUID caseId,UUID taskId){return tasks.findOwnerSubject(taskId,caseId).orElseThrow(()->new ApiException(404,"TASK_NOT_FOUND","Task was not found"));}
-    private void transitionInternal(UUID caseId,String target,String reason,long expectedVersion,Actor actor){CaseState current=state(caseId);if(current.version()!=expectedVersion)throw new ApiException(409,"CASE_VERSION_CONFLICT","The case was updated by another user");validateTransition(caseId,current.status(),target);int changed=cases.moveStatusAtVersion(caseId,expectedVersion,CaseStatus.valueOf(target),micros(clock.instant()));if(changed!=1)throw new ApiException(409,"CASE_VERSION_CONFLICT","The case was updated by another user");history(caseId,current.status(),target,actor,reason);syncWaitingOn(caseId,target);}
-    private void transitionWithoutVersion(UUID caseId,String target,String reason,Actor actor){CaseState current=state(caseId);if(current.status().equals(target))return;validateTransition(caseId,current.status(),target);int changed=cases.moveStatusAtVersion(caseId,current.version(),CaseStatus.valueOf(target),micros(clock.instant()));if(changed!=1)throw new ApiException(409,"CASE_VERSION_CONFLICT","The case was updated by another user");history(caseId,current.status(),target,actor,reason);syncWaitingOn(caseId,target);}
-    /**
-     * Keep "who must act next" aligned with the stage the case just entered. Responsibility still moves
-     * independently (a patient action sets it without any stage change) — this only stops the two drifting
-     * apart on the stages where the answer is unambiguous.
-     */
-    private void syncWaitingOn(UUID caseId,String target){
-        work.refreshWaitingOn(caseId,StaffWorkService.stageDefault(target),null); // open blocking work outranks the stage
+    @Transactional(noRollbackFor = ApiException.class)
+    public ProposalView decideProposal(UUID caseId, UUID versionId, ProposalDecisionRequest request) {
+        return proposalDecisions.decideProposal(caseId, versionId, request);
     }
-    private void validateTransition(UUID caseId,String current,String target){transitions.assertAllowed(caseId,current,target);}
-    private void requireState(UUID caseId,String expected){requireOneOfStates(caseId,Set.of(expected));}
-    private void requireOneOfStates(UUID caseId,Set<String> expected){String actual=state(caseId).status();if(!expected.contains(actual))throw new ApiException(409,"CASE_STATE_CONFLICT","This operation is not available while the case is "+actual);}
-    // A second-opinion assignment is read-and-opinion only; it never satisfies a primary clinical/staff write.
-    private void requireDecidableProposal(UUID versionId){ProposalView view=proposal(versionId);if(!Set.of("RELEASED","VIEWED").contains(view.status()))throw new ApiException(409,"PROPOSAL_NOT_DECIDABLE","This proposal can no longer be viewed or decided");if(view.validUntil()!=null&&!view.validUntil().isAfter(clock.instant()))throw new ApiException(410,"PROPOSAL_EXPIRED","This proposal has expired");}
-    private void validateSelectedOptionalItems(UUID versionId,List<UUID> selected){if(selected==null||selected.isEmpty())return;for(UUID itemId:new HashSet<>(selected)){if(!proposalItems.existsByIdAndProposalVersionIdAndOptionalTrue(itemId,versionId))throw new ApiException(400,"INVALID_OPTIONAL_ITEMS","Selected optional services do not belong to this proposal");}}
-    private CaseState state(UUID caseId){return cases.findStageAndVersion(caseId).map(c->new CaseState(c.getStatus().name(),c.getVersion())).orElseThrow(()->new ApiException(404,"CASE_NOT_FOUND","Case was not found"));}
-    /** A new proposal version, clinically approved by whoever approved the clinical review it builds on (no review: nothing is created, as before). */
-    private void createVersion(ProposalVersion.Document document,UUID versionId,ProposalVersion.Terms terms,ProposalVersion.Pricing pricing,String createdBy,Instant now){clinicalReviews.findById(document.clinicalReviewId()).ifPresent(review->proposalVersions.saveAndFlush(new ProposalVersion(versionId,document,terms,pricing,review.getApprovedBy(),review.getApprovedAt(),createdBy,now)));}
-    private void history(UUID caseId,String from,String to,Actor actor,String reason){statusLog.record(caseId,from,to,actor.subject(),actor.label(),reason, clock.instant());audit("CASE_STATUS_CHANGED",actor,caseId,"MedicalCase",caseId.toString(),"TRANSITION","SUCCESS",reason);}
-    private UUID practitionerId(String subject){return practitioners.findFirstByExternalSubjectAndCredentialingStatus(subject,"VERIFIED").map(PractitionerProfile::getId).orElseThrow(()->new ApiException(403,"DOCTOR_NOT_VERIFIED","The doctor account is not linked to a verified practitioner profile"));}
-    private void ensureProposalBelongs(UUID caseId,UUID versionId){if(!proposalVersions.belongsToCase(versionId,caseId))throw new ApiException(404,"PROPOSAL_NOT_FOUND","Proposal version was not found for this case");}
-    private ProposalView proposal(UUID versionId){return proposalQueries.proposal(versionId);}
-    /** The proposal's next version number, read under its row lock so concurrent drafts cannot share a number. */
-    private int nextProposalVersion(UUID proposalId){return proposalRecords.lockById(proposalId).orElseThrow().getCurrentVersion()+1;}
-    /** P1-19 (design §7.4): the released document names whose each line is (the fee line names itself) and, when it pays more than one party, each payee's total apart. */
-    private static final Map<String,String> PAYEE_WORDS=Map.of("CONSULTANT","the Consultant","FACILITY","the hospital","OTHER","others","PLATFORM","RehletShifaa");
-    static String renderProposal(ProposalView view){StringBuilder html=new StringBuilder("<article><h1>RehletShifaa Proposal v").append(view.versionNumber()).append("</h1><p>Status: released</p><ul>");for(ProposalItemView item:view.items()){html.append("<li>").append(escape(item.description())).append(" — ").append(item.quantity().multiply(item.unitPrice())).append(' ').append(escape(view.currency()));if(item.payee()!=null&&!"PLATFORM".equals(item.payee()))html.append(" (paid to ").append(PAYEE_WORDS.getOrDefault(item.payee(),escape(item.payee()))).append(')');html.append("</li>");}html.append("</ul>");
-        List<PayeeTotal> totals=view.payeeTotals()==null?List.of():view.payeeTotals();if(totals.stream().filter(t->!"PLATFORM".equals(t.payee())).count()>1){html.append("<h2>Who is paid</h2><ul>");for(PayeeTotal t:totals)html.append("<li>Paid to ").append(PAYEE_WORDS.getOrDefault(t.payee(),escape(t.payee()))).append(" — ").append(t.total()).append(' ').append(escape(view.currency())).append("</li>");html.append("</ul>");}
-        return html.append("<p>Proposal acceptance is not procedure-specific medical consent.</p></article>").toString();}
-    private static String escape(String value){return value==null?"":value.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;");}
-    private void audit(String type,Actor actor,UUID caseId,String entity,String entityId,String action,String outcome,String reason){auditTrail.event(type).actor(actor.subject(), actor.label()).caseId(caseId).entity(entity, entityId).action(action).outcome(outcome).reason(reason).record();}
-    /** The patient's own channel is proven: stamp it on the case's patient (row-locked). */
-    private void markPatientChannelVerified(UUID caseId,String channel,Instant now){UUID patientId=cases.findPatientId(caseId).orElseThrow();var profile=patients.lockById(patientId).orElseThrow();profile.markChannelVerified(channel,now);patients.saveAndFlush(profile);}
-    private record CaseState(String status,long version){}
+
+    ProposalView applyRecordedDecision(
+            UUID caseId,
+            UUID versionId,
+            RecordedDecisionRequest request,
+            String representativeSubject,
+            Actor actor) {
+        return proposalDecisions.applyRecordedDecision(caseId, versionId, request, representativeSubject, actor);
+    }
+
+    @Transactional
+    public IdResponse saveFinalAssessment(UUID caseId, FinalAssessmentRequest request) {
+        return clinicalRecommendations.saveFinalAssessment(caseId, request);
+    }
+
+    @Transactional
+    public ProposalView createFinalQuote(UUID caseId, FinalQuoteRequest request) {
+        return commercialProposals.createFinalQuote(caseId, request);
+    }
+
+    @Transactional
+    public ProposalView releaseFinalQuote(UUID caseId, UUID versionId) {
+        return commercialProposals.releaseFinalQuote(caseId, versionId);
+    }
+
+    @Transactional
+    public ProposalView confirmFinalQuoteFxRate(UUID caseId, UUID versionId) {
+        return commercialProposals.confirmFinalQuoteFxRate(caseId, versionId);
+    }
+
+    @Transactional
+    public ProposalView repriceFinalQuoteAtTodaysRate(UUID caseId, UUID versionId) {
+        return commercialProposals.repriceFinalQuoteAtTodaysRate(caseId, versionId);
+    }
+
+    @Transactional
+    public IdResponse resendProposalLink(UUID caseId, UUID versionId) {
+        return commercialProposals.resendProposalLink(caseId, versionId);
+    }
+
+    @Transactional
+    public IdResponse upsertTravel(UUID caseId, TravelPlanRequest request) {
+        return treatmentDelivery.upsertTravel(caseId, request);
+    }
+
+    @Transactional
+    public IdResponse treatment(UUID caseId, TreatmentRequest request) {
+        return treatmentDelivery.treatment(caseId, request);
+    }
+
+    @Transactional
+    public IdResponse captureProcedureConsent(UUID caseId, ProcedureConsentRequest request) {
+        return treatmentDelivery.captureProcedureConsent(caseId, request);
+    }
+
+    @Transactional
+    public IdResponse emergencyOverride(UUID caseId, EmergencyOverrideRequest request) {
+        return treatmentDelivery.emergencyOverride(caseId, request);
+    }
+
+    @Transactional
+    public IdResponse followUp(UUID caseId, FollowUpRequest request) {
+        return treatmentDelivery.followUp(caseId, request);
+    }
+
+    static String renderProposal(ProposalView view) { return CommercialProposalService.renderProposal(view); }
 }
