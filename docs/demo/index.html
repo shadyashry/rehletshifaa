@@ -57,7 +57,7 @@ main{flex:1;width:100%;max-width:1320px;margin:0 auto;padding:24px 28px 12px}
 .shot img,.shot video{display:block;width:auto;height:auto;max-width:100%;max-height:calc(100vh - 250px);margin:0 auto}
 /* callouts: a brief logo-coral border flash (transparent inside) on the fields that matter; invisible otherwise */
 .hs{position:absolute;border-radius:8px;border:2px solid transparent;background:transparent;padding:0;cursor:pointer;transition:border-color .25s ease,box-shadow .25s ease}
-.hs.on{border-color:#e07a5f;box-shadow:0 0 0 1px rgba(224,122,95,.3)}
+.hs.on{animation:none;border-color:#e07a5f;box-shadow:0 0 0 1px rgba(224,122,95,.3)}
 .hs:hover{border-color:rgba(224,122,95,.4)}
 @media (prefers-reduced-motion:reduce){.hs{transition:none}}
 /* caption card */
@@ -88,79 +88,99 @@ details.ar p{direction:rtl;text-align:right;font-size:.95rem;line-height:1.9;mar
 .voice .btn svg{width:14px;height:14px;vertical-align:-2px;margin-inline-end:6px;fill:currentColor}
 /* intro + closing */
 
+/* in-slide motion on screenshot slides: cursor, click ripples, stamps, typed code. Start times come from --s, film mode steps --t */
+.fx{position:absolute;inset:0;pointer-events:none;container-type:inline-size}
+.cur{position:absolute;width:34px;height:34px;margin:-3px 0 0 -5px;opacity:0;transform-origin:5px 3px;animation-duration:var(--T);animation-timing-function:ease-in-out;animation-fill-mode:both;animation-delay:calc(0s - var(--t,0)*1s);filter:drop-shadow(0 2px 3px rgba(19,41,46,.35))}
+.rip{position:absolute;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;border:3px solid var(--coral);opacity:0;animation:cRip .8s ease-out both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
+@keyframes cRip{0%{opacity:0;transform:scale(.2)}8%{opacity:.9}100%{opacity:0;transform:scale(1.7)}}
+.hs{animation:hsFlash 1.3s ease both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
+@keyframes hsFlash{0%{border-color:transparent}14%{border-color:#e07a5f}82%{border-color:#e07a5f}100%{border-color:transparent}}
+.patch{position:absolute;background:#fff;opacity:0;animation:cShow .01s both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
+@keyframes cShow{to{opacity:1}}
+.stamp{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border:.28cqw solid #d98f78;border-radius:.8cqw;color:#8f3b36;font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:1.1cqw;line-height:1.25;background:rgba(255,255,255,.0);opacity:0;transform:rotate(-8deg);animation:cStamp .55s cubic-bezier(.2,.9,.25,1.2) both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
+.stamp hr{width:78%;border:0;border-top:.18cqw solid #d98f78;margin:.35cqw 0}
+.stamp span{font-weight:600;letter-spacing:.05em;text-transform:none}
+@keyframes cStamp{0%{opacity:0;transform:rotate(-2deg) scale(2.6)}55%{opacity:1;transform:rotate(-9deg) scale(.93)}75%{transform:rotate(-7.5deg) scale(1.04)}100%{opacity:1;transform:rotate(-8deg) scale(1)}}
+.dots6{position:absolute;display:flex;align-items:center;gap:1.1cqw;padding-left:1cqw}
+.dots6 i{width:1.15cqw;height:1.15cqw;border-radius:50%;background:var(--ink-900);opacity:0;animation:cShow .01s both,cDotPop .25s ease both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s),calc(var(--s,0)*1s - var(--t,0)*1s)}
+@keyframes cDotPop{from{transform:scale(.3)}to{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.cur,.rip{display:none}.hs{animation:none}.stamp{animation:none;opacity:1}.patch{animation:none;opacity:1}.dots6 i{animation:none;opacity:1}}
+body.film .fx *,body.film .hs{animation-play-state:paused!important}
+
 /* cinematic intro: a fixed 1600x900 scene scaled to fit; every element has a start time --s (film mode steps --t) */
-.cine{position:relative;background:var(--petrol-900);border-radius:12px;overflow:hidden;aspect-ratio:16/9;width:100%;max-width:1240px;margin:8px auto}
-.scene{position:absolute;left:0;top:0;width:1600px;height:900px;transform-origin:0 0;color:var(--paper);font-family:var(--body)}
+.cine{position:relative;background:var(--paper);border-radius:12px;overflow:hidden;aspect-ratio:16/9;width:100%;max-width:1240px;margin:8px auto}
+.scene{position:absolute;left:0;top:0;width:1600px;height:900px;transform-origin:0 0;color:var(--ink-900);font-family:var(--body)}
 .scene .ico{stroke:currentColor}
 .c{opacity:0;animation-duration:.7s;animation-timing-function:cubic-bezier(.2,.8,.2,1);animation-fill-mode:both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
 .bgarcs{position:absolute;left:700px;top:-200px;width:1300px;height:1300px;animation:cSpin 120s linear infinite;animation-delay:calc(var(--t,0)*-1s)}
-.bgarcs circle{fill:none;stroke:#1f3f46;stroke-width:2}
+.bgarcs circle{fill:none;stroke:#e6e0d3;stroke-width:2}
 @keyframes cSpin{to{transform:rotate(360deg)}}
-.cbrand{position:absolute;left:0;top:0;display:flex;align-items:center;gap:22px;transform-origin:0 0;animation:cBrand 2.4s cubic-bezier(.65,0,.25,1) both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s);opacity:0}
-.cbrand .plate{display:flex;align-items:center;gap:20px;background:var(--paper);border-radius:22px;padding:16px 34px 16px 24px}
-.cbrand .plate img{width:76px;height:76px}
-.cbrand b{display:block;font-family:var(--head);font-weight:600;font-size:60px;line-height:1;color:var(--petrol-900)}
-.cbrand b span{color:var(--petrol-600)}
-.cbrand i{display:block;font-style:normal;font-size:30px;color:var(--petrol-600);margin-top:8px;direction:rtl;text-align:left}
-@keyframes cBrand{0%{opacity:0;transform:translate(560px,380px) scale(.7)}22%{opacity:1;transform:translate(560px,380px) scale(1)}58%{opacity:1;transform:translate(560px,380px) scale(1)}100%{opacity:1;transform:translate(56px,44px) scale(.62)}}
-.cburst{position:absolute;left:790px;top:438px;width:130px;height:130px;border-radius:50%;border:3px solid var(--coral);opacity:0;animation:cRing 1.3s ease-out both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
-.cburst.b2{border-color:var(--petrol-300)}
-@keyframes cRing{0%{opacity:.9;transform:translate(-50%,-50%) scale(.3)}100%{opacity:0;transform:translate(-50%,-50%) scale(3.4)}}
+.cbrand{position:absolute;left:0;top:0;transform-origin:0 0;animation:cBrand 2.4s cubic-bezier(.65,0,.25,1) both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s);opacity:0}
+.cbrand img{height:150px;width:auto;display:block}
+@keyframes cBrand{0%{opacity:0;transform:translate(508px,375px) scale(.7)}22%{opacity:1;transform:translate(508px,375px) scale(1)}58%{opacity:1;transform:translate(508px,375px) scale(1)}100%{opacity:1;transform:translate(48px,30px) scale(.42)}}
+.cburst{position:absolute;left:800px;top:450px;width:130px;height:130px;border-radius:50%;border:3px solid var(--coral);opacity:0;animation:cRing 1.3s ease-out both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
+.cburst.b2{border-color:var(--petrol-200)}
+@keyframes cRing{0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}8%{opacity:.9}100%{opacity:0;transform:translate(-50%,-50%) scale(3.4)}}
 /* journey line (becomes the roadmap strip at the bottom) */
 .jr{position:absolute;left:0;top:0;width:1600px;height:900px;transform-origin:800px 450px;animation:cStrip 1s cubic-bezier(.65,0,.25,1) both,cDim .6s ease both;animation-delay:calc(5.6s - var(--t,0)*1s),calc(13.2s - var(--t,0)*1s)}
 @keyframes cStrip{to{transform:translateY(285px) scale(.52)}}
 @keyframes cDim{to{opacity:.35}}
 .jr svg.path{position:absolute;left:0;top:0;width:1600px;height:900px;overflow:visible}
 .jr .dots{fill:none;stroke:var(--petrol-300);stroke-width:3;stroke-dasharray:2 14;stroke-linecap:round;opacity:0;animation:cFade .8s ease-out both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
-.jr .trail{fill:none;stroke:var(--petrol-300);stroke-width:5;stroke-linecap:round;stroke-dasharray:1 1;stroke-dashoffset:1;animation:cDraw var(--d) linear both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
+.jr .trail{fill:none;stroke:var(--petrol-600);stroke-width:5;stroke-linecap:round;stroke-dasharray:1 1;stroke-dashoffset:1;animation:cDraw var(--d) linear both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s)}
 @keyframes cFade{to{opacity:.55}}
 @keyframes cDraw{to{stroke-dashoffset:0}}
 .cplane{position:absolute;left:0;top:0;width:72px;height:72px;offset-path:path("M170 610 C 540 250, 1060 250, 1430 610");offset-rotate:auto 45deg;offset-anchor:50% 50%;animation:cFly var(--d) linear both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s);opacity:0}
 .cplane .ico{width:72px;height:72px;stroke:var(--coral);stroke-width:1.5}
 @keyframes cFly{0%{offset-distance:0%;opacity:0}3%{opacity:1}94%{opacity:1}100%{offset-distance:100%;opacity:0}}
 .cn{position:absolute;width:76px;height:76px;margin:-38px 0 0 -38px;animation-name:cPop;animation-duration:.55s}
-.cn .rg{width:76px;height:76px;border-radius:50%;background:var(--petrol-600);border:3px solid var(--petrol-300);display:grid;place-items:center;color:#fff}
+.cn .rg{width:76px;height:76px;border-radius:50%;background:var(--petrol-600);border:4px solid #fff;box-shadow:0 0 0 2px var(--petrol-200);display:grid;place-items:center;color:#fff}
 .cn .ico{width:36px;height:36px}
-.cn em{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;font-style:normal;font-size:28px;font-weight:600;color:var(--paper)}
+.cn em{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;font-style:normal;font-size:28px;font-weight:600;color:var(--petrol-900)}
 .cn em.up{top:-56px}.cn em.dn{top:92px}
 @keyframes cPop{0%{opacity:0;transform:scale(.2)}60%{opacity:1;transform:scale(1.14)}100%{opacity:1;transform:scale(1)}}
-.cend{position:absolute;color:var(--petrol-300);font-size:24px;animation-name:cUp}
-.cend i{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:var(--paper)}
+.cend{position:absolute;color:var(--ink-400);font-size:24px;animation-name:cUp}
+.cend i{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:var(--petrol-900)}
 .cend span{position:absolute;left:-30px;top:26px}
 @keyframes cUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
 /* three animated cards */
-.pc{position:absolute;top:170px;width:450px;height:430px;border:2px solid var(--petrol-300);border-radius:16px;background:#0f3338;padding:34px;animation:cCard .8s cubic-bezier(.2,.8,.2,1) both,cOut .6s ease-in both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s),calc(13.2s - var(--t,0)*1s);opacity:0}
+.pc{position:absolute;top:170px;width:450px;height:430px;border:2px solid var(--petrol-200);border-radius:16px;background:#fff;padding:34px;animation:cCard .8s cubic-bezier(.2,.8,.2,1) both,cOut .6s ease-in both;animation-delay:calc(var(--s,0)*1s - var(--t,0)*1s),calc(13.2s - var(--t,0)*1s);opacity:0}
 .pc::before{content:"";position:absolute;left:34px;top:-3px;width:84px;height:6px;border-radius:3px;background:var(--coral)}
 @keyframes cCard{from{opacity:0;transform:translateY(80px) scale(.94)}to{opacity:1;transform:none}}
 @keyframes cOut{to{opacity:0;transform:translateY(-50px)}}
 .pc .ic{position:relative;width:96px;height:96px;border-radius:50%;border:3px solid var(--coral);display:grid;place-items:center;color:var(--coral)}
 .pc .ic .ico{width:50px;height:50px;stroke:var(--coral)}
-.pc h3{font-family:var(--head);font-weight:600;font-size:40px;line-height:1.15;color:var(--paper);margin:26px 0 10px}
-.pc p{font-size:26px;line-height:1.4;color:var(--petrol-200);margin:0}
+.pc h3{font-family:var(--head);font-weight:600;font-size:40px;line-height:1.15;color:var(--petrol-900);margin:26px 0 10px}
+.pc p{font-size:26px;line-height:1.4;color:var(--ink-600);margin:0}
 .pc .ic .pr{position:absolute;inset:-3px;border-radius:50%;border:3px solid var(--coral);opacity:0;animation:cRing2 1.6s ease-out both;animation-delay:calc(var(--s,0)*1s + .6s - var(--t,0)*1s)}
 .pc .ic .pr.p2{animation-delay:calc(var(--s,0)*1s + 1.2s - var(--t,0)*1s)}
-@keyframes cRing2{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(2.2)}}
+@keyframes cRing2{0%{opacity:0;transform:scale(1)}8%{opacity:.9}100%{opacity:0;transform:scale(2.2)}}
 .pc .tags{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
 .pc .tags span{font-size:21px;font-weight:600;border:2px solid var(--petrol-300);border-radius:999px;padding:5px 16px;color:var(--paper);animation:cUp .5s ease both;animation-delay:calc(var(--s,0)*1s + var(--o,1)*1s - var(--t,0)*1s);opacity:0}
 .pc .bub{display:inline-block;border-radius:20px;padding:8px 16px;font-size:24px;font-weight:600;margin:20px 8px 0 0;opacity:0;animation:cPop .5s ease both;animation-delay:calc(var(--s,0)*1s + var(--o,1)*1s - var(--t,0)*1s)}
 .pc .bub.l{background:var(--petrol-600);color:#fff;direction:rtl;border-bottom-right-radius:4px}
-.pc .bub.r{background:var(--paper);color:var(--petrol-900);border-bottom-left-radius:4px}
+.pc .bub.r{background:#fff;border:1.5px solid var(--line-strong);color:var(--petrol-900);border-bottom-left-radius:4px}
 .pc .bars{display:flex;align-items:flex-end;gap:16px;height:96px;margin-top:6px}
 .pc .bars i{display:block;width:34px;background:var(--petrol-300);border-radius:6px 6px 0 0;transform-origin:bottom;transform:scaleY(0);animation:cGrow .7s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--s,0)*1s + var(--o,1)*1s - var(--t,0)*1s)}
 .pc .bars i:nth-child(3){background:var(--coral)}
 @keyframes cGrow{to{transform:scaleY(1)}}
-.ctag{position:absolute;left:0;right:0;top:300px;text-align:center;font-family:var(--head);font-weight:600;font-size:104px;line-height:1.1;color:var(--paper);animation-name:cUp;animation-duration:.9s}
+.ctag{position:absolute;left:0;right:0;top:300px;text-align:center;font-family:var(--head);font-weight:600;font-size:104px;line-height:1.1;color:var(--petrol-900);animation-name:cUp;animation-duration:.9s}
 .ctag::before{content:"";display:block;width:84px;height:6px;background:var(--coral);border-radius:3px;margin:0 auto 28px}
-.csub{position:absolute;left:0;right:0;top:535px;text-align:center;font-size:36px;color:var(--petrol-200);animation-name:cUp}
+.csub{position:absolute;left:0;right:0;top:535px;text-align:center;font-size:36px;color:var(--ink-600);animation-name:cUp}
 .ccta{position:absolute;left:0;right:0;bottom:14px;display:flex;gap:12px;justify-content:center;animation-name:cUp;animation-duration:.6s;z-index:3}
-.ccta .btn.ghost{background:transparent;color:var(--paper);border-color:var(--petrol-300)}.ccta .btn.ghost:hover{background:rgba(255,255,255,.08)}
-.ccta .btn{background:var(--paper);color:var(--petrol-900);border-color:var(--paper)}
+.ccta .btn.ghost{background:#fff;color:var(--petrol-700);border-color:var(--petrol-600)}
 @media (prefers-reduced-motion:reduce){.c,.cbrand,.jr .dots,.jr .trail,.cburst,.pc,.pc *,.bgarcs{animation:none!important}.c,.cn,.ctag,.csub,.ccta,.pc,.pc .tags span,.pc .bub{opacity:1}.cbrand{opacity:1;transform:translate(56px,44px) scale(.62)}.jr .trail{stroke-dashoffset:0}.jr .dots{opacity:.55}.pc .bars i{transform:none}.cplane,.cburst,.pr{display:none}.pc{display:none}}
 body.film.intro-on header.top,body.film.intro-on .rail{display:none}
 body.film.intro-on main{padding:0;max-width:none}
 body.film.intro-on .cine{max-width:none;margin:0;border-radius:0;width:100vw;height:100vh;aspect-ratio:auto}
 body.film.intro-on .ccta{display:none}
 @media (max-width:640px){.ccta{bottom:6px}.ccta .btn{padding:8px 12px;font-size:.8rem}}
+.solo{position:relative;width:210px;height:210px;border-radius:50%;background:var(--petrol-600);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-family:var(--head);font-weight:600;font-size:1.2rem}
+.solo .ico{stroke:#fff;width:68px;height:68px}
+.halo{position:absolute;inset:0;border-radius:50%;border:3px solid var(--petrol-300);opacity:0;animation:cHalo 2.4s ease-out infinite;animation-delay:calc(var(--s,0)*1s + 1s - var(--t,0)*1s)}
+.halo.h2{animation-delay:calc(var(--s,0)*1s + 2.2s - var(--t,0)*1s)}
+@keyframes cHalo{0%{opacity:0;transform:scale(1)}10%{opacity:.85}100%{opacity:0;transform:scale(1.42)}}
+.solo{margin:34px 0 26px}
 .duo{display:flex;gap:22px;align-items:stretch;justify-content:center;flex-wrap:wrap}
 .card{border:1px solid var(--line);border-radius:10px;padding:22px 26px;background:var(--white);display:flex;flex-direction:column;gap:10px;align-items:flex-start;min-width:230px;text-align:left}
 .card b{font-family:var(--head);font-size:1.15rem;color:var(--petrol-900)}
@@ -290,7 +310,7 @@ body.film .panel{max-width:1400px;margin-top:120px;font-size:21px}body.film .flo
 
 <script>
 const IMG='assets/',AUD='assets/audio/';
-const AR=["رحلة شفاء: من أول رسالة إلى المتابعة. استشاري يراجع حالتك، ومنسّق واحد يرافقك، وتقدير مبدئي للتكلفة.", "الصفحة الرئيسية. يرى المريض كيف تعمل الخدمة، ويبدأ بإرسال حالته. والقرار يبقى بيده.", "إرسال الحالة. نموذج قصير من ثلاث خطوات: بيانات المريض، ثم الحالة والتقارير، ثم الموافقة. ولا يحتاج المريض أن يعرف التخصص، ولا أن تكون كل التقارير معه.", "استلام الحالة. يحصل المريض فورًا على رقم الحالة وصفحة متابعة آمنة، وتُوضَّح له المرحلة الحالية، ولا يُطلب منه أي إجراء.", "مهامي. يبدأ المنسّق يومه من قائمة واحدة مرتّبة بحسب الأهمية، وكل بند يوضّح الخطوة التالية ومن ننتظر.", "مساحة عمل الحالة. يؤكّد المنسّق مجال الرعاية، ثم يختار استشاريًا مؤهَّلًا بالاسم، بحسب التخصص الدقيق وعدد الحالات الحالية.", "والأهم: من يراجع حالتك استشاري متخصّص في المجال، وليس طبيبًا عامًا. استشاري محدّد بالاسم، وله ملف تعريفي يمكنك قراءته، ويراجع قبل أن تسافر أو تدفع.", "مراجعة الاستشاري. يطّلع على الملف، ويسجّل توصيته السريرية وأي مخاطر ينبغي أن يعرفها المريض. وهنا يُتّخذ القرار الطبي، قبل أي التزام مالي.", "التقدير الأولي. يراه المريض في صفحته، وهو غير مُلزِم وليس سعرًا نهائيًا. ولا يحدث شيء حتى يقرّر.", "التحقّق برمز لمرة واحدة. يدخل المريض رمزًا من ستة أرقام يصله على هاتفه أو بريده، لأن العرض يحتوي معلومات خاصة. والرمز لا يُعرض هنا أبدًا.", "وديعة التنسيق. يدفع المريض بتحويل بنكي أو عبر وكيل، ثم يُدخل رقم مرجع التحويل. والبيانات البنكية هنا تجريبية.", "وفريق المالية لدينا يراجع كل فاتورة وكل تحويل مالي، قبل أن يُعتمد أي شيء.", "تأكيد الوديعة. عند التأكّد من الدفع يبدأ المنسّق ترتيب العلاج، وتُخصم الوديعة من السعر النهائي.", "ونساعد أيضًا في السفر والإقامة: تذاكر الطيران، والتأشيرة، وحجز الفندق، عبر مشغّلينا.", "الدخول والقسيمة. تعرض الحالة خطاب القبول وقسيمة المستشفى: ما يُضاف لحساب المستشفى، وما يدفعه المريض عند الكاشير، وما تبقّى.", "مراحل العلاج. تُسجَّل المراحل أثناء العلاج، ويراجعها الاستشاري ويصادق عليها، وهذا معنى زر كاونترساين: أن الاستشاري يوقّع ويؤكّد المرحلة. وأي علاج إضافي يُقترح بسبب سريري واضح، وتسعّره الإدارة المالية أولًا.", "ملف الخروج. الخروج ليس زرًّا: تعرض الحالة ما ينقص، والمستندات التي يحملها المريض معه.", "المتابعة. تُجدوَل مكالمات متابعة، وتصل الأسئلة عبر رابط آمن، وما يحتاج انتباهًا يرجع إلى الاستشاري، ولا تُغلق الحالة قبل أن ينتهي كل شيء معلّق.", "هذه هي الرحلة كاملة. الشاشات تعتمد على بيانات تجريبية، والتكاليف المعروضة تقديرات وليست أسعارًا. شكرًا لكم."];
+const AR=["رحلة شفاء: من أول رسالة إلى المتابعة. استشاري يراجع حالتك، ومنسّق واحد يرافقك، وتقدير مبدئي للتكلفة.", "الصفحة الرئيسية. يرى المريض كيف تعمل الخدمة، ويبدأ بإرسال حالته. والقرار يبقى بيده.", "إرسال الحالة. نموذج قصير من ثلاث خطوات: بيانات المريض، ثم الحالة والتقارير، ثم الموافقة. ولا يحتاج المريض أن يعرف التخصص، ولا أن تكون كل التقارير معه.", "استلام الحالة. يحصل المريض فورًا على رقم الحالة وصفحة متابعة آمنة، وتُوضَّح له المرحلة الحالية، ولا يُطلب منه أي إجراء.", "مهامي. يبدأ المنسّق يومه من قائمة واحدة مرتّبة بحسب الأهمية، وكل بند يوضّح الخطوة التالية ومن ننتظر.", "مساحة عمل الحالة. يؤكّد المنسّق مجال الرعاية، ثم يختار استشاريًا مؤهَّلًا بالاسم، بحسب التخصص الدقيق وعدد الحالات الحالية.", "والأهم: من يراجع حالتك استشاري على درجة عالية من الخبرة في مجال حالتك، ويراجعها قبل أن تسافر أو تدفع.", "مراجعة الاستشاري. يطّلع على الملف، ويسجّل توصيته السريرية وأي مخاطر ينبغي أن يعرفها المريض. وهنا يُتّخذ القرار الطبي، قبل أي التزام مالي.", "التقدير الأولي. يراه المريض في صفحته، وهو غير مُلزِم وليس سعرًا نهائيًا. ولا يحدث شيء حتى يقرّر.", "التحقّق برمز لمرة واحدة. يدخل المريض رمزًا من ستة أرقام يصله على هاتفه أو بريده، لأن العرض يحتوي معلومات خاصة. والرمز لا يُعرض هنا أبدًا.", "وديعة التنسيق. يدفع المريض بتحويل بنكي أو عبر وكيل، ثم يُدخل رقم مرجع التحويل. والبيانات البنكية هنا تجريبية.", "وفريق المالية لدينا يراجع كل فاتورة وكل تحويل مالي، قبل أن يُعتمد أي شيء.", "تأكيد الوديعة. عند التأكّد من الدفع يبدأ المنسّق ترتيب العلاج، وتُخصم الوديعة من السعر النهائي.", "ونساعد أيضًا في السفر والإقامة: تذاكر الطيران، والتأشيرة، وحجز الفندق، عبر مشغّلينا.", "الدخول والقسيمة. تعرض الحالة خطاب القبول وقسيمة المستشفى: ما يُضاف لحساب المستشفى، وما يدفعه المريض عند الكاشير، وما تبقّى.", "مراحل العلاج. تُسجَّل المراحل أثناء العلاج، ويراجعها الاستشاري ويصادق عليها، وهذا معنى زر كاونترساين: أن الاستشاري يوقّع ويؤكّد المرحلة. وأي علاج إضافي يُقترح بسبب سريري واضح، وتسعّره الإدارة المالية أولًا.", "ملف الخروج. الخروج ليس زرًّا: تعرض الحالة ما ينقص، والمستندات التي يحملها المريض معه.", "المتابعة. تُجدوَل مكالمات متابعة، وتصل الأسئلة عبر رابط آمن، وما يحتاج انتباهًا يرجع إلى الاستشاري، ولا تُغلق الحالة قبل أن ينتهي كل شيء معلّق.", "هذه هي الرحلة كاملة. الشاشات تعتمد على بيانات تجريبية، والتكاليف المعروضة تقديرات وليست أسعارًا. شكرًا لكم."];
 const ICO={
  plane:'<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
  bed:'<path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/>',
@@ -320,7 +340,7 @@ const steps=[
  hs:[{x:3,y:28,w:63,h:8.5,t:'Myself or someone else'},{x:3,y:19,w:63,h:3.5,t:'Three short steps'},{x:71,y:18,w:28,h:45,t:'What happens next'}],
  cap:'A short three-step form: patient and contact details, the case and documents, then consent. A family member can send it for the patient.',
  why:'Sending a case takes about five minutes and does not require every report to hand.'},
-{role:'Patient',view:'Secure status page',title:'Case received',img:'03-received.webp',w:1040,h:830,
+{role:'Patient',view:'Secure status page',title:'Case received',fx:{stamps:[{px:67.6,py:8.6,pw:13,ph:10.6,x:69,y:10.8,w:10.2,h:6.6,s:.7,lines:['Received','Mar 2']}]},img:'03-received.webp',w:1040,h:830,
  alt:'Case received page with case number RS-2026-000417, a Received stamp, the message that a coordinator is reviewing the case, no action required, and a seven-stage care journey.',
  hs:[{x:20,y:10,w:59,h:19,t:'Case number'},{x:20,y:77,w:59,h:16,t:'Seven-stage journey'}],
  cap:'The patient gets a case number and a secure status page straight away. It says plainly that nothing is needed from them now.',
@@ -336,19 +356,19 @@ const steps=[
  cap:'The coordinator confirms the care area, completes anything missing, then chooses a named Consultant from those who are eligible. Subspecialty, capability and current workload are shown side by side.',
  why:'The case reaches someone qualified to review it, not a general queue.'},
 {role:'Consultant',kind:'anim',anim:'consultant',view:'Consultant · Who reviews your case',title:'Reviewed by a Consultant',hs:[],
- cap:'The person who reviews the case is a specialist Consultant in the right care area, named and with a profile the patient can read. It is not a general doctor.',
+ cap:'Your case is reviewed by a highly experienced specialist Consultant in the right care area.',
  why:'That review happens before the patient travels, pays or decides.'},
 {role:'Consultant',view:'Consultant · Clinical review',title:'Consultant review',img:'06-consultant-review.webp',w:1220,h:1000,
  alt:'Consultant view of a case under review with the step "Record your clinical decision", a clinical recommendation field and the patient\'s file with documents.',
  hs:[{x:2,y:24,w:60,h:12,t:'Your step'},{x:2.5,y:64,w:62,h:17,t:'Clinical recommendation'}],
  cap:'The specialist Consultant reads the patient\'s file and records a clinical recommendation, with any risks the patient should know before going ahead.',
  why:'A Consultant reviews before the patient travels, pays or decides.'},
-{role:'Patient',view:'Patient · My Care',title:'Preliminary estimate',img:'07-estimate-ready.webp',w:1220,h:1230,
+{role:'Patient',view:'Patient · My Care',title:'Preliminary estimate',fx:{stamps:[{px:47.9,py:19.6,pw:15.2,ph:15.4,x:49.8,y:22.4,w:11.4,h:10,s:.7,lines:['Estimate','Ready','Sep 12']}]},img:'07-estimate-ready.webp',w:1220,h:1230,
  alt:'Patient My Care page: "Your estimate is ready to review", an Estimate ready stamp, a Review estimate button, and a preliminary estimate of $4,850 shown with a range bar and described as non-binding.',
  hs:[{x:3,y:41.5,w:13.5,h:5,t:'Review estimate'},{x:1,y:75.5,w:64,h:22,t:'Estimate, not a price'}],
  cap:'After the Consultant\'s recommendation the coordinator prepares a preliminary estimate. The patient sees it as an estimate, not a final price, and nothing happens until they decide.',
  why:'Honest cost staging: a preliminary estimate first, a final quote later, each labelled as such.'},
-{role:'Patient',view:'Patient · Secure link',title:'One-time code',img:'08-verify.webp',w:1040,h:560,
+{role:'Patient',view:'Patient · Secure link',title:'One-time code',fx:{type:{x:25.6,y:64.6,w:23.6,h:9.6}},img:'08-verify.webp',w:1040,h:560,
  alt:'"Verify it\'s you" screen asking for a six-digit code sent to a masked number, with an empty code field and a Verify button.',
  hs:[{x:25,y:62.5,w:25.5,h:13,t:'Six-digit code'},{x:25,y:78.5,w:9,h:9.5,t:'Verify'}],
  cap:'To read the proposal the patient opens the secure link and enters a six-digit code sent to their phone or email. The code is never shown here.',
@@ -405,10 +425,10 @@ function intro(){
  const ms=[['file','Send your case'],['chat','Coordinator prepares'],['steth','Consultant reviews'],['receipt','Your proposal'],['bank','Deposit'],['bed','Treatment'],['phone','Follow-up']];
  const nodes=ms.map(([ic,lb],k)=>{const u=0.05+0.15*k,[x,y]=at(u);return `<div class="c cn" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;--s:${(FS+FD*u-0.15).toFixed(2)}"><span class="rg">${svg(ic)}</span><em class="${k%2?'up':'dn'}">${lb}</em></div>`}).join('');
  const arcs=[300,430,560,690].map(r=>`<circle cx="650" cy="650" r="${r}"/>`).join('');
- return `<section class="cine anim" aria-label="Animated introduction: from the first message to follow-up, reviewed by a Consultant, with one coordinator and a cost estimate"><div class="scene" id="scene">
+ return `<section class="cine anim" aria-label="Animated introduction: from the first message to follow-up, reviewed by a highly experienced Consultant, with one multilingual coordinator and a cost estimate"><div class="scene" id="scene">
 <svg class="bgarcs" viewBox="0 0 1300 1300" aria-hidden="true">${arcs}</svg>
 <span class="cburst" style="--s:.5"></span><span class="cburst b2" style="--s:.8"></span>
-<div class="cbrand" style="--s:0.1"><div class="plate"><img src="assets/mark-teal.svg" alt=""><div><b>Rehlet<span>Shifaa</span></b><i lang="ar">رحلة شفاء</i></div></div></div>
+<div class="cbrand" style="--s:0.1"><img src="assets/logo.png" alt="RehletShifaa, رحلة شفاء"></div>
 <div class="jr">
 <svg class="path" viewBox="0 0 1600 900" aria-hidden="true"><path class="dots" style="--s:2.0" d="M170 610 C 540 250, 1060 250, 1430 610"/><path class="trail" pathLength="1" style="--s:${FS};--d:${FD}s" d="M170 610 C 540 250, 1060 250, 1430 610"/></svg>
 <div class="c cend" style="left:170px;top:610px;--s:2.2"><i></i><span style="left:-112px;top:-14px">Home</span></div>
@@ -416,7 +436,7 @@ function intro(){
 ${nodes}
 <span class="cplane" style="--s:${FS};--d:${FD}s">${svg('plane')}</span>
 </div>
-<div class="pc" style="left:90px;--s:5.8"><div class="ic">${svg('steth')}<i class="pr"></i><i class="pr p2"></i></div><h3>Reviewed by a Consultant</h3><p>A specialist in the right care area, not a general doctor.</p><div class="tags"><span style="--o:1.1">Named</span><span style="--o:1.4">Credentials reviewed</span></div></div>
+<div class="pc" style="left:90px;--s:5.8"><div class="ic">${svg('steth')}<i class="pr"></i><i class="pr p2"></i></div><h3>Reviewed by a Consultant</h3><p>A highly experienced specialist in your care area.</p></div>
 <div class="pc" style="left:575px;--s:8.2"><div class="ic">${svg('chat')}</div><h3>One multilingual coordinator</h3><p>With you from the first message to follow-up.</p><span class="bub l" style="--o:.9" lang="ar">مرحبًا</span><span class="bub r" style="--o:1.4">Hello</span><span class="bub r" style="--o:1.9">Bonjour</span></div>
 <div class="pc" style="left:1060px;--s:10.6"><div class="ic">${svg('bars')}</div><h3>Cost estimate</h3><p>A preliminary estimate, never a final price.</p><div class="bars"><i style="height:40px;--o:.9"></i><i style="height:66px;--o:1.1"></i><i style="height:92px;--o:1.3"></i></div></div>
 <h2 class="c ctag" style="--s:13.4">One case. One journey.</h2>
@@ -426,10 +446,9 @@ ${nodes}
 function fitCine(){const c=document.querySelector('.cine'),s=document.getElementById('scene');if(c&&s)s.style.transform=`scale(${c.clientWidth/1600})`}
 window.addEventListener('resize',fitCine);
 function visual(k){
- if(k==='consultant')return `<div class="vis anim"><div class="a" style="--s:0"><h3>Reviewed by a Consultant</h3><p class="vsub">A specialist in the right care area. Not a general doctor.</p></div>
-<div class="duo"><div class="card muted a" style="--s:.5">${svg('user')}<b>General doctor</b><span class="no">${svg('x')}Not who reviews your case</span></div>
-<div class="card hero a" style="--s:1.3">${svg('steth')}<b>Consultant</b><ul><li class="a" style="--s:2.1">${svg('check')}Right specialty, chosen for your case</li><li class="a" style="--s:2.5">${svg('check')}Credentials reviewed</li><li class="a" style="--s:2.9">${svg('check')}A profile you can read</li></ul></div></div>
-<span class="badge-op a" style="--s:3.5">Reviews before you travel, pay or decide</span></div>`;
+ if(k==='consultant')return `<div class="vis anim"><div class="a" style="--s:0"><h3>Reviewed by a Consultant</h3><p class="vsub">A highly experienced specialist in your care area.</p></div>
+<div class="solo a" style="--s:.5"><span class="halo"></span><span class="halo h2"></span>${svg('steth')}<b>Consultant</b></div>
+<span class="badge-op a" style="--s:2">Reviews before you travel, pay or decide</span></div>`;
  if(k==='finance')return `<div class="vis anim"><div class="a" style="--s:0"><h3>Our finance team</h3><p class="vsub">Every invoice and every transfer is checked before anything is confirmed.</p></div>
 <div class="fin"><div class="col"><div class="tile a" style="--s:.5">${svg('receipt')}Invoice</div><div class="tile a" style="--s:.8">${svg('bank')}Bank transfer</div></div>
 <span class="ln" style="--s:1.2"></span><div class="core a" style="--s:1.5">${svg('search')}Finance team</div><span class="ln" style="--s:2.1"></span>
@@ -452,11 +471,35 @@ function closing(){
 <li>Steps 14 to 17 show the Consultant's view of the case file.</li>
 </ul></div>
 <div class="cta"><button class="btn ghost" data-go="${total}">Back</button><button class="btn" data-go="0">Restart</button></div></section>`}
+function fxLayer(i,s){
+ const START=.6,STEP=2.6,MOVE=.9;let T=0;
+ const hs=s.hs||[],fx=s.fx||{};
+ let out='',arr=[];
+ hs.forEach((q,k)=>{arr.push(START+k*STEP+MOVE)});
+ (fx.stamps||[]).forEach(t=>{
+  out+=`<div class="patch" style="left:${t.px}%;top:${t.py}%;width:${t.pw}%;height:${t.ph}%;--s:${t.s}"></div>`;
+  out+=`<div class="stamp" style="left:${t.x}%;top:${t.y}%;width:${t.w}%;height:${t.h}%;--s:${t.s}">${t.lines.map((l,j)=>j===t.lines.length-1&&t.lines.length>1?`<hr><span>${l}</span>`:`<b>${l}</b>`).join('')}</div>`;
+  T=Math.max(T,t.s+1.2)});
+ if(fx.type){const t=fx.type,s0=(arr[0]||1.5)+.3;out+=`<div class="dots6" style="left:${t.x}%;top:${t.y}%;width:${t.w}%;height:${t.h}%">${[0,1,2,3,4,5].map(j=>`<i style="--s:${(s0+j*.22).toFixed(2)}"></i>`).join('')}</div>`;T=Math.max(T,s0+1.6)}
+ if(hs.length){
+  const pts=hs.map(q=>[q.x+q.w*.6,q.y+q.h*.5]);
+  const x0=Math.min(96,pts[0][0]+26),y0=108;
+  const kf=[[0,x0,y0,0,1],[START,x0,y0,1,1]];let prev=[x0,y0];
+  pts.forEach((pt,k)=>{const m=START+k*STEP,a=arr[k];kf.push([m,prev[0],prev[1],1,1],[a,pt[0],pt[1],1,1],[a+.08,pt[0],pt[1],1,.82],[a+.28,pt[0],pt[1],1,1]);prev=pt;
+   out+=`<span class="rip" style="left:${pt[0]}%;top:${pt[1]}%;--s:${a.toFixed(2)}"></span>`});
+  const end=arr[arr.length-1]+2.0;T=Math.max(T,end);
+  kf.push([end-.4,prev[0],prev[1],1,1],[end,prev[0],prev[1],0,1]);
+  const tot=end;
+  out+=`<style>@keyframes curK${i}{${kf.map(([t,x,y,o,sc])=>`${(t/tot*100).toFixed(3)}%{left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;opacity:${o};transform:scale(${sc})}`).join('')}}</style>`;
+  out+=`<svg class="cur" viewBox="0 0 24 24" style="--T:${tot.toFixed(2)}s;animation-name:curK${i}" aria-hidden="true"><path d="M5 3l14 8-6 1.8-2.4 6z" fill="#13292e" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+ }
+ window.fxEnd=T;
+ return out?`<div class="fx" aria-hidden="true">${out}</div>`:''}
 function step(i){
  const s=steps[i-1];
- const hs=s.hs.map((h,k)=>`<button class="hs" data-n="${k+1}" aria-label="${esc(h.t)}" style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%"></button>`).join('');
+ const hs=s.hs.map((h,k)=>`<button class="hs" data-n="${k+1}" aria-label="${esc(h.t)}" style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%;--s:${(.6+k*2.6+.9).toFixed(2)}"></button>`).join('');
  return `<div class="layout"><div class="frame"><div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="addr">${esc(s.view)}</span><span class="sp"></span></div>
- <div class="scroller">${s.kind==='anim'?visual(s.anim):`<div class="shot">${s.video?`<video id="heroVid" src="${IMG}${s.video}" poster="${IMG}${s.img}" width="${s.w}" height="${s.h}" muted loop playsinline autoplay aria-label="${esc(s.alt)}"></video>`:`<img src="${IMG}${s.img}" width="${s.w}" height="${s.h}" alt="${esc(s.alt)}">`}${hs}</div>`}</div></div>
+ <div class="scroller">${s.kind==='anim'?visual(s.anim):`<div class="shot">${s.video?`<video id="heroVid" src="${IMG}${s.video}" poster="${IMG}${s.img}" width="${s.w}" height="${s.h}" muted loop playsinline autoplay aria-label="${esc(s.alt)}"></video>`:`<img src="${IMG}${s.img}" width="${s.w}" height="${s.h}" alt="${esc(s.alt)}">`}${fxLayer(i,s)}${hs}</div>`}</div></div>
  <aside class="cap" aria-live="polite"><span class="rule"></span>
  <div class="meta">${chip(s.role)}<small>Step ${i} of ${total}</small></div>
  <h2>${esc(s.title)}</h2><p>${esc(s.cap)}</p>
@@ -472,13 +515,16 @@ function playAudio(){
  audio.onended=()=>{timer=setTimeout(()=>{if(cur>total){setTour(false)}else go(cur+1)},900)};
  audio.play().catch(()=>setTour(false));
 }
+let bgm=null;
 function setTour(on){
- tour=on;playBtn.setAttribute('aria-pressed',on);
+ tour=on;
+ if(on){if(!bgm){bgm=new Audio(AUD+'music.mp3');bgm.loop=true;bgm.volume=.13}bgm.play().catch(()=>{})}else if(bgm){bgm.pause()}playBtn.setAttribute('aria-pressed',on);
  playBtn.querySelector('span').textContent=on?'Pause voice-over':'Play with Arabic voice-over';
  playBtn.querySelector('svg').innerHTML=on?'<path d="M2.5 1.5h3v11h-3zM8.5 1.5h3v11h-3z"/>':'<path d="M3 1.5v11l9-5.5z"/>';
  if(on)playAudio();else stopAudio();
 }
 function render(){
+ window.fxEnd=0;
  stage.innerHTML=cur===0?intro():cur>total?closing():step(cur);
  document.body.classList.toggle('intro-on',cur===0);fitCine();
  rail.innerHTML=steps.map((s,i)=>`<li class="${i+1<cur?'done':i+1===cur?'now':''}"><button data-go="${i+1}" aria-label="Step ${i+1}: ${esc(s.title)}" ${i+1===cur?'aria-current="step"':''}><i></i></button></li>`).join('');
@@ -493,7 +539,7 @@ function go(n){cur=Math.max(0,Math.min(total+1,n));render()}
 window.go=go;window.setT=t=>document.documentElement.style.setProperty('--t',t);
 let flashTimers=[];
 function flash(k){const el=stage.querySelectorAll('.hs')[k];if(!el)return;el.classList.add('on');flashTimers.push(setTimeout(()=>el.classList.remove('on'),1100))}
-function flashAll(){flashTimers.forEach(clearTimeout);flashTimers=[];if(film)return;stage.querySelectorAll('.hs').forEach((_,k)=>flashTimers.push(setTimeout(()=>flash(k),700+k*1400)))}
+function flashAll(){flashTimers.forEach(clearTimeout);flashTimers=[]}
 document.addEventListener('click',e=>{
  const b=e.target.closest('[data-go]');if(b){go(+b.dataset.go);return}
  const f=e.target.closest('[data-flash]');if(f){flashTimers.forEach(clearTimeout);stage.querySelectorAll('.hs').forEach(x=>x.classList.remove('on'));flash(+f.dataset.flash);return}

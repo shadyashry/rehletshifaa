@@ -4,11 +4,11 @@ A guided click-through of one demo case, from the public home page to follow-up,
 
 **Open:** double-click `docs/demo/index.html` (keep the `assets/` folder beside it). Use Next/Back, the ← → keys and select a numbered point in the sidebar to replay its highlight. **Play with Arabic voice-over** plays the narration clip for each step and moves on by itself. Works down to 390px wide.
 
-**Video:** `journey.mp4` (1080p, about 4.8 min): the same walkthrough with the Arabic voice-over, no subtitles. Picture and audio are cut to the same slide lengths.
+**Video:** `journey.mp4` (1080p, about 4.7 min): the same walkthrough with the Arabic voice-over, no subtitles. Picture and audio are cut to the same slide lengths.
 
 ## Steps (17)
-Cinematic opening (about 16 seconds, no slide text to read): the logo lockup on a light plate, a plane flying the seven care-journey stages, three animated cards (reviewed by a Consultant, one multilingual coordinator, cost estimate), then "One case. One journey." The motion runs from CSS timings (`--s` start time per element), so the page and the video use the same animation. Then:
-1 Home page (the live hero animation plays) · 2 Sending the case · 3 Case received · 4 Coordinator My work · 5 Preparing the case (two dummy eligible Consultants) · 6 Reviewed by a Consultant (motion: a specialist Consultant, not a general doctor) · 7 Consultant review · 8 Preliminary estimate · 9 One-time code · 10 Coordination deposit · 11 Our finance team (motion: invoices and transfers are checked) · 12 Deposit confirmed · 13 Travel and stay (motion: flights, visa support, hotel through our operators) · 14 Admission and voucher · 15 Treatment milestones ("Countersign" is explained: the Consultant signs off the milestone) · 16 Discharge pack · 17 Follow-up. Then a swimlane summary (Patient / Coordinator / Consultant / Support team) and "Not shown yet".
+Cinematic opening (about 16 seconds, no slide text to read): the real logo (captured from the live site on transparent, true colours) on the paper theme, a plane flying the seven care-journey stages, three animated cards (reviewed by a highly experienced Consultant, one multilingual coordinator, cost estimate), then "One case. One journey." The motion runs from CSS timings (`--s` start time per element), so the page and the video use the same animation. Then:
+1 Home page (the live hero animation plays) · 2 Sending the case · 3 Case received · 4 Coordinator My work · 5 Preparing the case (two dummy eligible Consultants) · 6 Reviewed by a Consultant (motion: one highly experienced specialist) · 7 Consultant review · 8 Preliminary estimate · 9 One-time code · 10 Coordination deposit · 11 Our finance team (motion: invoices and transfers are checked) · 12 Deposit confirmed · 13 Travel and stay (motion: flights, visa support, hotel through our operators) · 14 Admission and voucher · 15 Treatment milestones ("Countersign" is explained: the Consultant signs off the milestone) · 16 Discharge pack · 17 Follow-up. Then a swimlane summary (Patient / Coordinator / Consultant / Support team) and "Not shown yet".
 
 Steps 14 to 17 show the Consultant's view of the case file. Steps 6, 11 and 13 are illustrative animations, not screenshots; every other screen is a real capture.
 
@@ -29,3 +29,9 @@ Names that were not obvious demo data (coordinator, Consultant and hospital name
 - An Arabic interface (the voice-over is Arabic; the screens are English).
 
 Fonts: the page asks for Alexandria and Plus Jakarta Sans and falls back to system fonts when they are not installed. Colours follow the Petrol & Paper tokens in `DESIGN.md`.
+
+## Motion inside the slides
+Every screenshot slide moves: a cursor travels to each highlighted element and clicks (a ripple), the element gets a one-second coral border flash, stamps slam into place (Received, Estimate ready), and masked dots type into the one-time-code field (never a real code). All of it is CSS keyed to start times, so the page and the video share one animation. Video frames are rendered by `tools/frames.js` and assembled by `tools/build_video.py`.
+
+## Music
+`assets/audio/music.mp3` is a calm ambient bed synthesised for this demo (soft pads and sparse bell notes, no third-party material; `tools/music.py`). In the video it sits well under the voice and is ducked while the voice speaks. On the page it plays quietly during "Play with Arabic voice-over".
