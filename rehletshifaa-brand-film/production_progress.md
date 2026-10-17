@@ -11,7 +11,7 @@
 | G | EN and AR masters, independently timed | Done | `renders/rehletshifaa_master_{en,ar}_1080p.mp4` |
 | H | QA pass 1 on rendered masters; fixes; QA pass 2 on final renders | Done | `quality_assurance_report.md` |
 | I | Shorts: patient 9:16 and business 16:9 in EN and AR | Done | `renders/rehletshifaa_{patient,business}_*.mp4` |
-| J | Documentation, licensing record, delivery | Done; push blocked | See below |
+| J | Documentation, licensing record, delivery | Done | Pushed to `feat/review-p0` |
 
 ## Gates
 - **Gate 1 (brand fidelity).** Tokens, fonts and logo are taken from the site and the repository; nothing is invented.
@@ -26,4 +26,3 @@
 1. **ElevenLabs licence.** Regenerate the narration and sound effects under a paid plan before public use (`licensing_record.md`).
 2. **Native listening checks.** EN and AR narration; AR lines flagged for سـ/صـ articulation.
 3. **CTA wording.** The film uses the site label "Send my case"; the brief's "Start My Case" is the alternative.
-4. **Git push.** Pushing `feat/review-p0` returned HTTP 403 (GitHub access for this session). The commits are local until access is restored.
