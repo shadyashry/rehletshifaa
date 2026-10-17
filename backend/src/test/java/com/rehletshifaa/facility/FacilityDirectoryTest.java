@@ -21,6 +21,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -35,6 +36,7 @@ class FacilityDirectoryTest {
     @Autowired FacilityDirectory directory;
     @Autowired JdbcTemplate jdbc;
     @Autowired CryptoService crypto;
+    @Autowired Clock clock;
 
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
     private void signIn(String subject, Role... roles) { TestPrincipals.signIn(jdbc, crypto, subject, roles); }
@@ -50,11 +52,12 @@ class FacilityDirectoryTest {
     @Test void listsActiveFacilitiesWithPriceablePackagesOnlyAndNothingCommercialBeyondTheRange() {
         signIn("ops-subject", Role.CONSULTANT_OPERATIONS_MANAGER);
         UUID open = facility("Nile Heart Hospital"), suspended = facility("Closed Clinic");
-        UUID approved = propose(open, "CABG", "cardiology", LocalDate.now(), null);
-        UUID expired = propose(open, "OLD", "cardiology", LocalDate.now().minusYears(2), LocalDate.now().minusDays(1));
-        UUID future = propose(open, "NEXT", "cardiology", LocalDate.now().plusDays(1), null);
-        propose(open, "TKR", "general-surgery", LocalDate.now(), null); // stays pending: not priceable
-        UUID onSuspended = propose(suspended, "CABG", "cardiology", LocalDate.now(), null);
+        LocalDate today = LocalDate.now(clock);
+        UUID approved = propose(open, "CABG", "cardiology", today, null);
+        UUID expired = propose(open, "OLD", "cardiology", today.minusYears(2), today.minusDays(1));
+        UUID future = propose(open, "NEXT", "cardiology", today.plusDays(1), null);
+        propose(open, "TKR", "general-surgery", today, null); // stays pending: not priceable
+        UUID onSuspended = propose(suspended, "CABG", "cardiology", today, null);
         signIn("finance-manager", Role.FINANCE_MANAGER);
         for (UUID id : new UUID[] {approved, expired, future}) catalog.approve(open, id, new DecisionRequest(null));
         catalog.approve(suspended, onSuspended, new DecisionRequest(null));

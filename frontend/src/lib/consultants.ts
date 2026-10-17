@@ -1,5 +1,6 @@
 import type { Locale } from "./i18n";
 import { API_BASE_URL } from "./api";
+import { connection } from "next/server";
 
 /**
  * Consultant profiles come only from the platform (GET /api/v1/public/consultants): the public site keeps no profile
@@ -38,6 +39,9 @@ export type ConsultantProfile = {
   sourceFile?: string;
   portrait?: { src: string; alt: string };
 };
+
+/** The bilingual editorial content stored by the platform; routing care-area facts are deliberately excluded. */
+export type ConsultantProfileContent = Omit<ConsultantProfile, "slug" | "careAreaHref" | "careAreaLabel">;
 
 export const consultantUi = {
   en: {
@@ -90,9 +94,14 @@ export const consultantUi = {
 /** Server-to-server base: the container network address when set, else the public API address. */
 const SERVER_API = (process.env.API_INTERNAL_BASE_URL ?? API_BASE_URL).replace(/\/+$/, "");
 
-async function read<T>(path: string, fallback: T): Promise<T> {
+async function read<T>(path: string, fallback: T, tags: string[]): Promise<T> {
   try {
-    const response = await fetch(`${SERVER_API}/api/v1/public/consultants${path}`, { cache: "no-store" });
+    // Keep the page request-rendered while caching only this shared directory read. This also keeps `next build`
+    // independent of the backend container, which is not reachable while the frontend image is built.
+    await connection();
+    const response = await fetch(`${SERVER_API}/api/v1/public/consultants${path}`, {
+      next: { revalidate: 900, tags },
+    });
     if (!response.ok) return fallback;
     return (await response.json()) as T;
   } catch {
@@ -103,11 +112,11 @@ async function read<T>(path: string, fallback: T): Promise<T> {
 
 /** Published Consultants, in directory order. */
 export function getConsultants(locale: Locale): Promise<readonly ConsultantProfile[]> {
-  return read<ConsultantProfile[]>(`?locale=${locale}`, []);
+  return read<ConsultantProfile[]>(`?locale=${locale}`, [], ["consultants"]);
 }
 
 export function getConsultant(locale: Locale, slug: string): Promise<ConsultantProfile | undefined> {
-  return read<ConsultantProfile | undefined>(`/${encodeURIComponent(slug)}?locale=${locale}`, undefined);
+  return read<ConsultantProfile | undefined>(`/${encodeURIComponent(slug)}?locale=${locale}`, undefined, ["consultants", `consultant:${slug}`]);
 }
 
 /** Consultants holding a university faculty appointment, read from the role in either language. */

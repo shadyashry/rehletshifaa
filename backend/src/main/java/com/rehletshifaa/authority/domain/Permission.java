@@ -15,7 +15,7 @@ public enum Permission {
     PROPOSAL_DECISION_RECORD(true),
     // clinical and fulfilment
     CLINICAL_REVIEW(false), SECOND_OPINION_SUBMIT(false), CLINICAL_APPROVE(true), OPERATIONS_FULFIL(false), FINANCE_SETTLE(true),
-    CONSULTANT_CATALOG_MANAGE(false), COMMERCIAL_POLICY_MANAGE(true), COMMERCIAL_POLICY_READ(false), PAYMENT_RECORD(true),
+    CONSULTANT_CATALOG_MANAGE(false), CONSULTANT_PROFILE_MANAGE(false), COMMERCIAL_POLICY_MANAGE(true), COMMERCIAL_POLICY_READ(false), PAYMENT_RECORD(true),
     // P0-5 (B-02): facilities and their package catalogue. Consultant Operations maintains them; Finance approves a package
     // price range once, with a fresh sign-in, because an approved range later releases proposal lines without a Finance check.
     FACILITY_READ(false), FACILITY_MANAGE(false), FACILITY_PACKAGE_APPROVE(true),

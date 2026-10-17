@@ -16,6 +16,8 @@ class ProductionSafetyValidatorTest {
                 "WHATSAPP_META_APP_SECRET", "REDIS_PASSWORD", "IDENTITY_ADMIN_CLIENT_SECRET"}) env.setProperty(key, "value-" + key);
         env.setProperty("FRONTEND_ALLOWED_ORIGINS", "https://rehletshifaa.com");
         env.setProperty("APP_PUBLIC_BASE_URL", "https://api.rehletshifaa.com");
+        env.setProperty("WEB_REVALIDATE_URL", "http://frontend:3000/api/revalidate/consultants");
+        env.setProperty("REVALIDATE_SECRET", "production-revalidation-secret-longer-than-32-characters");
         env.setProperty("APP_WEB_BASE_URL", "https://rehletshifaa.com");
         env.setProperty("OIDC_ISSUER_URI", "https://auth.rehletshifaa.com/realms/rs");
         env.setProperty("OIDC_JWK_SET_URI", "https://auth.rehletshifaa.com/realms/rs/certs");
@@ -64,5 +66,15 @@ class ProductionSafetyValidatorTest {
                 .hasMessageContaining("PAYMENT_BANK_IBAN contains a placeholder value")
                 .hasMessageContaining("PAYMENT_BANK_SWIFT contains a placeholder value")
                 .hasMessageContaining("PAYMENT_BANK_ACCOUNT_NUMBER is required");
+    }
+
+    @Test
+    void missingOrDevelopmentRevalidationConfigurationIsRefused() {
+        MockEnvironment env = complete();
+        env.setProperty("WEB_REVALIDATE_URL", "");
+        env.setProperty("REVALIDATE_SECRET", "local-only-revalidate-secret-change-in-production");
+        assertThatThrownBy(() -> new ProductionSafetyValidator(env).run(null))
+                .hasMessageContaining("WEB_REVALIDATE_URL is required")
+                .hasMessageContaining("REVALIDATE_SECRET is the development default");
     }
 }

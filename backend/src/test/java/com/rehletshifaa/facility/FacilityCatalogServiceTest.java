@@ -21,6 +21,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -37,6 +38,7 @@ class FacilityCatalogServiceTest {
     @Autowired FacilityCatalogService catalog;
     @Autowired JdbcTemplate jdbc;
     @Autowired CryptoService crypto;
+    @Autowired Clock clock;
 
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
@@ -61,11 +63,12 @@ class FacilityCatalogServiceTest {
         assertThat(facility.kind()).isEqualTo("HOSPITAL");
         assertThatThrownBy(() -> newFacility("nile heart hospital")).isInstanceOf(ApiException.class).satisfies(e -> assertThat(code(e)).isEqualTo("FACILITY_DUPLICATE"));
 
-        facility = catalog.recordAccreditation(facility.id(), new AccreditationRequest("JCI", "JCI-2026-001", LocalDate.now().minusYears(1), LocalDate.now().plusYears(2)));
+        LocalDate today = LocalDate.now(clock);
+        facility = catalog.recordAccreditation(facility.id(), new AccreditationRequest("JCI", "JCI-2026-001", today.minusYears(1), today.plusYears(2)));
         assertThat(facility.accreditationStatus()).isEqualTo("CURRENT");
         assertThat(facility.accreditations()).singleElement().satisfies(a -> assertThat(a.status()).isEqualTo("CURRENT"));
         UUID facilityId = facility.id();
-        assertThatThrownBy(() -> catalog.recordAccreditation(facilityId, new AccreditationRequest("GAHAR", null, null, LocalDate.now().minusDays(1))))
+        assertThatThrownBy(() -> catalog.recordAccreditation(facilityId, new AccreditationRequest("GAHAR", null, null, today.minusDays(1))))
                 .isInstanceOf(ApiException.class).satisfies(e -> assertThat(code(e)).isEqualTo("VALID_EXPIRY_REQUIRED"));
 
         PackageView proposed = catalog.propose(facilityId, cabg("180000", "220000"));

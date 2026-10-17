@@ -1159,6 +1159,19 @@ phases.
   state, years, sub-specialties, languages, practice locations from the facility registry, optional intro video on
   S3, scanned); no ratings; ethics regulation Article 10 (no promotional fields). The page itself is UX plan area 1b.
 - Sessions: 1. Model: Opus 5.5 fast, medium.
+- **Status (2026-10-17): delivered on `feat/consultant-public-profiles`.** Control Center staff APIs are
+  `GET|PUT /api/v1/control-center/consultants/{practitionerId}/public-profile`, `POST .../publish`,
+  `POST .../unpublish`, and `PATCH /api/v1/control-center/consultants/public-profiles/order`; writes require
+  `CONSULTANT_PROFILE_MANAGE`, while the staff read also accepts `CREDENTIAL_READ`. The existing Consultant page,
+  directory and onboarding flow now carry the bilingual editor, publication/order state, operational-readiness strip,
+  care-area overview and real public-component previews. Each committed directory fact writes a durable
+  `REVALIDATION` outbox message, which POSTs to the server-only Next route and immediately expires `consultants` plus
+  `consultant:<slug>`; the 15-minute data-cache TTL is the recovery bound. Portrait upload remains future work; existing
+  CV portrait references are preserved. Price research and V107 intentionally leave unsupported prices open rather than
+  manufacture figures; all 65 researched candidates are represented by 62 unique care-area template items, and the 34
+  sourced numeric candidates enter Consultant catalogs. Verification: backend 974 tests, 0 failures/errors, 3 gated skips;
+  `PostgresJpaMappingTest` passes on disposable PostgreSQL 17 with V1–V107; frontend typecheck, focused lint, 12 Vitest tests,
+  production build and the four-view screenshot run pass.
 
 ### P1-15  Admission, voucher and balance  (post-deposit design §5 stages 1–3, §6; architecture §5.1)
 - Source: `docs/post-deposit-journey-design.md` (decisions D-B, D-C, D-D) and `docs/post-deposit-solution-architecture.md`.
@@ -1957,7 +1970,7 @@ journey code is final, and retention (P1-7) and the DR drill (P1-9) stay launch 
 | 11 | ~~P1-7 Retention, purge, erasure, draft clean-up~~ | **done**: sessions 1 (backend, V104) and 2 (UI, copy), 2026-10-16 | Fable 5.1, high (Opus 5.5 stood in) | Sender digits decided (30-day transport log, 90 days after a conversation closes); evidence and statements are `LEGAL_RECORD`; terms marked "with counsel" wait for counsel |
 | 12 | P1-11 Split `JourneyService` | 2 | Fable 5.1, xhigh | After P1-18, so the extracted code is final |
 | 13 | ~~P1-9 Backups and restore drill~~ | **done**: 1 session (2026-10-15); local drill PASS in 135 s | Opus 5.5 | Production drill on the chosen host (managed PITR restore time, region failover) adds its row to `docs/deployment.md` before real patient data |
-| 14 | P1-14 Consultant public profiles (data and endpoint) | 1 | Opus 5.5 | The page is UX plan area 1b; photographs with consent |
+| 14 | ~~P1-14 Consultant public profiles (data and endpoint)~~ | **done: backend, Control Center UI, cache invalidation and research seed (2026-10-17)** | Sol medium | Portrait upload still needs the consent decision |
 | 15 | P2-24 Refund rules enforced | 1 | Fable high | Moves up from P2: the point of no return (P1-15) and the 10-day rule need enforcement before the first paying patient |
 | 16 | P2-15 … P2-26 (rest) | about 19 | per the P2 table | P2-15 needs the second-destination timing decision |
 | 17 | P3 backlog | one each | Sonnet or Opus | — |
@@ -2014,13 +2027,13 @@ the licence now; the credential type is a one-line addition in P1-19 (done: `LIA
 - [ ] P0-3: set urgency inside the intake form; show the previous reason in the urgency dialog; sort and badge queue cards and the team queue by urgency; a Send my case unit test for the emergency notice.
 - [ ] P0-4: vetted agent list for agent cash (comes with the partner entity in P1-12); card payments through the DEP-2 adapter.
 - [ ] P0-5: notify Consultant Operations when an accreditation lapses; store accreditation evidence documents; stamp `Facility.updated_at` from the expiry job; a dev-seed facility in `LocalDemoDataSeeder`; facility name on the patient proposal; patient-facing travel view.
-- [ ] P1-8: archive or acknowledge dead letters so the level can fall; tune the starting alert thresholds after a month of data; an Alertmanager route (page, ticket) for the Prometheus rules; fix the three facility tests' `LocalDate.now()` (local versus UTC date).
+- [ ] P1-8: archive or acknowledge dead letters so the level can fall; tune the starting alert thresholds after a month of data; an Alertmanager route (page, ticket) for the Prometheus rules. The three facility tests now use the application `Clock` instead of the host date (2026-10-17).
 - [ ] P1-6: an identity-review work item, so its 2-day level becomes a due date and a patient window; deadlines on referral offers; the offer deadline on queue cards (`CaseQueue.tsx`); email the consultant when an offer expires; an availability penalty after repeated expiry; escalate to the Finance Manager on an SLA breach (A-04); a window in the status link's deposit phase while Finance checks a transfer.
 
 ## Order of sessions (recommended, revised 2026-10-14)
 
 Done (checked 2026-10-16 against each phase's Status block and the branch history): P0-1, P0-2, P0-3, P0-4, P0-5, P1-6, P1-8,
-P1-7, P1-9, P1-10, P1-13, P1-15, P1-16, P1-17, P1-18, P1-19. Still to run: P1-11, P1-14, P2-24, P1-12 (waits for
+P1-7, P1-9, P1-10, P1-13, P1-14, P1-15, P1-16, P1-17, P1-18, P1-19. Still to run: P1-11, P2-24, P1-12 (waits for
 the owner's payer terms and partner commission), then P2 and P3.
 
 The original order, for the record:

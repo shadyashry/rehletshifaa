@@ -66,6 +66,9 @@ public final class RolePolicy {
             // Consultant operations, credentialing, identity review
             g(CONSULTANT_OPERATIONS_MANAGER, CONSULTANT_ONBOARD, PLATFORM),
             g(CONSULTANT_OPERATIONS_MANAGER, CONSULTANT_CATALOG_MANAGE, PLATFORM),
+            // Public editorial content confers no clinical, credentialing or commercial power.
+            g(CONSULTANT_OPERATIONS_MANAGER, CONSULTANT_PROFILE_MANAGE, PLATFORM),
+            g(SYSTEM_ADMINISTRATOR, CONSULTANT_PROFILE_MANAGE, PLATFORM),
             g(CONSULTANT_OPERATIONS_MANAGER, CREDENTIAL_READ, PLATFORM), g(CONSULTANT_OPERATIONS_MANAGER, TEAM_MANAGE, PLATFORM),
             g(CONSULTANT_OPERATIONS_MANAGER, STAFFING_REQUEST, PLATFORM),
             // P0-5 (B-02): facilities are a pricing source and a destination, never users. Consultant Operations owns the records

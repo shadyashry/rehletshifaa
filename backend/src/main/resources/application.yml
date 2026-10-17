@@ -126,6 +126,9 @@ app:
     pepper: ${CLAIM_TOKEN_PEPPER:local-development-pepper-only}
     intake-grant-expiry-seconds: ${INTAKE_GRANT_EXPIRY_SECONDS:7200}
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8080}
+  web:
+    revalidate-url: ${WEB_REVALIDATE_URL:}
+    revalidate-secret: ${REVALIDATE_SECRET:}
   web-base-url: ${APP_WEB_BASE_URL:http://localhost:3000}
   identity-admin:
     base-url: ${IDENTITY_ADMIN_BASE_URL:http://localhost:8180}

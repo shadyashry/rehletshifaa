@@ -26,7 +26,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * serves health and never the meters, not even to a System Administrator with a passkey; the metrics port serves the meters
  * without a token and nothing else; no other actuator internals are exposed on either port.
  */
-@SpringBootTest(properties = {"spring.task.scheduling.enabled=false", "app.management.metrics-port=" + MetricsPortTest.METRICS})
+@SpringBootTest(properties = {"spring.task.scheduling.enabled=false", "app.management.metrics-port=" + MetricsPortTest.METRICS,
+        "management.health.redis.enabled=false"})
 @AutoConfigureMockMvc
 @AutoConfigureObservability(tracing = false) // Boot's test slice switches metric exporters off; this test proves the Prometheus one
 @Transactional

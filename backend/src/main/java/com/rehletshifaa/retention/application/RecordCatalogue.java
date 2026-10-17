@@ -67,7 +67,7 @@ public final class RecordCatalogue {
                 "workforce_lead_designations", "workforce_staffing_requests", "workforce_identity_reviews", "workforce_identity_review_history",
                 "access_subjects", "platform_role_assignments", "service_accounts", "mfa_reset_requests", "identity_operations",
                 "identity_reconciliation_runs", "identity_reconciliation_discrepancies", "practitioner_profiles", "practitioner_credentials",
-                "practice_managers", "consultant_operations_ownerships", "consultant_capabilities", "consultant_service_catalog",
+                "practice_managers", "consultant_operations_ownerships", "consultant_capabilities", "consultant_directory_profiles", "consultant_service_catalog",
                 "consultation_slots", "virtual_clinics", "clinic_service_changes", "coordinator_capacity", "coordinator_intake_settings",
                 "reply_covers", "practice_manager_invitations", "workforce_invitation_roles");
         put(CONFIGURATION,

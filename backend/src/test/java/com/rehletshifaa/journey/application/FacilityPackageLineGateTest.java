@@ -20,6 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -39,6 +40,7 @@ class FacilityPackageLineGateTest {
     @Autowired CaseService cases; @Autowired JourneyService journey; @Autowired FacilityCatalogService facilities;
     @Autowired CommercialPolicyService commercialPolicies;
     @Autowired JdbcTemplate jdbc; @Autowired CryptoService crypto; @Autowired EntityManager em;
+    @Autowired Clock clock;
 
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
     private void authenticate(String subject, Role... roles) { com.rehletshifaa.authority.TestPrincipals.signIn(jdbc, crypto, subject, roles); }
@@ -51,7 +53,7 @@ class FacilityPackageLineGateTest {
         authenticate("ops-subject", Role.CONSULTANT_OPERATIONS_MANAGER);
         UUID facilityId = facilities.create(new FacilityRequest("Nile Heart Hospital " + UUID.randomUUID(), "Cairo", "HOSPITAL", "NET_30", null, null, null, null)).id();
         UUID packageId = facilities.propose(facilityId, new PackageRequest("CABG", "Bypass package", "cardiology", new BigDecimal("150000"), new BigDecimal("200000"),
-                "Theatre, 2 ICU nights, 5 ward days", null, LocalDate.now(), null)).id();
+                "Theatre, 2 ICU nights, 5 ward days", null, LocalDate.now(clock), null)).id();
         authenticate("finance-manager", Role.FINANCE_MANAGER);
         facilities.approve(facilityId, packageId, new DecisionRequest("2026 agreement"));
         SecurityContextHolder.clearContext();
@@ -132,7 +134,7 @@ class FacilityPackageLineGateTest {
         assertThatThrownBy(() -> reviewedCase(List.of(packageLine(pkg.packageId(), "250000")))).isInstanceOf(ApiException.class)
                 .satisfies(e -> assertThat(((ApiException) e).code()).isEqualTo("FACILITY_PACKAGE_RANGE"));
         authenticate("ops-subject", Role.CONSULTANT_OPERATIONS_MANAGER);
-        UUID pendingId = facilities.propose(pkg.facilityId(), new PackageRequest("TKR", "Knee", "cardiology", BigDecimal.ONE, BigDecimal.TEN, "x", null, LocalDate.now(), null)).id();
+        UUID pendingId = facilities.propose(pkg.facilityId(), new PackageRequest("TKR", "Knee", "cardiology", BigDecimal.ONE, BigDecimal.TEN, "x", null, LocalDate.now(clock), null)).id();
         assertThatThrownBy(() -> reviewedCase(List.of(packageLine(pendingId, "5")))).isInstanceOf(ApiException.class)
                 .satisfies(e -> assertThat(((ApiException) e).code()).isEqualTo("FACILITY_PACKAGE_INVALID"));
     }

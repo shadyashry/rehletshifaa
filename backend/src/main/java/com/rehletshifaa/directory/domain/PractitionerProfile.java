@@ -91,5 +91,6 @@ public class PractitionerProfile extends AssignedIdEntity {
 
     /** The consultant account is not disabled (a disabled account closes its clinic to delegates). */
     public boolean isAccountEnabled() { return !"DISABLED".equals(accountStatus) && disabledAt == null; }
+    public String getConsultantLifecycleStatus() { return consultantLifecycleStatus; }
     public long getVersion() { return version; }
 }

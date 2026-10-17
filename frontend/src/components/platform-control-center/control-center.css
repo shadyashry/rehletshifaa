@@ -446,3 +446,49 @@
 .cc-retention-cases>li:first-child{border-top:0}
 .cc-retention-find{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;margin:12px 0 16px}
 .cc-retention-find>.cc-field{flex:1 1 18rem;max-width:28rem;margin:0!important}
+
+/* Consultant public profiles — bilingual paper forms, operational readiness and real public previews. */
+.cc-directory-overview{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-block-end:22px;padding:20px;border-block-start:2px solid var(--cc-brand);border-block-end:1px solid var(--cc-line);background:var(--cc-surface)}
+.cc-directory-overview h2{margin:0;font-size:20px;color:var(--cc-ink)}
+.cc-directory-overview p{max-width:68ch;margin:4px 0 0;color:var(--cc-muted)}
+.cc-directory-overview>strong{font-size:18px;white-space:nowrap;color:var(--cc-brand-dark)}
+.cc-consultant-group{margin-block:24px 32px}
+.cc-consultant-group>header{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--cc-line);border-radius:10px}
+.cc-consultant-group>header>span{display:inline-flex;align-items:center;justify-content:center;inline-size:44px;block-size:44px;border-radius:50%;flex:none}
+.cc-consultant-group>header h2{margin:0;font-size:18px}
+.cc-consultant-group>header p{margin:1px 0 0;color:var(--cc-muted);font-size:13.5px}
+.cc-consultant-readiness-list{list-style:none;margin:0;padding:0;border-inline:1px solid var(--cc-line);border-block-end:1px solid var(--cc-line);border-radius:0 0 10px 10px;background:#fff}
+.cc-consultant-readiness-list>li{display:grid;grid-template-columns:minmax(180px,.85fr) minmax(0,2fr) auto;gap:18px;align-items:center;padding:16px;border-block-start:1px solid var(--cc-line-soft)}
+.cc-consultant-readiness-list>li:first-child{border-block-start:0}
+.cc-consultant-identity{display:flex;min-width:0;flex-direction:column}
+.cc-readiness-strip{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:8px}
+.cc-readiness-strip .cc-clinician-fact{display:flex;min-width:0;flex-direction:column;align-items:flex-start;gap:4px}
+.cc-readiness-strip .cc-clinician-fact-label{position:static;inline-size:auto;block-size:auto;margin:0;overflow:visible;clip:auto;white-space:normal;font-size:12px;font-weight:650;color:var(--cc-muted)}
+.cc-order-actions{display:flex;gap:6px}
+.cc .cc-order-actions .cc-icon-button,.cc .cc-profile-list-row .cc-icon-button,.cc .cc-profile-link-row .cc-icon-button{min-inline-size:44px;inline-size:44px;min-block-size:44px;padding:0;flex:none}
+.cc-profile-slug{max-inline-size:38rem}
+.cc-profile-languages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+.cc-profile-language{min-inline-size:0;margin:0;padding:18px;border:1px solid var(--cc-line);border-block-start:2px solid var(--cc-brand);border-radius:10px;background:var(--cc-surface)}
+.cc-profile-language[dir=rtl]{font-family:"Cairo",var(--font-arabic),sans-serif;letter-spacing:0}
+.cc-profile-language legend{padding-inline:8px;font-size:17px;font-weight:700;color:var(--cc-brand-dark)}
+.cc-profile-short-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(8rem,.35fr);gap:12px}
+.cc-profile-language .cc-field{margin-block-end:12px}
+.cc-profile-language .cc-field label,.cc-profile-list-field>.cc-field-label{font-size:14px;font-weight:650}
+.cc-profile-language .cc-field-hint{font-variant-numeric:tabular-nums;text-align:end}
+.cc-profile-list-field{margin-block:14px 18px}
+.cc-profile-list-field>.cc-field-label{margin:0 0 5px}
+.cc-profile-list-rows{display:grid;gap:7px}
+.cc-profile-list-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:end}
+.cc-profile-link-row{display:grid;grid-template-columns:minmax(8rem,.7fr) minmax(0,1.3fr) auto;gap:7px;align-items:end;margin-block-end:7px}
+.cc-profile-list-field>.cc-small{min-block-size:44px;margin-block-start:8px}
+.cc-profile-actions{position:sticky;inset-block-end:12px;z-index:4;margin-block:18px 26px;padding:12px;border:1px solid var(--cc-line);border-radius:10px;background:rgba(255,255,255,.96);box-shadow:0 6px 20px rgba(20,50,45,.12)}
+.cc-profile-previews{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.cc-profile-preview-language{min-width:0;padding:14px;border:1px solid var(--cc-line);border-radius:10px;background:var(--cc-surface)}
+.cc-profile-preview-language[dir=rtl]{font-family:"Cairo",var(--font-arabic),sans-serif;letter-spacing:0}
+.cc-profile-preview-label{margin:0 0 10px;font-weight:700;color:var(--cc-brand-dark)}
+.cc-profile-header-preview{display:flex;align-items:center;gap:14px;margin-block-start:14px;padding:14px;border-block-start:2px solid var(--cc-brand);background:#fff}
+.cc-profile-header-preview h3{margin:0;font-size:18px}
+.cc-profile-header-preview p{margin:2px 0;color:var(--cc-muted)}
+@media(max-width:1050px){.cc-readiness-strip{grid-template-columns:repeat(3,minmax(110px,1fr))}.cc-consultant-readiness-list>li{grid-template-columns:1fr}.cc-order-actions{justify-content:flex-start}}
+@media(max-width:800px){.cc-profile-languages,.cc-profile-previews{grid-template-columns:1fr}.cc-directory-overview{flex-direction:column}.cc-profile-actions{position:static}}
+@media(max-width:520px){.cc-readiness-strip{grid-template-columns:1fr 1fr}.cc-profile-language{padding:14px}.cc-profile-short-grid,.cc-profile-link-row{grid-template-columns:1fr}.cc-profile-link-row .cc-icon-button{justify-self:start}.cc-directory-overview{padding:16px}}

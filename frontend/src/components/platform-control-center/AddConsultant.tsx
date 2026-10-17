@@ -11,6 +11,7 @@ import { useAdminApi } from "./admin-api";
 import { EmptyState, ErrorNotice, Field } from "./cc-ui";
 import { CARE_AREAS, careAreaLabel } from "./admin-labels";
 import { consultantHref, consultantsHref } from "./consultant-model";
+import { getDictionary } from "@/lib/dictionary";
 
 const EMAIL = /^\S+@\S+\.\S+$/;
 
@@ -23,6 +24,7 @@ export function AddConsultant({ locale }: { locale: Locale }) {
   const access = useControlCenterAccess();
   const canAdd = access.can("CONSULTANT_ONBOARD");
   const [form, setForm] = useState({ name: "", email: "", language: locale as string, specialty: "", careArea: "" });
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const [touched, setTouched] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState<unknown>(null);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const need = (v: string, message?: string) => (touched && !v.trim() ? message ?? (ar ? "هذا الحقل مطلوب." : "This field is required.") : undefined);
@@ -37,7 +39,7 @@ export function AddConsultant({ locale }: { locale: Locale }) {
     setBusy(true);
     try {
       const created = await api<{ id: string }>("/admin/practitioners", { method: "POST", body: { legalName: form.name.trim(), displayName: form.name.trim(), email: form.email.trim(), locale: form.language, specialty: form.specialty.trim(), careCategory: form.careArea, practitionerType: "CONSULTANT", contractStatus: "ACTIVE", availabilityStatus: "UNAVAILABLE", expectedReviewHours: 48 } });
-      router.push(`${consultantHref(locale, created.id)}?invited=1`);
+      setCreatedId(created.id);
     } catch (err) { setError(err); } finally { setBusy(false); }
   };
 
@@ -46,6 +48,17 @@ export function AddConsultant({ locale }: { locale: Locale }) {
   if (authLoading || access.loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);
   if (!canAdd) return shell(<EmptyState title={ar ? "لا يمكنك إضافة استشاريين" : "You can't add consultants"} body={ar ? "يضيف مدير عمليات الاستشاريين الاستشاريين الجدد." : "The Consultant Operations Manager adds new consultants."} />);
+
+  if (createdId) {
+    const next = getDictionary(locale).controlCenterConsultantProfiles.onboarding;
+    return shell(<section className="cc-profile-onboarding-next" aria-labelledby="public-profile-next-title">
+      <h2 id="public-profile-next-title">{next.title}</h2><p>{next.body}</p>
+      <div className="cc-form-actions">
+        <button type="button" onClick={() => router.push(`${consultantHref(locale, createdId, "public-profile")}&invited=1`)}>{next.continue}</button>
+        <button type="button" className="cc-secondary" onClick={() => router.push(`${consultantHref(locale, createdId)}?invited=1`)}>{next.later}</button>
+      </div>
+    </section>);
+  }
 
   return shell(
     <form className="cc-add-clinician" onSubmit={submit} noValidate aria-label={title}>

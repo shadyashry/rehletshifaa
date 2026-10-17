@@ -10,13 +10,13 @@ import { AddConsultant } from "./AddConsultant";
 
 const auth = vi.hoisted(() => ({ user: { access_token: "test", profile: { sub: "ops", auth_time: Math.floor(Date.now() / 1000) } }, me: null as Me | null, roles: [] as string[], loading: false, meFailed: false, refreshMe: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
 vi.mock("@/components/AuthProvider", () => ({ useAuth: () => auth }));
-vi.mock("@/lib/api", () => ({ apiFetchAs: vi.fn() }));
+vi.mock("@/lib/api", () => ({ API_BASE_URL: "http://api.test", apiFetchAs: vi.fn() }));
 const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push }) }));
 
 const consultant = { id: "p-9", displayName: "Dr Omar Said", specialty: "Cardiology", careCategory: "cardiology", credentialingStatus: "UNDER_REVIEW", accountStatus: "INVITED", email: "omar@example.test" };
-const routes = { "/admin/practitioners": [consultant], "/admin/practitioners/p-9/catalog": [], "/admin/fx-rates": [{ currency: "USD", rate: 0.02, rateDate: "2026-09-23", source: "MARKET" }] };
-const MANAGER = ["CREDENTIAL_READ", "CONSULTANT_ONBOARD", "CONSULTANT_CATALOG_MANAGE", "TEAM_MANAGE"];
+const routes = { "/admin/practitioners": [consultant], "/control-center/consultants/public-profiles": [{ practitionerId: "p-9", slug: "omar-said", published: true, sortOrder: 1, version: 2, affiliationReady: false, priceListReady: false }], "/admin/practitioners/p-9/catalog": [], "/admin/fx-rates": [{ currency: "USD", rate: 0.02, rateDate: "2026-09-23", source: "MARKET" }] };
+const MANAGER = ["CREDENTIAL_READ", "CONSULTANT_ONBOARD", "CONSULTANT_CATALOG_MANAGE", "CONSULTANT_PROFILE_MANAGE", "TEAM_MANAGE"];
 const VERIFIER = ["CREDENTIAL_READ", "CREDENTIAL_DECIDE", "CAPABILITY_DECIDE"];
 beforeEach(() => { vi.mocked(apiFetchAs).mockImplementation(fakeApi(routes)); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); auth.me = null; });
@@ -29,7 +29,8 @@ describe("Consultants directory", () => {
     expect(link).toHaveAttribute("href", "/en/portal/control-center/consultants/p-9");
     const row = link.closest("li")!;
     expect(within(row).getByText("Awaiting review", { selector: ".cc-status" })).toBeVisible();
-    expect(within(row).getByText("Waiting for case approval", { selector: ".cc-row-sub" })).toBeInTheDocument();
+    expect(within(row).getByText("Published", { selector: ".cc-status" })).toBeInTheDocument();
+    expect(within(row).getByText("Affiliation declaration")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add consultant" })).toHaveAttribute("href", "/en/portal/control-center/consultants/new");
   });
 
@@ -38,11 +39,12 @@ describe("Consultants directory", () => {
     render(<ConsultantDirectory locale="en" />);
     expect(await screen.findByRole("link", { name: "Dr Omar Said" })).toBeVisible();
     expect(screen.queryByRole("link", { name: "Add consultant" })).not.toBeInTheDocument();
+    const callsBeforeDeniedRender = vi.mocked(apiFetchAs).mock.calls.length;
     cleanup();
     auth.me = meWith(["JOURNEY_READ"]);
     render(<ConsultantDirectory locale="en" />);
     expect(screen.getByText("You don't have access to consultants")).toBeVisible();
-    expect(apiFetchAs).toHaveBeenCalledTimes(1);
+    expect(apiFetchAs).toHaveBeenCalledTimes(callsBeforeDeniedRender);
   });
 });
 
@@ -80,7 +82,7 @@ describe("Consultant page", () => {
 });
 
 describe("Add consultant", () => {
-  it("sends one invitation and opens the consultant's page", async () => {
+  it("sends one invitation and offers the optional public-profile step", async () => {
     auth.me = meWith(MANAGER);
     vi.mocked(apiFetchAs).mockImplementation(fakeApi({ "POST /admin/practitioners": { id: "p-new" } }));
     render(<AddConsultant locale="en" />);
@@ -89,7 +91,9 @@ describe("Add consultant", () => {
     fireEvent.change(screen.getByLabelText(/Specialty/), { target: { value: "Cardiology" } });
     fireEvent.change(screen.getByRole("combobox", { name: /Care area/ }), { target: { value: "cardiology" } });
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/en/portal/control-center/consultants/p-new?invited=1"));
+    expect(await screen.findByRole("heading", { name: "Add the optional public profile" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Add public profile" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/en/portal/control-center/consultants/p-new?tab=public-profile&invited=1"));
     expect(apiFetchAs).toHaveBeenCalledWith("test", "/admin/practitioners", expect.objectContaining({ method: "POST", body: expect.stringContaining("\"careCategory\":\"cardiology\"") }));
   });
 

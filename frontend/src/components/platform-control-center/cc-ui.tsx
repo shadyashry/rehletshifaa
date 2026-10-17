@@ -25,7 +25,7 @@ export class ControlCenterError extends Error {
 }
 /** A 409 caused by someone else's newer change (a stale version/revision), as opposed to a business rule refusing the action. */
 export function isStaleConflict(error: unknown) {
-  return error instanceof ControlCenterError && error.status === 409 && /STALE|CONCURRENT|CHANGED|STATE_CONFLICT|REVALIDATION/.test(error.code ?? "");
+  return error instanceof ControlCenterError && error.status === 409 && /STALE|CONCURRENT|CHANGED|STATE_CONFLICT|VERSION_CONFLICT|REVALIDATION/.test(error.code ?? "");
 }
 /**
  * One business sentence per failure class, never claiming a save happened when it did not: 4xx responses are

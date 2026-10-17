@@ -34,7 +34,7 @@ export function setupStatus(d: Consultant, locale: Locale): Badge & { bucket: Se
 export function credentialStatus(d: Consultant, locale: Locale): Badge {
   const detail = t(locale, "Checked at case approval", "يُراجَع عند اعتماد الحالات");
   switch (d.credentialingStatus) {
-    case "VERIFIED": return { label: t(locale, "Verified", "تم التحقق"), tone: "success", detail };
+    case "VERIFIED": return { label: t(locale, "Credentials reviewed", "تمت مراجعة المؤهلات"), tone: "success", detail };
     case "REJECTED": return { label: t(locale, "Rejected", "مرفوض"), tone: "danger", detail };
     case "SUSPENDED": return { label: t(locale, "Suspended", "موقوف"), tone: "danger", detail };
     case "EXPIRED": return { label: t(locale, "Expired", "منتهي الصلاحية"), tone: "danger", detail };

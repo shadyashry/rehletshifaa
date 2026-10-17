@@ -1065,3 +1065,25 @@ seeded catalogue line was deactivated; the evidence heading level in the rail (h
 **Next:** slice 3-2 — after arrival (panel order by the current task, summaries for the Consultant's money facts, follow-up
 first after discharge with the complication first, the discharge stamp, work-type copy, a per-panel error boundary), started
 in a new session from this branch.
+
+## Control Center — Consultant public profiles (2026-10-17)
+
+The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The
+directory groups Consultants by care area and shows publication, credentialing, availability, affiliation and price-list
+badges; order controls are keyboard buttons. The Consultant page edits English and Arabic side by side, mirrors backend
+bounds, guards unsaved work, reports version conflicts and previews the real public card and header. The onboarding finish
+offers the profile as an optional next step. All new copy is in `en.json` and `ar.json`; Arabic fields use RTL/Cairo with no
+tracking, and new targets are at least 44px.
+
+Visual QA used synthetic API fixtures at 390px and 1440px in both languages. The eight production-rendered screenshots are
+in `screenshots/consultant-profiles/`; the focused Playwright run passed 4/4 with no horizontal overflow. The Next production
+route table marks home, Consultants, Consultant profiles and all care-area pages dynamic (`ƒ`). Portrait upload is the one
+visible profile-authoring gap; stored CV portrait references continue to render.
+
+The requested `impeccable detect` executable was not installed in this environment (`pnpm exec impeccable --help` returned
+command not found), so no detector result is claimed. The visual review found no overflow or target-size regression; the
+2px Petrol top edge remains the sanctioned DESIGN.md signature.
+
+**Verify.** Frontend typecheck and production build pass; touched-file eslint has 0 errors; focused Vitest has 12/12;
+the production-rendered Playwright screenshot run has 4/4. Backend `mvn -o -q test` has 974 tests, 0 failures/errors and
+3 environment-gated skips; the separately enabled `PostgresJpaMappingTest` passes on disposable PostgreSQL 17 with V1–V107.

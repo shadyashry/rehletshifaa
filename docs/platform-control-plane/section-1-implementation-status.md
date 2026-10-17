@@ -1473,6 +1473,20 @@ no Sonar scanner in the offline Maven cache); a model-independent Astra review o
 2026-10-07 review above was Claude's. Preserve unrelated brand/theme work and do not run concurrent builds that share
 `backend/target`.
 
+### Consultant public profiles handoff (2026-10-17)
+
+Branch `feat/consultant-public-profiles` adds `CONSULTANT_PROFILE_MANAGE` for System Administrator and Consultant Operations
+Manager, writable versioned directory profiles, strict bilingual records, staff GET/PUT/publish/unpublish/reorder endpoints,
+auditing, and durable outbox-driven Next tag invalidation. Public eligibility and credentialing remain independent. Next uses
+the `consultants` and per-slug data-cache tags with a 15-minute recovery TTL; pages remain request-rendered. V106 preserves
+published-slug history; V107 creates complete nine-care-area research templates and seeds only price evidence supported by
+the 2025–2026 source worksheet. Open price evidence is recorded in the research document and is never converted to a made-up
+catalog amount. The Control Center UI and eight EN/AR 390/1440 synthetic screenshots are in the same branch. Portrait upload
+remains open. Final verification: backend 974 tests, 0 failures/errors, 3 gated skips; the gated PostgreSQL mapping test
+passes separately on PostgreSQL 17 with V1–V107. Frontend typecheck, focused lint, 12 focused Vitest tests, production build
+and 4/4 production-rendered screenshot cases pass. The Impeccable executable is unavailable in this environment, so the
+documented visual review is the UI-detector fallback.
+
 ### Open evidence (P1–P6, 2026-10-05)
 
 - No approved implementation gap remains in P1–P6. OD-02 and Practice Manager consent remain excluded.

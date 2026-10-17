@@ -12,6 +12,8 @@ import { accountStatusLabel, approvalStatusLabel, careAreaLabel, formatDate, typ
 import { ConsultantApproval, ConsultantPriceList } from "./catalog-admin";
 import { caseEligibility, consultantHref, credentialStatus, setupStatus, type Consultant } from "./consultant-model";
 import { ConsultantOwnershipPanel } from "./ConsultantOwnershipPanel";
+import { ConsultantPublicProfile } from "./ConsultantPublicProfile";
+import { getDictionary } from "@/lib/dictionary";
 
 type SectionState = "complete" | "attention" | "waiting";
 const stateBadge = (state: SectionState, locale: Locale): { label: string; tone: Tone } => ({
@@ -20,7 +22,7 @@ const stateBadge = (state: SectionState, locale: Locale): { label: string; tone:
   waiting: { label: locale === "ar" ? "بالانتظار" : "Waiting", tone: "info" as Tone },
 })[state];
 
-export type ConsultantTab = "overview" | "approval" | "prices" | "access";
+export type ConsultantTab = "overview" | "public-profile" | "approval" | "prices" | "access";
 
 /**
  * A Consultant's page: one credential & case-approval decision (CREDENTIAL_DECIDE), their price list
@@ -37,13 +39,19 @@ export function ConsultantPage({ locale, practitionerId, initialTab, invited }: 
   const [error, setError] = useState<unknown>(null); const [actionError, setActionError] = useState<unknown>(null);
   const [notice, setNotice] = useState(invited ? (ar ? "أُرسلت الدعوة وأُنشئ الملف. الخطوة التالية: تسجيل الاعتماد ثم قرار الاعتماد للحالات." : "Invitation sent and profile created. Next: record their credential, then make the case-approval decision.") : "");
   const [tab, setTab] = useState<ConsultantTab>(initialTab ?? "overview"); const [busy, setBusy] = useState(false);
+  const [profileDirty, setProfileDirty] = useState(false);
   const noticeRef = useRef<HTMLDivElement>(null);
   const load = useCallback(async () => { setError(null); try { const all = await api<Consultant[]>("/admin/practitioners"); setItem(all.find((p) => p.id === practitionerId) ?? "missing"); } catch (e) { setError(e); } }, [api, practitionerId]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- the Control Center load-on-mount idiom
   useEffect(() => { if (user) void load(); }, [user, load]);
   const rendered = !access.loading && !!item && item !== "missing";
   useEffect(() => { if (invited && rendered) noticeRef.current?.focus(); }, [invited, rendered]);
-  const change = (t: ConsultantTab) => { setTab(t); router.replace(consultantHref(locale, practitionerId, t), { scroll: false }); };
+  const profileCopy = getDictionary(locale).controlCenterConsultantProfiles;
+  const change = (t: ConsultantTab) => {
+    if (profileDirty && t !== "public-profile" && !window.confirm(profileCopy.unsaved)) return;
+    if (t !== "public-profile") setProfileDirty(false);
+    setTab(t); router.replace(consultantHref(locale, practitionerId, t), { scroll: false });
+  };
   const name = item && item !== "missing" ? item.displayName ?? (ar ? "بلا اسم" : "Unnamed") : (ar ? "استشاري" : "Consultant");
   const act = async (action: "resend-invite" | "disable" | "enable") => {
     if (item === null || item === "missing") return;
@@ -68,6 +76,7 @@ export function ConsultantPage({ locale, practitionerId, initialTab, invited }: 
 
   const tabs = [
     { key: "overview" as const, label: ar ? "نظرة عامة" : "Overview" },
+    { key: "public-profile" as const, label: profileCopy.tab },
     { key: "approval" as const, label: ar ? "الاعتماد والموافقة على الحالات" : "Credential & case approval", attention: item.credentialingStatus === "UNDER_REVIEW" },
     { key: "prices" as const, label: ar ? "قائمة الأسعار" : "Price list" },
     { key: "access" as const, label: ar ? "الوصول للحساب" : "Account access" },
@@ -108,6 +117,7 @@ export function ConsultantPage({ locale, practitionerId, initialTab, invited }: 
           <TechnicalDetails locale={locale} items={[[ar ? "معرّف الطبيب" : "Practitioner ID", item.id], [ar ? "حالة الاعتماد" : "Credentialing code", item.credentialingStatus ?? "—"], [ar ? "حالة التوافر" : "Availability code", item.availabilityStatus ?? "—"]]} />
         </>}
         {shown === "approval" && <ConsultantApproval locale={locale} api={api} practitionerId={item.id} status={approval.label} editable={access.can("CREDENTIAL_DECIDE")} onChanged={() => void load()} />}
+        {shown === "public-profile" && <ConsultantPublicProfile locale={locale} api={api} practitionerId={item.id} careArea={item.careCategory ?? ""} editableByUser={access.can("CONSULTANT_PROFILE_MANAGE")} onDirtyChange={setProfileDirty} />}
         {shown === "prices" && <ConsultantPriceList locale={locale} api={api} practitionerId={item.id} careArea={item.careCategory} editable={access.can("CONSULTANT_CATALOG_MANAGE")} />}
         {shown === "access" && <Section title={ar ? "الوصول للحساب" : "Account access"} description={ar ? "يُتابَع تفعيل الحساب بشكل منفصل عن اعتماد المؤهلات." : "Account activation is tracked separately from credential approval."} id="access">
           <Facts items={[[ar ? "الحساب" : "Account", <StatusBadge key="a" tone={account.tone}>{account.label}</StatusBadge>]]} />

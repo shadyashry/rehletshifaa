@@ -27,6 +27,15 @@ public class ProductionSafetyValidator implements ApplicationRunner {
         require(failures, "APP_PUBLIC_BASE_URL", true);
         require(failures, "APP_WEB_BASE_URL", true);
         require(failures, "TURNSTILE_SECRET", false);
+        require(failures, "WEB_REVALIDATE_URL", false);
+        requireSecret(failures, "REVALIDATE_SECRET", "local-only-revalidate-secret-change-in-production");
+        String revalidateUrl = environment.getProperty("WEB_REVALIDATE_URL", "");
+        try {
+            java.net.URI uri = java.net.URI.create(revalidateUrl);
+            if (uri.getScheme() == null || !java.util.Set.of("http", "https").contains(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null)
+                failures.add("app.web.revalidate-url must be an absolute HTTP(S) URL without credentials");
+        } catch (IllegalArgumentException e) { failures.add("app.web.revalidate-url must be an absolute HTTP(S) URL without credentials"); }
+
         require(failures, "COORDINATOR_EMAIL", false);
         require(failures, "MAIL_FROM", false);
         require(failures, "OIDC_ISSUER_URI", true);

@@ -120,6 +120,7 @@ public class ConsultantOnboardingService {
         long revision = practitioners.findById(id).orElseThrow().getVersion();
         events.publishEvent(IdentityOperationRequested.state(UUID.randomUUID(), "practitioner:" + id + ":" + revision, subject, enabled,
                 actor.subject(), enabled ? "Restore sign-in after business lifecycle decision" : "Disable sign-in and end sessions after business lifecycle decision"));
+        events.publishEvent(new com.rehletshifaa.directory.domain.PractitionerDirectoryFactsChanged(id));
         audit(enabled ? "PRACTITIONER_ENABLE_QUEUED" : "PRACTITIONER_DISABLE_QUEUED", actor, "Practitioner", id, enabled ? "ENABLE" : "DISABLE", null);
         return new IdResponse(id, enabled ? "ACTIVE" : "DISABLED");
     }

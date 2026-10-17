@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
 import { ConsultantPage, type ConsultantTab } from "@/components/platform-control-center/ConsultantPage";
 
-const TABS: ConsultantTab[] = ["overview", "approval", "prices", "access"];
+const TABS: ConsultantTab[] = ["overview", "public-profile", "approval", "prices", "access"];
 
 export default async function ConsultantRoute({ params, searchParams }: { params: Promise<{ locale: string; id: string }>; searchParams: Promise<{ tab?: string; invited?: string }> }) {
   const { locale, id } = await params;
