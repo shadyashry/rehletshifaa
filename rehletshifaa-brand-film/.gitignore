@@ -1,0 +1,21 @@
+node_modules/
+source/node_modules/
+source/.hyperframes/
+source/renders/
+**/.hf-segments/
+*.tmp.wav
+assets/audio/**/*.raw.wav
+
+# generated test roots (tools/build_film.mjs --only …)
+source/test-*.html
+# regenerable audio intermediates — rebuilt by the commands in README.md
+assets/audio/music/*.wav
+assets/audio/brand/*.wav
+assets/audio/voiceover/*/line_*.wav
+mixes/**/*.wav
+mixes/**/*.flac
+source/assets/mix/
+review/gate3/*.wav
+# renderer scratch
+renders/work-*/
+renders/.*

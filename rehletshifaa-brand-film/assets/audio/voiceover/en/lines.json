@@ -1,0 +1,983 @@
+{
+  "lang": "en",
+  "source": "en_master_take1.mp3",
+  "lines": [
+    {
+      "line": 1,
+      "text": "When your health needs answers, finding the right care far from home can feel overwhelming.",
+      "file": "line_01.wav",
+      "duration": 5.772,
+      "speech_start": 0.0,
+      "speech_end": 5.6,
+      "transcript": "When your health needs answers, finding the right care far from home can feel overwhelming.",
+      "token_match": 1.0,
+      "words": [
+        {
+          "w": "When",
+          "s": 0.0,
+          "e": 0.32
+        },
+        {
+          "w": "your",
+          "s": 0.32,
+          "e": 0.58
+        },
+        {
+          "w": "health",
+          "s": 0.58,
+          "e": 0.86
+        },
+        {
+          "w": "needs",
+          "s": 0.86,
+          "e": 1.18
+        },
+        {
+          "w": "answers,",
+          "s": 1.18,
+          "e": 1.98
+        },
+        {
+          "w": "finding",
+          "s": 2.24,
+          "e": 2.6
+        },
+        {
+          "w": "the",
+          "s": 2.6,
+          "e": 2.88
+        },
+        {
+          "w": "right",
+          "s": 2.88,
+          "e": 3.12
+        },
+        {
+          "w": "care",
+          "s": 3.12,
+          "e": 3.4
+        },
+        {
+          "w": "far",
+          "s": 3.4,
+          "e": 3.78
+        },
+        {
+          "w": "from",
+          "s": 3.78,
+          "e": 4.04
+        },
+        {
+          "w": "home",
+          "s": 4.04,
+          "e": 4.3
+        },
+        {
+          "w": "can",
+          "s": 4.3,
+          "e": 4.62
+        },
+        {
+          "w": "feel",
+          "s": 4.62,
+          "e": 4.9
+        },
+        {
+          "w": "overwhelming.",
+          "s": 4.9,
+          "e": 5.6
+        }
+      ]
+    },
+    {
+      "line": 2,
+      "text": "With RehletShifaa, you can begin with the medical information you already have. Your journey starts with a simple step.",
+      "file": "line_02.wav",
+      "duration": 7.592,
+      "speech_start": 0.067,
+      "speech_end": 7.387,
+      "transcript": "With Rehlet Shifa, you can begin with the medical information you already have. Your journey starts with a simple step.",
+      "token_match": 1.0,
+      "words": [
+        {
+          "w": "With",
+          "s": 0.067,
+          "e": 0.247
+        },
+        {
+          "w": "Rehlet",
+          "s": 0.247,
+          "e": 0.627
+        },
+        {
+          "w": "Shifa,",
+          "s": 0.627,
+          "e": 1.027
+        },
+        {
+          "w": "you",
+          "s": 1.347,
+          "e": 1.447
+        },
+        {
+          "w": "can",
+          "s": 1.447,
+          "e": 1.727
+        },
+        {
+          "w": "begin",
+          "s": 1.727,
+          "e": 2.027
+        },
+        {
+          "w": "with",
+          "s": 2.027,
+          "e": 2.227
+        },
+        {
+          "w": "the",
+          "s": 2.227,
+          "e": 2.487
+        },
+        {
+          "w": "medical",
+          "s": 2.487,
+          "e": 2.767
+        },
+        {
+          "w": "information",
+          "s": 2.767,
+          "e": 3.407
+        },
+        {
+          "w": "you",
+          "s": 3.407,
+          "e": 3.707
+        },
+        {
+          "w": "already",
+          "s": 3.707,
+          "e": 4.267
+        },
+        {
+          "w": "have.",
+          "s": 4.267,
+          "e": 4.687
+        },
+        {
+          "w": "Your",
+          "s": 5.127,
+          "e": 5.347
+        },
+        {
+          "w": "journey",
+          "s": 5.347,
+          "e": 5.667
+        },
+        {
+          "w": "starts",
+          "s": 5.667,
+          "e": 6.067
+        },
+        {
+          "w": "with",
+          "s": 6.067,
+          "e": 6.347
+        },
+        {
+          "w": "a",
+          "s": 6.347,
+          "e": 6.547
+        },
+        {
+          "w": "simple",
+          "s": 6.547,
+          "e": 6.927
+        },
+        {
+          "w": "step.",
+          "s": 6.927,
+          "e": 7.387
+        }
+      ]
+    },
+    {
+      "line": 3,
+      "text": "A dedicated Patient Coordinator organizes your case, helps with the next steps, and remains your main point of contact.",
+      "file": "line_03.wav",
+      "duration": 7.618,
+      "speech_start": 0.078,
+      "speech_end": 7.338,
+      "transcript": "A dedicated patient coordinator organizes your case, helps with the next steps and remains your main point of contact.",
+      "token_match": 1.0,
+      "words": [
+        {
+          "w": "A",
+          "s": 0.078,
+          "e": 0.278
+        },
+        {
+          "w": "dedicated",
+          "s": 0.278,
+          "e": 0.778
+        },
+        {
+          "w": "patient",
+          "s": 0.778,
+          "e": 1.238
+        },
+        {
+          "w": "coordinator",
+          "s": 1.238,
+          "e": 1.858
+        },
+        {
+          "w": "organizes",
+          "s": 1.858,
+          "e": 2.638
+        },
+        {
+          "w": "your",
+          "s": 2.638,
+          "e": 2.918
+        },
+        {
+          "w": "case,",
+          "s": 2.918,
+          "e": 3.358
+        },
+        {
+          "w": "helps",
+          "s": 3.638,
+          "e": 3.918
+        },
+        {
+          "w": "with",
+          "s": 3.918,
+          "e": 4.178
+        },
+        {
+          "w": "the",
+          "s": 4.178,
+          "e": 4.298
+        },
+        {
+          "w": "next",
+          "s": 4.298,
+          "e": 4.538
+        },
+        {
+          "w": "steps",
+          "s": 4.538,
+          "e": 4.938
+        },
+        {
+          "w": "and",
+          "s": 4.938,
+          "e": 5.298
+        },
+        {
+          "w": "remains",
+          "s": 5.298,
+          "e": 5.678
+        },
+        {
+          "w": "your",
+          "s": 5.678,
+          "e": 6.018
+        },
+        {
+          "w": "main",
+          "s": 6.018,
+          "e": 6.238
+        },
+        {
+          "w": "point",
+          "s": 6.238,
+          "e": 6.538
+        },
+        {
+          "w": "of",
+          "s": 6.538,
+          "e": 6.778
+        },
+        {
+          "w": "contact.",
+          "s": 6.778,
+          "e": 7.338
+        }
+      ]
+    },
+    {
+      "line": 4,
+      "text": "A verified Consultant, selected for your medical needs, carefully reviews the information and recommends appropriate next steps.",
+      "file": "line_04.wav",
+      "duration": 8.645,
+      "speech_start": 0.02,
+      "speech_end": 8.4,
+      "transcript": "A verified consultant, selected for your medical needs, carefully reviews the information and recommends appropriate next steps.",
+      "token_match": 1.0,
+      "words": [
+        {
+          "w": "A",
+          "s": 0.02,
+          "e": 0.36
+        },
+        {
+          "w": "verified",
+          "s": 0.36,
+          "e": 0.8
+        },
+        {
+          "w": "consultant,",
+          "s": 0.8,
+          "e": 1.6
+        },
+        {
+          "w": "selected",
+          "s": 1.76,
+          "e": 2.2
+        },
+        {
+          "w": "for",
+          "s": 2.2,
+          "e": 2.46
+        },
+        {
+          "w": "your",
+          "s": 2.46,
+          "e": 2.74
+        },
+        {
+          "w": "medical",
+          "s": 2.74,
+          "e": 3.08
+        },
+        {
+          "w": "needs,",
+          "s": 3.08,
+          "e": 3.44
+        },
+        {
+          "w": "carefully",
+          "s": 3.94,
+          "e": 4.38
+        },
+        {
+          "w": "reviews",
+          "s": 4.38,
+          "e": 4.78
+        },
+        {
+          "w": "the",
+          "s": 4.78,
+          "e": 5.08
+        },
+        {
+          "w": "information",
+          "s": 5.08,
+          "e": 5.78
+        },
+        {
+          "w": "and",
+          "s": 5.78,
+          "e": 6.22
+        },
+        {
+          "w": "recommends",
+          "s": 6.22,
+          "e": 6.78
+        },
+        {
+          "w": "appropriate",
+          "s": 6.78,
+          "e": 7.52
+        },
+        {
+          "w": "next",
+          "s": 7.52,
+          "e": 7.82
+        },
+        {
+          "w": "steps.",
+          "s": 7.82,
+          "e": 8.4
+        }
+      ]
+    },
+    {
+      "line": 5,
+      "text": "You understand the recommendation, the next steps, and preliminary costs before deciding whether to continue.",
+      "file": "line_05.wav",
+      "duration": 6.878,
+      "speech_start": 0.035,
+      "speech_end": 6.635,
+      "transcript": "You understand the recommendation, the next steps and preliminary costs before deciding whether to continue.",
+      "token_match": 1.0,
+      "words": [
+        {
+          "w": "You",
+          "s": 0.035,
+          "e": 0.195
+        },
+        {
+          "w": "understand",
+          "s": 0.195,
+          "e": 0.775
+        },
+        {
+          "w": "the",
+          "s": 0.775,
+          "e": 1.055
+        },
+        {
+          "w": "recommendation,",
+          "s": 1.055,
+          "e": 1.715
+        },
+        {
+          "w": "the",
+          "s": 2.115,
+          "e": 2.255
+        },
+        {
+          "w": "next",
+          "s": 2.255,
+          "e": 2.455
+        },
+        {
+          "w": "steps",
+          "s": 2.455,
+          "e": 2.855
+        },
+        {
+          "w": "and",
+          "s": 2.855,
+          "e": 3.235
+        },
+        {
+          "w": "preliminary",
+          "s": 3.235,
+          "e": 3.815
+        },
+        {
+          "w": "costs",
+          "s": 3.815,
+          "e": 4.475
+        },
+        {
+          "w": "before",
+          "s": 4.475,
+          "e": 5.075
+        },
+        {
+          "w": "deciding",
+          "s": 5.075,
+          "e": 5.575
+        },
+        {
+          "w": "whether",
+          "s": 5.575,
+          "e": 5.875
+        },
+        {
+          "w": "to",
+          "s": 5.875,
+          "e": 6.135
+        },
+        {
+          "w": "continue.",
+          "s": 6.135,
+          "e": 6.635
+        }
+      ]
+    },
+    {
+      "line": 6,
+      "text": "The decision is yours. When you're ready, we help organize what comes next.",
+      "file": "line_06.wav",
+      "duration": 6.283,
+      "speech_start": 0.143,
+      "speech_end": 6.043,
+      "transcript": "The decision is yours. When you're ready, we help organize what comes next.",
+      "token_match": 1.0,
+      "words": [
+        {
+          "w": "The",
+          "s": 0.143,
+          "e": 0.363
+        },
+        {
+          "w": "decision",
+          "s": 0.363,
+          "e": 0.863
+        },
+        {
+          "w": "is",
+          "s": 0.863,
+          "e": 1.303
+        },
+        {
+          "w": "yours.",
+          "s": 1.303,
+          "e": 1.743
+        },
+        {
+          "w": "When",
+          "s": 2.803,
+          "e": 2.963
+        },
+        {
+          "w": "you're",
+          "s": 2.963,
+          "e": 3.203
+        },
+        {
+          "w": "ready,",
+          "s": 3.203,
+          "e": 3.583
+        },
+        {
+          "w": "we",
+          "s": 3.903,
+          "e": 4.143
+        },
+        {
+          "w": "help",
+          "s": 4.143,
+          "e": 4.423
+        },
+        {
+          "w": "organize",
+          "s": 4.423,
+          "e": 4.903
+        },
+        {
+          "w": "what",
+          "s": 4.903,
+          "e": 5.163
+        },
+        {
+          "w": "comes",
+          "s": 5.163,
+          "e": 5.463
+        },
+        {
+          "w": "next.",
+          "s": 5.463,
+          "e": 6.043
+        }
+      ]
+    },
+    {
+      "line": 7,
+      "text": "If you continue your care in Egypt, we coordinate your medical appointments first, then the practical travel arrangements you need.",
+      "file": "line_07.wav",
+      "duration": 7.974,
+      "speech_start": 0.225,
+      "speech_end": 7.665,
+      "transcript": "If you continue your care in Egypt, we coordinate your medical appointments first, then the practical travel arrangements you need.",
+      "token_match": 1.0,
+      "words": [
+        {
+          "w": "If",
+          "s": 0.225,
+          "e": 0.385
+        },
+        {
+          "w": "you",
+          "s": 0.385,
+          "e": 0.625
+        },
+        {
+          "w": "continue",
+          "s": 0.625,
+          "e": 1.045
+        },
+        {
+          "w": "your",
+          "s": 1.045,
+          "e": 1.345
+        },
+        {
+          "w": "care",
+          "s": 1.345,
+          "e": 1.505
+        },
+        {
+          "w": "in",
+          "s": 1.505,
+          "e": 1.725
+        },
+        {
+          "w": "Egypt,",
+          "s": 1.725,
+          "e": 2.145
+        },
+        {
+          "w": "we",
+          "s": 2.385,
+          "e": 2.625
+        },
+        {
+          "w": "coordinate",
+          "s": 2.625,
+          "e": 3.045
+        },
+        {
+          "w": "your",
+          "s": 3.045,
+          "e": 3.365
+        },
+        {
+          "w": "medical",
+          "s": 3.365,
+          "e": 3.725
+        },
+        {
+          "w": "appointments",
+          "s": 3.725,
+          "e": 4.165
+        },
+        {
+          "w": "first,",
+          "s": 4.165,
+          "e": 4.825
+        },
+        {
+          "w": "then",
+          "s": 5.185,
+          "e": 5.525
+        },
+        {
+          "w": "the",
+          "s": 5.525,
+          "e": 5.745
+        },
+        {
+          "w": "practical",
+          "s": 5.745,
+          "e": 6.245
+        },
+        {
+          "w": "travel",
+          "s": 6.245,
+          "e": 6.645
+        },
+        {
+          "w": "arrangements",
+          "s": 6.645,
+          "e": 7.105
+        },
+        {
+          "w": "you",
+          "s": 7.105,
+          "e": 7.385
+        },
+        {
+          "w": "need.",
+          "s": 7.385,
+          "e": 7.665
+        }
+      ]
+    },
+    {
+      "line": 8,
+      "text": "From arrival to appointments, your coordination team helps keep the practical details organized.",
+      "file": "line_08.wav",
+      "duration": 6.008,
+      "speech_start": 0.02,
+      "speech_end": 5.72,
+      "transcript": "From arrival to appointments, your coordination team helps keep the practical details organized.",
+      "token_match": 1.0,
+      "words": [
+        {
+          "w": "From",
+          "s": 0.02,
+          "e": 0.3
+        },
+        {
+          "w": "arrival",
+          "s": 0.3,
+          "e": 0.82
+        },
+        {
+          "w": "to",
+          "s": 0.82,
+          "e": 1.14
+        },
+        {
+          "w": "appointments,",
+          "s": 1.14,
+          "e": 1.7
+        },
+        {
+          "w": "your",
+          "s": 1.7,
+          "e": 2.2
+        },
+        {
+          "w": "coordination",
+          "s": 2.2,
+          "e": 2.84
+        },
+        {
+          "w": "team",
+          "s": 2.84,
+          "e": 3.16
+        },
+        {
+          "w": "helps",
+          "s": 3.16,
+          "e": 3.48
+        },
+        {
+          "w": "keep",
+          "s": 3.48,
+          "e": 3.76
+        },
+        {
+          "w": "the",
+          "s": 3.76,
+          "e": 4.04
+        },
+        {
+          "w": "practical",
+          "s": 4.04,
+          "e": 4.44
+        },
+        {
+          "w": "details",
+          "s": 4.44,
+          "e": 4.94
+        },
+        {
+          "w": "organized.",
+          "s": 4.94,
+          "e": 5.72
+        }
+      ]
+    },
+    {
+      "line": 9,
+      "text": "Your treating team confirms the appropriate care plan, while your Coordinator stays connected throughout the agreed journey.",
+      "file": "line_09.wav",
+      "duration": 6.92,
+      "speech_start": 0.238,
+      "speech_end": 6.698,
+      "transcript": "Your treating team confirms the appropriate care plan, while your coordinator stays connected throughout the agreed journey.",
+      "token_match": 1.0,
+      "words": [
+        {
+          "w": "Your",
+          "s": 0.238,
+          "e": 0.378
+        },
+        {
+          "w": "treating",
+          "s": 0.378,
+          "e": 0.718
+        },
+        {
+          "w": "team",
+          "s": 0.718,
+          "e": 1.118
+        },
+        {
+          "w": "confirms",
+          "s": 1.118,
+          "e": 1.618
+        },
+        {
+          "w": "the",
+          "s": 1.618,
+          "e": 1.958
+        },
+        {
+          "w": "appropriate",
+          "s": 1.958,
+          "e": 2.438
+        },
+        {
+          "w": "care",
+          "s": 2.438,
+          "e": 2.818
+        },
+        {
+          "w": "plan,",
+          "s": 2.818,
+          "e": 3.078
+        },
+        {
+          "w": "while",
+          "s": 3.438,
+          "e": 3.518
+        },
+        {
+          "w": "your",
+          "s": 3.518,
+          "e": 3.798
+        },
+        {
+          "w": "coordinator",
+          "s": 3.798,
+          "e": 4.258
+        },
+        {
+          "w": "stays",
+          "s": 4.258,
+          "e": 4.678
+        },
+        {
+          "w": "connected",
+          "s": 4.678,
+          "e": 5.238
+        },
+        {
+          "w": "throughout",
+          "s": 5.238,
+          "e": 5.678
+        },
+        {
+          "w": "the",
+          "s": 5.678,
+          "e": 6.018
+        },
+        {
+          "w": "agreed",
+          "s": 6.018,
+          "e": 6.218
+        },
+        {
+          "w": "journey.",
+          "s": 6.218,
+          "e": 6.698
+        }
+      ]
+    },
+    {
+      "line": 10,
+      "text": "And after you return home, we help coordinate your agreed follow-up.",
+      "file": "line_10.wav",
+      "duration": 5.172,
+      "speech_start": 0.344,
+      "speech_end": 4.904,
+      "transcript": "And after you return home, we help coordinate your agreed follow -up.",
+      "token_match": 0.87,
+      "words": [
+        {
+          "w": "And",
+          "s": 0.344,
+          "e": 0.564
+        },
+        {
+          "w": "after",
+          "s": 0.564,
+          "e": 0.864
+        },
+        {
+          "w": "you",
+          "s": 0.864,
+          "e": 1.144
+        },
+        {
+          "w": "return",
+          "s": 1.144,
+          "e": 1.444
+        },
+        {
+          "w": "home,",
+          "s": 1.444,
+          "e": 1.824
+        },
+        {
+          "w": "we",
+          "s": 2.164,
+          "e": 2.404
+        },
+        {
+          "w": "help",
+          "s": 2.404,
+          "e": 2.604
+        },
+        {
+          "w": "coordinate",
+          "s": 2.604,
+          "e": 3.084
+        },
+        {
+          "w": "your",
+          "s": 3.084,
+          "e": 3.424
+        },
+        {
+          "w": "agreed",
+          "s": 3.424,
+          "e": 3.784
+        },
+        {
+          "w": "follow",
+          "s": 3.784,
+          "e": 4.144
+        },
+        {
+          "w": "-up.",
+          "s": 4.144,
+          "e": 4.904
+        }
+      ]
+    },
+    {
+      "line": 11,
+      "text": "RehletShifaa. Understand your options before you travel.",
+      "file": "line_11.wav",
+      "duration": 4.272,
+      "speech_start": 0.192,
+      "speech_end": 4.012,
+      "transcript": "Rehlet Shifa, understand your options before you travel.",
+      "token_match": 1.0,
+      "words": [
+        {
+          "w": "Rehlet",
+          "s": 0.192,
+          "e": 0.552
+        },
+        {
+          "w": "Shifa,",
+          "s": 0.552,
+          "e": 0.992
+        },
+        {
+          "w": "understand",
+          "s": 1.792,
+          "e": 2.252
+        },
+        {
+          "w": "your",
+          "s": 2.252,
+          "e": 2.512
+        },
+        {
+          "w": "options",
+          "s": 2.512,
+          "e": 2.952
+        },
+        {
+          "w": "before",
+          "s": 2.952,
+          "e": 3.452
+        },
+        {
+          "w": "you",
+          "s": 3.452,
+          "e": 3.752
+        },
+        {
+          "w": "travel.",
+          "s": 3.752,
+          "e": 4.012
+        }
+      ]
+    }
+  ]
+}

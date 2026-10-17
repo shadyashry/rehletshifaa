@@ -1,0 +1,85 @@
+{
+ "lang": "en",
+ "total": 13,
+ "music_offset": 22,
+ "cues": [
+  {
+   "kind": "sfx",
+   "t": 1.1,
+   "name": "papers_slide",
+   "gain": -14,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 6.35,
+   "name": "ui_confirm",
+   "gain": -20,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 9.75,
+   "name": "ui_message",
+   "gain": -22,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 11,
+   "name": "ui_calendar",
+   "gain": -22,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 1.35,
+   "name": "keyboard_soft",
+   "gain": -24,
+   "scene": "s03-coordinator",
+   "dur": 1.3
+  },
+  {
+   "kind": "sfx",
+   "t": 7.25,
+   "name": "keyboard_soft",
+   "gain": -23,
+   "scene": "s03-coordinator",
+   "dur": 2
+  },
+  {
+   "kind": "sfx",
+   "t": 4.45,
+   "name": "paper_pickup",
+   "gain": -24,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 9.6,
+   "name": "chair_settle",
+   "gain": -27,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "amb",
+   "t": 0,
+   "end": 13.8,
+   "name": "roomtone_office",
+   "gain": -46,
+   "scene": "s03-coordinator"
+  }
+ ],
+ "vo": [
+  {
+   "scene": "s03-coordinator",
+   "t": 2.5,
+   "file": "line_03.wav",
+   "dur": 7.618,
+   "speech": [
+    0.078,
+    7.338
+   ]
+  }
+ ]
+}

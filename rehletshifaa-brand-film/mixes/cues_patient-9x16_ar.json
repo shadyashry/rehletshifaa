@@ -1,0 +1,232 @@
+{
+ "lang": "ar",
+ "total": 39.329,
+ "music_offset": 0,
+ "cues": [
+  {
+   "kind": "sfx",
+   "t": 1,
+   "name": "paper_pickup",
+   "gain": -13,
+   "scene": "s01-uncertainty",
+   "pan": 0.45
+  },
+  {
+   "kind": "sfx",
+   "t": 3.9,
+   "name": "page_turn",
+   "gain": -20,
+   "scene": "s01-uncertainty",
+   "pan": 0.45
+  },
+  {
+   "kind": "sfx",
+   "t": 9.5,
+   "name": "phone_set_down",
+   "gain": -24,
+   "scene": "s01-uncertainty",
+   "pan": 0.6
+  },
+  {
+   "kind": "amb",
+   "t": 0,
+   "end": 11.4,
+   "name": "amb_home_day",
+   "gain": -45,
+   "scene": "s01-uncertainty",
+   "fadeIn": 1
+  },
+  {
+   "kind": "sfx",
+   "t": 10.755,
+   "name": "phone_taps",
+   "gain": -24,
+   "scene": "s02-discover",
+   "dur": 0.32,
+   "pan": 0.65
+  },
+  {
+   "kind": "sfx",
+   "t": 11.955,
+   "name": "phone_taps",
+   "gain": -24,
+   "scene": "s02-discover",
+   "dur": 0.32,
+   "pan": 0.65
+  },
+  {
+   "kind": "sfx",
+   "t": 13.105,
+   "name": "ui_confirm",
+   "gain": -30,
+   "scene": "s02-discover",
+   "pan": 0.65
+  },
+  {
+   "kind": "sfx",
+   "t": 14.555,
+   "name": "phone_taps",
+   "gain": -24,
+   "scene": "s02-discover",
+   "dur": 0.32,
+   "pan": 0.65
+  },
+  {
+   "kind": "sfx",
+   "t": 15.355,
+   "name": "phone_taps",
+   "gain": -24,
+   "scene": "s02-discover",
+   "dur": 0.32,
+   "pan": 0.65
+  },
+  {
+   "kind": "sfx",
+   "t": 15.755,
+   "name": "ui_submitted",
+   "gain": -22,
+   "scene": "s02-discover",
+   "pan": 0.65
+  },
+  {
+   "kind": "amb",
+   "t": 10.2,
+   "end": 19.12,
+   "name": "amb_home_day",
+   "gain": -47,
+   "scene": "s02-discover",
+   "fadeIn": 0.8999999999999999
+  },
+  {
+   "kind": "sfx",
+   "t": 19.28,
+   "name": "transition_paper",
+   "gain": -30,
+   "scene": "s05-clarity"
+  },
+  {
+   "kind": "sfx",
+   "t": 23.63,
+   "name": "ui_message",
+   "gain": -30,
+   "scene": "s05-clarity"
+  },
+  {
+   "kind": "amb",
+   "t": 17.92,
+   "end": 25.28,
+   "name": "amb_home_day",
+   "gain": -47,
+   "scene": "s05-clarity",
+   "fadeIn": 0.8999999999999999
+  },
+  {
+   "kind": "sfx",
+   "t": 28.658,
+   "name": "phone_taps",
+   "gain": -24,
+   "scene": "s06-decision",
+   "dur": 0.32,
+   "pan": 0.4
+  },
+  {
+   "kind": "sfx",
+   "t": 29.258,
+   "name": "ui_submitted",
+   "gain": -28,
+   "scene": "s06-decision"
+  },
+  {
+   "kind": "amb",
+   "t": 24.08,
+   "end": 32.56,
+   "name": "amb_home_day",
+   "gain": -47,
+   "scene": "s06-decision",
+   "fadeIn": 0.8999999999999999
+  },
+  {
+   "kind": "sfx",
+   "t": 31.36,
+   "name": "transition_air",
+   "gain": -27,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "sfx",
+   "t": 32.41,
+   "name": "logo_signature",
+   "gain": -20,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "sfx",
+   "t": 35.46,
+   "name": "ui_confirm",
+   "gain": -30,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "amb",
+   "t": 31.36,
+   "end": 32.96,
+   "name": "amb_home_evening",
+   "gain": -47,
+   "scene": "s10-followup",
+   "fadeOut": 1.2,
+   "fadeIn": 0.8999999999999999
+  }
+ ],
+ "vo": [
+  {
+   "scene": "s01-uncertainty",
+   "t": 2.2,
+   "file": "line_01.wav",
+   "dur": 8.12,
+   "speech": [
+    0,
+    8
+   ]
+  },
+  {
+   "scene": "s02-discover",
+   "t": 10.505,
+   "file": "line_02.wav",
+   "dur": 7.928,
+   "speech": [
+    0.195,
+    7.515
+   ]
+  },
+  {
+   "scene": "s05-clarity",
+   "t": 18.43,
+   "file": "line_05.wav",
+   "dur": 5.896,
+   "speech": [
+    0.09,
+    5.85
+   ]
+  },
+  {
+   "scene": "s06-decision",
+   "t": 25.158,
+   "file": "line_06.wav",
+   "dur": 6.16,
+   "speech": [
+    0.122,
+    6.102
+   ]
+  },
+  {
+   "scene": "s10-followup",
+   "t": 32.573,
+   "file": "line_11.wav",
+   "dur": 4.176,
+   "speech": [
+    0.176,
+    4.156
+   ]
+  }
+ ]
+}

@@ -1,0 +1,92 @@
+[
+ {
+  "t": 0.0,
+  "scene": 1,
+  "chord": "Bm9"
+ },
+ {
+  "t": 3.6,
+  "scene": 1,
+  "chord": "Gmaj7"
+ },
+ {
+  "t": 7.2,
+  "scene": 1,
+  "chord": "D/F#"
+ },
+ {
+  "t": 10.2,
+  "scene": 2,
+  "chord": "Gmaj7"
+ },
+ {
+  "t": 12.97,
+  "scene": 2,
+  "chord": "D/F#"
+ },
+ {
+  "t": 15.75,
+  "scene": 2,
+  "chord": "Em9"
+ },
+ {
+  "t": 14.36,
+  "scene": 2,
+  "chord": "motif F#4-A4-E4-D4"
+ },
+ {
+  "t": 17.92,
+  "scene": 5,
+  "chord": "Gmaj7"
+ },
+ {
+  "t": 20.17,
+  "scene": 5,
+  "chord": "A"
+ },
+ {
+  "t": 22.43,
+  "scene": 5,
+  "chord": "F#m7"
+ },
+ {
+  "t": 21.3,
+  "scene": 5,
+  "chord": "motif F#4-A4-B4-A4"
+ },
+ {
+  "t": 24.08,
+  "scene": 6,
+  "chord": "Bm9"
+ },
+ {
+  "t": 28.02,
+  "scene": 6,
+  "chord": "Asus"
+ },
+ {
+  "t": 31.36,
+  "scene": 10,
+  "chord": "Gmaj7"
+ },
+ {
+  "t": 33.35,
+  "scene": 10,
+  "chord": "Asus"
+ },
+ {
+  "t": 35.34,
+  "scene": 10,
+  "chord": "Dadd9"
+ },
+ {
+  "t": 37.34,
+  "scene": 10,
+  "chord": "Dadd9"
+ },
+ {
+  "t": 36.3,
+  "scene": 10,
+  "chord": "motif F#4-A4-E4-D4"
+ }
+]

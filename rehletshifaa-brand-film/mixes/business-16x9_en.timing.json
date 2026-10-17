@@ -1,0 +1,37 @@
+{
+ "edition": "business-16x9",
+ "lang": "en",
+ "total": 40.224,
+ "scenes": [
+  {
+   "id": "s03-coordinator",
+   "index": 3,
+   "start": 0,
+   "dur": 9.06
+  },
+  {
+   "id": "s04-consultant",
+   "index": 4,
+   "start": 8.46,
+   "dur": 9.48
+  },
+  {
+   "id": "s07-appointments",
+   "index": 7,
+   "start": 17.34,
+   "dur": 8.54
+  },
+  {
+   "id": "s09-care",
+   "index": 9,
+   "start": 25.28,
+   "dur": 7.46
+  },
+  {
+   "id": "s10-followup",
+   "index": 10,
+   "start": 32.14,
+   "dur": 8.084
+  }
+ ]
+}

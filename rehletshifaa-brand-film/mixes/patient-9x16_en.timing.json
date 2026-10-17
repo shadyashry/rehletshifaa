@@ -1,0 +1,37 @@
+{
+ "edition": "patient-9x16",
+ "lang": "en",
+ "total": 38.304,
+ "scenes": [
+  {
+   "id": "s01-uncertainty",
+   "index": 1,
+   "start": 0,
+   "dur": 8.9
+  },
+  {
+   "id": "s02-discover",
+   "index": 2,
+   "start": 8.3,
+   "dur": 8.32
+  },
+  {
+   "id": "s05-clarity",
+   "index": 5,
+   "start": 16.02,
+   "dur": 7.6
+  },
+  {
+   "id": "s06-decision",
+   "index": 6,
+   "start": 23.02,
+   "dur": 7.8
+  },
+  {
+   "id": "s10-followup",
+   "index": 10,
+   "start": 30.22,
+   "dur": 8.084
+  }
+ ]
+}

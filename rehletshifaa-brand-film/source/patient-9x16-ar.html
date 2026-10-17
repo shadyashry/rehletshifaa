@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>RehletShifaa — From Uncertainty to Clarity (patient-9x16, ar)</title>
+    <script src="shared/vendor/gsap.min.js"></script>
+    <script src="shared/rs-rig.js"></script>
+    <script src="shared/rs-face.js"></script>
+    <script src="shared/chars/amal.js"></script>
+    <script src="shared/chars/nour.js"></script>
+    <script src="shared/chars/consultant.js"></script>
+    <script src="shared/rs-scene.js"></script>
+    <script src="shared/rs-env.js"></script>
+    <script src="shared/rs-props.js"></script>
+    <script src="shared/rs-ui.js"></script>
+    <script src="shared/rs-proposal.js"></script>
+    <script src="shared/rs-standing.js"></script>
+    <script src="shared/rs-env-travel.js"></script>
+    <script src="shared/rs-i18n.js"></script>
+    <script src="shared/rs-film.js"></script>
+    <script src="data/timing.ar.js"></script>
+    <script src="shared/scenes/s01.js"></script>
+    <script src="shared/scenes/s02.js"></script>
+    <script src="shared/scenes/s03.js"></script>
+    <script src="shared/scenes/s04.js"></script>
+    <script src="shared/scenes/s05.js"></script>
+    <script src="shared/scenes/s06.js"></script>
+    <script src="shared/scenes/s07.js"></script>
+    <script src="shared/scenes/s08.js"></script>
+    <script src="shared/scenes/s09.js"></script>
+    <script src="shared/scenes/s10.js"></script>
+    <script src="shared/rs-editions.js"></script>
+    <style>
+/* Brand fonts — the site's own files (frontend/src/assets/fonts), shipped locally for deterministic renders. */
+@font-face { font-family: "Alexandria"; src: url("assets/fonts/alexandria-latin-var.woff2") format("woff2"); font-weight: 100 900; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Alexandria"; src: url("assets/fonts/alexandria-arabic-var.woff2") format("woff2"); font-weight: 100 900; unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0898-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/jakarta-latin-400.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/jakarta-latin-500.woff2") format("woff2"); font-weight: 500; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/jakarta-latin-600.woff2") format("woff2"); font-weight: 600; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/jakarta-latin-700.woff2") format("woff2"); font-weight: 700; }
+@font-face { font-family: "Cairo"; src: url("assets/fonts/cairo-arabic-400.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Cairo"; src: url("assets/fonts/cairo-arabic-600.woff2") format("woff2"); font-weight: 600; }
+@font-face { font-family: "Cairo"; src: url("assets/fonts/cairo-arabic-700.woff2") format("woff2"); font-weight: 700; }
+
+.rs-head { font-family: "Alexandria", "Plus Jakarta Sans", sans-serif; }
+.rs-body { font-family: "Plus Jakarta Sans", sans-serif; }
+.rs-head-ar { font-family: "Alexandria", "Cairo", sans-serif; }
+.rs-body-ar { font-family: "Cairo", "Alexandria", sans-serif; }
+.rs-logo, .rs-logo-ar { font-family: "Alexandria", sans-serif; }
+
+html, body { margin: 0; background: #f7f4ee; }
+#root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #f7f4ee; }
+.scene { position: absolute; inset: 0; }
+.scene > svg, .overlay > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.overlay { position: absolute; inset: 0; pointer-events: none; }
+
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="patient-9x16-ar" data-start="0" data-width="1080" data-height="1920" data-duration="39.329" data-fps="30" data-rebase="0">
+      <audio id="mix-ar" src="assets/mix/patient-9x16_ar.wav" data-start="0" data-duration="39.329" data-track-index="10" data-volume="1"></audio>
+    </div>
+    <script>
+      (function () {
+        const lang = "ar";
+        const only = null;
+        const rebase = 0;
+        if (rebase) {
+          const T = window.RS_TIMINGS[lang];
+          T.scenes.forEach((s) => { s.start = +(s.start - rebase).toFixed(3); s.captions.forEach((c) => { c.s -= rebase; c.e -= rebase; }); });
+          T.total = 39.329;
+        }
+        const edition = "patient-9x16";
+        const { tl, compId } = (edition !== "master" && !only ? RS.filmEdition : RS.film)({ lang, edition, only });
+        window.RS_CUES = RS.CUES;
+        window.__timelines[compId] = tl;
+      })();
+    </script>
+  </body>
+</html>
