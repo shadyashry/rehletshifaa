@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Gate 2 — Amal &amp; Consultant interaction test</title>
+    <script src="shared/vendor/gsap.min.js"></script>
+    <script src="shared/rs-rig.js"></script>
+    <script src="shared/rs-face.js"></script>
+    <script src="shared/chars/amal.js"></script>
+    <script src="shared/chars/nour.js"></script>
+    <script src="shared/chars/consultant.js"></script>
+    <script src="shared/rs-scene.js"></script>
+    <script src="shared/rs-env.js"></script>
+    <style>
+      body { margin: 0; background: #f7f4ee; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #f7f4ee; }
+      #stage { position: absolute; inset: 0; width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="gate2" data-start="0" data-width="1920" data-height="1080" data-duration="10">
+      <svg id="stage" class="clip" data-start="0" data-duration="10" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <script>
+      (function () {
+        const DUR = 10;
+        const svg = document.getElementById("stage");
+        const world = RS.el("g", { id: "world" }, svg);
+        const L = RS.env.consultRoom(svg, world);
+
+        // characters: Amal left facing right, Consultant right facing left (mirrored rig)
+        const amal = RS.place(L.near, "amal", { x: 112, y: -78, s: 1.35, seed: 21, id: "g2-amal" });
+        const doc = RS.place(L.near, "consultant", { x: 1812, y: -86, s: 1.35, flip: true, seed: 33, id: "g2-doc" });
+
+        // desk + props in the foreground layer
+        const DESK_Y = 846;
+        RS.desk(svg, L.fg, { id: "g2-desk", y0: DESK_Y, y1: 1040 });
+        const rep = RS.el("g", { transform: "translate(1010 900) matrix(1.15 0 -0.5 0.4 0 0)" }, L.fg);
+        RS.props.report(svg, rep, { w: 300, h: 380, variant: "knee", rows: 8, id: "g2-rep" });
+        const repFocus = rep.querySelector(".focus");
+        const own = RS.el("g", { transform: "translate(640 912) matrix(1.1 0 0.44 0.36 0 0) rotate(-4)" }, L.fg);
+        RS.props.report(svg, own, { w: 260, h: 340, rows: 9, id: "g2-own" });
+        const glass = RS.el("g", { transform: "translate(905 868) scale(1.2)" }, L.fg);
+        RS.el("path", { d: "M-22 -70 L22 -70 L18 30 L-18 30 Z", fill: "#e8f1f1", opacity: 0.55, stroke: "#c8d8d8", "stroke-width": 2 }, glass);
+        RS.el("path", { d: "M-20 -30 L20 -30 L18 30 L-18 30 Z", fill: "#cfe3e3", opacity: 0.5 }, glass);
+        // depth: walls → desk → far arms → torsos (clipped at the desk edge) → near arms → light
+        world.insertBefore(L.fg, L.near);
+        const armsBehind = RS.el("g", { class: "arms-behind" }, world);
+        world.insertBefore(armsBehind, L.near);
+        const armsTop = RS.el("g", { class: "arms-top" }, world);
+        RS.seatAtDesk(svg, amal, DESK_Y, { behind: armsBehind, front: armsTop });
+        RS.seatAtDesk(svg, doc, DESK_Y, { behind: armsBehind, front: armsTop });
+        L.light.parentNode.appendChild(L.light);
+        RS.props.beam(svg, L.light, { id: "g2-beam", a: 0.22, d: "M60 100 L460 100 L1100 1080 L-200 1080 Z" });
+
+        const tl = gsap.timeline({ paused: true });
+
+        // ------------------------------------------------------------ acting
+        // the near arm was moved out of the body group, so follow the body lean manually
+
+        // base poses: forearms on desk, hands relaxed
+        amal.key(0, { shoulderNear: -10, elbowNear: 14, wristNear: -4, lookX: 0.5, lookY: 0.7, headNod: 3, headTilt: 2, lidL: 0.82, lidR: 0.82 })
+          .key(0, RS.EXPRESSIONS.concerned).hand(0, "Near", "rest").hand(0, "Far", "rest");
+        doc.key(0, { shoulderNear: -14, elbowNear: 12, wristNear: 2, lookX: 0.35, lookY: 0.95, headNod: 6, headTilt: 3, lidL: 0.7, lidR: 0.7, lean: 2 })
+          .key(0, RS.EXPRESSIONS.thoughtful).hand(0, "Near", "point").hand(0, "Far", "rest");
+
+        // 0–1.6  Consultant reads, finger tracking the report line by line
+        doc.key(0.5, { wristNear: 6, elbowNear: 10 }, "sine").key(0.95, { wristNear: 0, elbowNear: 13 }, "sine")
+          .key(1.35, { wristNear: 7, elbowNear: 9 }, "sine");
+        amal.key(1.2, { lookX: 0.8, lookY: 0.6 }, "inOut");
+
+        // 1.6–2.3  anticipation: small dip, then he looks up to Amal — eye contact
+        doc.key(1.75, { headNod: 8, lookY: 1 }, "inOut")
+          .key(2.25, { headNod: -1, headTilt: 0, lookX: 0.55, lookY: 0.05, lidL: 1, lidR: 1 }, "settle")
+          .key(2.25, RS.EXPRESSIONS.attentive, "settle").hand(2.3, "Near", "rest");
+        amal.key(2.05, { lookX: 0.6, lookY: 0.1, headNod: 0, headTilt: 0, lidL: 1, lidR: 1 }, "out");
+
+        // 2.4–4.1  Amal asks a question: lean in, open hand, brows lift at the inner corners
+        amal.key(2.6, { lean: 2.2, shrug: 0.4 }, "inOut").hand(2.7, "Near", "open")
+          .key(2.75, { shoulderNear: -12, elbowNear: 0, wristNear: -14 }, "settle")
+          .key(2.7, { browInner: 1.1, browRaise: 1.3, smile: -0.1 }, "inOut");
+        RS.speak(amal, 2.6, 3.95, { seed: 4, rate: 4.4, scale: 0.85 });
+        amal.key(4.25, { shoulderNear: -10, elbowNear: 13, wristNear: -4, lean: 1.2, shrug: 0 }, "inOut").hand(4.3, "Near", "rest");
+
+        // listening: one considered nod
+        doc.key(3.1, { headNod: 3 }, "inOut").key(3.5, { headNod: -1 }, "out").key(3.9, { headNod: 2.5 }, "inOut").key(4.2, { headNod: 0 }, "out");
+        doc.key(3.2, RS.EXPRESSIONS.listening);
+
+        // 4.4–7.8  Consultant explains: open hand, then indicates the imaging on the report
+        doc.key(4.5, { lean: 0.5 }).hand(4.6, "Near", "open")
+          .key(4.7, { shoulderNear: -15, elbowNear: -1, wristNear: -14 }, "settle")
+          .key(4.7, RS.EXPRESSIONS.warm, "inOut").key(5.6, { smile: 0.25 });
+        RS.speak(doc, 4.7, 7.5, { seed: 9, rate: 4.0, scale: 0.75 });
+        doc.key(5.9, { headTilt: -2, headNod: 1 }, "sine").key(6.5, { headTilt: 1, headNod: 2 }, "sine");
+        doc.key(6.5, { shoulderNear: -16, elbowNear: 12, wristNear: 4, lookX: 0.35, lookY: 0.95, headNod: 6 }, "inOut").hand(6.55, "Near", "point");
+        doc.key(7.45, { lookX: 0.55, lookY: 0.05, headNod: 0 }, "inOut");
+        amal.key(6.6, { lookX: 0.9, lookY: 0.75, headNod: 4, lidL: 0.8, lidR: 0.8 }, "inOut")
+          .key(7.6, { lookX: 0.6, lookY: 0.1, headNod: 0, lidL: 1, lidR: 1 }, "inOut");
+        // knee-imaging highlight responds to his point
+        tl.fromTo(repFocus, { attr: { opacity: 0 } }, { attr: { opacity: 0.85 }, duration: 0.5, ease: "sine.out" }, 6.8);
+
+        // 7.8–10  understanding: brows release, a small nod, shoulders relax, a gentle (not broad) smile
+        amal.key(8.0, RS.EXPRESSIONS.reassured, "inOut").key(8.3, { headNod: 3 }, "inOut").key(8.7, { headNod: -0.5 }, "out")
+          .key(9.0, { shrug: -0.6, lean: 0.4 }, "inOut").key(9.4, { smile: 0.32 }, "inOut");
+        doc.key(8.2, { smile: 0.38, lean: 0 }, "inOut").key(8.4, { shoulderNear: -14, elbowNear: 12, wristNear: 2 }, "inOut").hand(8.45, "Near", "rest");
+
+        amal.autoBlink(0, DUR, { quiet: [[2.6, 3.9]] }).blink(2.0).blink(7.65);
+        doc.autoBlink(0, DUR, { quiet: [[4.8, 5.4]] }).blink(2.2).blink(7.5);
+
+        RS.drive(tl, [amal, doc], DUR);
+
+        // camera: slow motivated push toward Amal's reaction, with parallax
+        const keys = [{ t: 0, s: 1.0, x: 0, y: 0 }, { t: 6, s: 1.04, x: 24, y: 6 }, { t: DUR, s: 1.09, x: 90, y: 10 }];
+        RS.parallax(tl, [[L.far, 0.55], [L.mid, 0.8], [L.fg, 1], [armsBehind, 1], [L.near, 1], [armsTop, 1], [L.light, 0.6]], keys);
+        // daylight breathes very slightly
+        tl.fromTo(L.window.glow, { opacity: 0.85 }, { opacity: 1, duration: DUR, ease: "sine.inOut" }, 0);
+        tl.fromTo(L.window.curtain, { x: 0 }, { x: 5, duration: 5, ease: "sine.inOut", yoyo: true, repeat: 1 }, 0);
+
+        window.__timelines["gate2"] = tl;
+      })();
+    </script>
+  </body>
+</html>

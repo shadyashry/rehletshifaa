@@ -1,0 +1,19 @@
+{
+ "name": "gate3_s03_en",
+ "lang": "en",
+ "duration_s": 13.5,
+ "master_lufs_i": -16.0,
+ "master_true_peak_dbtp": -1.6399999856948853,
+ "stems_lufs_i_pre_master": {
+  "narration": -18.0,
+  "music": -32.9,
+  "ambience": -46.1,
+  "foley": -33.6,
+  "ui": -30.9,
+  "transitions": -99.0,
+  "logo": -99.0
+ },
+ "narration_vs_music_during_speech_lu": 15.4,
+ "cues": 9,
+ "lines": 1
+}

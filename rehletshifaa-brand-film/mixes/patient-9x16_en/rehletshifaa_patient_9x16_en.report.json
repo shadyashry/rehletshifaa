@@ -1,0 +1,19 @@
+{
+ "name": "rehletshifaa_patient_9x16_en",
+ "lang": "en",
+ "duration_s": 38.8,
+ "master_lufs_i": -16.0,
+ "master_true_peak_dbtp": -1.149999976158142,
+ "stems_lufs_i_pre_master": {
+  "narration": -18.0,
+  "music": -33.8,
+  "ambience": -48.5,
+  "foley": -34.8,
+  "ui": -38.0,
+  "transitions": -39.1,
+  "logo": -33.7
+ },
+ "narration_vs_music_during_speech_lu": 16.8,
+ "cues": 21,
+ "lines": 5
+}

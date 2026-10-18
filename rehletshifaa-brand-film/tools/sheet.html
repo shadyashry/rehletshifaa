@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>body{margin:0;background:#f7f4ee;font:600 18px system-ui;color:#13292e} .row{display:flex;flex-wrap:wrap} .cell{position:relative} .cell span{position:absolute;left:12px;top:10px}</style>
+<script src="../source/shared/rs-rig.js"></script>
+<script src="../source/shared/rs-face.js"></script>
+<script src="../source/shared/chars/amal.js"></script>
+<script src="../source/shared/chars/nour.js" onerror="0"></script>
+<script src="../source/shared/chars/consultant.js" onerror="0"></script>
+</head><body><div class="row" id="row"></div>
+<script>
+const q = new URLSearchParams(location.search);
+const char = q.get('char') || 'amal';
+const mode = q.get('mode') || 'faces';
+const vb = q.get('vb') || (mode==='faces' ? '252 228 156 205' : '140 180 480 640');
+const size = +(q.get('w') || (mode==='faces' ? 480 : 640));
+const cells = mode==='faces'
+ ? ['neutral','concerned','attentive','thoughtful','reassured','warm','listening','blink','lookdown','speak']
+ : ['rest','hold','phone','point','open','lean'];
+for (const c of cells) {
+  const d = document.createElement('div'); d.className='cell';
+  d.innerHTML = `<span>${c}</span>`;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox', vb); svg.setAttribute('width', size); svg.setAttribute('height', size*vb.split(' ')[3]/vb.split(' ')[2]);
+  d.appendChild(svg); document.getElementById('row').appendChild(d);
+  const rig = new RS.Rig(RS.CHARS[char], svg, {id: char+'-'+c, seed: 3});
+  rig.procedural = {breath:0, sway:0, saccade:0};
+  const p = Object.assign({}, rig.params, RS.EXPRESSIONS[c] || {});
+  if (c==='blink') { p.lidL = .08; p.lidR=.08; }
+  if (c==='lookdown') { p.lookY = .9; p.lookX=.3; p.lidL=.55; p.lidR=.55; p.headNod=6; p.headTilt=3; }
+  if (c==='speak') { p.mouthOpen=.45; p.browRaise=.8; }
+  if (mode==='poses') {
+    const hp = RS.HAND_POSES[c];
+    if (hp) for (const side of ['Near','Far']) { p['hand'+side+'Curl']=hp.curl; p['hand'+side+'Spread']=hp.spread; p['hand'+side+'Index']=hp.index; p['hand'+side+'Thumb']=hp.thumb; p['hand'+side+'ThumbFront']=hp.thumbFront; }
+    if (c==='lean') { p.lean = 3; p.headTilt=-3; p.shoulderNear=-6; p.elbowNear=-22; p.wristNear=-10; const hp=RS.HAND_POSES.open; p.handNearCurl=hp.curl; p.handNearSpread=hp.spread; }
+  }
+  rig.apply(p);
+}
+</script></body></html>

@@ -1,0 +1,244 @@
+{
+ "lang": "en",
+ "total": 40.224,
+ "music_offset": 0,
+ "cues": [
+  {
+   "kind": "sfx",
+   "t": 4.972,
+   "name": "ui_confirm",
+   "gain": -20,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 8.372,
+   "name": "ui_message",
+   "gain": -22,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": -0.028,
+   "name": "keyboard_soft",
+   "gain": -24,
+   "scene": "s03-coordinator",
+   "dur": 1.3
+  },
+  {
+   "kind": "sfx",
+   "t": 5.872,
+   "name": "keyboard_soft",
+   "gain": -23,
+   "scene": "s03-coordinator",
+   "dur": 2
+  },
+  {
+   "kind": "sfx",
+   "t": 3.072,
+   "name": "paper_pickup",
+   "gain": -24,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 8.222,
+   "name": "chair_settle",
+   "gain": -27,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "amb",
+   "t": 0,
+   "end": 9.66,
+   "name": "roomtone_office",
+   "gain": -46,
+   "scene": "s03-coordinator",
+   "fadeIn": 1
+  },
+  {
+   "kind": "sfx",
+   "t": 14.84,
+   "name": "pen_write",
+   "gain": -26,
+   "scene": "s04-consultant",
+   "pan": 0.6
+  },
+  {
+   "kind": "sfx",
+   "t": 16.74,
+   "name": "phone_set_down",
+   "gain": -30,
+   "scene": "s04-consultant",
+   "pan": 0.6
+  },
+  {
+   "kind": "amb",
+   "t": 8.46,
+   "end": 18.54,
+   "name": "roomtone_clinic",
+   "gain": -46,
+   "scene": "s04-consultant",
+   "fadeIn": 0.8999999999999999
+  },
+  {
+   "kind": "sfx",
+   "t": 21.615,
+   "name": "ui_calendar",
+   "gain": -24,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "sfx",
+   "t": 23.615,
+   "name": "ui_confirm",
+   "gain": -30,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "sfx",
+   "t": 24.215,
+   "name": "ui_confirm",
+   "gain": -30,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "sfx",
+   "t": 25.515,
+   "name": "ui_message",
+   "gain": -27,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "sfx",
+   "t": 19.265,
+   "name": "keyboard_soft",
+   "gain": -25,
+   "scene": "s07-appointments",
+   "dur": 1.3
+  },
+  {
+   "kind": "sfx",
+   "t": 25.765,
+   "name": "chair_settle",
+   "gain": -29,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "amb",
+   "t": 17.34,
+   "end": 26.48,
+   "name": "roomtone_office",
+   "gain": -46,
+   "scene": "s07-appointments",
+   "fadeIn": 0.8999999999999999
+  },
+  {
+   "kind": "sfx",
+   "t": 28.142,
+   "name": "ui_confirm",
+   "gain": -28,
+   "scene": "s09-care"
+  },
+  {
+   "kind": "sfx",
+   "t": 30.442,
+   "name": "ui_message",
+   "gain": -27,
+   "scene": "s09-care",
+   "pan": 0.4
+  },
+  {
+   "kind": "amb",
+   "t": 25.28,
+   "end": 33.34,
+   "name": "roomtone_clinic",
+   "gain": -46,
+   "scene": "s09-care",
+   "fadeIn": 0.8999999999999999
+  },
+  {
+   "kind": "sfx",
+   "t": 32.14,
+   "name": "transition_air",
+   "gain": -27,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "sfx",
+   "t": 33.49,
+   "name": "logo_signature",
+   "gain": -20,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "sfx",
+   "t": 36.24,
+   "name": "ui_confirm",
+   "gain": -30,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "amb",
+   "t": 32.14,
+   "end": 33.74,
+   "name": "amb_home_evening",
+   "gain": -47,
+   "scene": "s10-followup",
+   "fadeOut": 1.2,
+   "fadeIn": 0.8999999999999999
+  }
+ ],
+ "vo": [
+  {
+   "scene": "s03-coordinator",
+   "t": 1.122,
+   "file": "line_03.wav",
+   "dur": 7.618,
+   "speech": [
+    0.078,
+    7.338
+   ]
+  },
+  {
+   "scene": "s04-consultant",
+   "t": 9.04,
+   "file": "line_04.wav",
+   "dur": 8.645,
+   "speech": [
+    0.02,
+    8.4
+   ]
+  },
+  {
+   "scene": "s07-appointments",
+   "t": 17.615,
+   "file": "line_07.wav",
+   "dur": 7.974,
+   "speech": [
+    0.225,
+    7.665
+   ]
+  },
+  {
+   "scene": "s09-care",
+   "t": 25.642,
+   "file": "line_09.wav",
+   "dur": 6.92,
+   "speech": [
+    0.238,
+    6.698
+   ]
+  },
+  {
+   "scene": "s10-followup",
+   "t": 33.612,
+   "file": "line_11.wav",
+   "dur": 4.272,
+   "speech": [
+    0.192,
+    4.012
+   ]
+  }
+ ]
+}

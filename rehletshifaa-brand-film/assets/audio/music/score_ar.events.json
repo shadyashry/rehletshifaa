@@ -1,0 +1,172 @@
+[
+ {
+  "t": 0.0,
+  "scene": 1,
+  "chord": "Bm9"
+ },
+ {
+  "t": 4.17,
+  "scene": 1,
+  "chord": "Gmaj7"
+ },
+ {
+  "t": 8.35,
+  "scene": 1,
+  "chord": "D/F#"
+ },
+ {
+  "t": 12.52,
+  "scene": 2,
+  "chord": "Gmaj7"
+ },
+ {
+  "t": 16.52,
+  "scene": 2,
+  "chord": "D/F#"
+ },
+ {
+  "t": 20.52,
+  "scene": 2,
+  "chord": "Em9"
+ },
+ {
+  "t": 18.52,
+  "scene": 2,
+  "chord": "motif F#4-A4-E4-D4"
+ },
+ {
+  "t": 24.52,
+  "scene": 3,
+  "chord": "G6"
+ },
+ {
+  "t": 28.52,
+  "scene": 3,
+  "chord": "D/F#"
+ },
+ {
+  "t": 32.52,
+  "scene": 3,
+  "chord": "Em9"
+ },
+ {
+  "t": 36.52,
+  "scene": 4,
+  "chord": "Bm7"
+ },
+ {
+  "t": 40.69,
+  "scene": 4,
+  "chord": "Gmaj7"
+ },
+ {
+  "t": 44.85,
+  "scene": 4,
+  "chord": "Asus"
+ },
+ {
+  "t": 49.02,
+  "scene": 5,
+  "chord": "Gmaj7"
+ },
+ {
+  "t": 53.19,
+  "scene": 5,
+  "chord": "A"
+ },
+ {
+  "t": 57.35,
+  "scene": 5,
+  "chord": "F#m7"
+ },
+ {
+  "t": 55.27,
+  "scene": 5,
+  "chord": "motif F#4-A4-B4-A4"
+ },
+ {
+  "t": 61.52,
+  "scene": 6,
+  "chord": "Bm9"
+ },
+ {
+  "t": 66.77,
+  "scene": 6,
+  "chord": "Asus"
+ },
+ {
+  "t": 72.02,
+  "scene": 7,
+  "chord": "Dadd9"
+ },
+ {
+  "t": 76.19,
+  "scene": 7,
+  "chord": "A/C#"
+ },
+ {
+  "t": 80.35,
+  "scene": 7,
+  "chord": "Bm7"
+ },
+ {
+  "t": 78.27,
+  "scene": 7,
+  "chord": "motif A4-C#5-B4-A4"
+ },
+ {
+  "t": 84.52,
+  "scene": 8,
+  "chord": "Gmaj7"
+ },
+ {
+  "t": 88.19,
+  "scene": 8,
+  "chord": "Dadd9"
+ },
+ {
+  "t": 91.85,
+  "scene": 8,
+  "chord": "Asus"
+ },
+ {
+  "t": 95.52,
+  "scene": 9,
+  "chord": "Em9"
+ },
+ {
+  "t": 99.52,
+  "scene": 9,
+  "chord": "G6"
+ },
+ {
+  "t": 103.53,
+  "scene": 9,
+  "chord": "Dadd9"
+ },
+ {
+  "t": 107.53,
+  "scene": 10,
+  "chord": "Gmaj7"
+ },
+ {
+  "t": 111.75,
+  "scene": 10,
+  "chord": "Asus"
+ },
+ {
+  "t": 115.97,
+  "scene": 10,
+  "chord": "Dadd9"
+ },
+ {
+  "t": 120.2,
+  "scene": 10,
+  "chord": "Dadd9"
+ },
+ {
+  "t": 118.0,
+  "scene": 10,
+  "chord": "motif F#4-A4-E4-D4"
+ }
+]

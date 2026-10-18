@@ -1,0 +1,576 @@
+{
+ "lang": "en",
+ "total": 123.24,
+ "music_offset": 0,
+ "cues": [
+  {
+   "kind": "sfx",
+   "t": 1,
+   "name": "paper_pickup",
+   "gain": -13,
+   "scene": "s01-uncertainty",
+   "pan": 0.45
+  },
+  {
+   "kind": "sfx",
+   "t": 3.9,
+   "name": "page_turn",
+   "gain": -20,
+   "scene": "s01-uncertainty",
+   "pan": 0.45
+  },
+  {
+   "kind": "sfx",
+   "t": 9.5,
+   "name": "phone_set_down",
+   "gain": -24,
+   "scene": "s01-uncertainty",
+   "pan": 0.6
+  },
+  {
+   "kind": "amb",
+   "t": 0,
+   "end": 11.8,
+   "name": "amb_home_day",
+   "gain": -45,
+   "scene": "s01-uncertainty",
+   "fadeIn": 2.5
+  },
+  {
+   "kind": "sfx",
+   "t": 12.25,
+   "name": "phone_taps",
+   "gain": -24,
+   "scene": "s02-discover",
+   "dur": 0.32,
+   "pan": 0.65
+  },
+  {
+   "kind": "sfx",
+   "t": 13.45,
+   "name": "phone_taps",
+   "gain": -24,
+   "scene": "s02-discover",
+   "dur": 0.32,
+   "pan": 0.65
+  },
+  {
+   "kind": "sfx",
+   "t": 14.6,
+   "name": "ui_confirm",
+   "gain": -30,
+   "scene": "s02-discover",
+   "pan": 0.65
+  },
+  {
+   "kind": "sfx",
+   "t": 16.05,
+   "name": "phone_taps",
+   "gain": -24,
+   "scene": "s02-discover",
+   "dur": 0.32,
+   "pan": 0.65
+  },
+  {
+   "kind": "sfx",
+   "t": 16.85,
+   "name": "phone_taps",
+   "gain": -24,
+   "scene": "s02-discover",
+   "dur": 0.32,
+   "pan": 0.65
+  },
+  {
+   "kind": "sfx",
+   "t": 17.25,
+   "name": "ui_submitted",
+   "gain": -22,
+   "scene": "s02-discover",
+   "pan": 0.65
+  },
+  {
+   "kind": "amb",
+   "t": 10.2,
+   "end": 23.8,
+   "name": "amb_home_day",
+   "gain": -47,
+   "scene": "s02-discover"
+  },
+  {
+   "kind": "sfx",
+   "t": 22.1,
+   "name": "transition_paper",
+   "gain": -26,
+   "scene": "s02-discover"
+  },
+  {
+   "kind": "sfx",
+   "t": 23.1,
+   "name": "papers_slide",
+   "gain": -14,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 28.35,
+   "name": "ui_confirm",
+   "gain": -20,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 31.75,
+   "name": "ui_message",
+   "gain": -22,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 33,
+   "name": "ui_calendar",
+   "gain": -22,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 23.35,
+   "name": "keyboard_soft",
+   "gain": -24,
+   "scene": "s03-coordinator",
+   "dur": 1.3
+  },
+  {
+   "kind": "sfx",
+   "t": 29.25,
+   "name": "keyboard_soft",
+   "gain": -23,
+   "scene": "s03-coordinator",
+   "dur": 2
+  },
+  {
+   "kind": "sfx",
+   "t": 26.45,
+   "name": "paper_pickup",
+   "gain": -24,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 31.6,
+   "name": "chair_settle",
+   "gain": -27,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "amb",
+   "t": 22,
+   "end": 35.8,
+   "name": "roomtone_office",
+   "gain": -46,
+   "scene": "s03-coordinator"
+  },
+  {
+   "kind": "sfx",
+   "t": 42.1,
+   "name": "pen_write",
+   "gain": -26,
+   "scene": "s04-consultant",
+   "pan": 0.6
+  },
+  {
+   "kind": "sfx",
+   "t": 35.3,
+   "name": "page_turn",
+   "gain": -26,
+   "scene": "s04-consultant",
+   "pan": 0.6
+  },
+  {
+   "kind": "sfx",
+   "t": 44,
+   "name": "phone_set_down",
+   "gain": -30,
+   "scene": "s04-consultant",
+   "pan": 0.6
+  },
+  {
+   "kind": "amb",
+   "t": 34,
+   "end": 48.3,
+   "name": "roomtone_clinic",
+   "gain": -46,
+   "scene": "s04-consultant"
+  },
+  {
+   "kind": "sfx",
+   "t": 47.6,
+   "name": "ui_confirm",
+   "gain": -32,
+   "scene": "s05-clarity"
+  },
+  {
+   "kind": "sfx",
+   "t": 49.95,
+   "name": "transition_paper",
+   "gain": -30,
+   "scene": "s05-clarity"
+  },
+  {
+   "kind": "sfx",
+   "t": 54.3,
+   "name": "ui_message",
+   "gain": -30,
+   "scene": "s05-clarity"
+  },
+  {
+   "kind": "sfx",
+   "t": 56.1,
+   "name": "ui_message",
+   "gain": -28,
+   "scene": "s05-clarity"
+  },
+  {
+   "kind": "amb",
+   "t": 46.6,
+   "end": 60.8,
+   "name": "amb_home_day",
+   "gain": -47,
+   "scene": "s05-clarity"
+  },
+  {
+   "kind": "sfx",
+   "t": 65.9,
+   "name": "phone_taps",
+   "gain": -24,
+   "scene": "s06-decision",
+   "dur": 0.32,
+   "pan": 0.6
+  },
+  {
+   "kind": "sfx",
+   "t": 66.5,
+   "name": "ui_submitted",
+   "gain": -28,
+   "scene": "s06-decision"
+  },
+  {
+   "kind": "amb",
+   "t": 59.3,
+   "end": 71.3,
+   "name": "amb_home_day",
+   "gain": -47,
+   "scene": "s06-decision"
+  },
+  {
+   "kind": "sfx",
+   "t": 75.5,
+   "name": "ui_calendar",
+   "gain": -24,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "sfx",
+   "t": 77.5,
+   "name": "ui_confirm",
+   "gain": -30,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "sfx",
+   "t": 78.1,
+   "name": "ui_confirm",
+   "gain": -30,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "sfx",
+   "t": 79.4,
+   "name": "ui_message",
+   "gain": -27,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "sfx",
+   "t": 70.75,
+   "name": "keyboard_soft",
+   "gain": -25,
+   "scene": "s07-appointments",
+   "dur": 1.2
+  },
+  {
+   "kind": "sfx",
+   "t": 73.15,
+   "name": "keyboard_soft",
+   "gain": -25,
+   "scene": "s07-appointments",
+   "dur": 1.3
+  },
+  {
+   "kind": "sfx",
+   "t": 79.65,
+   "name": "chair_settle",
+   "gain": -29,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "amb",
+   "t": 69.6,
+   "end": 83.8,
+   "name": "roomtone_office",
+   "gain": -46,
+   "scene": "s07-appointments"
+  },
+  {
+   "kind": "sfx",
+   "t": 88.3,
+   "name": "ui_message",
+   "gain": -33,
+   "scene": "s08-arrival"
+  },
+  {
+   "kind": "sfx",
+   "t": 88.85,
+   "name": "ui_message",
+   "gain": -34,
+   "scene": "s08-arrival"
+  },
+  {
+   "kind": "sfx",
+   "t": 89.4,
+   "name": "ui_message",
+   "gain": -35,
+   "scene": "s08-arrival"
+  },
+  {
+   "kind": "sfx",
+   "t": 83,
+   "name": "footsteps",
+   "gain": -29,
+   "scene": "s08-arrival",
+   "dur": 4.2,
+   "pan": 0.45
+  },
+  {
+   "kind": "sfx",
+   "t": 83,
+   "name": "suitcase",
+   "gain": -33,
+   "scene": "s08-arrival",
+   "dur": 4.3,
+   "pan": 0.35
+  },
+  {
+   "kind": "sfx",
+   "t": 87.55,
+   "name": "car_door",
+   "gain": -24,
+   "scene": "s08-arrival",
+   "pan": 0.7
+  },
+  {
+   "kind": "amb",
+   "t": 82,
+   "end": 88,
+   "name": "amb_airport",
+   "gain": -44,
+   "scene": "s08-arrival",
+   "fadeOut": 0.5
+  },
+  {
+   "kind": "amb",
+   "t": 87.5,
+   "end": 94.8,
+   "name": "amb_street",
+   "gain": -50,
+   "scene": "s08-arrival",
+   "fadeIn": 0.5
+  },
+  {
+   "kind": "sfx",
+   "t": 97.7,
+   "name": "ui_confirm",
+   "gain": -28,
+   "scene": "s09-care"
+  },
+  {
+   "kind": "sfx",
+   "t": 100,
+   "name": "ui_message",
+   "gain": -27,
+   "scene": "s09-care",
+   "pan": 0.4
+  },
+  {
+   "kind": "sfx",
+   "t": 94.4,
+   "name": "page_turn",
+   "gain": -30,
+   "scene": "s09-care",
+   "pan": 0.7
+  },
+  {
+   "kind": "amb",
+   "t": 93,
+   "end": 106.8,
+   "name": "roomtone_clinic",
+   "gain": -46,
+   "scene": "s09-care"
+  },
+  {
+   "kind": "sfx",
+   "t": 107.3,
+   "name": "ui_calendar",
+   "gain": -27,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "sfx",
+   "t": 109.5,
+   "name": "ui_message",
+   "gain": -28,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "sfx",
+   "t": 112.3,
+   "name": "transition_air",
+   "gain": -27,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "sfx",
+   "t": 113.65,
+   "name": "logo_signature",
+   "gain": -20,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "sfx",
+   "t": 116.4,
+   "name": "ui_confirm",
+   "gain": -30,
+   "scene": "s10-followup"
+  },
+  {
+   "kind": "amb",
+   "t": 105,
+   "end": 113.9,
+   "name": "amb_home_evening",
+   "gain": -47,
+   "scene": "s10-followup",
+   "fadeOut": 1.2
+  }
+ ],
+ "vo": [
+  {
+   "scene": "s01-uncertainty",
+   "t": 2.7,
+   "file": "line_01.wav",
+   "dur": 5.772,
+   "speech": [
+    0,
+    5.6
+   ]
+  },
+  {
+   "scene": "s02-discover",
+   "t": 12.1,
+   "file": "line_02.wav",
+   "dur": 7.592,
+   "speech": [
+    0.067,
+    7.387
+   ]
+  },
+  {
+   "scene": "s03-coordinator",
+   "t": 24.5,
+   "file": "line_03.wav",
+   "dur": 7.618,
+   "speech": [
+    0.078,
+    7.338
+   ]
+  },
+  {
+   "scene": "s04-consultant",
+   "t": 36.3,
+   "file": "line_04.wav",
+   "dur": 8.645,
+   "speech": [
+    0.02,
+    8.4
+   ]
+  },
+  {
+   "scene": "s05-clarity",
+   "t": 49.1,
+   "file": "line_05.wav",
+   "dur": 6.878,
+   "speech": [
+    0.035,
+    6.635
+   ]
+  },
+  {
+   "scene": "s06-decision",
+   "t": 62.4,
+   "file": "line_06.wav",
+   "dur": 6.283,
+   "speech": [
+    0.143,
+    6.043
+   ]
+  },
+  {
+   "scene": "s07-appointments",
+   "t": 71.5,
+   "file": "line_07.wav",
+   "dur": 7.974,
+   "speech": [
+    0.225,
+    7.665
+   ]
+  },
+  {
+   "scene": "s08-arrival",
+   "t": 84.3,
+   "file": "line_08.wav",
+   "dur": 6.008,
+   "speech": [
+    0.02,
+    5.72
+   ]
+  },
+  {
+   "scene": "s09-care",
+   "t": 95.2,
+   "file": "line_09.wav",
+   "dur": 6.92,
+   "speech": [
+    0.238,
+    6.698
+   ]
+  },
+  {
+   "scene": "s10-followup",
+   "t": 107,
+   "file": "line_10.wav",
+   "dur": 5.172,
+   "speech": [
+    0.344,
+    4.904
+   ]
+  },
+  {
+   "scene": "s10-followup",
+   "t": 113.772,
+   "file": "line_11.wav",
+   "dur": 4.272,
+   "speech": [
+    0.192,
+    4.012
+   ]
+  }
+ ]
+}

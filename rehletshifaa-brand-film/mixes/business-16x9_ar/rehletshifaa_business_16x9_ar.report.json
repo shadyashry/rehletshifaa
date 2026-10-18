@@ -1,0 +1,19 @@
+{
+ "name": "rehletshifaa_business_16x9_ar",
+ "lang": "ar",
+ "duration_s": 42.31,
+ "master_lufs_i": -16.0,
+ "master_true_peak_dbtp": -1.149999976158142,
+ "stems_lufs_i_pre_master": {
+  "narration": -18.0,
+  "music": -34.4,
+  "ambience": -46.2,
+  "foley": -46.4,
+  "ui": -34.4,
+  "transitions": -38.1,
+  "logo": -33.7
+ },
+ "narration_vs_music_during_speech_lu": 16.9,
+ "cues": 24,
+ "lines": 5
+}

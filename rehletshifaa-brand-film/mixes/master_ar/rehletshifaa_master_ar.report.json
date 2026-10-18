@@ -1,0 +1,19 @@
+{
+ "name": "rehletshifaa_master_ar",
+ "lang": "ar",
+ "duration_s": 124.92,
+ "master_lufs_i": -16.0,
+ "master_true_peak_dbtp": -1.149999976158142,
+ "stems_lufs_i_pre_master": {
+  "narration": -18.0,
+  "music": -35.1,
+  "ambience": -47.0,
+  "foley": -37.2,
+  "ui": -35.5,
+  "transitions": -39.1,
+  "logo": -33.7
+ },
+ "narration_vs_music_during_speech_lu": 17.6,
+ "cues": 59,
+ "lines": 11
+}
