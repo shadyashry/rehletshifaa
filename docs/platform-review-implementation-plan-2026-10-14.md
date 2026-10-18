@@ -1004,6 +1004,9 @@ phases.
   change; ArchUnit and all 720 tests green; do this **after** P0-2/P0-4/P1-10 so the extracted code is the final
   shape.
 - Sessions: 2. Model: Fable 5.1, xhigh.
+- **Status (2026-10-18): done on `refactor/journey-service` at `ca97d1d1`.** The facade now delegates to focused
+  assignment, clinical review, proposal decision, final quote, treatment and follow-up services; the compatibility
+  contract and authority boundaries remain covered by the full backend suite and ArchUnit.
 
 ### P1-12  Payouts, payer organisations, partners  (B-04, C-03/F-01, F-04)
 - Settlement statement per case from the frozen snapshot (provider net, deposits received, balance, facility
@@ -1925,7 +1928,7 @@ phases.
 | P2-21 | Arabic-first copy pass and type scale (D-05) — **moved to the UX plan** (cross-cutting); the native review stays a launch gate | — | — |
 | P2-22 | Staff keyboard flow and one-next-action strip (D-06) — **moved to the UX plan** (area 2); bilingual reply templates stay here (backend data) | 0.5 | Opus fast |
 | P2-23 | Per-link rate limits and Turnstile-backed upload exemption (E-11) | 1 | Opus fast |
-| P2-24 | Refund rules enforced per §2.6 (B-06); minimum coordination fee (B-07) | 1 | Fable high |
+| P2-24 | **Done 2026-10-18:** refund rules enforced per §2.6 (B-06); minimum coordination fee (B-07) | 1 | Sol medium |
 | P2-25 | Paid specialist opinion product (F-02) on the review flow + payment adapter (§2.5 decided) | 3 | Fable high |
 | P2-26 | Decision record: Flowable frozen as definition + history + simulation (E-07) | 0.5 | Sonnet |
 
@@ -2032,8 +2035,8 @@ the licence now; the credential type is a one-line addition in P1-19 (done: `LIA
 
 ## Order of sessions (recommended, revised 2026-10-14)
 
-Done (checked 2026-10-16 against each phase's Status block and the branch history): P0-1, P0-2, P0-3, P0-4, P0-5, P1-6, P1-8,
-P1-7, P1-9, P1-10, P1-13, P1-14, P1-15, P1-16, P1-17, P1-18, P1-19. Still to run: P1-11, P2-24, P1-12 (waits for
+Done (checked 2026-10-18 against each phase's Status block and the branch history): P0-1, P0-2, P0-3, P0-4, P0-5, P1-6, P1-8,
+P1-7, P1-9, P1-10, P1-11, P1-13, P1-14, P1-15, P1-16, P1-17, P1-18, P1-19 and P2-24. Still to run: P1-12 (waits for
 the owner's payer terms and partner commission), then P2 and P3.
 
 The original order, for the record:

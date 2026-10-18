@@ -40,12 +40,12 @@ in any patient-facing DTO/UI).
 |---|---|---|
 | Per-consultant **price catalog** + care-area templates + CSV import | `PricingCatalogService` | admin catalog screen; doctor multi-select |
 | **Currency** (daily FX cached in `fx_rates`, senior-Finance override, snapshot+freeze on release) | `CurrencyService` | currency switcher (doctor/coordinator) |
-| **Central margin / commercial policy** (System Administrators and Finance Managers, versioned, audited; 15% default) | `CommercialPolicyService` | Finance "Commercial settings" panel |
+| **Central margin / commercial policy** (System Administrators and Finance Managers, versioned, audited; 15% default, configurable minimum fee with a zero default) | `CommercialPolicyService` | Finance "Commercial settings" panel |
 | **Two document types** `PRELIMINARY_ESTIMATE` / `FINAL_TREATMENT_QUOTE`, min/expected/max **ranges** | `JourneyService.createProposal` / `createFinalQuote` | `ProposalSign` (patient) + coordinator/doctor panels |
 | **Conditional gates** (backend-computed `ProposalGates`) | `computeGates` | Not required / Waiting / Complete checklist |
 | **Final in-person assessment → final quote** (locked rate, scope diff, case stays `ARRIVAL_CONFIRMED`) | `saveFinalAssessment` / `createFinalQuote` / `releaseFinalQuote` | doctor `FinalAssessment`, coordinator `FinalQuoteActions` |
 | **Treatment-commencement gate** (accepted final quote + procedure-specific consent, or audited break-glass) | `captureProcedureConsent` / `emergencyOverride` / `treatment` | (endpoints only) |
-| **Deposits + offline payment ledger** (central deposit policy, append-only `payment_events`, idempotent) | `PaymentService` | `DepositCard` (finance record/refund; others read-only); patient "what you pay now" |
+| **Deposits + enforced refunds + offline payment ledger** (central deposit policy and cutoff, append-only `payment_events`, idempotent) | `PaymentService`, `RefundPolicyService` | `DepositCard` (typed Finance refund; others read-only); patient "what you pay now" |
 | **Secure delivery + idempotent resend** (masked delivery status) | `resendProposalLink` / `deliveryStatus` | coordinator `DeliveryCard` |
 
 ### The four conditional approval paths (never inferred from status on the client)
@@ -59,6 +59,21 @@ in any patient-facing DTO/UI).
 
 Finance is also required for expired/inactive catalog prices, a missing EGP base, a missing
 policy, or a requested policy exception. The ordinary margin never creates a case-level Finance gate.
+
+### Refund enforcement (P2-24)
+
+- The deposit policy stores a versioned `refundCutoffDays` (10 by default). Operations or the case Coordinator records the
+  explicit first confirmed appointment; patient cancellation and no-show refunds are allowed only before the start of the
+  cutoff date in `Africa/Cairo`. Entitlement uses the matching case-exit's recorded time, so a Finance processing delay cannot
+  change the result. Missing appointment evidence cannot be used to deny a refund, and the appointment fact cannot change after exit.
+- Platform, facility or Consultant cancellation and medical decline require a matching typed case-exit fact and return the
+  full remaining deposit. Those exits open durable Finance work after ordinary case work closes. Settlement-credit refunds
+  remain available after the cutoff and are capped by the latest statement's remaining credit.
+- Every refund is capped by net recorded receipts, keeps deposit-scoped idempotency, records the original offline payment rail,
+  and leaves actual money movement with Finance. An open guaranteed-refund task grants Finance only the payment view after exit;
+  a full refund closes that work in the same transaction. Refunds remain append-only; no case, assignment or statement is deleted.
+- The minimum coordination fee is part of each versioned commercial policy and applies as a floor to the disclosed fee line.
+  Its default is EGP 0 because no nonzero owner-approved amount exists yet.
 
 ### Money model specifics (important when touching pricing code)
 
@@ -135,8 +150,9 @@ secure access**, never legal identity (see [end-to-end-workflows.md](end-to-end-
 1. Optional: extract focused components out of `Portal.tsx` (do **not** rewrite the whole portal);
    add a frontend test matrix (Playwright/Vitest) for the preliminary/final patient views, the gate
    checklist, and bilingual/RTL critical content.
-3. Decisions still owed to Egyptian legal/tax/PSP advisers (see references in the task brief): exact
-   deposit refundability, PSP choice (currently **offline record-only**), VAT invoice separation,
+3. Decisions still owed to Egyptian legal/tax/PSP advisers (see references in the task brief): patient-facing refund wording
+   (the approved 2026-09-25 text still uses appointment confirmation rather than the configured cutoff and must be versioned
+   when counsel approves the replacement), PSP choice (currently **offline record-only**), VAT invoice separation,
    procedure-specific consent wording (a reviewed default is in place).
 
 ## Preserve (do not rebuild or weaken)

@@ -50,8 +50,8 @@ public class PaymentService {
     private final AuditTrail auditTrail;
     /** Version of the patient-facing deposit terms (frontend lib/commercial-terms.ts), recorded with each new component. */
     public static final String DEPOSIT_TERMS_VERSION = "deposit-terms-2026-09-25";
-    static final String DEPOSIT_TERMS_REFERENCE = "Deducted from the final treatment plan and quote price. Refund and cancellation terms: as shown to the patient ("
-            + DEPOSIT_TERMS_VERSION + "). Refund classification awaits a legal decision.";
+    static final String DEPOSIT_TERMS_REFERENCE = "Deducted from the final treatment plan and quote price. Runtime refund eligibility uses the versioned deposit policy; "
+            + "patient-facing refund wording remains " + DEPOSIT_TERMS_VERSION + " until counsel approves its replacement.";
     private final Authority authority;
     private final Clock clock;
     private final ApplicationEventPublisher events;
@@ -59,12 +59,16 @@ public class PaymentService {
     private final com.rehletshifaa.casemanagement.application.CareAreas careAreas;
 
     private final DepositCalculator calculator;
+    private final RefundPolicyService refundPolicy;
+    private final StaffWorkService staffWork;
 
     public PaymentService(DepositQueryService queries, Authority authority, Clock clock, ApplicationEventPublisher events, AuditTrail auditTrail,
                           DepositRepository deposits, DepositComponentRepository depositComponents, CoordinationDepositPolicyRepository depositPolicies,
                           PaymentEventRepository paymentEvents, MedicalCaseRepository cases, ProposalVersionRepository proposalVersions,
                           DepositTransferReportRepository transfers, com.rehletshifaa.casemanagement.application.CareAreas careAreas,
-                          DepositCalculator calculator) {
+                          DepositCalculator calculator, RefundPolicyService refundPolicy, StaffWorkService staffWork) {
+        this.staffWork = staffWork;
+        this.refundPolicy = refundPolicy;
         this.calculator = calculator;
         this.queries = queries; this.paymentEvents = paymentEvents; this.depositPolicies = depositPolicies; this.depositComponents = depositComponents;
         this.deposits = deposits; this.auditTrail = auditTrail; this.cases = cases; this.proposalVersions = proposalVersions;
@@ -189,11 +193,22 @@ public class PaymentService {
         Resource onCase = Resource.ofCase(caseId);
         if (!authority.allowed(Permission.CASE_READ, onCase)) authority.require(Permission.CASE_DEPOSIT_READ, onCase);
         cases.lockById(caseId);
-        cases.touch(caseId, micros(clock.instant()));
         DepositRepository.Quoted deposit = requireDeposit(caseId, depositId);
-        appendEvent(caseId, depositId, "REFUND_RECORDED", request.amountEgp(), displayFor(deposit, request.amountEgp()), deposit.getCurrency(), null, "OFFLINE", null, "RECORDED", actor.subject(), request.reason(), request.idempotencyKey());
+        String key = "refund:" + depositId + ":" + request.idempotencyKey();
+        if (paymentEvents.existsByIdempotencyKeyAndDepositId(key, depositId)) return depositForCase(caseId);
+        BigDecimal netPaid = queries.totalsOf(depositId).netEgp();
+        refundPolicy.requireEntitlement(caseId, deposit, request.reasonCode(), request.amountEgp(), netPaid);
+        var original = paymentEvents.findOriginalPayments(depositId, Limit.of(1)).stream().findFirst()
+                .orElseThrow(() -> new ApiException(409, "REFUND_PAYMENT_REQUIRED", "No original payment exists for this deposit"));
+        String detail = request.reason() == null ? "" : request.reason().trim();
+        String reason = request.reasonCode().name() + (detail.isEmpty() ? "" : ": " + detail);
+        appendEvent(caseId, depositId, "REFUND_RECORDED", request.amountEgp(), displayFor(deposit, request.amountEgp()), deposit.getCurrency(),
+                original.getMethod(), original.getProvider(), original.getProviderReference(), "RECORDED", actor.subject(), reason, key);
+        cases.touch(caseId, micros(clock.instant()));
         recomputeStatus(caseId, deposit);
-        audit(actor, caseId, "DEPOSIT_REFUND_RECORDED", depositId, request.reason());
+        if (request.amountEgp().compareTo(netPaid) == 0)
+            staffWork.closeWorkItems(caseId, RefundObligationService.REFUND_WORK, "The remaining coordination deposit was refunded");
+        audit(actor, caseId, "DEPOSIT_REFUND_RECORDED", depositId, "amount=" + request.amountEgp() + "; reasonCode=" + request.reasonCode().name());
         return depositForCase(caseId);
     }
 
@@ -213,14 +228,16 @@ public class PaymentService {
             throw new ApiException(400, "DEPOSIT_BOUNDS_INVALID", "The minimum must not be negative and the maximum must be above zero");
         if (request.minimumUsd() != null && request.maximumUsd() != null && request.minimumUsd().compareTo(request.maximumUsd()) > 0)
             throw new ApiException(400, "DEPOSIT_BOUNDS_INVALID", "The minimum must not be above the maximum");
+        int refundCutoffDays = request.refundCutoffDays() == null ? 10 : request.refundCutoffDays();
+        if (refundCutoffDays < 0 || refundCutoffDays > 365) throw new ApiException(400, "REFUND_CUTOFF_INVALID", "Refund cutoff days must be between 0 and 365");
         String careCategory = request.careCategory() == null || request.careCategory().isBlank() ? null : request.careCategory().trim();
         // QA #22: any managed care area, never a misspelt one that no case would ever match.
         if (careCategory != null && !careAreas.exists(careCategory)) throw new ApiException(400, "CARE_AREA_UNKNOWN", "This care area does not exist");
         int prev = (careCategory == null ? depositPolicies.findLatestDefaultVersion() : depositPolicies.findLatestVersionFor(careCategory)).orElse(0);
         if (careCategory == null) depositPolicies.retireDefault(); else depositPolicies.retireFor(careCategory);
         UUID id = UUID.randomUUID();
-        depositPolicies.saveAndFlush(new CoordinationDepositPolicy(id, request.name() == null || request.name().isBlank() ? "Coordination-initiation deposit" : request.name().trim(), careCategory, request.depositRate(), request.minimumUsd(), request.maximumUsd(), prev + 1, actor.subject(), LocalDate.now(clock), clock.instant()));
-        audit(actor, null, "DEPOSIT_POLICY_CONFIGURED", id, "rate=" + request.depositRate() + "; minUsd=" + request.minimumUsd() + "; maxUsd=" + request.maximumUsd());
+        depositPolicies.saveAndFlush(new CoordinationDepositPolicy(id, request.name() == null || request.name().isBlank() ? "Coordination-initiation deposit" : request.name().trim(), careCategory, request.depositRate(), request.minimumUsd(), request.maximumUsd(), prev + 1, actor.subject(), LocalDate.now(clock), clock.instant(), refundCutoffDays));
+        audit(actor, null, "DEPOSIT_POLICY_CONFIGURED", id, "rate=" + request.depositRate() + "; minUsd=" + request.minimumUsd() + "; maxUsd=" + request.maximumUsd() + "; refundCutoffDays=" + refundCutoffDays);
         return queries.policy(id);
     }
 

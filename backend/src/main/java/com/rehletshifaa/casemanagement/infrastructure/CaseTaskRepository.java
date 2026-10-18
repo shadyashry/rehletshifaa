@@ -12,6 +12,12 @@ import java.util.UUID;
 
 /** Task changes, each guarded by the task state (and, for staff edits, the version) the caller saw. */
 public interface CaseTaskRepository extends BaseRepository<CaseTask, UUID> {
+    @Query("""
+            select count(t) > 0 from CaseTask t
+            where t.caseId = :caseId and t.taskType = 'REFUND_DEPOSIT' and t.ownerRole = 'FINANCE'
+                and t.visibilityScope = 'INTERNAL' and t.status in ('OPEN', 'IN_PROGRESS')""")
+    boolean hasOpenDepositRefund(@Param("caseId") UUID caseId);
+
     boolean existsByCaseIdAndBlockingTrueAndStatusIn(UUID caseId, java.util.Collection<String> statuses);
 
     /** Open blocking work of one visibility scope (who has the ball). */

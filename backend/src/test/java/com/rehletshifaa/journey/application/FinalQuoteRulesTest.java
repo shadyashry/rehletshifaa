@@ -248,15 +248,20 @@ class FinalQuoteRulesTest {
         asSystemAdministrator();
         assertThat(commercialPolicies.configure(new CommercialPolicyRequest("Platform", null, new BigDecimal("0.15"), null, 14, new BigDecimal("0.03"))).finalQuoteValidityDays()).isEqualTo(14);
         asFinanceManager();
-        var set = commercialPolicies.configure(new CommercialPolicyRequest("Cardiology", "cardiology", new BigDecimal("0.15"), null, 10, new BigDecimal("0.05")));
+        var set = commercialPolicies.configure(new CommercialPolicyRequest("Cardiology", "cardiology", new BigDecimal("0.15"), null, 10,
+                new BigDecimal("0.05"), null, null, null, null, new BigDecimal("250.00")));
         assertThat(set.finalQuoteValidityDays()).isEqualTo(10);
         assertThat(set.fxToleranceRate()).isEqualByComparingTo("0.05");
+        assertThat(set.minimumCoordinationFeeEgp()).isEqualByComparingTo("250.00");
         var revised = commercialPolicies.configure(new CommercialPolicyRequest("Cardiology", "cardiology", new BigDecimal("0.12")));
         assertThat(revised.finalQuoteValidityDays()).isEqualTo(10);
         assertThat(revised.fxToleranceRate()).isEqualByComparingTo("0.05");
+        assertThat(revised.minimumCoordinationFeeEgp()).isEqualByComparingTo("250.00");
         assertThat(revised.version()).isEqualTo(set.version() + 1);
         assertThat(catchThrowableOfType(() -> commercialPolicies.configure(new CommercialPolicyRequest("Bad", "cardiology", new BigDecimal("0.15"), null, 0, null)), ApiException.class).code()).isEqualTo("QUOTE_VALIDITY_INVALID");
         assertThat(catchThrowableOfType(() -> commercialPolicies.configure(new CommercialPolicyRequest("Bad", "cardiology", new BigDecimal("0.15"), null, null, new BigDecimal("0.6"))), ApiException.class).code()).isEqualTo("FX_TOLERANCE_INVALID");
+        assertThat(catchThrowableOfType(() -> commercialPolicies.configure(new CommercialPolicyRequest("Bad", "cardiology", new BigDecimal("0.15"), null,
+                null, null, null, null, null, null, new BigDecimal("-0.01"))), ApiException.class).code()).isEqualTo("MINIMUM_COORDINATION_FEE_INVALID");
         // The platform default carries the owner's values from V96.
         assertThat(commercialPolicies.activePolicyFor(null).quoteValidityDays()).isEqualTo(14);
         assertThat(commercialPolicies.activePolicyFor(null).fxTolerance()).isEqualByComparingTo("0.03");

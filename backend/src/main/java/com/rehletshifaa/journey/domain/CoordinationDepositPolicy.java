@@ -25,6 +25,7 @@ public class CoordinationDepositPolicy extends AssignedIdEntity {
     @Column(name = "deposit_rate", nullable = false, precision = 6, scale = 4) private BigDecimal depositRate;
     @Column(name = "minimum_usd", precision = 12, scale = 2) private BigDecimal minimumUsd;
     @Column(name = "maximum_usd", precision = 12, scale = 2) private BigDecimal maximumUsd;
+    @Column(name = "refund_cutoff_days", nullable = false) private int refundCutoffDays = 10;
     @Column(nullable = false) private boolean active;
     @Column(nullable = false) private int version;
     @Column(name = "created_by", length = 120) private String createdBy;
@@ -35,7 +36,13 @@ public class CoordinationDepositPolicy extends AssignedIdEntity {
 
     public CoordinationDepositPolicy(UUID id, String name, String careCategory, BigDecimal depositRate, BigDecimal minimumUsd,
                                      BigDecimal maximumUsd, int version, String createdBy, LocalDate validFrom, Instant now) {
+        this(id, name, careCategory, depositRate, minimumUsd, maximumUsd, version, createdBy, validFrom, now, 10);
+    }
+
+    public CoordinationDepositPolicy(UUID id, String name, String careCategory, BigDecimal depositRate, BigDecimal minimumUsd,
+            BigDecimal maximumUsd, int version, String createdBy, LocalDate validFrom, Instant now, int refundCutoffDays) {
         super(id);
+        this.refundCutoffDays = refundCutoffDays;
         this.name = name; this.careCategory = careCategory; this.depositRate = depositRate; this.active = true;
         this.minimumUsd = minimumUsd; this.maximumUsd = maximumUsd;
         this.version = version; this.createdBy = createdBy; this.validFrom = validFrom; this.createdAt = micros(now);

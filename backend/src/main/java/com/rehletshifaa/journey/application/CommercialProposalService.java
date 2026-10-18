@@ -135,12 +135,13 @@ public class CommercialProposalService {
         String careArea=cases.findCareCategory(caseId).orElse(null);
         var policy=commercialPolicy.activePolicyFor(careArea);
         BigDecimal marginRate=policy!=null?policy.marginRate():BigDecimal.ZERO;
+        BigDecimal minimumFee=policy!=null?policy.minimumFee():BigDecimal.ZERO;
         if(policy==null)requiresFinance=true; // a missing applicable policy forces finance review
         // P0-5 (B-02 / A-07): catalogue lines, still-approved facility packages and manual lines inside the pre-approved band release without Finance.
         {java.time.LocalDate gateDate=java.time.LocalDate.now(clock);BigDecimal manualBand=policy!=null?policy.manualBandEgp():null;requiresFinance=requiresFinance||consultantItems.stream().anyMatch(i->lineNeedsFinance(i.requiresFinance(),i.catalogServiceId(),i.facilityPackageId(),i.priceEgp(),manualBand,gateDate));}
         // P1-10 (D-A): each medical line at the provider's own price; the fee is marginRate x the provider totals (ProposalPricing).
         List<ProposalPricing.ProviderLine> providerLines=consultantItems.stream().map(i->ProposalPricing.ProviderLine.of(i.priceEgp(),i.priceEgpMin(),i.priceEgpMax())).toList();
-        ProposalPricing.Totals priced=ProposalPricing.of(providerLines,marginRate);
+        ProposalPricing.Totals priced=ProposalPricing.of(providerLines,marginRate,minimumFee);
         BigDecimal providerNet=priced.providerExpected(),marginAmount=priced.feeExpected();
         UUID policyId=policy!=null?policy.id():null;Integer policyVersion=policy!=null?policy.version():null;
         UUID proposalId=proposalRecords.findIdByCaseId(caseId).orElseGet(()->{UUID id=UUID.randomUUID();Instant now=clock.instant();proposalRecords.saveAndFlush(new Proposal(id,caseId,now));return id;});
@@ -195,14 +196,14 @@ public class CommercialProposalService {
         String displayCurrency=requireIssuableCurrency(hasText(request.currency())?request.currency():finalRecommendedCurrency);java.time.LocalDate rateDate=java.time.LocalDate.now(clock);
         BigDecimal rate=com.rehletshifaa.shared.currency.CurrencyService.BASE.equals(displayCurrency)?BigDecimal.ONE:currency.effectiveRate(displayCurrency,rateDate);
         // Reuse the SAME locked commercial policy rate captured on the preliminary estimate; recalc against the final scope.
-        record Locked(BigDecimal rate,UUID policyId,Integer policyVersion){}
-        Locked locked=proposalVersions.findLockedMargin(caseId,Limit.of(1)).stream().findFirst().map(l->new Locked(l.getMarginRate(),l.getCommercialPolicyId(),l.getCommercialPolicyVersion())).orElse(null);
-        BigDecimal marginRate;UUID policyId;Integer policyVersion;
-        if(locked!=null){marginRate=locked.rate();policyId=locked.policyId();policyVersion=locked.policyVersion();}
-        else{String careArea=cases.findCareCategory(caseId).orElse(null);var pol=commercialPolicy.activePolicyFor(careArea);marginRate=pol!=null?pol.marginRate():BigDecimal.ZERO;policyId=pol!=null?pol.id():null;policyVersion=pol!=null?pol.version():null;if(pol==null)requiresFinance=true;}
+        record Locked(BigDecimal rate,UUID policyId,Integer policyVersion,BigDecimal minimumFee){}
+        Locked locked=proposalVersions.findLockedMargin(caseId,Limit.of(1)).stream().findFirst().map(l->new Locked(l.getMarginRate(),l.getCommercialPolicyId(),l.getCommercialPolicyVersion(),l.getMinimumCoordinationFeeEgp())).orElse(null);
+        BigDecimal marginRate;UUID policyId;Integer policyVersion;BigDecimal minimumFee;
+        if(locked!=null){marginRate=locked.rate();policyId=locked.policyId();policyVersion=locked.policyVersion();minimumFee=locked.minimumFee()==null?BigDecimal.ZERO:locked.minimumFee();}
+        else{String careArea=cases.findCareCategory(caseId).orElse(null);var pol=commercialPolicy.activePolicyFor(careArea);marginRate=pol!=null?pol.marginRate():BigDecimal.ZERO;policyId=pol!=null?pol.id():null;policyVersion=pol!=null?pol.version():null;minimumFee=pol!=null?pol.minimumFee():BigDecimal.ZERO;if(pol==null)requiresFinance=true;}
         {java.time.LocalDate gateDate=java.time.LocalDate.now(clock);var bandPolicy=commercialPolicy.activePolicyFor(cases.findCareCategory(caseId).orElse(null));BigDecimal manualBand=bandPolicy!=null?bandPolicy.manualBandEgp():null;requiresFinance=requiresFinance||items.stream().anyMatch(i->lineNeedsFinance(i.requiresFinance(),i.catalogServiceId(),i.facilityPackageId(),i.priceEgp(),manualBand,gateDate));}
         List<ProposalPricing.ProviderLine> providerLines=items.stream().map(i->ProposalPricing.ProviderLine.of(i.priceEgp(),i.priceEgpMin(),i.priceEgpMax())).toList();
-        ProposalPricing.Totals priced=ProposalPricing.of(providerLines,marginRate);
+        ProposalPricing.Totals priced=ProposalPricing.of(providerLines,marginRate,minimumFee);
         BigDecimal providerNet=priced.providerExpected(),marginAmount=priced.feeExpected();
         // P1-10 (B-05): the policy's validity runs from release; the coordinator may ask for an earlier end, never a later one.
         int validityDays=quoteValidityDays(caseId);

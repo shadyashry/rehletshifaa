@@ -52,4 +52,14 @@ class ProposalPricingTest {
         assertThat(t.patientMax()).isEqualByComparingTo("14950.00");
         assertThat(ProposalPricing.fee(new BigDecimal("1000"), null)).isEqualByComparingTo("0.00");
     }
+
+    @Test void theConfiguredMinimumAppliesToEveryPointInTheRange() {
+        var t = ProposalPricing.of(List.of(ProposalPricing.ProviderLine.of(new BigDecimal("1000"), new BigDecimal("500"), new BigDecimal("3000"))),
+                new BigDecimal("0.10"), new BigDecimal("250.00"));
+
+        assertThat(t.feeMin()).isEqualByComparingTo("250.00");
+        assertThat(t.feeExpected()).isEqualByComparingTo("250.00");
+        assertThat(t.feeMax()).isEqualByComparingTo("300.00");
+        assertThat(t.patientExpected()).isEqualByComparingTo("1250.00");
+    }
 }

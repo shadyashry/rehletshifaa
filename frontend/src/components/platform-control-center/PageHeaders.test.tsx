@@ -25,6 +25,25 @@ const policies = {
 };
 
 describe("Commercial › Margin & Deposit", () => {
+  it("prefills and confirms the cutoff and minimum coordination fee before saving", async () => {
+    auth.me = meWith(["COMMERCIAL_POLICY_READ", "COMMERCIAL_POLICY_MANAGE", "REFERENCE_DATA_READ"]);
+    vi.mocked(apiFetchAs).mockImplementation(fakeApi({ ...policies,
+      "/finance/commercial-policies": [{ id: "m0", marginRate: 0.15, minimumCoordinationFeeEgp: 250, active: true, version: 1 }],
+      "/finance/deposit-policies": [{ id: "d0", depositRate: 0.15, refundCutoffDays: 12, active: true, version: 1 }] }));
+    render(<MarginDeposit locale="en" />);
+    expect(await screen.findByText("Minimum coordination fee EGP 250")).toBeVisible();
+    expect(screen.getByText("Refund cutoff: 12 days before the first appointment")).toBeVisible();
+    expect(screen.getByLabelText("Minimum coordination fee (EGP)")).toHaveValue(250);
+    expect(screen.getByLabelText("Refund cutoff before appointment (days)")).toHaveValue(12);
+    fireEvent.change(screen.getByLabelText("Coordination deposit (% of the estimate)"), { target: { value: "15" } });
+    fireEvent.change(screen.getByLabelText("Refund cutoff before appointment (days)"), { target: { value: "8" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Review new version" })[1]);
+    const dialog = screen.getByRole("dialog", { name: "Confirm new version" });
+    expect(dialog).toHaveTextContent("Refund cutoff: 8 days before the first appointment");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/deposit-policies", expect.objectContaining({ body: JSON.stringify({ depositRate: 0.15, minimumUsd: 200, maximumUsd: 1500, refundCutoffDays: 8 }) })));
+  });
+
   it("Finance sees the active policies and saves a new version only after confirming its consequence", async () => {
     auth.me = meWith(["COMMERCIAL_POLICY_READ", "COMMERCIAL_POLICY_MANAGE", "REFERENCE_DATA_READ"]);
     vi.mocked(apiFetchAs).mockImplementation(fakeApi(policies));
@@ -45,7 +64,7 @@ describe("Commercial › Margin & Deposit", () => {
     expect(within(dialog).getByText(/used for preliminary estimates created from now on/)).toBeVisible();
     expect(apiFetchAs).not.toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
-    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ marginRate: 0.15, manualBandEgp: null, finalQuoteValidityDays: 14, fxToleranceRate: 0.03, changeOrderBandRate: 0.1, changeOrderBandEgp: 12000, fitToFlyHours: 72, followUpFreeDays: 30 }) })));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ marginRate: 0.15, manualBandEgp: null, finalQuoteValidityDays: 14, fxToleranceRate: 0.03, changeOrderBandRate: 0.1, changeOrderBandEgp: 12000, fitToFlyHours: 72, followUpFreeDays: 30, minimumCoordinationFeeEgp: 0 }) })));
   });
 
   it("states the pre-approved manual band with every margin revision (P0-5)", async () => {
@@ -59,7 +78,7 @@ describe("Commercial › Margin & Deposit", () => {
     const dialog = screen.getByRole("dialog", { name: "Confirm new version" });
     expect(dialog).toHaveTextContent("Manual lines up to EGP 25000 release without Finance");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
-    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ body: JSON.stringify({ marginRate: 0.15, manualBandEgp: 25000, finalQuoteValidityDays: 14, fxToleranceRate: 0.03, changeOrderBandRate: 0.1, changeOrderBandEgp: 15000, fitToFlyHours: 72, followUpFreeDays: 30 }) })));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ body: JSON.stringify({ marginRate: 0.15, manualBandEgp: 25000, finalQuoteValidityDays: 14, fxToleranceRate: 0.03, changeOrderBandRate: 0.1, changeOrderBandEgp: 15000, fitToFlyHours: 72, followUpFreeDays: 30, minimumCoordinationFeeEgp: 0 }) })));
   });
 
   it("shows and sends the final-quote validity and the exchange-rate tolerance with every margin revision (P1-10)", async () => {
@@ -78,7 +97,7 @@ describe("Commercial › Margin & Deposit", () => {
     expect(dialog).toHaveTextContent("final quote valid 10 days");
     expect(dialog).toHaveTextContent("rate tolerance 2.5%");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
-    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ marginRate: 0.15, manualBandEgp: null, finalQuoteValidityDays: 10, fxToleranceRate: 0.025, changeOrderBandRate: 0.1, changeOrderBandEgp: 15000, fitToFlyHours: 72, followUpFreeDays: 30 }) })));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ marginRate: 0.15, manualBandEgp: null, finalQuoteValidityDays: 10, fxToleranceRate: 0.025, changeOrderBandRate: 0.1, changeOrderBandEgp: 15000, fitToFlyHours: 72, followUpFreeDays: 30, minimumCoordinationFeeEgp: 0 }) })));
   });
 
   it("shows the change-order band and sends it, prefilled from the active version, with every margin revision (P1-16, D-E)", async () => {
@@ -102,7 +121,7 @@ describe("Commercial › Margin & Deposit", () => {
     expect(dialog).toHaveTextContent("Change orders up to 5.00% of the package or EGP 9000 (the lower) are Finance's to decide");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
     await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/commercial-policies", expect.objectContaining({ method: "PUT",
-      body: JSON.stringify({ marginRate: 0.15, manualBandEgp: null, finalQuoteValidityDays: 14, fxToleranceRate: 0.03, changeOrderBandRate: 0.05, changeOrderBandEgp: 9000, fitToFlyHours: 96, followUpFreeDays: 45 }) })));
+      body: JSON.stringify({ marginRate: 0.15, manualBandEgp: null, finalQuoteValidityDays: 14, fxToleranceRate: 0.03, changeOrderBandRate: 0.05, changeOrderBandEgp: 9000, fitToFlyHours: 96, followUpFreeDays: 45, minimumCoordinationFeeEgp: 0 }) })));
   });
 
   it("sets the deposit as a share of the estimate (W-1: 15%)", async () => {
@@ -117,7 +136,7 @@ describe("Commercial › Margin & Deposit", () => {
     // P0-4: the revision states its dollar bounds too, prefilled from the policy in use, so saving a rate never drops them.
     expect(dialog).toHaveTextContent("Minimum 200 USD · Maximum 1500 USD");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save new version" }));
-    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/deposit-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ depositRate: 0.2, minimumUsd: 200, maximumUsd: 1500 }) })));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/deposit-policies", expect.objectContaining({ method: "PUT", body: JSON.stringify({ depositRate: 0.2, minimumUsd: 200, maximumUsd: 1500, refundCutoffDays: 10 }) })));
   });
 
   it("shows the deposit bounds in use and sends an emptied bound as none (P0-4)", async () => {
@@ -129,7 +148,7 @@ describe("Commercial › Margin & Deposit", () => {
     fireEvent.change(screen.getByLabelText("Maximum (USD)"), { target: { value: "" } });
     fireEvent.click(screen.getAllByRole("button", { name: "Review new version" })[1]);
     fireEvent.click(within(screen.getByRole("dialog", { name: "Confirm new version" })).getByRole("button", { name: "Save new version" }));
-    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/deposit-policies", expect.objectContaining({ body: JSON.stringify({ depositRate: 0.15, minimumUsd: 200, maximumUsd: null }) })));
+    await waitFor(() => expect(apiFetchAs).toHaveBeenCalledWith("test", "/finance/deposit-policies", expect.objectContaining({ body: JSON.stringify({ depositRate: 0.15, minimumUsd: 200, maximumUsd: null, refundCutoffDays: 10 }) })));
   });
 
   it("is read-only for someone who may read but not manage commercial policy", async () => {

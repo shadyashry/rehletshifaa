@@ -119,6 +119,35 @@ class AuthorityIntegrationTest {
     }
 
     @Test
+    void financePaymentViewSurvivesExitOnlyWhileInternalDepositRefundWorkIsOpen() {
+        new WorkforceTestData(jdbc, crypto, clock.instant()).person("a-refund-finance", "FINANCE")
+                .person("a-refund-ops", "OPERATIONS");
+        Resource onCase = Resource.ofCase(caseId);
+        jdbc.update("UPDATE medical_cases SET status='CANCELLED' WHERE id=?", caseId);
+        UUID task = UUID.randomUUID();
+        jdbc.update("INSERT INTO case_tasks(id,case_id,task_type,title,owner_role,visibility_scope,priority,status,blocking,created_by,created_at,updated_at,version) "
+                        + "VALUES(?,?,'REFUND_DEPOSIT',?,'FINANCE','INTERNAL','NORMAL','OPEN',FALSE,'SYSTEM',?,?,0)",
+                task, caseId, crypto.encrypt("Refund deposit"), clock.instant(), clock.instant());
+
+        assertThat(decide("a-refund-finance", Permission.CASE_DEPOSIT_READ, onCase).scope()).isEqualTo(Scope.CASE_DEPOSIT_OPEN);
+        for (Permission action : List.of(Permission.CASE_READ, Permission.ADMISSION_READ, Permission.EVIDENCE_COUNTERSIGN,
+                Permission.CHANGE_ORDER_PRICE, Permission.RECONCILE, Permission.SETTLEMENT_READ))
+            assertThat(decide("a-refund-finance", action, onCase).granted()).as(action.name()).isFalse();
+        assertThat(decide("a-refund-ops", Permission.CASE_DEPOSIT_READ, onCase).granted()).isFalse();
+
+        jdbc.update("UPDATE case_tasks SET status='IN_PROGRESS' WHERE id=?", task);
+        assertThat(decide("a-refund-finance", Permission.CASE_DEPOSIT_READ, onCase).granted()).isTrue();
+        jdbc.update("UPDATE case_tasks SET status='COMPLETED' WHERE id=?", task);
+        assertThat(decide("a-refund-finance", Permission.CASE_DEPOSIT_READ, onCase).granted()).isFalse();
+        jdbc.update("UPDATE case_tasks SET status='OPEN', task_type='REFUND_CREDIT' WHERE id=?", task);
+        assertThat(decide("a-refund-finance", Permission.CASE_DEPOSIT_READ, onCase).granted()).isFalse();
+        jdbc.update("UPDATE case_tasks SET task_type='REFUND_DEPOSIT', owner_role='OPERATIONS' WHERE id=?", task);
+        assertThat(decide("a-refund-finance", Permission.CASE_DEPOSIT_READ, onCase).granted()).isFalse();
+        jdbc.update("UPDATE case_tasks SET owner_role='FINANCE', visibility_scope='PATIENT_ACTION' WHERE id=?", task);
+        assertThat(decide("a-refund-finance", Permission.CASE_DEPOSIT_READ, onCase).granted()).isFalse();
+    }
+
+    @Test
     void administratorsAndAuditorsHoldNoCasePower() {
         assertThat(decide("a-admin", Permission.CASE_READ, Resource.ofCase(caseId)).code()).isEqualTo("PERMISSION_NOT_HELD");
         assertThat(decide("a-auditor", Permission.CASE_READ, Resource.ofCase(caseId)).code()).isEqualTo("PERMISSION_NOT_HELD");

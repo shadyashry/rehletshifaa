@@ -302,7 +302,7 @@ describe("CancelCaseDialog", () => {
   it("after acceptance it needs a typed reason and sends it with the note through the transition endpoint (P0-2)", async () => {
     const mutate = vi.fn().mockResolvedValue({}), onClose = vi.fn();
     renderWithWork(<CancelCaseDialog caseId="c1" version={4} status="TREATMENT_IN_PROGRESS" busy={false} mutate={mutate} onClose={onClose}/>);
-    expect(screen.getAllByRole("radio")).toHaveLength(5);
+    expect(screen.getAllByRole("radio")).toHaveLength(7);
     fireEvent.click(screen.getByRole("button", { name: "Cancel case" }));
     expect(screen.getByRole("alert").textContent).toContain("Choose a reason");
     expect(mutate).not.toHaveBeenCalled();
@@ -311,6 +311,14 @@ describe("CancelCaseDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel case" }));
     expect(mutate).toHaveBeenCalledWith("/coordinator/cases/c1/transition", { targetStatus: "CANCELLED", expectedVersion: 4, reason: "Bed capacity", cancellationReason: "HOSPITAL_REFUSED" });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it.each(["PLATFORM_CANCELLED", "CONSULTANT_CANCELLED"] as const)("records guaranteed refund exit %s", reason => {
+    const mutate = vi.fn().mockResolvedValue({});
+    renderWithWork(<CancelCaseDialog caseId="c1" version={2} status="ACCEPTED" busy={false} mutate={mutate} onClose={vi.fn()}/>);
+    fireEvent.click(screen.getByRole("radio", { name: workCopyFor("en").cancelCase.reasons[reason] }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel case" }));
+    expect(mutate).toHaveBeenCalledWith("/coordinator/cases/c1/transition", { targetStatus: "CANCELLED", expectedVersion: 2, reason: null, cancellationReason: reason });
   });
 
   it("before acceptance the reason is optional", () => {

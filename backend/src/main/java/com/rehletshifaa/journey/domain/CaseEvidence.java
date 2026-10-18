@@ -28,6 +28,8 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 public class CaseEvidence extends AssignedIdEntity {
     /** P1-15's, P1-16's and P1-17's kinds; later phases add theirs (outcomes). */
     public enum Kind {
+        /** Explicit first confirmed appointment date, independent of arrival and admission. */
+        FIRST_CONFIRMED_APPOINTMENT,
         /** The hospital's pro-forma or admission letter with the quoted package price (Operations; Finance countersigns). */
         FACILITY_ADMISSION_LETTER,
         /** Finance's decision on a letter whose price is outside the accepted estimate (accepted with a reason, or refused). */

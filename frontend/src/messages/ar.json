@@ -1361,6 +1361,17 @@
         "refund": "تسجيل استرداد",
         "amount": "المبلغ (ج.م)",
         "reason": "سبب الاسترداد",
+        "chooseReason": "اختر سبب الاسترداد",
+        "reasonDetail": "تفاصيل (اختياري)",
+        "refundReasons": {
+          "PATIENT_CANCELLED": "إلغاء من المريض",
+          "PATIENT_NO_SHOW": "عدم حضور المريض",
+          "PLATFORM_CANCELLED": "إلغاء من المنصة",
+          "FACILITY_CANCELLED": "إلغاء من المنشأة",
+          "CONSULTANT_CANCELLED": "إلغاء من الاستشاري",
+          "MEDICALLY_DECLINED": "رفض العلاج لأسباب طبية",
+          "SETTLEMENT_CREDIT": "رصيد التسوية"
+        },
         "note": "تسجيل دون اتصال فقط — يسجّل الدفعات المستلمة فعليًا؛ لا تُدخل بيانات بطاقة.",
         "credited": "تُخصم من الرصيد النهائي"
       },
@@ -1971,6 +1982,7 @@
         "RECONCILE_INVOICE": "طابق الفاتورة",
         "COUNTERSIGN_RECONCILIATION": "راجع المطابقة",
         "FACILITY_DISPUTE": "سوِّ النزاع",
+        "REFUND_DEPOSIT": "افتح دفعة التنسيق",
         "REFUND_CREDIT": "افتح المطابقة",
         "FOLLOW_UP_CONTACT": "تسجيل التواصل",
         "REBOOK_FOLLOW_UP": "ترتيب موعد تواصل جديد",
@@ -2866,6 +2878,8 @@
       "hint": "ينهي رحلة المريض. لا يمكن التراجع عن ذلك.",
       "reasonLabel": "السبب",
       "reasons": {
+        "PLATFORM_CANCELLED": "إلغاء من المنصة",
+        "CONSULTANT_CANCELLED": "إلغاء من الاستشاري",
         "PATIENT_WITHDREW": "انسحب المريض",
         "HOSPITAL_REFUSED": "رفض المستشفى المريض",
         "MEDICAL_CONTRAINDICATION": "مانع طبي",
@@ -3015,6 +3029,7 @@
       "RECONCILE_INVOICE": "مطابقة الفاتورة النهائية",
       "COUNTERSIGN_RECONCILIATION": "المصادقة على مطابقة فوق النطاق",
       "FACILITY_DISPUTE": "تسوية مطالبة متنازع عليها مع المستشفى",
+      "REFUND_DEPOSIT": "رد دفعة التنسيق",
       "REFUND_CREDIT": "رد الرصيد الدائن للمريض",
       "FOLLOW_UP_CONTACT": "تواصل المتابعة",
       "REBOOK_FOLLOW_UP": "إعادة حجز تواصل متابعة فائت",
@@ -3564,6 +3579,10 @@
           "title": "سوِّ المطالبة المتنازع عليها في الحالة {caseNumber}",
           "context": "فوتر المستشفى بندًا لم يُحمّل على المريض. سوِّه مع المستشفى وسجّل كيف انتهى."
         },
+        "REFUND_DEPOSIT": {
+          "title": "رد دفعة التنسيق للحالة {caseNumber}",
+          "context": "انتهت الحالة لسبب يضمن استرداد الدفعة بالكامل. راجع المبلغ المدفوع وسجّل الاسترداد."
+        },
         "REFUND_CREDIT": {
           "title": "رد الرصيد الدائن في الحالة {caseNumber}",
           "context": "يُظهر كشف الحساب رصيدًا مستحقًا للمريض. رده مع استرداد الدفعة المقدمة."
@@ -3630,6 +3649,12 @@
       "askLead": "اطلب من قائد فريقك إضافة استشاري لمجال {area} أو اعتماد أحد الاستشاريين."
     },
     "admission": {
+      "firstAppointment": {
+        "title": "أول موعد مؤكد",
+        "hint": "سجّل تاريخ أول موعد مؤكد. يحدد هذا التاريخ الحد الزمني للاسترداد؛ وضّح السبب عند تصحيحه.",
+        "date": "تاريخ أول موعد",
+        "reason": "سبب التأكيد أو التصحيح"
+      },
       "title": "الدخول والمدفوعات",
       "notReserved": "لم يُحجز مستشفى بعد.",
       "loadFailed": "تعذّر تحميل تفاصيل الدخول.",
@@ -3757,6 +3782,7 @@
           "SYSTEM": "النظام"
         },
         "kinds": {
+          "FIRST_CONFIRMED_APPOINTMENT": "أول موعد مؤكد",
           "FACILITY_ADMISSION_LETTER": "خطاب الدخول",
           "PRICE_VARIANCE_CHECK": "مراجعة السعر",
           "ARRIVAL_ATTESTED": "أكّدت العمليات الوصول",
@@ -3794,6 +3820,16 @@
       "cancel": "إلغاء"
     },
     "errorCodes": {
+      "REFUND_EXIT_REASON_MISMATCH": "سبب الاسترداد لا يطابق سبب إلغاء الحالة المسجل. اختر السبب المسجل في الحالة.",
+      "FULL_REFUND_REQUIRED": "يتطلب هذا الإلغاء استرداد كامل المبلغ المتبقي المدفوع على الدفعة.",
+      "REFUND_EXCEEDS_SETTLEMENT_CREDIT": "يتجاوز الاسترداد رصيد التسوية المتبقي.",
+      "REFUND_REASON_REQUIRED": "اختر سبب الاسترداد.",
+      "REFUND_AMOUNT_INVALID": "أدخل مبلغ استرداد أكبر من صفر.",
+      "REFUND_EXCEEDS_NET_PAID": "يتجاوز الاسترداد المبلغ المتبقي من الدفعة القابل للإرجاع. راجع الاستردادات السابقة.",
+      "REFUND_CUTOFF_PASSED": "إلغاء المريض أو عدم حضوره يقع ضمن الفترة غير القابلة للاسترداد قبل أول موعد مؤكد.",
+      "REFUND_PAYMENT_REQUIRED": "يتطلب الاسترداد دفعة مقدمة مسجلة.",
+      "REFUND_CUTOFF_INVALID": "أدخل عدد أيام صحيحًا للحد الزمني للاسترداد.",
+      "APPOINTMENT_FACT_REQUIRED": "أدخل تاريخ أول موعد مؤكد وسبب التأكيد أو التصحيح.",
       "NOT_IN_TREATMENT": "لا يُسجّل هذا إلا والمريض في مرحلة العلاج.",
       "MILESTONE_IN_FUTURE": "لا يمكن أن تكون المرحلة في المستقبل. تحقّق من وقت حدوثها.",
       "OPERATIVE_NOTE_REQUIRED": "يحتاج الإجراء المكتمل إلى تقرير العملية: أدخل مرجعه أو اختر مستنده.",

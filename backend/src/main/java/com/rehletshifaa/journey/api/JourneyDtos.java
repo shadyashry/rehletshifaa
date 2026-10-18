@@ -252,7 +252,12 @@ public final class JourneyDtos {
     /** providerCredentialing: the practitioner is enrolled under provider credentialing (ProviderCredentialEligibility.adopted), so Direct approval writes are refused. */
     public record PractitionerSummaryView(UUID id,String displayName,String specialty,String subspecialty,String careCategory,String credentialingStatus,String availabilityStatus,String email,String accountStatus,Instant invitedAt) {}
     public record CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,boolean active,int version,String createdBy,LocalDate validFrom,int finalQuoteValidityDays,BigDecimal fxToleranceRate,
-                                       BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp,int fitToFlyHours,int followUpFreeDays) {}
+                                       BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp,int fitToFlyHours,int followUpFreeDays,BigDecimal minimumCoordinationFeeEgp) {
+        public CommercialPolicyView(UUID id,String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,boolean active,int version,String createdBy,LocalDate validFrom,int finalQuoteValidityDays,BigDecimal fxToleranceRate,
+                BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp,int fitToFlyHours,int followUpFreeDays) {
+            this(id,name,careCategory,marginRate,manualBandEgp,active,version,createdBy,validFrom,finalQuoteValidityDays,fxToleranceRate,changeOrderBandRate,changeOrderBandEgp,fitToFlyHours,followUpFreeDays,BigDecimal.ZERO);
+        }
+    }
     /**
      * P1-10: {@code finalQuoteValidityDays} and {@code fxToleranceRate} left out keep the care area's current values (default 14 days, 0.03).
      * P1-16 (D-E): so do {@code changeOrderBandRate} and {@code changeOrderBandEgp} (default 0.10 of the facility package, capped at EGP 15,000).
@@ -260,7 +265,11 @@ public final class JourneyDtos {
      * P1-18 (D-G): and {@code followUpFreeDays} (default 30, 7 to 90).
      */
     public record CommercialPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0")BigDecimal marginRate,@DecimalMin("0.0")BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate,
-                                          BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp,Integer fitToFlyHours,Integer followUpFreeDays) {
+                                          BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp,Integer fitToFlyHours,Integer followUpFreeDays,@DecimalMin("0.0") @Digits(integer=12,fraction=2) BigDecimal minimumCoordinationFeeEgp) {
+        public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate,
+                BigDecimal changeOrderBandRate,BigDecimal changeOrderBandEgp,Integer fitToFlyHours,Integer followUpFreeDays) {
+            this(name,careCategory,marginRate,manualBandEgp,finalQuoteValidityDays,fxToleranceRate,changeOrderBandRate,changeOrderBandEgp,fitToFlyHours,followUpFreeDays,null);
+        }
         public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate){this(name,careCategory,marginRate,null);}
         public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp){this(name,careCategory,marginRate,manualBandEgp,null,null);}
         public CommercialPolicyRequest(String name,String careCategory,BigDecimal marginRate,BigDecimal manualBandEgp,Integer finalQuoteValidityDays,BigDecimal fxToleranceRate){
@@ -296,15 +305,21 @@ public final class JourneyDtos {
     public record TransferRejectionRequest(@NotBlank @Size(max=500)String reason) {}
     /** Finance confirms the amount received against the patient's pending transfer reference (method and reference come from it). */
     public record RecordReceiptRequest(@NotNull @DecimalMin("0.01")@Digits(integer=12,fraction=2)BigDecimal amountEgp,@NotBlank @Size(max=180)String idempotencyKey) {}
-    public record RefundRequest(@NotNull @DecimalMin("0.01")BigDecimal amountEgp,@NotBlank @Size(max=2000)String reason,@NotBlank @Size(max=180)String idempotencyKey) {}
-    public record DepositPolicyView(UUID id,String name,String careCategory,BigDecimal depositRate,BigDecimal minimumUsd,BigDecimal maximumUsd,boolean active,int version,String createdBy,LocalDate validFrom) {}
+    public enum RefundReason { PATIENT_CANCELLED, PATIENT_NO_SHOW, PLATFORM_CANCELLED, FACILITY_CANCELLED, CONSULTANT_CANCELLED, MEDICALLY_DECLINED, SETTLEMENT_CREDIT }
+    public record FirstConfirmedAppointmentRequest(@NotNull LocalDate appointmentDate, @NotBlank @Size(max=2000) String reason) {}
+    public record FirstConfirmedAppointmentView(UUID evidenceId, LocalDate appointmentDate) {}
+    public record RefundRequest(@NotNull @DecimalMin("0.01") @Digits(integer=12,fraction=2) BigDecimal amountEgp,@NotNull RefundReason reasonCode,@Size(max=2000)String reason,@NotBlank @Size(max=150)String idempotencyKey) {
+        public RefundRequest(BigDecimal amountEgp, String reason, String idempotencyKey) { this(amountEgp, RefundReason.PATIENT_CANCELLED, reason, idempotencyKey); }
+    }
+    public record DepositPolicyView(UUID id,String name,String careCategory,BigDecimal depositRate,BigDecimal minimumUsd,BigDecimal maximumUsd,boolean active,int version,String createdBy,LocalDate validFrom,int refundCutoffDays) {}
     /**
      * {@code depositRate}: the share of the patient's estimated total due as the coordination deposit, 0–1 (0.15 = 15%);
      * {@code minimumUsd} / {@code maximumUsd}: its bounds in US dollars (P0-4), null for none.
      */
     public record DepositPolicyRequest(@Size(max=160)String name,@Size(max=60)String careCategory,@NotNull @DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("1.0") @Digits(integer=1,fraction=4)BigDecimal depositRate,
-            @DecimalMin("0.0") @Digits(integer=10,fraction=2)BigDecimal minimumUsd,@DecimalMin("0.01") @Digits(integer=10,fraction=2)BigDecimal maximumUsd) {
-        public DepositPolicyRequest(String name,String careCategory,BigDecimal depositRate){this(name,careCategory,depositRate,null,null);}
+            @DecimalMin("0.0") @Digits(integer=10,fraction=2)BigDecimal minimumUsd,@DecimalMin("0.01") @Digits(integer=10,fraction=2)BigDecimal maximumUsd,@jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(365) Integer refundCutoffDays) {
+        public DepositPolicyRequest(String name,String careCategory,BigDecimal depositRate,BigDecimal minimumUsd,BigDecimal maximumUsd){this(name,careCategory,depositRate,minimumUsd,maximumUsd,10);}
+        public DepositPolicyRequest(String name,String careCategory,BigDecimal depositRate){this(name,careCategory,depositRate,null,null,10);}
     }
     public record CatalogImportRow(int line,String serviceCode,String serviceName,String category,BigDecimal priceEgp,String action,String message) {}
     public record CatalogImportResult(boolean committed,int added,int updated,int unchanged,int errors,List<CatalogImportRow> rows) {}

@@ -1,5 +1,6 @@
 "use client";
 
+import { RefundForm } from "./RefundForm";
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { createContext, use, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import dynamic from "next/dynamic";
@@ -713,9 +714,7 @@ function TransferPanel({locale,deposit,caseId,isFinance,busy,mutate,tx,amountLab
 
 function DepositCard({deposit}:{deposit:DepositView}){
  const {locale,role,c:{id:caseId},busy,mutate}=useCaseWorkspace();
- const workCopy=useWorkCopy();const confirmCopy=workCopy.confirm;const tx=workCopy.depositTransfer;const g=workCopy.caseView.deposit;
- // A refund is money leaving: the amount is read back before it is recorded.
- const [refund,setRefund]=useState<{form:HTMLFormElement;amountEgp:number;reason:string}|null>(null);
+ const workCopy=useWorkCopy();const tx=workCopy.depositTransfer;const g=workCopy.caseView.deposit;
  const isFinance=role==="finance";
  const amount=(n?:number)=>n==null?"—":money(n,deposit.currency||"EGP",locale);
  // QA W-26: Finance records in EGP, so each figure in the patient's currency carries its EGP amount.
@@ -729,15 +728,10 @@ function DepositCard({deposit}:{deposit:DepositView}){
   {deposit.components.length>0&&<ul className="mt-3 space-y-1 text-sm">{deposit.components.map((cp,i)=><li key={i} className="flex justify-between gap-3"><span>{cp.purpose} <span className="text-[0.8125rem] text-ink-400">({cp.beneficiary}{cp.creditedToFinal?` · ${g.credited}`:""})</span></span><strong className="whitespace-nowrap"><bdi dir="ltr">{amount(cp.amountDisplay)}</bdi></strong></li>)}</ul>}
   {open&&<TransferPanel locale={locale} deposit={deposit} caseId={caseId} isFinance={isFinance} busy={busy} mutate={mutate} tx={tx} amountLabel={g.amount}/>}
   {isFinance&&<>
-   <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);setRefund({form:f,amountEgp:Number(d.get("amount"))||0,reason:String(d.get("reason")||"").trim()});}}>
-    <label className="text-[0.8125rem] font-bold">{g.amount}<input className="field w-28" name="amount" type="number" min="0.01" step="0.01" required/></label>
-    <label className="flex-1 text-[0.8125rem] font-bold">{g.reason}<input className="field" name="reason" required/></label>
-    <button className="btn-secondary" disabled={busy}>{g.refund}</button>
-   </form>
+   <RefundForm locale={locale} busy={busy} onRecord={request=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/refunds`,request)}/>
    <p className="mt-2 text-[0.8125rem] text-ink-500">{g.note}</p>
   </>}
-  {refund&&<ConfirmDialog title={fillTemplate(confirmCopy.refundTitle,{amount:money(refund.amountEgp,"EGP",locale)})} body={confirmCopy.refundBody} confirm={confirmCopy.refund} cancel={confirmCopy.cancel}
-   onCancel={()=>setRefund(null)} onConfirm={()=>{const r=refund;setRefund(null);void mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/refunds`,{amountEgp:r.amountEgp,reason:r.reason,idempotencyKey:crypto.randomUUID()}).then(result=>{if(result)r.form.reset();});}}/>}
+
  </div>;
 }
 

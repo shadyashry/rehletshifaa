@@ -1361,6 +1361,17 @@
         "refund": "Record a refund",
         "amount": "Amount (EGP)",
         "reason": "Refund reason",
+        "chooseReason": "Choose a refund reason",
+        "reasonDetail": "Details (optional)",
+        "refundReasons": {
+          "PATIENT_CANCELLED": "Patient cancelled",
+          "PATIENT_NO_SHOW": "Patient did not attend",
+          "PLATFORM_CANCELLED": "Platform cancelled",
+          "FACILITY_CANCELLED": "Facility cancelled",
+          "CONSULTANT_CANCELLED": "Consultant cancelled",
+          "MEDICALLY_DECLINED": "Treatment medically declined",
+          "SETTLEMENT_CREDIT": "Settlement credit"
+        },
         "note": "Offline record-only — records payments actually received; no card data is entered.",
         "credited": "credited to final"
       },
@@ -1912,6 +1923,7 @@
         "RECONCILE_INVOICE": "Reconcile the invoice",
         "COUNTERSIGN_RECONCILIATION": "Check the reconciliation",
         "FACILITY_DISPUTE": "Settle the dispute",
+        "REFUND_DEPOSIT": "Open the coordination deposit",
         "REFUND_CREDIT": "Open the reconciliation",
         "FOLLOW_UP_CONTACT": "Record the contact",
         "REBOOK_FOLLOW_UP": "Arrange a new contact",
@@ -2807,6 +2819,8 @@
       "hint": "Ends the patient's journey. This cannot be undone.",
       "reasonLabel": "Reason",
       "reasons": {
+        "PLATFORM_CANCELLED": "The platform cancelled",
+        "CONSULTANT_CANCELLED": "The Consultant cancelled",
         "PATIENT_WITHDREW": "The patient withdrew",
         "HOSPITAL_REFUSED": "The hospital refused the patient",
         "MEDICAL_CONTRAINDICATION": "Medical contraindication",
@@ -2956,6 +2970,7 @@
       "RECONCILE_INVOICE": "Reconcile the final invoice",
       "COUNTERSIGN_RECONCILIATION": "Countersign a reconciliation above the band",
       "FACILITY_DISPUTE": "Settle a disputed hospital charge",
+      "REFUND_DEPOSIT": "Refund the coordination deposit",
       "REFUND_CREDIT": "Refund the patient's credit",
       "FOLLOW_UP_CONTACT": "Follow-up contact",
       "REBOOK_FOLLOW_UP": "Rebook a missed follow-up contact",
@@ -3505,6 +3520,10 @@
           "title": "Settle the disputed charge on {caseNumber}",
           "context": "The hospital billed something that was not charged to the patient. Settle it with the hospital and record how it ended."
         },
+        "REFUND_DEPOSIT": {
+          "title": "Refund the coordination deposit on {caseNumber}",
+          "context": "The case ended for a reason that guarantees a full deposit refund. Check the amount paid and record the refund."
+        },
         "REFUND_CREDIT": {
           "title": "Refund the credit on {caseNumber}",
           "context": "The statement shows a credit due to the patient. Refund it with the deposit refund."
@@ -3571,6 +3590,12 @@
       "askLead": "Ask your coordinator lead to add or approve a Consultant for {area}."
     },
     "admission": {
+      "firstAppointment": {
+        "title": "First confirmed appointment",
+        "hint": "Record the earliest confirmed appointment date. This date determines the refund cutoff; record a reason when correcting it.",
+        "date": "First appointment date",
+        "reason": "Confirmation or correction reason"
+      },
       "title": "Admission & money",
       "notReserved": "No hospital is reserved yet.",
       "loadFailed": "The admission details could not be loaded.",
@@ -3698,6 +3723,7 @@
           "SYSTEM": "System"
         },
         "kinds": {
+          "FIRST_CONFIRMED_APPOINTMENT": "First confirmed appointment",
           "FACILITY_ADMISSION_LETTER": "Admission letter",
           "PRICE_VARIANCE_CHECK": "Price check",
           "ARRIVAL_ATTESTED": "Arrival confirmed by Operations",
@@ -3735,6 +3761,16 @@
       "cancel": "Cancel"
     },
     "errorCodes": {
+      "REFUND_EXIT_REASON_MISMATCH": "The refund reason does not match the recorded case cancellation. Choose the reason recorded on the case.",
+      "FULL_REFUND_REQUIRED": "This cancellation requires a full refund of the amount still paid on the deposit.",
+      "REFUND_EXCEEDS_SETTLEMENT_CREDIT": "The refund exceeds the remaining settlement credit.",
+      "REFUND_REASON_REQUIRED": "Choose a refund reason.",
+      "REFUND_AMOUNT_INVALID": "Enter a refund amount greater than zero.",
+      "REFUND_EXCEEDS_NET_PAID": "The refund exceeds the deposit amount still available to return. Check previous refunds.",
+      "REFUND_CUTOFF_PASSED": "The patient cancellation or no-show is within the non-refundable period before the first confirmed appointment.",
+      "REFUND_PAYMENT_REQUIRED": "A refund requires a recorded deposit payment.",
+      "REFUND_CUTOFF_INVALID": "Enter a valid whole number of days for the refund cutoff.",
+      "APPOINTMENT_FACT_REQUIRED": "Enter the first confirmed appointment date and a confirmation or correction reason.",
       "NOT_IN_TREATMENT": "This can only be recorded while the patient is in treatment.",
       "MILESTONE_IN_FUTURE": "A milestone cannot be in the future. Check the time it happened.",
       "OPERATIVE_NOTE_REQUIRED": "A completed procedure needs the operative note: give its reference or choose its document.",

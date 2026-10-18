@@ -2,6 +2,7 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.authority.application.CaseRelationships;
 import com.rehletshifaa.casemanagement.infrastructure.CaseAssignmentRepository;
+import com.rehletshifaa.casemanagement.infrastructure.CaseTaskRepository;
 import com.rehletshifaa.casemanagement.infrastructure.MedicalCaseRepository;
 import com.rehletshifaa.journey.infrastructure.CaseEvidenceRepository;
 import com.rehletshifaa.journey.infrastructure.DepositRepository;
@@ -26,15 +27,18 @@ public class JourneyCaseRelationships implements CaseRelationships {
     private final MedicalCaseRepository cases;
     private final ReplyCoverRepository covers;
     private final DepositRepository deposits;
+    private final CaseTaskRepository tasks;
     private final FacilityAdmissionRepository admissions;
     private final CaseEvidenceRepository evidence;
     private final Clock clock;
 
     public JourneyCaseRelationships(CaseAssignmentRepository assignments, MedicalCaseRepository cases, ReplyCoverRepository covers,
-                                    DepositRepository deposits, FacilityAdmissionRepository admissions, CaseEvidenceRepository evidence, Clock clock) {
+                                    DepositRepository deposits, FacilityAdmissionRepository admissions, CaseEvidenceRepository evidence,
+                                    CaseTaskRepository tasks, Clock clock) {
         this.admissions = admissions; this.evidence = evidence;
         this.assignments = assignments;
         this.deposits = deposits;
+        this.tasks = tasks;
         this.covers = covers;
         this.cases = cases;
         this.clock = clock;
@@ -69,7 +73,7 @@ public class JourneyCaseRelationships implements CaseRelationships {
 
     @Override
     public boolean depositOpen(UUID caseId) {
-        return deposits.isOpenOn(caseId);
+        return deposits.isOpenOn(caseId) || tasks.hasOpenDepositRefund(caseId);
     }
 
     @Override

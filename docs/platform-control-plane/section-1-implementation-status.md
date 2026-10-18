@@ -1487,6 +1487,36 @@ passes separately on PostgreSQL 17 with V1–V107. Frontend typecheck, focused l
 and 4/4 production-rendered screenshot cases pass. The Impeccable executable is unavailable in this environment, so the
 documented visual review is the UI-detector fallback.
 
+### Refund rule enforcement handoff (2026-10-18)
+
+Branch `feat/refund-rule-enforcement` delivers P2-24 on top of the completed `JourneyService` split. V108 adds the
+versioned deposit refund cutoff, the minimum coordination-fee floor and typed platform/Consultant cancellation exits.
+Patient cancellation and no-show use the matching exit's recorded time against the first confirmed appointment in
+`Africa/Cairo`; Finance processing delay cannot change entitlement, missing appointment evidence cannot deny it, and
+the appointment fact is immutable after case exit. Platform, facility or Consultant cancellation and medical decline
+require their matching typed exit and the full remaining net deposit. Settlement credit is bounded by the latest
+statement credit after later refunds. All refunds remain deposit-scoped, idempotent, append-only, capped by net receipts
+and recorded against the original offline rail.
+
+Guaranteed exits open `REFUND_DEPOSIT` work for Finance. That open internal Finance task grants only the case payment
+view after exit, never clinical `CASE_READ` or the broader money-work scopes; a full refund closes the task in the same
+transaction. The portal now uses typed refund reasons with optional detail and confirmation, and Operations/the
+Coordinator can record the explicit first appointment. Control Center commercial policy screens expose the cutoff and
+minimum fee. The minimum defaults to EGP 0 until the owner approves a nonzero amount.
+
+Verification: focused refund/pricing/authority/ArchUnit tests green; full backend `mvn -o -q test` with the supported ECS
+log format: **996 tests, 0 failures/errors, 3 gated skips**, with V1–V108 applied on H2. `PostgresJpaMappingTest`
+also passes on disposable PostgreSQL 17.11 with V1–V108 and all repository queries planned. Frontend typecheck and touched-file
+eslint are green. Refund, appointment and commercial-policy Vitest coverage is green; the combined selected run had 94
+passing tests and one pre-existing unrelated `MyWork` empty-state assertion in `StaffOperationalUi.test.tsx`. Independent
+Sol-medium review findings on cancellation time, bounded Finance access, task closure and stale patient terms were triaged
+and fixed or recorded.
+
+Open: counsel-approved patient refund wording still describes appointment confirmation rather than the configured cutoff;
+ship the replacement English/native Arabic wording and bump `DEPOSIT_TERMS_VERSION` together. The PSP remains offline
+record-only, mixed-rail receipts still resolve to the earliest recorded original rail, and travel-fee refund enforcement
+waits for a travel-fee collection ledger. A nonzero minimum coordination fee remains an owner decision.
+
 ### Open evidence (P1–P6, 2026-10-05)
 
 - No approved implementation gap remains in P1–P6. OD-02 and Practice Manager consent remain excluded.

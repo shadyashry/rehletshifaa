@@ -23,6 +23,9 @@ public class CommercialPolicy extends AssignedIdEntity {
     @Column(nullable = false, length = 160) private String name;
     @Column(name = "care_category", length = 60) private String careCategory;
     @Column(name = "margin_rate", nullable = false, precision = 6, scale = 4) private BigDecimal marginRate;
+    /** P2-24 (B-07): the minimum disclosed coordination and guarantee fee; zero until Finance approves a floor. */
+    @Column(name = "minimum_coordination_fee_egp", nullable = false, precision = 14, scale = 2)
+    private BigDecimal minimumCoordinationFeeEgp = DEFAULT_MINIMUM_COORDINATION_FEE_EGP;
     /** P0-5 (A-07): a manual line priced at or below this EGP figure needs no Finance approval; null means every manual line does. */
     @Column(name = "manual_band_egp", precision = 14, scale = 2) private BigDecimal manualBandEgp;
     /** P1-10 (B-05): days a released final quote stays open; the coordinator may shorten it, never lengthen it. */
@@ -50,6 +53,7 @@ public class CommercialPolicy extends AssignedIdEntity {
     public static final int DEFAULT_FIT_TO_FLY_HOURS = 72;
     /** D-G as recommended (design §12): 30 days of follow-up included in the package; paid teleconsultation after it (P2-25). */
     public static final int DEFAULT_FOLLOW_UP_FREE_DAYS = 30;
+    public static final BigDecimal DEFAULT_MINIMUM_COORDINATION_FEE_EGP = new BigDecimal("0.00");
 
     protected CommercialPolicy() {}
 
@@ -62,6 +66,11 @@ public class CommercialPolicy extends AssignedIdEntity {
     /** P1-10: the final-quote validity and FX band this version carries. */
     public CommercialPolicy withQuoteRules(int finalQuoteValidityDays, BigDecimal fxToleranceRate) {
         this.finalQuoteValidityDays = finalQuoteValidityDays; this.fxToleranceRate = fxToleranceRate; return this;
+    }
+
+    public CommercialPolicy withMinimumCoordinationFee(BigDecimal minimumFeeEgp) {
+        this.minimumCoordinationFeeEgp = minimumFeeEgp;
+        return this;
     }
 
     /** P1-16: the change-order band this version carries. */
@@ -80,6 +89,7 @@ public class CommercialPolicy extends AssignedIdEntity {
     public String getName() { return name; }
     public String getCareCategory() { return careCategory; }
     public BigDecimal getMarginRate() { return marginRate; }
+    public BigDecimal getMinimumCoordinationFeeEgp() { return minimumCoordinationFeeEgp; }
     public BigDecimal getManualBandEgp() { return manualBandEgp; }
     public int getFinalQuoteValidityDays() { return finalQuoteValidityDays; }
     public BigDecimal getFxToleranceRate() { return fxToleranceRate; }

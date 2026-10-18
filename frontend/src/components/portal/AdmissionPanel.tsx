@@ -221,6 +221,17 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         </div>
       )}
 
+      {(role === "operations" || role === "coordinator") && (
+        <Task title={t.firstAppointment.title} next={false}>
+          <p className="mb-3 text-[0.85rem] text-ink-600">{t.firstAppointment.hint}</p>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(data => act(`/cases/${caseId}/first-confirmed-appointment`, { appointmentDate: text(data.get("appointmentDate")), reason: text(data.get("reason")) }))}>
+            <label className="block text-sm font-semibold">{t.firstAppointment.date}<input className="field" name="appointmentDate" type="date" required /></label>
+            <label className="block text-sm font-semibold">{t.firstAppointment.reason}<input className="field" name="reason" maxLength={500} required /></label>
+            <div className="sm:col-span-2"><button className="btn-secondary" disabled={busy}>{t.forms.record}</button></div>
+          </form>
+        </Task>
+      )}
+
       {role === "doctor" && caseStatus === "ARRIVAL_CONFIRMED" && !view.emergencyOverride && <EmergencyAdmission t={t} busy={busy}
         onRecord={reason => act(`/doctor/cases/${caseId}/emergency-admission`, { reason })}/>}
 

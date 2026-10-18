@@ -15,27 +15,27 @@ import java.util.UUID;
 public interface DepositRepository extends BaseRepository<Deposit, UUID> {
     /** A deposit's quote (EGP total, display total, currency, snapshot rate) and where it stands. */
     interface Quoted {
-        UUID getId(); String getStatus(); String getCurrency(); BigDecimal getFxRate(); BigDecimal getTotalEgp(); BigDecimal getTotalDisplay();
+        UUID getId(); UUID getPolicyId(); String getStatus(); String getCurrency(); BigDecimal getFxRate(); BigDecimal getTotalEgp(); BigDecimal getTotalDisplay();
         Instant getWaivedAt(); Instant getPayableAt();
     }
 
     /** The case's deposits, cancelled ones included, newest first (pass {@code Limit.of(1)} for the latest). */
     @Query("""
-            select d.id as id, d.status as status, d.currency as currency, d.fxRate as fxRate, d.totalEgp as totalEgp,
+            select d.id as id, d.policyId as policyId, d.status as status, d.currency as currency, d.fxRate as fxRate, d.totalEgp as totalEgp,
                 d.totalDisplay as totalDisplay, d.waivedAt as waivedAt, d.payableAt as payableAt
             from Deposit d where d.caseId = :caseId order by d.createdAt desc""")
     List<Quoted> findLatestOf(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
 
     /** The case's live (not cancelled) deposits, newest first (pass {@code Limit.of(1)} for the active one). */
     @Query("""
-            select d.id as id, d.status as status, d.currency as currency, d.fxRate as fxRate, d.totalEgp as totalEgp,
+            select d.id as id, d.policyId as policyId, d.status as status, d.currency as currency, d.fxRate as fxRate, d.totalEgp as totalEgp,
                 d.totalDisplay as totalDisplay, d.waivedAt as waivedAt, d.payableAt as payableAt
             from Deposit d where d.caseId = :caseId and d.status <> 'CANCELLED' order by d.createdAt desc""")
     List<Quoted> findLatestLiveOf(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);
 
     /** The deposit, only when it belongs to the case. */
     @Query("""
-            select d.id as id, d.status as status, d.currency as currency, d.fxRate as fxRate, d.totalEgp as totalEgp,
+            select d.id as id, d.policyId as policyId, d.status as status, d.currency as currency, d.fxRate as fxRate, d.totalEgp as totalEgp,
                 d.totalDisplay as totalDisplay, d.waivedAt as waivedAt, d.payableAt as payableAt
             from Deposit d where d.id = :id and d.caseId = :caseId""")
     Optional<Quoted> findOnCase(@Param("id") UUID id, @Param("caseId") UUID caseId);

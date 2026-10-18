@@ -26,6 +26,8 @@ public class CaseExitReason extends AssignedIdEntity {
     public enum Reason {
         // a coordinator's typed cancellation (also the patient's own withdrawal, recorded by them)
         PATIENT_WITHDREW, HOSPITAL_REFUSED, MEDICAL_CONTRAINDICATION, PATIENT_DECEASED, NO_SHOW,
+        // cancellations by a party whose action always preserves the patient's full deposit entitlement
+        PLATFORM_CANCELLED, CONSULTANT_CANCELLED,
         // the deposit reminder cycle ended unpaid (ACCEPTED -> EXPIRED)
         DEPOSIT_UNPAID,
         // the Consultant recorded that no follow-up is needed (DISCHARGED -> CLOSED)

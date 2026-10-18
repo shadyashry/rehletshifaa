@@ -34,13 +34,24 @@ final class ProposalPricing {
     }
 
     static Totals of(List<ProviderLine> lines, BigDecimal marginRate) {
+        return of(lines, marginRate, BigDecimal.ZERO);
+    }
+
+    static Totals of(List<ProviderLine> lines, BigDecimal marginRate, BigDecimal minimumFeeEgp) {
         BigDecimal expected = BigDecimal.ZERO, min = BigDecimal.ZERO, max = BigDecimal.ZERO;
         for (ProviderLine line : lines) { expected = expected.add(line.expected()); min = min.add(line.min()); max = max.add(line.max()); }
-        return new Totals(expected, min, max, fee(expected, marginRate), fee(min, marginRate), fee(max, marginRate));
+        return new Totals(expected, min, max, fee(expected, marginRate, minimumFeeEgp), fee(min, marginRate, minimumFeeEgp),
+                fee(max, marginRate, minimumFeeEgp));
     }
 
     static BigDecimal fee(BigDecimal providerTotal, BigDecimal marginRate) {
-        return providerTotal.multiply(marginRate == null ? BigDecimal.ZERO : marginRate).setScale(2, RoundingMode.HALF_UP);
+        return fee(providerTotal, marginRate, BigDecimal.ZERO);
+    }
+
+    static BigDecimal fee(BigDecimal providerTotal, BigDecimal marginRate, BigDecimal minimumFeeEgp) {
+        BigDecimal calculated = providerTotal.multiply(marginRate == null ? BigDecimal.ZERO : marginRate).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal minimum = minimumFeeEgp == null ? BigDecimal.ZERO : minimumFeeEgp.setScale(2, RoundingMode.HALF_UP);
+        return calculated.max(minimum);
     }
 
     static BigDecimal display(BigDecimal egp, BigDecimal rate) { return egp.multiply(rate).setScale(2, RoundingMode.HALF_UP); }

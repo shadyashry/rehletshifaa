@@ -43,9 +43,9 @@ public class CommercialPolicyService {
      */
     public record Policy(UUID id, String name, String careCategory, BigDecimal marginRate, BigDecimal manualBandEgp, int version,
                          Integer finalQuoteValidityDays, BigDecimal fxToleranceRate, BigDecimal changeOrderBandRate, BigDecimal changeOrderBandEgp,
-                         Integer fitToFlyHours, Integer followUpFreeDays) {
+                         Integer fitToFlyHours, Integer followUpFreeDays, BigDecimal minimumCoordinationFeeEgp) {
         public Policy(UUID id, String name, String careCategory, BigDecimal marginRate, BigDecimal manualBandEgp, int version) {
-            this(id, name, careCategory, marginRate, manualBandEgp, version, null, null, null, null, null, null);
+            this(id, name, careCategory, marginRate, manualBandEgp, version, null, null, null, null, null, null, null);
         }
         public int quoteValidityDays() { return finalQuoteValidityDays == null ? CommercialPolicy.DEFAULT_FINAL_QUOTE_VALIDITY_DAYS : finalQuoteValidityDays; }
         public BigDecimal fxTolerance() { return fxToleranceRate == null ? CommercialPolicy.DEFAULT_FX_TOLERANCE_RATE : fxToleranceRate; }
@@ -61,6 +61,9 @@ public class CommercialPolicyService {
         public int fitToFlyWindowHours() { return fitToFlyHours == null ? CommercialPolicy.DEFAULT_FIT_TO_FLY_HOURS : fitToFlyHours; }
         /** P1-18 (D-G): the free follow-up window in days; boxed for the same cache reason. */
         public int followUpDays() { return followUpFreeDays == null ? CommercialPolicy.DEFAULT_FOLLOW_UP_FREE_DAYS : followUpFreeDays; }
+        public BigDecimal minimumFee() {
+            return minimumCoordinationFeeEgp == null ? CommercialPolicy.DEFAULT_MINIMUM_COORDINATION_FEE_EGP : minimumCoordinationFeeEgp;
+        }
     }
 
     /** The band with no policy configured: the D-E defaults. */
@@ -90,7 +93,7 @@ public class CommercialPolicyService {
                 .or(policies::findFirstByActiveTrueAndCareCategoryIsNullOrderByVersionDesc)
                 .map(p -> new Policy(p.getId(), p.getName(), p.getCareCategory(), p.getMarginRate(), p.getManualBandEgp(), p.getVersion(),
                         p.getFinalQuoteValidityDays(), p.getFxToleranceRate(), p.getChangeOrderBandRate(), p.getChangeOrderBandEgp(), p.getFitToFlyHours(),
-                        p.getFollowUpFreeDays()))
+                        p.getFollowUpFreeDays(), p.getMinimumCoordinationFeeEgp()))
                 .orElse(null);
     }
 
@@ -141,22 +144,29 @@ public class CommercialPolicyService {
         // P1-18 (D-G): the free follow-up window carries over the same way.
         int followUpDays = request.followUpFreeDays() != null ? request.followUpFreeDays() : current != null ? current.getFollowUpFreeDays() : CommercialPolicy.DEFAULT_FOLLOW_UP_FREE_DAYS;
         if (followUpDays < 7 || followUpDays > 90) throw new ApiException(400, "FOLLOW_UP_WINDOW_INVALID", "The free follow-up window must be between 7 and 90 days");
+        BigDecimal minimumFee = request.minimumCoordinationFeeEgp() != null
+                ? request.minimumCoordinationFeeEgp().setScale(2, java.math.RoundingMode.HALF_UP)
+                : current != null ? current.getMinimumCoordinationFeeEgp() : CommercialPolicy.DEFAULT_MINIMUM_COORDINATION_FEE_EGP;
+        if (minimumFee.signum() < 0)
+            throw new ApiException(400, "MINIMUM_COORDINATION_FEE_INVALID", "The minimum coordination fee must be zero or more EGP");
         active.forEach(CommercialPolicy::retire);
         policies.saveAllAndFlush(active);
         String name = request.name() == null || request.name().isBlank() ? "Coordinated-care margin" : request.name().trim();
         CommercialPolicy policy = policies.saveAndFlush(new CommercialPolicy(name, careCategory, rate, band, previous + 1, actor.subject(),
                 LocalDate.now(clock), clock.instant()).withQuoteRules(validityDays, fxTolerance).withChangeOrderBand(bandRate, bandEgp).withFitToFlyHours(fitToFly)
-                .withFollowUpFreeDays(followUpDays));
+                .withFollowUpFreeDays(followUpDays).withMinimumCoordinationFee(minimumFee));
         audit.event("COMMERCIAL_POLICY_CONFIGURED").actor(actor.subject(), actor.label()).entity("CommercialPolicy", policy.getId())
                 .action("CONFIGURE").reason("rate=" + rate + " careCategory=" + careCategory + " manualBandEgp=" + band
                         + " finalQuoteValidityDays=" + validityDays + " fxToleranceRate=" + fxTolerance
-                        + " changeOrderBandRate=" + bandRate + " changeOrderBandEgp=" + bandEgp + " fitToFlyHours=" + fitToFly + " followUpFreeDays=" + followUpDays).record();
+                        + " changeOrderBandRate=" + bandRate + " changeOrderBandEgp=" + bandEgp + " fitToFlyHours=" + fitToFly
+                        + " followUpFreeDays=" + followUpDays + " minimumCoordinationFeeEgp=" + minimumFee).record();
         return view(policy);
     }
 
     private static CommercialPolicyView view(CommercialPolicy p) {
         return new CommercialPolicyView(p.getId(), p.getName(), p.getCareCategory(), p.getMarginRate(), p.getManualBandEgp(), p.isActive(), p.getVersion(),
                 p.getCreatedBy(), p.getValidFrom(), p.getFinalQuoteValidityDays(), p.getFxToleranceRate(),
-                p.getChangeOrderBandRate(), p.getChangeOrderBandEgp(), p.getFitToFlyHours(), p.getFollowUpFreeDays());
+                p.getChangeOrderBandRate(), p.getChangeOrderBandEgp(), p.getFitToFlyHours(), p.getFollowUpFreeDays(),
+                p.getMinimumCoordinationFeeEgp());
     }
 }

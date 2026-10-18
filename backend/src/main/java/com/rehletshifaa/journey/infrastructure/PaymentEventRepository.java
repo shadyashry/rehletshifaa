@@ -15,6 +15,12 @@ public interface PaymentEventRepository extends BaseRepository<PaymentEvent, UUI
     /** The ledger already holds this command (a replayed receipt or callback). */
     boolean existsByIdempotencyKeyAndDepositIdAndActorSubject(String idempotencyKey, UUID depositId, String actorSubject);
 
+    boolean existsByIdempotencyKeyAndDepositId(String idempotencyKey, UUID depositId);
+
+    interface OriginalPayment { String getMethod(); String getProvider(); String getProviderReference(); }
+    @Query("select e.method as method, e.provider as provider, e.providerReference as providerReference from PaymentEvent e where e.depositId = :depositId and e.eventType = 'PAYMENT_RECORDED' order by e.occurredAt, e.id")
+    List<OriginalPayment> findOriginalPayments(@Param("depositId") UUID depositId, org.springframework.data.domain.Limit limit);
+
     interface Entry {
         String getEventType(); BigDecimal getAmountDisplay(); String getCurrency(); String getMethod(); String getProvider();
         String getProviderReference(); String getStatus(); String getReason(); Instant getOccurredAt();
@@ -35,6 +41,9 @@ public interface PaymentEventRepository extends BaseRepository<PaymentEvent, UUI
                 sum(case when e.eventType = 'REFUND_RECORDED' then e.amountEgp end) as refundedEgp
             from PaymentEvent e where e.depositId = :depositId""")
     Totals findTotalsOf(@Param("depositId") UUID depositId);
+
+    @Query("select coalesce(sum(e.amountEgp), 0) from PaymentEvent e where e.caseId = :caseId and e.eventType = 'REFUND_RECORDED'")
+    BigDecimal refundedOnCase(@Param("caseId") UUID caseId);
 
     /** Appends a ledger entry; a duplicate idempotency key appends nothing. @return 1 when appended */
     @Modifying(flushAutomatically = true)

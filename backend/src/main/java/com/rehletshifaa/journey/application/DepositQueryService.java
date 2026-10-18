@@ -160,7 +160,7 @@ public class DepositQueryService {
 
     private static DepositPolicyView policyView(CoordinationDepositPolicyRepository.Row p) {
         return new DepositPolicyView(p.getId(), p.getName(), p.getCareCategory(), p.getDepositRate(), p.getMinimumUsd(), p.getMaximumUsd(), Boolean.TRUE.equals(p.getActive()),
-                p.getVersion(), p.getCreatedBy(), p.getValidFrom());
+                p.getVersion(), p.getCreatedBy(), p.getValidFrom(), p.getRefundCutoffDays() == null ? 10 : p.getRefundCutoffDays());
     }
 
     static BigDecimal display(BigDecimal egp, BigDecimal rate) { return egp.multiply(rate).setScale(2, RoundingMode.HALF_UP); }

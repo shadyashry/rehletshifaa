@@ -38,6 +38,15 @@ function setup(role: AdmissionRole, view: AdmissionView, props: { caseStatus?: s
 describe("AdmissionPanel — Operations", () => {
   afterEach(cleanup);
 
+  it.each(["operations", "coordinator"] as const)("records an explicit first confirmed appointment as %s", async role => {
+    const { mutate } = setup(role, reserved);
+    const date = await screen.findByLabelText("First appointment date");
+    fireEvent.change(date, { target: { value: "2026-10-25" } });
+    fireEvent.change(screen.getByLabelText("Confirmation or correction reason"), { target: { value: "Clinic confirmed the earliest visit" } });
+    fireEvent.submit(date.closest("form")!);
+    await waitFor(() => expect(mutate).toHaveBeenCalledWith("/cases/c1/first-confirmed-appointment", { appointmentDate: "2026-10-25", reason: "Clinic confirmed the earliest visit" }));
+  });
+
   it("reads its own role's view and opens the reservation as the one primary action", async () => {
     const { mutate, load } = setup("operations", empty);
     expect(await screen.findByText("No hospital is reserved yet.")).toBeTruthy();

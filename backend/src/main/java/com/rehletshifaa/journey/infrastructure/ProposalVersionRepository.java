@@ -167,11 +167,15 @@ public interface ProposalVersionRepository extends BaseRepository<ProposalVersio
     BigDecimal providerMaximumEgp(@Param("versionId") UUID versionId);
 
     /** The commercial policy rate locked on the case's latest preliminary estimate. */
-    interface LockedMargin { BigDecimal getMarginRate(); UUID getCommercialPolicyId(); Integer getCommercialPolicyVersion(); }
+    interface LockedMargin {
+        BigDecimal getMarginRate(); UUID getCommercialPolicyId(); Integer getCommercialPolicyVersion();
+        BigDecimal getMinimumCoordinationFeeEgp();
+    }
 
     @Query("""
-            select v.marginRate as marginRate, v.commercialPolicyId as commercialPolicyId, v.commercialPolicyVersion as commercialPolicyVersion
-            from ProposalVersion v join Proposal p on p.id = v.proposalId
+            select v.marginRate as marginRate, v.commercialPolicyId as commercialPolicyId, v.commercialPolicyVersion as commercialPolicyVersion,
+                cp.minimumCoordinationFeeEgp as minimumCoordinationFeeEgp
+            from ProposalVersion v join Proposal p on p.id = v.proposalId left join CommercialPolicy cp on cp.id = v.commercialPolicyId
             where p.caseId = :caseId and v.documentType = 'PRELIMINARY_ESTIMATE' and v.marginRate is not null
             order by v.versionNumber desc""")
     List<LockedMargin> findLockedMargin(@Param("caseId") UUID caseId, org.springframework.data.domain.Limit limit);

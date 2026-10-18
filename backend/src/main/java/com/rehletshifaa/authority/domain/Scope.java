@@ -27,7 +27,8 @@ public enum Scope {
     CASE_UNCLAIMED,
     /**
      * The accepted case's coordination deposit is open: requested or partly paid, not waived. Lets whoever records payments
-     * see the case they record against; it ends when the deposit is paid, waived or refunded, or the case leaves ACCEPTED.
+     * see the case they record against. An open internal Finance REFUND_DEPOSIT item also permits this payment view after
+     * a case exit; that access ends when the refund work closes.
      */
     CASE_DEPOSIT_OPEN,
     /**

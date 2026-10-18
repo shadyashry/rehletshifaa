@@ -41,7 +41,8 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  * Every exit cancels the open work on the case (staff items and patient actions; a governance review such as the
  * emergency-override review survives, see {@link StaffWorkService#SURVIVES_EXIT}), clears who the case waits on, and is
  * audited. The exit's note lives only in the encrypted exit row: history and audit carry the typed reason alone.
- * Money is left where it is: refunds of a deposit already received are Finance's rule (P0-4).
+ * Money remains append-only: a guaranteed-refund exit opens Finance work after ordinary case work is closed; Finance records
+ * the actual return to the original payment method through the refund ledger command.
  */
 @Service
 public class CaseExitService {
@@ -56,6 +57,7 @@ public class CaseExitService {
     private final CaseTransitionPolicy policy;
     private final StaffWorkService work;
     private final AuditTrail auditTrail;
+    private final RefundObligationService refundObligations;
     private final Clock clock;
     private final com.rehletshifaa.journey.infrastructure.FacilityAdmissionRepository admissions;
     private final org.springframework.context.ApplicationEventPublisher events;
@@ -63,12 +65,13 @@ public class CaseExitService {
     public CaseExitService(Authority authority, MedicalCaseRepository cases, CaseStatusLog statusLog, CaseExitReasonRepository exits,
                            TravelPlanRepository travelPlans, DepositRepository deposits, PaymentService payment,
                            DepositTransferService transfers, CaseTransitionPolicy policy, StaffWorkService work, AuditTrail auditTrail, Clock clock,
+                           RefundObligationService refundObligations,
                            com.rehletshifaa.journey.infrastructure.FacilityAdmissionRepository admissions,
                            org.springframework.context.ApplicationEventPublisher events) {
         this.admissions = admissions; this.events = events;
         this.authority = authority; this.cases = cases; this.statusLog = statusLog; this.exits = exits; this.travelPlans = travelPlans;
         this.deposits = deposits; this.payment = payment; this.transfers = transfers; this.policy = policy; this.work = work;
-        this.auditTrail = auditTrail; this.clock = clock;
+        this.auditTrail = auditTrail; this.clock = clock; this.refundObligations = refundObligations;
     }
 
     /**
@@ -178,6 +181,7 @@ public class CaseExitService {
                         || a.getStatus() == com.rehletshifaa.journey.domain.FacilityAdmission.Status.CONFIRMED)
                 .ifPresent(a -> { a.cancel(actorSubject, now); admissions.saveAndFlush(a); });
         work.closeOpenWork(caseId, "The case left its journey (" + target + (reason == null ? "" : ": " + reason.name()) + ")");
+        refundObligations.openForGuaranteedExit(caseId, reason);
         work.refreshWaitingOn(caseId, StaffWorkService.stageDefault(target), null);
         work.changed(caseId);
         if ("CLOSED".equals(target)) events.publishEvent(new CaseEvents.CaseClosed(caseId));

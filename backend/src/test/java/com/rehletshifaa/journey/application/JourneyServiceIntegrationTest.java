@@ -1,6 +1,7 @@
 package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.authority.domain.Role;
+import com.rehletshifaa.authority.application.Actor;
 
 import com.rehletshifaa.casemanagement.api.CaseDtos.CreateCaseRequest;
 import com.rehletshifaa.casemanagement.api.CaseDtos.NewCaseForPatientRequest;
@@ -211,7 +212,7 @@ class JourneyServiceIntegrationTest {
         var bounded=payment.configurePolicy(new DepositPolicyRequest(null,null,new BigDecimal("0.15"),new BigDecimal("200"),new BigDecimal("1500")));
         assertThat(bounded.minimumUsd()).isEqualByComparingTo("200");
         assertThat(bounded.maximumUsd()).isEqualByComparingTo("1500");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='DEPOSIT_POLICY_CONFIGURED' AND reason='rate=0.15; minUsd=200; maxUsd=1500'",Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='DEPOSIT_POLICY_CONFIGURED' AND reason='rate=0.15; minUsd=200; maxUsd=1500; refundCutoffDays=10'",Integer.class)).isEqualTo(1);
         // QA #22: a policy can be set for every managed care area, and only for one.
         assertThat(commercialPolicies.careAreas()).extracting(CareCategoryView::slug)
                 .hasSize(jdbc.queryForObject("SELECT count(*) FROM care_categories",Integer.class)).contains("cardiology","womens-health","general-surgery");
@@ -259,6 +260,9 @@ class JourneyServiceIntegrationTest {
         com.rehletshifaa.journey.DepositTestData.reportTransfer(jdbc,caseId,"FT-B");
         assertThat(payment.recordReceipt(caseId,depositId,new RecordReceiptRequest(new BigDecimal("1765.44"),"ledger-b-"+caseId)).status()).isEqualTo("PAID");
         assertThat(payment.depositSatisfied(caseId)).isTrue();
+        long version = jdbc.queryForObject("SELECT version FROM medical_cases WHERE id=?", Long.class, caseId);
+        exits.cancel(caseId, new Actor("coordinator-subject", Instant.now(), Role.COORDINATOR, Set.of(Role.COORDINATOR)),
+                "PATIENT_WITHDREW", "Patient cancelled before an appointment was confirmed", version);
         assertThat(payment.recordRefund(caseId,depositId,new RefundRequest(new BigDecimal("500.00"),"Partial refund","ledger-c-"+caseId)).status()).isEqualTo("PARTIALLY_PAID");
         var refunded=payment.recordRefund(caseId,depositId,new RefundRequest(new BigDecimal("2500.00"),"Full refund","ledger-d-"+caseId));
         assertThat(refunded.status()).isEqualTo("REFUNDED");

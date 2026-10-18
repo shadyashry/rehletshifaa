@@ -2,15 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { getDictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
 import { careAreaLabel } from "./admin-labels";
-import { EmptyState, ErrorNotice, Field, Section, SuccessNotice } from "./cc-ui";
+import { EmptyState, ErrorNotice, Field, Section, SuccessNotice, WordedErrorNotice } from "./cc-ui";
 import { FocusTrapDialog } from "./FocusTrapDialog";
 
-type CommercialPolicy = { id: string; careCategory?: string; marginRate: number; /** P0-5 (A-07): a manual line at or below this EGP figure needs no Finance; null for none. */ manualBandEgp?: number | null;
+type CommercialPolicy = { id: string; careCategory?: string; marginRate: number; minimumCoordinationFeeEgp?: number; /** P0-5 (A-07): a manual line at or below this EGP figure needs no Finance; null for none. */ manualBandEgp?: number | null;
   /** P1-10 (B-05): days a released final quote stays acceptable, and the exchange-rate move (0–1) beyond which Finance re-approves. */
   finalQuoteValidityDays?: number; fxToleranceRate?: number;
   /** P1-16 (D-E): a change order within the lower of this share (0–0.5) of the facility package and this EGP cap is Finance's alone. */
@@ -19,10 +20,10 @@ type CommercialPolicy = { id: string; careCategory?: string; marginRate: number;
   fitToFlyHours?: number;
   /** P1-18 (D-G): days of free follow-up after discharge (7–90), frozen per case at discharge. */
   followUpFreeDays?: number; active: boolean; version: number; validFrom?: string };
-type DepositPolicy = { id: string; careCategory?: string; /** Share of the estimate, 0–1 (W-1). */ depositRate: number;
+type DepositPolicy = { id: string; careCategory?: string; /** Share of the estimate, 0–1 (W-1). */ depositRate: number; refundCutoffDays?: number;
   /** P0-4: bounds in US dollars, null for none. */ minimumUsd?: number | null; maximumUsd?: number | null; active: boolean; version: number; validFrom?: string };
 type CareArea = { slug: string; nameEn: string; nameAr: string };
-type Pending = { kind: "margin" | "deposit"; area: string; value: number; minimumUsd?: number | null; maximumUsd?: number | null; manualBandEgp?: number | null; finalQuoteValidityDays?: number; fxTolerancePercent?: number; bandPercent?: number; bandEgp?: number; fitToFlyHours?: number; followUpFreeDays?: number; form: HTMLFormElement };
+type Pending = { kind: "margin" | "deposit"; area: string; value: number; minimumCoordinationFeeEgp?: number; refundCutoffDays?: number; minimumUsd?: number | null; maximumUsd?: number | null; manualBandEgp?: number | null; finalQuoteValidityDays?: number; fxTolerancePercent?: number; bandPercent?: number; bandEgp?: number; fitToFlyHours?: number; followUpFreeDays?: number; form: HTMLFormElement };
 
 /**
  * Commercial › Margin & Deposit — internal commercial configuration: the central margin and coordination-deposit policies.
@@ -72,9 +73,9 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
         // P1-17: and the fit-to-fly window (prefilled; left out, the backend carries the current value over).
         fitToFlyHours: pending.fitToFlyHours,
         // P1-18: and the free follow-up (prefilled; left out, the backend carries the current value over).
-        followUpFreeDays: pending.followUpFreeDays } });
+        followUpFreeDays: pending.followUpFreeDays, minimumCoordinationFeeEgp: pending.minimumCoordinationFeeEgp } });
       // P0-4: every revision states its bounds; an empty field is no bound, never "keep the old one".
-      else await api("/finance/deposit-policies", { method: "PUT", body: { careCategory, depositRate: pending.value / 100, minimumUsd: pending.minimumUsd ?? null, maximumUsd: pending.maximumUsd ?? null } });
+      else await api("/finance/deposit-policies", { method: "PUT", body: { careCategory, depositRate: pending.value / 100, minimumUsd: pending.minimumUsd ?? null, maximumUsd: pending.maximumUsd ?? null, refundCutoffDays: pending.refundCutoffDays } });
       pending.form.reset(); setPending(null); setNotice(ar ? "حُفظ إصدار جديد." : "New version saved."); await load();
     } catch (e) { setSaveError(e); } finally { setBusy(false); }
   };
@@ -91,13 +92,15 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   if (loadError) return shell(<ErrorNotice error={loadError} locale={locale} action="load" onRetry={() => void load()} />);
   const areaSelect = <Field label={ar ? "مجال الرعاية" : "Care area"}><select name="area"><option value="">{area()}</option>{careAreas.map((a) => <option key={a.slug} value={a.slug}>{ar ? a.nameAr : a.nameEn}</option>)}</select></Field>;
   const usd = (raw: FormDataEntryValue | null) => { const text = String(raw ?? "").trim(); return text === "" ? null : Number(text); };
-  const stage = (kind: Pending["kind"]) => (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const d = new FormData(e.currentTarget); setPending({ kind, area: String(d.get("area") || ""), value: Number(d.get("rate")) || 0, form: e.currentTarget, ...(kind === "deposit" ? { minimumUsd: usd(d.get("minimumUsd")), maximumUsd: usd(d.get("maximumUsd")) } : { manualBandEgp: usd(d.get("manualBandEgp")), finalQuoteValidityDays: Number(d.get("finalQuoteValidityDays")) || undefined, fxTolerancePercent: usd(d.get("fxTolerancePercent")) ?? undefined, bandPercent: usd(d.get("bandPercent")) ?? undefined, bandEgp: usd(d.get("bandEgp")) ?? undefined, fitToFlyHours: usd(d.get("fitToFlyHours")) ?? undefined, followUpFreeDays: usd(d.get("followUpFreeDays")) ?? undefined }) }); };
+  const stage = (kind: Pending["kind"]) => (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const d = new FormData(e.currentTarget); setPending({ kind, area: String(d.get("area") || ""), value: Number(d.get("rate")) || 0, form: e.currentTarget, ...(kind === "deposit" ? { refundCutoffDays: Number(d.get("refundCutoffDays")), minimumUsd: usd(d.get("minimumUsd")), maximumUsd: usd(d.get("maximumUsd")) } : { minimumCoordinationFeeEgp: Number(d.get("minimumCoordinationFeeEgp")), manualBandEgp: usd(d.get("manualBandEgp")), finalQuoteValidityDays: Number(d.get("finalQuoteValidityDays")) || undefined, fxTolerancePercent: usd(d.get("fxTolerancePercent")) ?? undefined, bandPercent: usd(d.get("bandPercent")) ?? undefined, bandEgp: usd(d.get("bandEgp")) ?? undefined, fitToFlyHours: usd(d.get("fitToFlyHours")) ?? undefined, followUpFreeDays: usd(d.get("followUpFreeDays")) ?? undefined }) }); };
   const bounds = (min?: number | null, max?: number | null) => min == null && max == null ? (ar ? "بلا حد أدنى أو أقصى" : "No minimum or maximum")
     : `${min != null ? `${ar ? "الحد الأدنى" : "Minimum"} ${min} USD` : ""}${min != null && max != null ? " · " : ""}${max != null ? `${ar ? "الحد الأقصى" : "Maximum"} ${max} USD` : ""}`;
   const currentDefault = deposits.find((p) => p.active && !p.careCategory);
   const currentMargin = margins.find((p) => p.active && !p.careCategory);
   const validity = (days?: number, tolerance?: number) => days == null || tolerance == null ? ""
     : ar ? `العرض النهائي صالح ${days} يومًا · يراجع الفريق المالي سعر الصرف عند تغيّره بأكثر من ${(tolerance * 100).toFixed(2)}%` : `Final quote valid ${days} days · Finance re-approves a rate move beyond ${(tolerance * 100).toFixed(2)}%`;
+  const refundCutoff = (days = 10) => ar ? `حد الاسترداد قبل الموعد الأول بـ ${days} أيام` : `Refund cutoff: ${days} days before the first appointment`;
+  const minimumFee = (amount = 0) => ar ? `الحد الأدنى لرسوم التنسيق ${amount} ج.م` : `Minimum coordination fee EGP ${amount}`;
   const freeFollowUp = (days?: number) => days == null ? "" : ar ? `متابعة مجانية ${days} يومًا بعد الخروج` : `Free follow-up for ${days} days after discharge`;
   const fitToFly = (hours?: number) => hours == null ? "" : ar ? `شهادة اللياقة للسفر صالحة ${hours} ساعة بعد الفحص` : `A fit to fly is valid ${hours} hours after the examination`;
   const changeBand = (rate?: number, cap?: number) => rate == null || cap == null ? ""
@@ -107,11 +110,12 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   return shell(<>
     <p className="cc-internal" role="note"><strong>{ar ? "داخلي فقط." : "Internal only."}</strong> {ar ? "لا يظهر الهامش أبدًا للمرضى أو الأطباء أو الجهات الطبية؛ يرى المريض سعر الباقة الشامل ودفعة التنسيق فقط." : "The margin is never shown to patients, clinicians or provider organizations; patients see only the inclusive package price and the coordination deposit."}</p>
     <SuccessNotice>{notice || null}</SuccessNotice>
-    <ErrorNotice error={saveError} locale={locale} />
+    <WordedErrorNotice error={saveError} locale={locale} words={getDictionary(locale).portalWork.errorCodes} />
     <Section id="margin" title={ar ? "سياسة الهامش" : "Margin policy"} description={ar ? "يُدمج في سعر الباقة عند إنشاء التقدير المبدئي. يستخدم العرض النهائي الهامش نفسه المثبّت في التقدير المبدئي للحالة." : "Built into the package price when a preliminary estimate is created. The final quote reuses the margin locked in the case's preliminary estimate."}>
-      <ul className="cc-list">{margins.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.marginRate * 100).toFixed(2)}%</bdi> <span className="cc-meta">{band(p.manualBandEgp)}</span> <span className="cc-meta">{validity(p.finalQuoteValidityDays, p.fxToleranceRate)}</span> <span className="cc-meta">{changeBand(p.changeOrderBandRate, p.changeOrderBandEgp)}</span> <span className="cc-meta">{fitToFly(p.fitToFlyHours)}</span> <span className="cc-meta">{freeFollowUp(p.followUpFreeDays)}</span></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
+      <ul className="cc-list">{margins.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.marginRate * 100).toFixed(2)}%</bdi> <span className="cc-meta">{band(p.manualBandEgp)}</span> <span className="cc-meta">{validity(p.finalQuoteValidityDays, p.fxToleranceRate)}</span> <span className="cc-meta">{changeBand(p.changeOrderBandRate, p.changeOrderBandEgp)}</span> <span className="cc-meta">{fitToFly(p.fitToFlyHours)}</span> <span className="cc-meta">{freeFollowUp(p.followUpFreeDays)}</span> <span className="cc-meta">{minimumFee(p.minimumCoordinationFeeEgp)}</span></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
       {canEdit && <form className="cc-filterbar" onSubmit={stage("margin")} aria-label={ar ? "إصدار جديد من سياسة الهامش" : "New margin policy version"}>
         {areaSelect}
+        <Field label={ar ? "الحد الأدنى لرسوم التنسيق (ج.م)" : "Minimum coordination fee (EGP)"}><input name="minimumCoordinationFeeEgp" type="number" min="0" step="0.01" required dir="ltr" defaultValue={currentMargin?.minimumCoordinationFeeEgp ?? 0} /></Field>
         <Field label={ar ? "الهامش %" : "Margin %"}><input name="rate" type="number" min="0" max="50" step="0.1" required dir="ltr" /></Field>
         <Field label={ar ? "النطاق اليدوي المعتمد مسبقًا (ج.م)" : "Pre-approved manual band (EGP)"} hint={ar ? "بند يدوي بهذا السعر أو أقل لا يحتاج الفريق المالي؛ اتركه فارغًا ليحتاجه كل بند." : "A manual line at or below this price needs no Finance; leave empty so every manual line does."}><input name="manualBandEgp" type="number" min="0" step="100" dir="ltr" defaultValue={currentMargin?.manualBandEgp ?? ""} /></Field>
         <Field label={ar ? "صلاحية العرض النهائي (أيام)" : "Final quote validity (days)"} hint={ar ? "المدة التي يبقى فيها العرض النهائي قابلًا للقبول بعد إرساله؛ يستطيع المنسّق تقصيرها فقط." : "How long a released final quote can be accepted; the coordinator can shorten it, never lengthen it."}><input name="finalQuoteValidityDays" type="number" min="1" max="90" step="1" required dir="ltr" defaultValue={currentMargin?.finalQuoteValidityDays ?? 14} /></Field>
@@ -124,10 +128,11 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
       </form>}
     </Section>
     <Section id="deposit" title={ar ? "سياسة دفعة التنسيق" : "Coordination deposit policy"} description={ar ? "نسبة من الإجمالي المتوقَّع في التقدير المبدئي، تُطلب عندما يُقرّ المريض بالتقدير، وتُحوَّل بسعر الصرف المجمَّد فيه." : "A share of the preliminary estimate's expected total, requested when the patient acknowledges the estimate and converted at its frozen exchange rate."}>
-      <ul className="cc-list">{deposits.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.depositRate * 100).toFixed(2)}%</bdi> <span className="cc-meta"><bdi dir="ltr">{bounds(p.minimumUsd, p.maximumUsd)}</bdi></span></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
+      <ul className="cc-list">{deposits.filter((p) => p.active).map((p) => <li key={p.id}><span><strong>{area(p.careCategory)}</strong></span><span><bdi dir="ltr">{(p.depositRate * 100).toFixed(2)}%</bdi> <span className="cc-meta"><bdi dir="ltr">{bounds(p.minimumUsd, p.maximumUsd)}</bdi></span> <span className="cc-meta">{refundCutoff(p.refundCutoffDays)}</span></span><span className="cc-meta">{since(p.validFrom) ? (ar ? `سارية منذ ${since(p.validFrom)}` : `In use since ${since(p.validFrom)}`) : (ar ? "سارية" : "In use")}</span><span /></li>)}</ul>
       {canEdit && <form className="cc-filterbar" onSubmit={stage("deposit")} aria-label={ar ? "إصدار جديد من سياسة دفعة التنسيق" : "New coordination deposit policy version"}>
         {areaSelect}
         <Field label={ar ? "دفعة التنسيق (% من التقدير)" : "Coordination deposit (% of the estimate)"}><input name="rate" type="number" min="0" max="100" step="0.01" required dir="ltr" /></Field>
+        <Field label={ar ? "حد الاسترداد قبل الموعد (أيام)" : "Refund cutoff before appointment (days)"}><input name="refundCutoffDays" type="number" min="0" step="1" required dir="ltr" defaultValue={currentDefault?.refundCutoffDays ?? 10} /></Field>
         <Field label={ar ? "الحد الأدنى (دولار أمريكي)" : "Minimum (USD)"}><input name="minimumUsd" type="number" min="0" step="1" dir="ltr" defaultValue={currentDefault?.minimumUsd ?? 200} /></Field>
         <Field label={ar ? "الحد الأقصى (دولار أمريكي)" : "Maximum (USD)"}><input name="maximumUsd" type="number" min="1" step="1" dir="ltr" defaultValue={currentDefault?.maximumUsd ?? 1500} /></Field>
         <button disabled={busy}>{ar ? "مراجعة الإصدار الجديد" : "Review new version"}</button>
@@ -135,7 +140,7 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
     </Section>
     {pending && <FocusTrapDialog label={ar ? "تأكيد الإصدار الجديد" : "Confirm new version"} onClose={busy ? () => undefined : () => setPending(null)}>
       <h2>{pending.kind === "margin" ? (ar ? "حفظ إصدار جديد من الهامش؟" : "Save a new margin version?") : (ar ? "حفظ إصدار جديد من دفعة التنسيق؟" : "Save a new coordination deposit version?")}</h2>
-      <p><strong>{area(pending.area || undefined)}</strong> · <bdi dir="ltr">{pending.value.toFixed(2)}%</bdi>{pending.kind === "deposit" ? (ar ? " من التقدير" : " of the estimate") : null}{pending.kind === "deposit" && <> · <bdi dir="ltr">{bounds(pending.minimumUsd, pending.maximumUsd)}</bdi></>}{pending.kind === "margin" && <> · {band(pending.manualBandEgp)} · {ar ? `صلاحية العرض النهائي ${pending.finalQuoteValidityDays} يومًا` : `final quote valid ${pending.finalQuoteValidityDays} days`} · {ar ? `هامش سعر الصرف ${pending.fxTolerancePercent}%` : `rate tolerance ${pending.fxTolerancePercent}%`}{pending.bandPercent != null && pending.bandEgp != null && <> · {changeBand(pending.bandPercent / 100, pending.bandEgp)}</>}{pending.fitToFlyHours != null && <> · {fitToFly(pending.fitToFlyHours)}</>}{pending.followUpFreeDays != null && <> · {freeFollowUp(pending.followUpFreeDays)}</>}</>}</p>
+      <p><strong>{area(pending.area || undefined)}</strong> · <bdi dir="ltr">{pending.value.toFixed(2)}%</bdi>{pending.kind === "deposit" ? (ar ? " من التقدير" : " of the estimate") : null}{pending.kind === "deposit" && <> · <bdi dir="ltr">{bounds(pending.minimumUsd, pending.maximumUsd)}</bdi> · {refundCutoff(pending.refundCutoffDays)}</>}{pending.kind === "margin" && <> · {band(pending.manualBandEgp)} · {minimumFee(pending.minimumCoordinationFeeEgp)} · {ar ? `صلاحية العرض النهائي ${pending.finalQuoteValidityDays} يومًا` : `final quote valid ${pending.finalQuoteValidityDays} days`} · {ar ? `هامش سعر الصرف ${pending.fxTolerancePercent}%` : `rate tolerance ${pending.fxTolerancePercent}%`}{pending.bandPercent != null && pending.bandEgp != null && <> · {changeBand(pending.bandPercent / 100, pending.bandEgp)}</>}{pending.fitToFlyHours != null && <> · {fitToFly(pending.fitToFlyHours)}</>}{pending.followUpFreeDays != null && <> · {freeFollowUp(pending.followUpFreeDays)}</>}</>}</p>
       <ul className="cc-consequences">
         <li>{ar ? "يحل محل الإصدار الحالي لمجال الرعاية هذا فورًا." : "It replaces the current version for this care area immediately."}</li>
         <li>{pending.kind === "margin"

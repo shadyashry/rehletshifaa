@@ -23,7 +23,7 @@ public interface CaseRelationships {
     /** The case is in intake and no primary coordinator holds it. */
     boolean unclaimedIntake(UUID caseId);
 
-    /** The case is ACCEPTED and its coordination deposit is open: requested or partly paid, and not waived. */
+    /** An accepted case has an open deposit, or internal Finance deposit-refund work remains open after an exit. */
     boolean depositOpen(UUID caseId);
 
     /** P1-15: the deposit is open, or the hospital admission is reserved or confirmed (money Finance must act on). */

@@ -183,7 +183,7 @@ export function MoreActions({ locale, caseId, available, travelPackage, version,
 
 /** Stages where a cancellation leaves a committed journey and so carries a typed reason (mirrors CaseTransitionPolicy.TYPED_CANCELLATION_STAGES). */
 export const TYPED_CANCELLATION_STAGES = new Set(["ACCEPTED", "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "TREATMENT_IN_PROGRESS", "DISCHARGED", "FOLLOW_UP"]);
-const CANCELLATION_REASONS = ["PATIENT_WITHDREW", "HOSPITAL_REFUSED", "MEDICAL_CONTRAINDICATION", "PATIENT_DECEASED", "NO_SHOW"] as const;
+const CANCELLATION_REASONS = ["PATIENT_WITHDREW", "HOSPITAL_REFUSED", "MEDICAL_CONTRAINDICATION", "PATIENT_DECEASED", "NO_SHOW", "PLATFORM_CANCELLED", "CONSULTANT_CANCELLED"] as const;
 
 /**
  * The coordinator's cancellation (P0-2): after acceptance the lifecycle needs a typed reason, kept beside the status
