@@ -1,218 +1,339 @@
-/* RehletShifaa — branded Keycloak login theme (parent: keycloak classic).
-   Palette: warm cream background, healing teal primary, soft ink headings,
-   pale aqua surfaces. Bilingual EN/AR with logical properties for RTL. */
+/* RehletShifaa — Keycloak login theme (parent: keycloak classic), "Petrol & Paper".
+   The same paper, ink and type as the portal (DESIGN.md): a paper canvas, one white card edged by a hairline with the
+   2px petrol tab of a file, petrol for the one action, Alexandria headings, Plus Jakarta Sans body, Cairo for Arabic.
+   Bilingual by construction: logical properties only, and Arabic is never tracked or uppercased. */
 
+/* ---- Tokens ----
+   Keycloak cannot read the portal's CSS, so the values it needs are mirrored here under their source names, from
+   frontend/src/app/globals.css (@theme and the component tokens) as re-pointed by frontend/src/app/theme-petrol.css.
+   frontend/e2e/keycloak-theme.spec.ts fails when a mirrored value drifts from its source: change both together. */
 :root {
-  --rs-cream: #f7f3ec;
-  --rs-cream-2: #efe8dc;
-  --rs-surface: #ffffff;
-  --rs-aqua: #e6f2f0;
-  --rs-teal: #0f8a7e;
-  --rs-teal-strong: #0b6f66;
-  --rs-teal-soft: #14a599;
-  --rs-ink: #23343a;
-  --rs-ink-soft: #4a5b62;
-  --rs-border: #d9d0c2;
-  --rs-danger: #b23a48;
-  --rs-radius: 14px;
-  --rs-shadow: 0 18px 48px rgba(15, 138, 126, 0.12), 0 2px 8px rgba(35, 52, 58, 0.06);
+  color-scheme: light;
+  --paper: #f7f4ee;
+  --paper-deep: #efeae0;
+  --color-surface-default: #ffffff;
+  --color-line: #e3ded4;
+  --color-line-strong: #cfc8ba;
+  --color-border-card: #e0dacd;
+
+  --color-brand-50: #eef4f3;
+  --color-brand-100: #d9e8e6;
+  --color-brand-200: #b6d3cf;
+  --color-brand-300: #8cbab4;
+  --color-brand-600: #0e5f66;
+  --color-brand-700: #0e4f55;
+  --color-brand-800: #0c4247;
+  --color-brand-900: #13292e;
+
+  --color-ink-900: #14262b;
+  --color-ink-800: #1b2f34;
+  --color-ink-700: #24383d;
+  --color-ink-600: #33474c;
+  --color-ink-500: #41555a;
+  --color-ink-400: #5d6e72;
+  --color-ink-350: #7a898c;
+
+  --color-alert-50: #fdf5f4;
+  --color-alert-200: #f0d4d1;
+  --color-alert-700: #8c2b28;
+  --color-alert-800: #74201e;
+  --color-status-success-fg: #1b5f3d;
+  --color-status-success-surface: #e2f5ec;
+  --color-status-success-border: #bcdccc;
+  --color-status-warning-fg: #8a5218;
+  --color-status-warning-surface: #fcf1e3;
+  --color-status-warning-border: #ecd0a8;
+
+  --radius-card: 0.5rem;
+  --shadow-card: 0 1px 2px rgba(20, 38, 43, 0.05);
+
+  /* Theme-local layout values (not tokens): the card's inner padding, read by the footer that spans it. */
+  --rs-card-pad: 2rem;
+  --rs-control-height: 3rem;
+
+  --rs-font-latin: "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --rs-font-arabic: "Cairo", "Plus Jakarta Sans", "Segoe UI", Tahoma, sans-serif;
+  --rs-font-heading: "Alexandria", "Plus Jakarta Sans", "Segoe UI", sans-serif;
 }
 
+/* ---- Faces: the portal's own self-hosted files (frontend/src/assets/fonts, SIL OFL 1.1; licences beside them) ---- */
+@font-face { font-family: "Plus Jakarta Sans"; src: url("../fonts/jakarta-latin-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("../fonts/jakarta-latin-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("../fonts/jakarta-latin-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("../fonts/jakarta-latin-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Cairo"; src: url("../fonts/cairo-arabic-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Cairo"; src: url("../fonts/cairo-arabic-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Cairo"; src: url("../fonts/cairo-arabic-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Cairo"; src: url("../fonts/cairo-arabic-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+/* Alexandria ships as two subsets of one family; unicode-range lets one name carry both scripts. */
+@font-face {
+  font-family: "Alexandria";
+  src: url("../fonts/alexandria-arabic-var.woff2") format("woff2");
+  font-weight: 500 700;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: "Alexandria";
+  src: url("../fonts/alexandria-latin-var.woff2") format("woff2");
+  font-weight: 500 700;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212;
+}
+
+/* ---- Page ---- */
 html {
-  height: 100%;
+  min-block-size: 100%;
 }
 
 body.login-pf,
 .login-pf body {
-  background: var(--rs-cream);
-  color: var(--rs-ink);
-  font-family: "Segoe UI", "Cairo", "Helvetica Neue", Arial, "Noto Sans Arabic", sans-serif;
+  background: var(--paper);
+  background-image: none;
+  color: var(--color-ink-600);
+  font-family: var(--rs-font-latin);
+  font-size: 1rem;
+  line-height: 1.6;
+  text-align: start; /* PatternFly 4 resets body to left, which every label would inherit in Arabic */
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Soft healing backdrop */
-body.login-pf {
-  background-color: var(--rs-cream);
-  background-image:
-    radial-gradient(1200px 620px at 88% -8%, rgba(20, 165, 153, 0.16), transparent 60%),
-    radial-gradient(980px 560px at -6% 108%, rgba(15, 138, 126, 0.12), transparent 60%);
-  background-attachment: fixed;
+html[dir="rtl"] body {
+  font-family: var(--rs-font-arabic);
+  line-height: 1.85;
+}
+
+::selection {
+  background: var(--color-brand-100);
+  color: var(--color-ink-900);
 }
 
 .login-pf-page {
-  padding-top: 3vh;
+  padding-block: 2.5rem 3rem;
   padding-inline: 1rem;
 }
 
-.login-pf-page .login-pf-page-header {
-  margin-bottom: 1.5rem;
-}
-
-/* Brand logo replaces the default realm-name text */
+/* ---- Header: the lockup, centred above the card ---- */
 #kc-header,
 #kc-header-wrapper {
   color: transparent;
   font-size: 0;
   line-height: 0;
+  letter-spacing: 0;
+  text-transform: none;
   white-space: normal;
   text-shadow: none;
   padding: 0;
+  float: none;
+}
+
+.login-pf-page .login-pf-page-header {
+  margin-block-end: 1.5rem;
 }
 
 #kc-header-wrapper {
   display: block;
-  height: 92px;
+  block-size: 4.5rem;
   background-image: url("../img/brand-lockup.png");
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
-  filter: none;
 }
 
-/* Card */
-.card-pf {
-  background: var(--rs-surface);
-  border: 1px solid var(--rs-border);
-  border-radius: var(--rs-radius);
-  box-shadow: var(--rs-shadow);
-  border-top: 4px solid var(--rs-teal);
-  padding: 2rem 2.25rem 2.25rem;
-  max-width: 480px;
+/* ---- The card: white, a hairline, the petrol tab of a file ---- */
+.login-pf-page .card-pf {
+  position: relative;
+  background: var(--color-surface-default);
+  border: 1px solid var(--color-border-card);
+  border-block-start: 2px solid var(--color-brand-600);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 1.75rem var(--rs-card-pad) var(--rs-card-pad);
+  max-inline-size: 30rem;
   margin-inline: auto;
+  min-inline-size: 0;
+  overflow-wrap: break-word;
 }
 
 #kc-page-title {
-  color: var(--rs-ink);
-  font-weight: 700;
-  letter-spacing: 0.2px;
+  margin-block: 0.25rem 0;
+  color: var(--color-brand-900);
+  font-family: var(--rs-font-heading);
+  font-size: 1.625rem;
+  font-weight: 600;
+  line-height: 1.16;
+  letter-spacing: -0.025em;
+  text-align: start;
+  text-wrap: balance;
+}
+
+html[dir="rtl"] #kc-page-title {
+  font-size: 1.375rem;
+  line-height: 1.36;
+  letter-spacing: 0;
 }
 
 #kc-content-wrapper {
-  margin-top: 0.75rem;
+  margin-block-start: 1.25rem;
 }
 
-/* Labels & inputs */
-.control-label,
-label {
-  color: var(--rs-ink-soft);
+/* The account a second step belongs to: a quiet line, not a heading. */
+#kc-username {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+#kc-attempted-username {
+  padding: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-ink-800);
+  font-size: 1rem;
   font-weight: 600;
+  margin: 0;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* The restart link: a 44px target whose tooltip stays inside the card. */
+#reset-login {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 2.75rem;
+  min-block-size: 2.75rem;
+}
+
+/* The restart arrow points toward the start of the flow, so it mirrors in Arabic. */
+#reset-login .pficon-arrow:dir(rtl) {
+  transform: scaleX(-1);
+}
+
+/* Keycloak's hover tooltip cannot be dismissed (WCAG 1.4.13) and pushed the page sideways; the link keeps its
+   aria-label, and 7-3 gives it a visible one. */
+.kc-login-tooltip .kc-tooltip-text {
+  display: none;
+}
+
+/* ---- Text ---- */
+#kc-content p,
+.instruction {
+  color: var(--color-ink-600);
+  font-size: 1rem;
+  text-align: start;
+}
+
+/* ---- Labels and fields ---- */
+.pf-c-form__label,
+.pf-c-form__label-text,
+.control-label,
+#kc-content label {
+  color: var(--color-ink-700);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.pf-c-form__label,
+.form-group > label,
+.form-group .control-label {
+  display: inline-block;
+  margin-block-end: 0.5rem;
+}
+
+.form-group {
+  margin-block-end: 1.25rem;
 }
 
 input.form-control,
 .pf-c-form-control,
 select.form-control {
-  border: 1px solid var(--rs-border);
-  border-radius: 10px;
-  background: var(--rs-cream);
-  color: var(--rs-ink);
-  min-height: 44px;
+  --pf-c-form-control--BorderTopColor: var(--color-ink-350);
+  --pf-c-form-control--BorderRightColor: var(--color-ink-350);
+  --pf-c-form-control--BorderBottomColor: var(--color-ink-350);
+  --pf-c-form-control--BorderLeftColor: var(--color-ink-350);
+  --pf-c-form-control--hover--BorderBottomColor: var(--color-brand-600);
+  --pf-c-form-control--focus--BorderBottomColor: var(--color-brand-600);
+  --pf-c-form-control--focus--BorderBottomWidth: 1px;
+  --pf-c-form-control--focus--PaddingBottom: var(--pf-c-form-control--PaddingBottom);
+  --pf-c-form-control--hover--PaddingBottom: var(--pf-c-form-control--PaddingBottom);
+  min-block-size: var(--rs-control-height);
+  padding-inline: 0.875rem;
+  border: 1px solid var(--color-ink-350);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-default);
+  color: var(--color-ink-900);
+  font: inherit;
+  font-size: 1rem;
+  caret-color: var(--color-brand-600);
   box-shadow: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  text-align: start;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Hover firms the edge (petrol, 7.4:1) rather than fading it: the field must keep 3:1 under the pointer. */
+input.form-control:hover,
+.pf-c-form-control:hover {
+  border-color: var(--color-brand-600);
 }
 
 input.form-control:focus,
 .pf-c-form-control:focus,
 select.form-control:focus {
-  border-color: var(--rs-teal);
-  background: var(--rs-surface);
-  box-shadow: 0 0 0 3px rgba(20, 165, 153, 0.25);
-  outline: none;
+  border-color: var(--color-brand-600);
+  box-shadow: 0 0 0 3px var(--color-brand-100);
+  outline: 3px solid var(--color-brand-600);
+  outline-offset: 2px;
 }
 
-/* Primary / secondary buttons */
-.btn {
-  border-radius: 10px;
-  min-height: 44px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
+/* The password field and its show/hide control are one composite input: the group is always dir="ltr" (Keycloak), so
+   the logical end corners below are its right side in both languages. */
+.pf-c-input-group > .pf-c-form-control {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
 }
 
-.btn-primary,
-input.btn-primary {
-  background: var(--rs-teal);
-  border-color: var(--rs-teal-strong);
-  color: #ffffff;
-  transition: background 0.15s ease, transform 0.02s ease;
-}
-
-.btn-primary:hover,
-.btn-primary:focus,
-input.btn-primary:hover,
-input.btn-primary:focus {
-  background: var(--rs-teal-strong);
-  border-color: var(--rs-teal-strong);
-  color: #ffffff;
-}
-
-.btn-primary:active {
-  transform: translateY(1px);
-}
-
-.btn-default,
-.btn-secondary {
-  background: var(--rs-aqua);
-  border-color: #cfe4e0;
-  color: var(--rs-teal-strong);
-}
-
-/* PatternFly v4 buttons (KC 26 classic theme uses these) */
-.pf-c-button.pf-m-primary {
-  --pf-c-button--m-primary--BackgroundColor: var(--rs-teal);
-  --pf-c-button--m-primary--hover--BackgroundColor: var(--rs-teal-strong);
-  --pf-c-button--m-primary--focus--BackgroundColor: var(--rs-teal-strong);
-  --pf-c-button--m-primary--active--BackgroundColor: var(--rs-teal-strong);
-  background-color: var(--rs-teal);
-  border-radius: 10px;
-  min-height: 44px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-}
-
-.pf-c-button.pf-m-primary:hover,
-.pf-c-button.pf-m-primary:focus,
-.pf-c-button.pf-m-primary:active {
-  background-color: var(--rs-teal-strong);
-}
-
-/* Input-group control button (e.g. password show/hide) */
 .pf-c-button.pf-m-control {
-  border-radius: 0 10px 10px 0;
-  border-color: var(--rs-border);
-  color: var(--rs-ink-soft);
+  min-inline-size: var(--rs-control-height);
+  min-block-size: var(--rs-control-height);
+  border: 1px solid var(--color-ink-350);
+  border-inline-start: 0;
+  border-radius: 0;
+  border-start-end-radius: var(--radius-card);
+  border-end-end-radius: var(--radius-card);
+  background: var(--color-surface-default);
+  color: var(--color-ink-500);
 }
 
-html[dir="rtl"] .pf-c-button.pf-m-control {
-  border-radius: 10px 0 0 10px;
+.pf-c-button.pf-m-control::after {
+  border: 0;
 }
 
-.pf-c-form-control {
-  --pf-c-form-control--BorderTopColor: var(--rs-border);
-  --pf-c-form-control--BorderRightColor: var(--rs-border);
-  --pf-c-form-control--BorderBottomColor: var(--rs-border);
-  --pf-c-form-control--BorderLeftColor: var(--rs-border);
-  --pf-c-form-control--focus--BorderBottomColor: var(--rs-teal);
+.pf-c-button.pf-m-control:hover {
+  color: var(--color-brand-700);
 }
 
 /* ---- Sign-in errors: one calm message, quiet fields ----
-   PatternFly's invalid state paints a red exclamation icon inside the field, thickens the bottom border
-   and pads the text away from it; against the rounded cream inputs above that read as a malformed field,
-   and in RTL the icon sat under the typed characters. The semantics stay (aria-invalid, aria-live); only
-   the presentation changes: a thin danger border, no icon, and one concise line of text beneath. */
+   PatternFly's invalid state paints a red icon inside the field and thickens its bottom edge. The semantics stay
+   (aria-invalid, aria-live); only the presentation changes: the error edge, no icon, one line of text beneath. */
 .pf-c-form-control[aria-invalid="true"],
 input.form-control[aria-invalid="true"] {
   --pf-c-form-control--invalid--BackgroundUrl: none;
   --pf-c-form-control--invalid--BorderBottomWidth: 1px;
-  --pf-c-form-control--invalid--PaddingRight: var(--pf-c-form-control--PaddingRight, 0.5rem);
+  --pf-c-form-control--invalid--BorderBottomColor: var(--color-alert-700);
+  --pf-c-form-control--invalid--PaddingRight: 0.875rem;
   --pf-c-form-control--invalid--PaddingBottom: var(--pf-c-form-control--PaddingBottom, 0.375rem);
-  border: 1px solid var(--rs-danger);
+  padding-inline: 0.875rem;
+  border-color: var(--color-alert-700);
   background-image: none;
-  box-shadow: 0 0 0 3px rgba(178, 58, 72, 0.12);
 }
 
 .pf-c-form-control[aria-invalid="true"]:focus,
 input.form-control[aria-invalid="true"]:focus {
-  border-color: var(--rs-danger);
-  background: var(--rs-surface);
-  box-shadow: 0 0 0 3px rgba(178, 58, 72, 0.2);
+  border-color: var(--color-alert-700);
+  box-shadow: 0 0 0 3px var(--color-alert-200);
+  outline-color: var(--color-alert-700);
 }
 
 /* aria-invalid="" (no error) must look like a normal field: PatternFly only styles the "true" value. */
@@ -220,17 +341,17 @@ input.form-control[aria-invalid="true"]:focus {
   background-image: none;
 }
 
-/* The single sign-in error line rendered by the login form (id="input-error"). */
 #input-error,
+[id^="input-error"],
 .pf-c-form__helper-text.pf-m-error,
 .kc-feedback-text.pf-m-error {
   display: block;
-  margin: 0.4rem 0 0;
+  margin: 0.5rem 0 0;
   padding: 0;
-  font-size: 0.875rem;
-  line-height: 1.45;
+  color: var(--color-alert-800);
+  font-size: 0.9375rem;
   font-weight: 500;
-  color: var(--rs-danger);
+  line-height: 1.5;
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -241,119 +362,404 @@ input.form-control[aria-invalid="true"]:focus {
   content: none;
 }
 
-/* The classic theme's form group keeps a bottom margin; the error line must not double it. */
 #kc-form-login .form-group #input-error {
-  margin-bottom: 0;
+  margin-block-end: 0;
 }
 
-/* Links */
-a,
-#kc-registration a,
-#kc-info-wrapper a,
-.login-pf-page a {
-  color: var(--rs-teal-strong);
-  font-weight: 600;
+/* One-time codes: digits, spaced for reading back. The field is dir="ltr" in both languages. */
+input#otp,
+input#totp {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2em;
 }
 
-a:hover {
-  color: var(--rs-teal);
+/* ---- Checkboxes: a box and its words side by side in either direction ---- */
+.checkbox,
+.login-pf-settings .checkbox {
+  margin-block: 0;
 }
 
-/* Checkbox (remember me / consent) */
 .checkbox label,
-.login-pf-settings label {
-  color: var(--rs-ink-soft);
+#kc-content .checkbox label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-block-size: 2.75rem;
+  padding-inline-start: 0;
+  color: var(--color-ink-600);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.checkbox input[type="checkbox"],
+.checkbox label input[type="checkbox"] {
+  position: static;
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0;
+  accent-color: var(--color-brand-600);
+}
+
+.login-pf-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 1rem;
+}
+
+#kc-form-options span {
+  display: inline;
+}
+
+/* ---- Buttons: one petrol action, flat ---- */
+.pf-c-button.pf-m-primary,
+.btn-primary,
+input.btn-primary {
+  --pf-c-button--m-primary--BackgroundColor: var(--color-brand-600);
+  --pf-c-button--m-primary--hover--BackgroundColor: var(--color-brand-700);
+  --pf-c-button--m-primary--focus--BackgroundColor: var(--color-brand-700);
+  --pf-c-button--m-primary--active--BackgroundColor: var(--color-brand-700);
+  min-block-size: var(--rs-control-height);
+  padding-inline: 1.25rem;
+  border: 0;
+  border-radius: var(--radius-card);
+  background-color: var(--color-brand-600);
+  color: #ffffff;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  box-shadow: none;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.pf-c-button.pf-m-primary:hover,
+.pf-c-button.pf-m-primary:focus-visible,
+.btn-primary:hover,
+.btn-primary:focus-visible {
+  background-color: var(--color-brand-700);
+  color: #ffffff;
+}
+
+.pf-c-button.pf-m-primary:active,
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.pf-c-button.pf-m-primary::after,
+.btn-default::after {
+  border: 0;
+}
+
+/* Secondary (e.g. Cancel beside Save): white, a field-edge hairline, petrol ink. */
+.btn-default,
+.btn-secondary,
+.pf-c-button.btn-default {
+  min-block-size: var(--rs-control-height);
+  padding-inline: 1.25rem;
+  border: 1px solid var(--color-ink-350);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-default);
+  color: var(--color-brand-900);
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0;
+  box-shadow: none;
+}
+
+.btn-default:hover,
+.btn-secondary:hover {
+  border-color: var(--color-brand-900);
+  background: var(--color-surface-default);
+  color: var(--color-brand-900);
+}
+
+#kc-form-buttons {
+  margin-block-start: 1.5rem;
+}
+
+/* ---- Links: petrol, bold, a 44px target ---- */
+a,
+.login-pf-page a {
+  color: var(--color-brand-600);
+  font-weight: 600;
+  text-decoration: none;
+  text-underline-offset: 4px;
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--color-brand-700);
+  text-decoration: underline;
+}
+
+/* Links set inside sentences are underlined: petrol alone is too close to the body ink. */
+#kc-info a,
+#kc-info-message a,
+#kc-error-message a,
+.instruction a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+}
+
+#kc-form-options a,
+.login-pf-settings a,
+#kc-info a,
+#kc-info-message a,
+#kc-error-message a,
+#kc-content-wrapper > form a,
+#mode-manual,
+#mode-barcode {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+}
+
+/* ---- Info footer: paper, inside the card, edged by a hairline ---- */
+#kc-info {
+  margin: 1.75rem calc(-1 * var(--rs-card-pad)) calc(-1 * var(--rs-card-pad));
+}
+
+#kc-info-wrapper {
+  padding: 1rem var(--rs-card-pad);
+  border-block-start: 1px solid var(--color-line);
+  border-end-start-radius: var(--radius-card);
+  border-end-end-radius: var(--radius-card);
+  background: var(--paper);
+  color: var(--color-ink-600);
+  font-size: 0.9375rem;
+  text-align: start;
+}
+
+#kc-info-wrapper p {
+  margin: 0;
+}
+
+/* ---- Alerts: the status tokens, an icon beside the words ---- */
+.pf-c-alert {
+  --pf-c-alert--BoxShadow: none;
+  --pf-c-alert--BorderTopWidth: 0;
+  margin-block-end: 1.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-brand-200);
+  border-radius: var(--radius-card);
+  background: var(--color-brand-50);
+  color: var(--color-brand-800);
+  box-shadow: none;
+}
+
+.pf-c-alert .pf-c-alert__title,
+.pf-c-alert .kc-feedback-text {
+  color: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.pf-c-alert .pf-c-alert__icon {
+  color: inherit;
+}
+
+.pf-c-alert.pf-m-danger,
+.alert-error {
+  border-color: var(--color-alert-200);
+  background: var(--color-alert-50);
+  color: var(--color-alert-800);
+}
+
+.pf-c-alert.pf-m-success,
+.alert-success {
+  border-color: var(--color-status-success-border);
+  background: var(--color-status-success-surface);
+  color: var(--color-status-success-fg);
+}
+
+.pf-c-alert.pf-m-warning,
+.alert-warning {
+  border-color: var(--color-status-warning-border);
+  background: var(--color-status-warning-surface);
+  color: var(--color-status-warning-fg);
+}
+
+/* ---- Language switch: a 44px control at the card's top end ---- */
+#kc-locale {
+  inset-inline: auto 0;
+  text-align: end;
+}
+
+#kc-locale-dropdown button,
+#kc-current-locale-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-block-size: 2.75rem;
+  min-inline-size: 2.75rem;
+  padding-inline: 0.5rem;
+  color: var(--color-ink-600);
+  font: inherit;
+  font-size: 0.9375rem;
   font-weight: 500;
 }
 
-/* Info / registration footer block */
-#kc-info,
-#kc-info-wrapper {
-  background: var(--rs-aqua);
-  border-radius: 0 0 var(--rs-radius) var(--rs-radius);
-  color: var(--rs-ink-soft);
+/* The menu opens below its 44px button, and on keyboard focus as well as hover. */
+#kc-locale-dropdown:focus-within ul {
+  display: block;
 }
 
-/* Alerts */
-.alert {
-  border-radius: 10px;
-  border: 1px solid transparent;
-}
-
-.alert-error,
-.pf-m-danger {
-  background: #fbeced;
-  border-color: #f0c4c9;
-  color: var(--rs-danger);
-}
-
-.alert-success,
-.pf-m-success {
-  background: var(--rs-aqua);
-  border-color: #bfe0da;
-  color: var(--rs-teal-strong);
-}
-
-/* Language switcher */
 #kc-locale ul {
-  background: var(--rs-surface);
-  border: 1px solid var(--rs-border);
-  border-radius: 10px;
-  box-shadow: var(--rs-shadow);
+  inset-block-start: 100%;
+  margin-block-start: 0.25rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-default);
+  box-shadow: var(--shadow-card);
+  inset-inline: auto 0;
+}
+
+button#kc-current-locale-link::after {
+  margin-inline-start: 0;
 }
 
 #kc-locale-dropdown a {
-  color: var(--rs-ink-soft);
+  display: block;
+  min-block-size: 2.75rem;
+  padding-inline: 1rem;
+  line-height: 2.75rem;
+  color: var(--color-ink-700);
+  font-size: 0.9375rem;
+  text-align: start;
 }
 
-/* OTP / code inputs stay legible */
-input[type="text"][id*="otp"],
-input[name="otp"],
-#kc-otp-login-form input {
-  letter-spacing: 4px;
+/* ---- Second-factor and passkey pieces ---- */
+.pf-c-form__label-required,
+span.required:not(.pf-c-form__helper-text) {
+  color: var(--color-alert-700);
+}
+
+.select-auth-box-parent {
+  text-align: start;
+}
+
+.select-auth-box-icon,
+#kc-form-webauthn .select-auth-box-icon {
+  margin-inline: 0 1rem;
+}
+
+.select-auth-box-arrow {
+  margin-inline: 0 2rem;
+}
+
+#kc-form-webauthn .select-auth-box-headline {
+  color: var(--color-ink-800);
+  font-family: var(--rs-font-heading);
+  font-weight: 600;
+}
+
+#kc-totp-settings,
+#kc-totp-settings li,
+#kc-totp-supported-apps {
+  color: var(--color-ink-600);
+  text-align: start;
+}
+
+ol#kc-totp-settings {
+  padding-inline: 1.25rem 0;
+}
+
+/* Keycloak forces dir="ltr" on the authenticator's name; an Arabic name should still read right to left. */
+#userLabel {
+  unicode-bidi: plaintext;
+}
+
+#kc-totp-secret-qr-code {
+  max-inline-size: 100%;
+  block-size: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+}
+
+#kc-totp-secret-key {
+  direction: ltr;
+  unicode-bidi: isolate;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
-/* ---- RTL (Arabic) ---- */
-html[dir="rtl"] body,
-html[dir="rtl"] .card-pf,
-html[dir="rtl"] input.form-control,
-html[dir="rtl"] .pf-c-form-control {
-  text-align: right;
+/* ---- Focus: the portal's 3px petrol ring, on everything (PatternFly 3's a:focus and checkbox rules are more specific
+   than a bare :focus-visible, so they are named) ---- */
+:focus-visible,
+a:focus-visible,
+input[type="checkbox"]:focus-visible,
+.pf-c-button:focus-visible,
+.btn-default:focus-visible {
+  outline: 3px solid var(--color-brand-600);
+  outline-offset: 2px;
 }
 
-/* The username field is forced dir="ltr" by Keycloak while the page is RTL: keep the value off the border. */
-html[dir="rtl"] input.pf-c-form-control,
-html[dir="rtl"] input.form-control {
-  padding-left: 0.75rem;
-  padding-right: 0.75rem;
+a:focus:not(:focus-visible),
+input[type="checkbox"]:focus:not(:focus-visible) {
+  outline: none;
 }
 
-html[dir="rtl"] #kc-locale {
-  inset-inline-end: auto;
-  inset-inline-start: 20px;
+/* ---- Forced colours: the lockup is a background image, so the realm name it hides is shown instead ---- */
+@media (forced-colors: active) {
+  #kc-header-wrapper {
+    background-image: none;
+    color: CanvasText;
+    font-size: 1.25rem;
+    line-height: 1.4;
+    text-align: center;
+  }
 }
 
-/* ---- Responsive ---- */
-@media (max-width: 520px) {
-  .card-pf {
-    padding: 1.5rem 1.25rem 1.75rem;
-    border-radius: 12px;
+/* ---- Phones ---- */
+@media (max-width: 767px) {
+  :root {
+    --rs-card-pad: 1.25rem;
+  }
+
+  .login-pf-page {
+    padding-block-start: 1.5rem;
+  }
+
+  #kc-header {
+    inline-size: 100%;
+    max-inline-size: 30rem;
+    margin-inline: auto;
+    padding-inline: 0;
   }
 
   #kc-header-wrapper {
-    height: 72px;
+    block-size: 3.75rem;
+    padding: 0;
+  }
+
+  .login-pf-page .card-pf {
+    padding-block-start: 1.25rem;
+    margin-inline: auto;
+  }
+
+  #kc-locale {
+    position: static;
+    inline-size: auto;
+    margin-block-end: 0.25rem;
   }
 }
 
-/* ---- Reduced motion & focus visibility (a11y) ---- */
+/* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     transition: none !important;
   }
-}
 
-:focus-visible {
-  outline: 3px solid rgba(20, 165, 153, 0.55);
-  outline-offset: 2px;
+  .pf-c-button.pf-m-primary:active,
+  .btn-primary:active {
+    transform: none;
+  }
 }

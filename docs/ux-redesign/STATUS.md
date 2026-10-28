@@ -1948,6 +1948,66 @@ the known `StaffOperationalUi` W-44 (`ReconciliationPanel.test.tsx`: "leads on R
 fee test passes the step). Playwright on a production build on :3241: finance-workspace, finance-shots (`AREA4_SHOTS=b-4-1`),
 staff-chrome, a11y en+ar — 99/99. Shots in `screenshots/area-4/b-4-1/`; overwritten shots restored.
 
+## UX area 7 — Keycloak theme: critique, plan, slice 7-0 paper, ink and type (2026-10-28, worktree `quirky-leavitt-31a7ce`, branch `claude/quirky-leavitt-31a7ce` from `feat/review-p0` line @ `18fbe35a`)
+
+Scope: `PLAN.md` row 7 — sign-in, the patient's account setup (link → password → ready / expired), reset, email verification,
+the staff second factor (authenticator, code, passkey), en and ar.
+
+**Harness, not the live stack.** Keycloak on :8180 was down (another session is rebuilding the stack), so every page is
+rendered by a new static harness: `infrastructure/keycloak/theme-harness/render.sh` copies Keycloak 26.7.3's theme and
+FreeMarker jars out of the local image (`docker create` + `docker cp` on a container never started; no compose) and
+`Render.java` renders the real templates, resolved base ← keycloak ← rehletshifaa as the server does, with synthetic data
+(13 scenarios × en/ar; output and cache git-ignored). `frontend/e2e/keycloak-theme.spec.ts` (`KC_HARNESS_DIR`,
+`PLAYWRIGHT_EXTERNAL_SERVER=true`, shots only when `AREA7_SHOTS` is set) checks every page at 390 and 1440: dir/lang, fonts
+loaded (none failed), Cairo body in Arabic / Jakarta in English, Alexandria headings, no horizontal scroll, no tracked Arabic,
+no uppercase, 44px targets, axe serious/critical (390), and that every mirrored token still equals its portal source.
+
+**Critique: 17/40** (dual-agent; `.impeccable/critique/2026-10-28T19-22-30Z__ifaa-login-resources-css-rehletshifaa-css-0ac0c72f.md`;
+first run). P0: horizontal scroll at 390 on seven pages (restart tooltip, info footer). P1: a pre-Petrol palette (white on
+#0f8a7e 4.23:1, field edge 1.5:1, radial washes, teal glow, 10–14px radii), Segoe UI with no faces loaded, Arabic tracked,
+physical properties, the checkbox over its Arabic label, two dead `node_modules` stylesheets (404 on every page). P2: Keycloak
+jargon and « » glyphs, no heading on the second-factor pages, Continue as a bare link. Detector: 19 in our CSS, ~190 vendor
+false positives. Before shots: `screenshots/area-7/before/`.
+
+**Plan** `plans/keycloak-theme.md` (no owner gate; assumptions [A]): 7-0 paper, ink and type → 7-1 words (both bundles) →
+7-2 the setup moments (`info.ftl`, `error.ftl`, `login-update-password.ftl`) → 7-3 the second factor (OTP/TOTP/passkey
+templates) + close (re-critique ≥ 28/40, after shots, live walk when the stack is up).
+
+**Slice 7-0 — paper, ink and type.** `rehletshifaa.css` rewritten onto Petrol & Paper; no copy or template change:
+- the values Keycloak cannot import are mirrored under their source names (`--paper`, `--color-brand-600`, `--color-ink-350`,
+  alert and status tokens, `--radius-card`, `--shadow-card`), guarded by the spec's drift check;
+- paper canvas, white card with a hairline and the 2px petrol tab, 8px radii, the Rest shadow only; petrol-600 actions
+  (white 7.4:1), petrol-900 Alexandria headings, Jakarta body, Cairo Arabic (the portal's own woff2 files and OFL licences
+  copied into `resources/fonts/`; Alexandria's two subsets under one name by `unicode-range`);
+- fields: ink-350 edge (3.6:1), hover firms to petrol (the portal's petrol-300 hover is 2.1:1; stricter rule), focus ring +
+  halo, alert-700/800 errors, the sign-in error kept as one quiet line; alerts on the status tokens;
+- Arabic: no tracking or case anywhere, Cairo 1.85 leading, `text-align: start` from the body down (PatternFly 4 reset body
+  to left), logical properties only (the `html[dir=rtl]` physical overrides are gone; the password group's ltr corners are
+  logical end corners), checkbox rows as flex so the box never covers its Arabic label, the restart arrow mirrored, the
+  passkey row's physical margins neutralised, the parent's `padding-right` on the account line removed;
+- no sideways scroll at 390 (the info footer spans the card's own padding; the undismissable hover tooltip is hidden, the
+  link keeps its aria-label until 7-3 labels it); 44px for the locale button, links and checkbox rows; the locale menu opens
+  below its button and on keyboard focus; the 3px petrol ring reaches links and checkboxes (PatternFly 3's `a:focus` won);
+  links inside sentences underlined; forced-colours shows the realm name where the lockup image disappears;
+- `theme.properties`: the two non-existent `node_modules/patternfly` stylesheets removed.
+
+**Reviews.** RB: HIGH ×1 fixed (the harness doubled apostrophes, so "Haven''t" showed text Keycloak never renders; one
+formatter now as Keycloak's) and the MEDIUMs (cache stamp + version keyed, a real font-load check, shots gated so a check run
+never overwrites `before/`, dir/lang asserted, exact page list, any-value token match). WG: HIGH ×2 fixed (links' focus ring,
+locale menu over its button) + MEDIUMs (hover edge, underlines in text, forced colours). RTL: HIGH ×1 fixed (body `text-align`)
++ MEDIUMs/LOWs in CSS (passkey row, account padding, caret margin, restart arrow, TOTP list padding, Arabic 1.85, `#userLabel`
+plaintext). Pro Max: no text below 4.5:1, no overflow at 375/768/1024/1440; its MEDIUMs fixed (focus ring, hover, locale
+menu, passkey row; tooltip hidden). The rest — copy (7-1), templates (7-2/7-3), font preload, SVG icons, PatternFly 3 — in
+backlog.md "Area 7 — Keycloak theme".
+
+**Verify.** Detector on the theme CSS: 0 (two values ignored with reasons in `.impeccable/config.json`: Plus Jakarta Sans is
+DESIGN.md's body face; 15px is on the ladder in rem). `keycloak-theme.spec.ts` 8/8 on the harness (26 pages × 390/1440).
+`pnpm typecheck` ok; eslint on the spec clean. No frontend app code changed, so vitest and the portal Playwright specs were not
+re-run. Not verified live: Keycloak was down; `login-error.spec.ts` / `mfa-live.spec.ts` at the close. Shots:
+`screenshots/area-7/before/` and `screenshots/area-7/7-0/` (13 pages × en/ar × 390/1440).
+
+**Next:** slice 7-1 — words, started in a new session from this branch.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

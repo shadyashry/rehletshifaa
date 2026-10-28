@@ -137,6 +137,18 @@
         ],
         "createdAt": "2026-10-16T20:56:55.034Z",
         "reason": "DESIGN.md signature: 2px Petrol top edge on cards, 'like the tab of a file' (Cards / Containers)"
+      },
+      {
+        "rule": "overused-font",
+        "value": "plus jakarta sans",
+        "createdAt": "2026-10-28T19:25:18.932Z",
+        "reason": "DESIGN.md names Plus Jakarta Sans as the body face; the Keycloak theme mirrors the portal (area 7)"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "0.9375rem",
+        "createdAt": "2026-10-28T19:25:19.237Z",
+        "reason": "15px is on the DESIGN.md Ladder Rule (12-20px); written in rem"
       }
     ]
   }

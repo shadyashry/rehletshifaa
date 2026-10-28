@@ -743,3 +743,26 @@ MEDIUM/LOW findings, the critique's minor observations, and the items that later
 | LOW | Control Center › Margin & Deposit is in Petrol & Paper (`.cc-petrol`), but `.cc-badge`, `.cc-notice-*` and `.cc-table` keep the legacy palette, and each policy's facts run on as one paragraph (`cc-meta` spans inline, two "Review new version" filled buttons per page); the rest of the Control Center is area 6 | 4-3 Pro Max | `control-center.css` | area 6 |
 | LOW | Finance's deposit-confirm amount is `w-44` with `max={balanceEgp}` (a 7-digit Arabic amount is close to clipping; an over-amount gets the browser's message): move it to `AmountInput` with a visible balance hint | 4-3 Pro Max, 4-0 WG | `StaffCaseView.tsx` (`TransferActs`) | shared polish |
 | LOW | Arabic contexts from the work type are generic (the backend's English context may name specifics); entries with parameters keep the backend's sentence | 4-3 RTL | `portal-labels.ts` (`workTypeContext`) | backend copy codes |
+
+## Area 7 — Keycloak theme (2026-10-28)
+
+Deferred from 7-0's reviews (RB = harness/spec code, WG = web-design-guidelines, RTL = RTL/i18n, Pro Max = checklist). Copy rows
+are 7-1's scope; template rows are 7-2/7-3's.
+
+| Severity | Finding | Source | Where | Slice |
+|---|---|---|---|---|
+| MEDIUM | `en` overrides none of the 12 keys `ar` overrides (`usernameOrEmail`, `doForgotPassword`, `backToLogin`, `doSubmit`, …), so English shows Keycloak's voice ("Forgot Password?", "« Back to Login", "Username or email") | 7-0 RTL | `messages_en.properties` | 7-1 |
+| MEDIUM | `proceedWithAction` / `backToApplication` carry « » glyphs pointing backwards in both languages (and read as quotation marks in Arabic); drop them, any arrow is CSS and mirrors | critique, 7-0 RTL | messages | 7-1 |
+| MEDIUM | Keycloak jargon: Device Name, OTP devices, barcode, "Unable to scan?", Submit/«إرسال» for a save, "We are sorry…", stock verify-email copy (English on the Arabic page), raw `webauthn-transport-internal`, the English passkey label on `ar` | critique | messages (`loginTotp*`, `doSubmit`, `errorTitle`, `emailVerify*`, `webauthn-*`) | 7-1 |
+| MEDIUM | The language button's `aria-label` is the English "languages" on Arabic pages and overrides the visible «عربي» (WCAG 2.5.3); add `languages` in both bundles | 7-0 Pro Max, RTL | messages | 7-1 |
+| LOW | `usernameOrEmail` says "email or username" though patients sign in with their email; setup copy says «حالتي»/"my case" when a relative may hold the account | critique, 7-0 RTL | messages | 7-1 |
+| MEDIUM | Setup start/done: "Continue" is a bare link after an orphan colon; one primary button instead. Password intro is a warning alert; plain text plus the password rule before submit | critique | `info.ftl`, `login-update-password.ftl` | 7-2 |
+| MEDIUM | The expired link offers only "Continue to my case"; say who sends a new link (coordinator) | critique | `error.ftl`, messages | 7-2 |
+| MEDIUM | Second-factor pages have no h1 (the account sits in the title slot); the restart link's tooltip is hidden in 7-0 (not dismissible, WCAG 1.4.13) and needs a visible label; `loginTotpIntro` never renders; the QR alt is "Figure: Barcode"; on a phone the manual key should lead | critique, 7-0 Pro Max | `login-otp.ftl`, `login-config-totp.ftl`, `webauthn-*.ftl` | 7-3 |
+| MEDIUM | Fonts are not preloaded and have no metric-matched fallbacks (Arabic reflows on swap); preload the body and heading faces from `template.ftl` per locale | 7-0 WG | `template.ftl` override | 7-3 |
+| LOW | Icons are Keycloak's font glyphs (pficon arrow for restart reads as "open in new", FontAwesome eye, pficon key) and the locale caret is the character ˅; SVG via `mask-image` with `currentColor` | 7-0 Pro Max, WG | `rehletshifaa.css` | 7-3 |
+| LOW | The error span is not tied to its field by `aria-describedby`; `#otp` lacks `inputmode="numeric"`; `spellcheck="false"` on username/code; `theme-color` meta; the "English" menu item has no `lang="en"`; positive `tabindex` values in Keycloak's markup | 7-0 WG, RTL, Pro Max | templates | 7-3 |
+| LOW | The lockup is a 780×216 PNG background (sits slightly off-centre at 390 because the art is asymmetric); use the shipped SVG; the unused `img/logo.png` (835 KB) ships with the theme | critique, 7-0 WG, Pro Max | `rehletshifaa.css`, `resources/img` | 7-3 |
+| LOW | `stylesCommon` still loads PatternFly 3 (its `a:focus`/checkbox rules forced 7-0 to name the focus ring per element); drop it if no template uses PF3 classes | 7-0 WG | `theme.properties` | 7-3 |
+| LOW | The portal's own `--field-border-hover` (petrol-300, 2.1:1 on white) fades the field edge under the pointer; the Keycloak theme uses petrol-600 instead (stricter rule). Converge the portal token | 7-0 WG, Pro Max | `globals.css` `--field-border-hover` | shared polish |
+| LOW | Focused fields draw the 3px ring plus the petrol-100 halo (DESIGN.md "Inputs / Fields"); WG finds it heavy. Kept for parity with the portal | 7-0 WG | `rehletshifaa.css` | owner review |
