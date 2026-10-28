@@ -234,7 +234,8 @@ A cool, inky petrol family on warm paper, with a single coral accent from the lo
   accents (`accent-color`, caret). White on Petrol is 7.4:1.
 - **Deep Petrol** (petrol-700): hover and pressed state of actions, the closing call-to-action panel, reached journey
   markers and the lead Consultant monogram.
-- **Petrol Ink** (petrol-900): every heading and the wordmark; 13.8:1 on paper.
+- **Petrol Ink** (petrol-900): every heading and the wordmark; 13.8:1 on paper. The wordmark's accent ("Shifaa" /
+  «شفاء») is `--logo-accent` = petrol-500 (5.7:1 on paper; the old #247c86 was 4.45:1).
 - **Petrol Tints** (petrol-50 / petrol-100): hover wash and the focus halo or selection respectively. Never a
   section background.
 - **Support Teal** (petrol-400): thin rules, journey connector lines and markers only; never text.
@@ -371,7 +372,8 @@ Firm and quiet: flat at rest, petrol for intent, hairlines for structure, motion
 
 ### Inputs / Fields
 - **Style:** white, Field Edge border, 8px radius, about 54px tall (44px in the portal).
-- **Hover:** the border warms to petrol-300.
+- **Hover:** the border firms to Petrol (petrol-600, `--field-border-hover`); petrol-300 was 2.1:1, below the 3:1 a field
+  edge needs (converged with the Keycloak theme, 2026-10-29).
 - **Focus:** Petrol border plus a 3px Petrol Tint halo; the field's label also turns Deep Petrol.
 - **Error:** alert-700 border, alert-800 message text.
 - **Choice cards** (radio groups): an 8px card that lifts 1px on hover; when checked it gets a Petrol edge, petrol-50

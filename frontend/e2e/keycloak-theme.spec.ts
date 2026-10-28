@@ -191,6 +191,16 @@ test.describe("Keycloak theme", () => {
     }
   });
 
+  // The ready page says what happens next to a patient (their setup returns to a case), never to staff.
+  test("setup done: the next line is for patients only", async ({ page }) => {
+    for (const locale of LOCALES) {
+      await open(page, `setup-done-patient-${locale}`);
+      await expect.soft(page.locator("#kc-account-ready-next"), `patient ${locale}`).toBeVisible();
+      await open(page, `setup-done-${locale}`);
+      await expect.soft(page.locator("#kc-account-ready-next"), `staff ${locale}`).toHaveCount(0);
+    }
+  });
+
   // 7-3 close: the password rule ticks as the person types (a hint; the realm's policy still decides).
   test("password rule ticks as you type", async ({ page }) => {
     await open(page, "setup-password-en");

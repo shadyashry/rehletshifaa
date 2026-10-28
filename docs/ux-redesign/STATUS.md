@@ -2181,6 +2181,36 @@ Arabic review (owner's reviewer); portal-side items in shared polish (`--field-b
 lockup accent's 4.45:1, which is `Logo.tsx`'s brand colour); owner review of the focus halo; plural-sensitive password
 refusals only if the realm policy rises.
 
+### Area 7 — the last open points (2026-10-29, same worktree and branch, on `38a8a737`)
+
+Owner: "fix all open points instead live walk". Done:
+- **Token proposal (accepted for use here): `--logo-accent`**, a component token in `theme-petrol.css` =
+  `var(--color-brand-500)` (#1d6b6b, 5.7:1 on paper). `Logo.tsx` already read `var(--logo-accent, #247c86)`; the old
+  fallback teal was 4.45:1 on paper and passed only as large text. The portal's lockup and the Keycloak theme (mirrored,
+  drift-checked) now use it. No other new token.
+- **Field hover converged:** the portal's `--field-border-hover` was petrol-300 (2.1:1 on white, below the 3:1 a field edge
+  needs); it is now petrol-600 in `globals.css`, `DESIGN.md` says so, and the theme mirrors and uses the token.
+- **White on petrol:** no new token. The portal already has `--button-primary-fg` (= surface-default); the theme mirrors it in
+  place of its raw `#ffffff`.
+- **Decision (owner review item, applied as recommended):** focused fields keep the 3px ring plus the petrol-100 halo, as
+  `DESIGN.md` "Inputs / Fields" specifies, so the portal and the sign-in pages share one focus language.
+- **Patient-only "what happens next":** possible after all. `PatientAccountService` sends the patient setup email with
+  `redirect_uri` `/{lang}/portal?case=<id>&continue=1`; staff setup (`KeycloakStaffIdentityService`) returns to `/{lang}/portal`.
+  Keycloak gives that redirect to the done page as `pageRedirectUri`, so `info.ftl` shows the line only when it carries
+  `case=` (new scenario `setup-done-patient`; the spec checks patient yes, staff no).
+- **Arabic consistency and grammar pass** (no native reviewer can be replaced): headings now imperative like English
+  («أكّد بريدك الإلكتروني», «أعد تعيين كلمة المرور», «أعدّ تطبيق المصادقة», «أعدّ مفتاح المرور», «أكّد هويتك بمفتاح المرور»);
+  a password character is «رمز خاص» so «رمز» stays the code; the rule's last line a noun phrase («اختلافها عن بريدك
+  الإلكتروني»); «وإن لم يكن» in the expired message; «امسح رمز الاستجابة السريعة هذا»; «الإعدادات التالية»; the Bluetooth
+  key parallel to USB. Terms match `ar.json` («منسّق», «الحالة», «رعايتي», «تحدث مع منسّق»). The bundle's header marks it as
+  still awaiting native sign-off.
+
+**Verify.** `keycloak-theme.spec.ts` green incl. the token drift check over the new mirrors; portal `tsc` and eslint on the
+changed files clean; no portal test pins the two changed values. Shots re-taken (`7-3/`, `after/`); Oracle copy re-synced.
+
+**The only remaining check is the live walk**: Keycloak on :8180 mounts the main checkout's theme, and it is never rebuilt
+from here. Also still owed by people, not code: the native Arabic sign-off.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

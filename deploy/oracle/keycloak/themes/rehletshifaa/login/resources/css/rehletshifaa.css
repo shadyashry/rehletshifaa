@@ -20,6 +20,7 @@
   --color-brand-100: #d9e8e6;
   --color-brand-200: #b6d3cf;
   --color-brand-300: #8cbab4;
+  --color-brand-500: #1d6b6b;
   --color-brand-600: #0e5f66;
   --color-brand-700: #0e4f55;
   --color-brand-800: #0c4247;
@@ -43,6 +44,10 @@
   --color-status-warning-fg: #8a5218;
   --color-status-warning-surface: #fcf1e3;
   --color-status-warning-border: #ecd0a8;
+
+  --field-border-hover: var(--color-brand-600);
+  --button-primary-fg: var(--color-surface-default);
+  --logo-accent: var(--color-brand-500);
 
   --radius-card: 0.5rem;
   --shadow-card: 0 1px 2px rgba(20, 38, 43, 0.05);
@@ -115,8 +120,8 @@ html[dir="rtl"] body {
 
 /* ---- Header: the lockup, centred above the card ----
    The portal's lockup (frontend/src/components/Logo.tsx), as live text: the mark, then the name in Alexandria in both
-   scripts, the lead in medium and the accent in bold and colour, the first "i" of "Shifaa" dotted in coral. Its three
-   colours are Logo.tsx's own values (not @theme tokens), hence theme-local names. */
+   scripts, the lead in medium and the accent in bold and colour, the first "i" of "Shifaa" dotted in coral. The accent
+   is the portal's --logo-accent token; the ink and the dot are still Logo.tsx's own values, hence theme-local names. */
 .login-pf-page .login-pf-page-header {
   margin-block-end: 1.5rem;
 }
@@ -135,7 +140,6 @@ html[dir="rtl"] body {
   display: flex;
   justify-content: center;
   --rs-logo-ink: #29454d;
-  --rs-logo-accent: #247c86;
   --rs-logo-dot: #e98d78;
   --rs-logo-size: 3rem;
 }
@@ -178,7 +182,7 @@ html[dir="rtl"] body {
 }
 
 .rs-wordmark-accent {
-  color: var(--rs-logo-accent);
+  color: var(--logo-accent);
   font-weight: 700;
 }
 
@@ -333,10 +337,10 @@ select.form-control {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Hover firms the edge (petrol, 7.4:1) rather than fading it: the field must keep 3:1 under the pointer. */
+/* Hover firms the edge (petrol, 7.4:1): the portal's --field-border-hover, converged at the area 7 close. */
 input.form-control:hover,
 .pf-c-form-control:hover {
-  border-color: var(--color-brand-600);
+  border-color: var(--field-border-hover);
 }
 
 input.form-control:focus,
@@ -488,7 +492,7 @@ input.btn-primary {
   border: 1px solid transparent; /* forced colours draw it, so the button keeps an edge there */
   border-radius: var(--radius-card);
   background-color: var(--color-brand-600);
-  color: #ffffff;
+  color: var(--button-primary-fg);
   font: inherit;
   font-size: 1rem;
   font-weight: 600;
@@ -503,7 +507,7 @@ input.btn-primary {
 .btn-primary:hover,
 .btn-primary:focus-visible {
   background-color: var(--color-brand-700);
-  color: #ffffff;
+  color: var(--button-primary-fg);
 }
 
 .pf-c-button.pf-m-primary:active,
@@ -593,7 +597,7 @@ a:focus-visible {
 }
 
 #kc-content a.pf-c-button.pf-m-primary {
-  color: #ffffff;
+  color: var(--button-primary-fg);
 }
 
 /* A secondary way on beside the primary one (the coordinator, a resend): the white secondary button. */
@@ -953,7 +957,7 @@ ol#kc-totp-settings {
 }
 
 #kc-content .rs-choice-item:hover {
-  border-color: var(--color-brand-600);
+  border-color: var(--field-border-hover);
 }
 
 #kc-content .rs-choice-item:has(input:checked) {

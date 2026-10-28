@@ -153,6 +153,12 @@ public class Render {
                 m.put("message", message(m, "success", "accountUpdatedMessage"));
                 m.put("pageRedirectUri", "#");
             }),
+            // A patient's setup: PatientAccountService sends redirect_uri /{lang}/portal?case=<id>&continue=1.
+            new Scenario("setup-done-patient", "info.ftl", m -> {
+                m.put("messageHeader", "accountUpdatedTitle");
+                m.put("message", message(m, "success", "accountUpdatedMessage"));
+                m.put("pageRedirectUri", "portal?case=00000000-0000-4000-8000-000000000000&continue=1");
+            }),
             new Scenario("setup-expired", "error.ftl", m -> {
                 m.put("message", message(m, "error", "expiredActionMessage"));
                 m.put("client", Map.of("baseUrl", "#"));

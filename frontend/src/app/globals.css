@@ -244,7 +244,8 @@
     --field-fg: var(--color-ink-900);
     --field-placeholder: var(--color-ink-400);
     --field-border: var(--color-ink-350);
-    --field-border-hover: var(--color-brand-300);
+    /* Hover firms the edge to petrol (UX 7 close): petrol-300 was 2.1:1 on white, below the 3:1 a field edge needs. */
+    --field-border-hover: var(--color-brand-600);
     --field-border-focus: var(--color-brand-600);
     --field-focus-halo: 3px var(--color-brand-100);
     --field-label-fg-focus: var(--color-brand-700);

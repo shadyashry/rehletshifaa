@@ -28,6 +28,8 @@
   --color-brand-300: #8cbab4;
   --color-brand-400: #5fb3ac; /* support teal: thin rules and markers only */
   --color-brand-500: #1d6b6b; /* 5.7:1 on paper */
+  /* The lockup accent ("Shifaa" / «شفاء», Logo.tsx --logo-accent): its old #247c86 was 4.45:1 on paper (UX 7 close). */
+  --logo-accent: var(--color-brand-500);
   --color-brand-600: #0e5f66; /* actions, links — white 7.4:1 */
   --color-brand-700: #0e4f55; /* hover, the closing panel */
   --color-brand-800: #0c4247;

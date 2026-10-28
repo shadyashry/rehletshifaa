@@ -16,6 +16,12 @@
         <#if messageHeader??>
             <p class="instruction">${message.summary}</p>
         </#if>
+        <#-- UX 7 close: what happens next, for a patient only. The backend's patient setup email returns to
+             /{lang}/portal?case=<id>&continue=1 (PatientAccountService), staff setup to /{lang}/portal without a case;
+             Keycloak hands that redirect to this page as pageRedirectUri. -->
+        <#if (messageHeader!"") == "accountUpdatedTitle" && (pageRedirectUri!"")?contains("case=")>
+            <p class="instruction" id="kc-account-ready-next">${msg("accountReadyNext")}</p>
+        </#if>
         <#if requiredActions?? && requiredActions?has_content>
             <#if requiredActions?size == 1>
                 <p class="instruction" id="kc-required-actions">${kcSanitize(msg("requiredActionNext", msg("requiredAction.${requiredActions[0]}")))?no_esc}</p>
