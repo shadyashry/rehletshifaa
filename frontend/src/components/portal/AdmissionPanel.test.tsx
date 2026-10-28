@@ -64,17 +64,21 @@ describe("AdmissionPanel — Operations", () => {
 
   it("shows the voucher amounts exactly as returned and records the cashier receipt", async () => {
     const { mutate } = setup("operations", reserved, { currentCode: "RECORD_HOSPITAL_BALANCE" });
-    expect(await screen.findByText("RS-V-RS-2026-000123-1")).toBeTruthy();
+    // UX 5-4: the issued voucher is a done act of the file and the head of the money disclosure.
+    expect(await screen.findAllByText("RS-V-RS-2026-000123-1")).toHaveLength(2);
     expect(screen.getAllByText("EGP 195,432.10").length).toBeGreaterThan(0);
     expect(screen.getAllByText("$3,987.65").length).toBeGreaterThan(0);
-    expect(screen.getByText("The hospital balance is not evidenced (cashier receipt countersigned by Finance)")).toBeTruthy();
+    // UX 5-4: the receipt is Operations' own act, so the balance is not repeated as something to wait on.
+    expect(screen.queryByText("The hospital balance is not evidenced (cashier receipt countersigned by Finance)")).toBeNull();
+    expect(screen.queryByText("Before admission, waiting on others")).toBeNull();
     // The receipt is the next thing to do: its form is open and its button is the panel's primary.
     const receipt = screen.getByText("Record the hospital receipt").closest("details")!;
     expect(receipt.open).toBe(true);
     const form = within(receipt);
     fireEvent.change(form.getByLabelText("Receipt number"), { target: { value: "CASH-991" } });
     // UX 5-2: the amount starts at the balance still owed, and says so.
-    expect(form.getByLabelText("Amount (EGP)")).toHaveValue(195432.1);
+    // UX 5-4: grouped as the receipt prints it, read back as a number.
+    expect(form.getByLabelText("Amount (EGP)")).toHaveValue("195,432.10");
     expect(form.getByLabelText("Amount (EGP)")).toHaveAccessibleDescription(/balance still owed/);
     expect((form.getByLabelText("Paid at") as HTMLInputElement).value).not.toBe("");
     fireEvent.change(form.getByLabelText("Paid at"), { target: { value: "2026-10-19T09:30" } });
@@ -106,7 +110,8 @@ describe("AdmissionPanel — Operations", () => {
   it("once cleared, records the admission number and offers nothing before it", async () => {
     const { mutate } = setup("operations", { ...reserved, caseStatus: "ADMISSION_READY", balanceOwedEgp: 0, admissionBlockers: [] },
       { caseStatus: "ADMISSION_READY", currentCode: "RECORD_ADMISSION_NUMBER" });
-    expect(await screen.findByText("Nothing stands between the patient and admission.")).toBeTruthy();
+    expect(await screen.findByLabelText("Hospital admission number")).toBeTruthy();
+    expect(screen.queryByText("Before admission, waiting on others")).toBeNull();
     expect(screen.queryByText("Record the hospital receipt")).toBeNull();
     expect(screen.queryByText("Change the reservation")).toBeNull();
     // B-3-1b: on a cleared case the number starts treatment, and the field says so.
@@ -141,9 +146,16 @@ describe("AdmissionPanel — Operations' hospital file", () => {
     const items = within(acts).getAllByRole("listitem").map(li => li.textContent ?? "");
     expect(items[0]).toMatch(/^Reserved · ⁨Nile Heart Hospital⁩ · ⁨Cairo⁩ · admission .*2026/);
     expect(items[1]).toContain("Record the admission letter");
+    // UX 5-4: the list is the sequence; the voucher waits for the checked letter. The point of no return and the first
+    // appointment, possible now but no step of the sequence, wait together under the file.
     expect(items[2]).toBe("Travel act");
-    expect(items[3]).toBe("Later: Record the hospital receipt");
-    expect(items[4]).toBe("Later: Record the admission number");
+    expect(items[3]).toBe("Later: Issue the voucher");
+    expect(items[4]).toBe("Later: Record the hospital receipt");
+    expect(items[5]).toBe("Later: Record the admission number");
+    const also = screen.getByText("Also possible now: Point of no return · First confirmed appointment", { selector: "summary" }).closest("details")!;
+    expect(also.open).toBe(false);
+    expect(within(also).getByText("Set the point of no return", { selector: "summary" })).toBeInTheDocument();
+    expect(within(also).getByText("First confirmed appointment", { selector: "summary" })).toBeInTheDocument();
     expect(screen.getByText("Record the admission letter").closest("details")).toHaveAttribute("open");
     expect(travel).toHaveBeenLastCalledWith(false);
     expect(container.querySelectorAll(".btn-primary")).toHaveLength(1);
@@ -257,11 +269,12 @@ describe("AdmissionPanel — Consultant and Arabic", () => {
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
   });
 
-  it("speaks Arabic with the checklist and the trail", async () => {
-    setup("operations", reserved, { locale: "ar" });
+  it("speaks Arabic with the blockers and the file history", async () => {
+    setup("operations", { ...reserved, admissionBlockers: ["PROCEDURE_CONSENT_MISSING", "BALANCE_NOT_EVIDENCED"] }, { locale: "ar" });
     expect(await screen.findByRole("heading", { name: "الدخول والمدفوعات" })).toBeTruthy();
-    expect(screen.getByText("لم يُثبت سداد رصيد المستشفى (إيصال الخزينة موقّع من المالية)")).toBeTruthy();
-    expect(screen.getByText(/سجل الإثباتات/)).toBeTruthy();
+    expect(screen.getByText("قبل الدخول، بانتظار أطراف أخرى")).toBeTruthy();
+    expect(screen.getByText("لا توجد موافقة على الإجراء في الملف")).toBeTruthy();
+    expect(screen.getByText(/سجل الملف/, { selector: "summary" })).toBeTruthy();
   });
 });
 
@@ -375,5 +388,104 @@ describe("AdmissionPanel — the cashier (UX 5-2)", () => {
     setup("operations", { ...reserved, caseStatus: "TREATMENT_IN_PROGRESS", admissionNumber: "ADM-1", balanceOwedEgp: 0, admissionBlockers: [] });
     expect(await screen.findByText("Correct the admission number", { selector: "summary" })).toBeInTheDocument();
     expect(screen.queryByText(/first confirmed appointment/i)).toBeNull();
+  });
+});
+
+/** UX 5-4: the cards around the file folded into it — only what others must clear, the acts possible now, one File history. */
+describe("AdmissionPanel — the file holds it all (UX 5-4)", () => {
+  afterEach(cleanup);
+  const receiptRow = { id: "e2", kind: "BALANCE_EVIDENCED", reference: "CASH-1", amountEgp: 195432.1, recordedRole: "OPERATIONS", recordedAt: "2026-10-19T09:00:00Z", superseded: false };
+
+  it("names only the blockers Operations cannot clear: consent, the quote, Finance's countersignature", async () => {
+    setup("operations", { ...reserved, voucher: null, evidence: [...reserved.evidence, receiptRow],
+      admissionBlockers: ["PROCEDURE_CONSENT_MISSING", "VOUCHER_NOT_ISSUED", "BALANCE_NOT_EVIDENCED", "ADMISSION_NUMBER_MISSING"] });
+    const heading = await screen.findByText("Before admission, waiting on others");
+    const list = heading.parentElement!.querySelector("ul")!;
+    expect(within(list).getAllByRole("listitem").map(li => li.textContent)).toEqual([
+      "Procedure consent is not on file", "The hospital balance is not evidenced (cashier receipt countersigned by Finance)"]);
+    expect(screen.queryByText("Before admission")).toBeNull();
+    expect(screen.queryByText("No voucher issued yet.")).toBeNull();
+  });
+
+  it("keeps the record behind one closed File history: a recorded first appointment's correction and the evidence trail", async () => {
+    setup("operations", { ...reserved, evidence: [...reserved.evidence, { id: "e5", kind: "FIRST_CONFIRMED_APPOINTMENT", recordedRole: "OPERATIONS", recordedAt: "2026-10-12T10:00:00Z", superseded: false }] });
+    const history = (await screen.findByText("File history (2)", { selector: "summary" })).closest("details")!;
+    expect(history.open).toBe(false);
+    expect(within(history).getByText("Correct the first confirmed appointment", { selector: "summary" })).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Hospital file" })).queryByText(/first confirmed appointment/i)).toBeNull();
+    expect(within(history).getByRole("list", { name: "Evidence trail" })).toBeInTheDocument();
+    expect(screen.queryByText(/^Evidence trail/, { selector: "summary" })).toBeNull();
+    // The estimate is read where the letter's price is typed, not as a fact under the file.
+    expect(screen.queryByText("Accepted estimate maximum")).toBeNull();
+  });
+
+  it("offers the voucher by hand only once the letter is checked, and as a later act before", async () => {
+    setup("operations", { ...reserved, caseStatus: "TRAVEL_COORDINATION", voucher: null, balanceOwedEgp: null });
+    const issue = (await screen.findByText("Issue the voucher", { selector: "summary" })).closest("details")!;
+    expect(within(issue).getByRole("button", { name: "Issue the voucher" })).toHaveClass("btn-secondary");
+    cleanup();
+    setup("operations", { ...reserved, caseStatus: "TRAVEL_COORDINATION", voucher: null, balanceOwedEgp: null, admissionBlockers: ["FINAL_QUOTE_NOT_ACCEPTED"] });
+    const acts = await screen.findByRole("list", { name: "Hospital file" });
+    expect(within(acts).getByText("Issue the voucher").closest("p")).toHaveTextContent("Later: Issue the voucher");
+    expect(screen.queryByRole("button", { name: "Issue the voucher" })).toBeNull();
+  });
+
+  it("says a set point of no return as one line, changeable until Finance approves it", async () => {
+    setup("operations", { ...reserved, pointOfNoReturnAt: "2026-10-19T16:00:00Z", pointOfNoReturnApproved: false });
+    const acts = await screen.findByRole("list", { name: "Hospital file" });
+    expect(acts.textContent).toMatch(/No refund for travel after .*2026.* · waiting for Finance/);
+    expect(screen.getByText("Change the point of no return", { selector: "summary" })).toBeInTheDocument();
+    cleanup();
+    setup("operations", { ...reserved, pointOfNoReturnAt: "2026-10-19T16:00:00Z", pointOfNoReturnApproved: true });
+    expect((await screen.findByRole("list", { name: "Hospital file" })).textContent).toMatch(/approved by Finance/);
+    expect(screen.queryByText("Change the point of no return")).toBeNull();
+  });
+
+  it("groups the receipt amount when the field is left and sends it as a number", async () => {
+    const { mutate } = setup("operations", reserved, { currentCode: "RECORD_HOSPITAL_BALANCE" });
+    const form = within((await screen.findByText("Record the hospital receipt")).closest("details")!);
+    const amount = form.getByLabelText("Amount (EGP)");
+    fireEvent.change(amount, { target: { value: "1200000.5" } });
+    fireEvent.blur(amount);
+    expect(amount).toHaveValue("1,200,000.50");
+    fireEvent.change(form.getByLabelText("Receipt number"), { target: { value: "CASH-7" } });
+    fireEvent.click(form.getByRole("button", { name: "Record the receipt" }));
+    await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/admission/balance", expect.objectContaining({ amountEgp: 1200000.5 })));
+  });
+
+  it("reads an Arabic keypad's digits and a pasted currency, and refuses an ambiguous amount instead of re-reading it", async () => {
+    setup("operations", reserved, { currentCode: "RECORD_HOSPITAL_BALANCE", locale: "ar" });
+    const form = within((await screen.findByText("سجّل إيصال خزينة المستشفى", { selector: "summary" })).closest("details")!);
+    const amount = form.getByLabelText("المبلغ (جنيه مصري)") as HTMLInputElement;
+    fireEvent.change(amount, { target: { value: "١٩٥٬٥٠٠٫٥" } });
+    fireEvent.blur(amount);
+    expect(amount).toHaveValue("195,500.50");
+    expect(amount.validity.valid).toBe(true);
+    fireEvent.change(amount, { target: { value: "195,500 ج.م." } });
+    fireEvent.blur(amount);
+    expect(amount).toHaveValue("195,500");
+    for (const typed of ["195,50", "1,2", "0", "-5"]) {
+      fireEvent.change(amount, { target: { value: typed } });
+      fireEvent.blur(amount);
+      expect(amount).toHaveValue(typed);
+      expect(amount.validationMessage).toBe("اكتب المبلغ بالأرقام وأكبر من صفر، مثل 195,500.");
+    }
+  });
+
+  it("stops asking for money at the cashier once the receipt is recorded or nothing is owed", async () => {
+    setup("operations", { ...reserved, evidence: [...reserved.evidence, receiptRow] });
+    expect(await screen.findByText("The voucher and what is owed", { selector: "summary" })).toBeInTheDocument();
+    expect(screen.queryByText(/^Patient pays at the cashier:/, { selector: "p" })).toBeNull();
+    cleanup();
+    setup("operations", { ...reserved, caseStatus: "ADMISSION_READY", balanceOwedEgp: 0, admissionBlockers: [] });
+    expect(await screen.findByText("The voucher and what is owed", { selector: "summary" })).toBeInTheDocument();
+    expect(screen.queryByText(/^Patient pays at the cashier:/, { selector: "p" })).toBeNull();
+  });
+
+  it("waits on Finance only for a receipt it has not countersigned", async () => {
+    setup("operations", { ...reserved, evidence: [...reserved.evidence, { ...receiptRow, countersignedRole: "FINANCE", countersignedAt: "2026-10-19T12:00:00Z" }],
+      admissionBlockers: ["BALANCE_NOT_EVIDENCED"] });
+    expect(await screen.findByRole("list", { name: "Hospital file" })).toBeInTheDocument();
+    expect(screen.queryByText("Before admission, waiting on others")).toBeNull();
   });
 });

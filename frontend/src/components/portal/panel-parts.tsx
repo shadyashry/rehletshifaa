@@ -1,7 +1,7 @@
 "use client";
 
 import { Component, use, useEffect, useId, useRef, useState, type FocusEventHandler, type FormEvent, type ReactNode } from "react";
-import { Check, ChevronDown, Circle, CircleAlert, Clock } from "lucide-react";
+import { Check, ChevronDown, CircleAlert, CircleDashed, Clock } from "lucide-react";
 
 import { ConfirmDialog, FeedbackContext } from "@/components/portal/portal-ui";
 
@@ -60,16 +60,18 @@ export function DoneAct({ fact, tone = "done", change, children }: {
   );
 }
 
-/** UX 5-1: an act that comes later, named so the order is plain; `notYet` is read first by screen readers. */
+/** UX 5-1: an act that comes later, named so the order is plain. UX 5-4: its "Later:" is shown, and its marker is dashed, so the
+ * row never reads as a radio button to pick. */
 export function LaterAct({ notYet, children }: { notYet: string; children: ReactNode }) {
-  return <p className="flex items-start gap-2 py-2 text-[0.875rem] text-ink-500"><Circle size={16} aria-hidden className="mt-0.5 flex-none"/><span className="min-w-0 [overflow-wrap:anywhere]"><span className="sr-only">{notYet} </span>{children}</span></p>;
+  return <p className="flex items-start gap-2 py-2 text-[0.875rem] text-ink-500"><CircleDashed size={16} aria-hidden className="mt-0.5 flex-none"/><span className="min-w-0 [overflow-wrap:anywhere]"><span className="font-semibold">{notYet}</span> {children}</span></p>;
 }
 
 /** A disclosure's summary with a drawn marker that turns as its own `<details>` opens (the native marker is gone once it is a
- * flex box). It reads its parent, not a `group`, so a closed disclosure inside an open one keeps its closed marker (UX 5-2). */
+ * flex box). It reads its parent, not a `group`, so a closed disclosure inside an open one keeps its closed marker (UX 5-2). It does
+ * not wrap, so a long label wraps beside its marker, never under it (UX 5-4). */
 export function Summary({ children }: { children: ReactNode }) {
   return (
-    <summary className="inline-flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2 text-sm font-bold text-brand-700 hover:text-brand-900 [&::-webkit-details-marker]:hidden">
+    <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-x-2 text-sm font-bold text-brand-700 hover:text-brand-900 [&::-webkit-details-marker]:hidden">
       <ChevronDown size={16} aria-hidden className="flex-none transition-transform motion-reduce:transition-none [details[open]>summary>&]:rotate-180"/>{children}
     </summary>
   );

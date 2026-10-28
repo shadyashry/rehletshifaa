@@ -28,6 +28,9 @@ for (const locale of ["en", "ar"] as const) for (const width of [390, 1440]) {
       await page.goto(`/${locale}/portal?case=${id}`);
       await page.locator("#case-heading").waitFor();
       await settle(page);
+      // UX 5-4: the case tabs fit the phone in both languages (the Arabic "Activity" tab was clipped at 390).
+      const tabs = page.getByRole("tablist");
+      expect(await tabs.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`case-${id}-${locale}-${width}`), fullPage: true });
     }
   });

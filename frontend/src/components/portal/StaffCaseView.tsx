@@ -158,7 +158,10 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  const reserved=reservation?.caseId===c.id&&reservation.admissionId?reservation:null;
  const stageLine=cv.logistics.stage as Record<string,string>;
  const travelLine=Object.hasOwn(stageLine,c.status)?stageLine[c.status]:plan?label(cv.logistics.travel,plan.status):cv.logistics.notPlanned;
- const logistics=plan||reserved?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{cv.logistics.title}</h3>
+ // UX 5-4: Operations reads the destination in its own file (the reservation, the travel act, the arrival) and, at the end, in its
+ // going-home acts, so the card is left out while any of them is on the page.
+ const fileShowsIt=role==="operations"&&(admissionShown||travelLive||!!dischargePanel);
+ const logistics=(plan||reserved)&&!fileShowsIt?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{cv.logistics.title}</h3>
   <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-4">
    {/* "Not chosen yet" only while one can still be chosen; later, a hospital not read here is left unsaid rather than denied. */}
    {(reserved||plan?.facilityName||TRAVEL_STAGES.has(c.status))&&<div><dt className="text-ink-500">{cv.logistics.facility}</dt><dd className="font-semibold text-ink-900">{reserved?<><bdi>{reserved.facilityName??"—"}</bdi>{reserved.facilityCity&&<span className="font-normal text-ink-600"> · <bdi>{reserved.facilityCity}</bdi></span>}</>:plan?.facilityName?<bdi>{plan.facilityName}</bdi>:cv.logistics.notChosen}</dd></div>}
@@ -316,9 +319,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   <div aria-busy={busy||undefined} className="min-w-0">
    <div className={`mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start ${evidence&&tab==="clinical"?"xl:grid-cols-[minmax(0,1fr)_22rem]":""}`}>
     <div className="min-w-0">
-     {<div role="tablist" aria-label={t.caseWorkspaceLabel} className="mb-4 flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-line-strong)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+     {<div role="tablist" aria-label={t.caseWorkspaceLabel} className="mb-4 flex gap-0 overflow-x-auto sm:gap-1 shadow-[inset_0_-1px_0_var(--color-line-strong)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {caseTabs.map(item=><button key={item.id} type="button" role="tab" id={`case-tab-${item.id}`} aria-controls="case-tab-panel" aria-selected={tab===item.id}
-        className={`min-h-11 flex-none whitespace-nowrap border-b-2 px-3 py-2 text-[0.875rem] font-bold transition-colors ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
+        className={`min-h-11 flex-none whitespace-nowrap border-b-2 px-2 py-2 sm:px-3 text-[0.875rem] font-bold transition-colors ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
         onKeyDown={event=>{const target=tabKeyTarget(event.key,caseTabs.findIndex(x=>x.id===tab),caseTabs.length,locale==="ar");if(target<0)return;event.preventDefault();const next=caseTabs[target];setTab(next.id);requestAnimationFrame(()=>document.getElementById(`case-tab-${next.id}`)?.focus());}}
         tabIndex={tab===item.id?0:-1}
         onClick={()=>setTab(item.id)}>{item.label}{item.count?<span className="ms-1.5 text-[0.8125rem] font-semibold text-ink-400">{item.count}</span>:null}</button>)}

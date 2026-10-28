@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FocusEvent, type ReactNode } from "react";
+import { Clock } from "lucide-react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
@@ -23,6 +24,10 @@ export const ADMISSION_WORK: ReadonlySet<string> = new Set(["RECORD_HOSPITAL_BAL
 /** Ledger rows Finance countersigns from here (a letter is countersigned by its own decision). */
 const COUNTERSIGNED_HERE = new Set(["BALANCE_EVIDENCED", "POINT_OF_NO_RETURN"]);
 const LETTER_DECIDABLE = new Set(["CHECK_PENDING", "VARIANCE_OPEN"]);
+/** Admission blockers that are acts of Operations' own file (the voucher, the receipt, the number). */
+const OPERATIONS_CLEARS = new Set(["VOUCHER_NOT_ISSUED", "BALANCE_NOT_EVIDENCED", "ADMISSION_NUMBER_MISSING"]);
+/** A letter Finance has checked: the voucher can be issued by hand from here. */
+const LETTER_CHECKED = new Set(["WITHIN_ESTIMATE", "VARIANCE_ACCEPTED"]);
 
 /**
  * P1-15, staff case page: the "Admission & money" panel (design §5 stages 1–3). It shows the reservation, the frozen voucher
@@ -74,7 +79,7 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
     requestAnimationFrame(() => {
       const lost = document.activeElement;
       if (lost && lost !== document.body && lost.isConnected) return;
-      const nextAct = document.getElementById("admission-next") ?? document.getElementById("travel-next");
+      const nextAct = document.getElementById("admission-next") ?? document.getElementById("travel-plan-next") ?? document.getElementById("travel-arrival-next");
       (nextAct?.querySelector<HTMLElement>("select,input,textarea,button") ?? document.getElementById(`${id}-title`))?.focus();
     });
     return true;
@@ -96,6 +101,10 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
   const toCountersign = role === "finance" ? openRows.filter(row => COUNTERSIGNED_HERE.has(row.kind) && !row.countersignedAt) : [];
   const feeOwed = (view.feeBalanceOwedEgp ?? 0) > 0;
   const appointmentSet = openRows.some(row => row.kind === "FIRST_CONFIRMED_APPOINTMENT");
+  // UX 5-4: the blockers Operations cannot clear itself; the ones it clears are the file's own acts. A balance with its receipt
+  // recorded and not yet countersigned waits on Finance, not on Operations.
+  const hasReceipt = openRows.some(row => row.kind === "BALANCE_EVIDENCED" && !row.countersignedAt);
+  const waitingOnOthers = view.admissionBlockers.filter(code => code === "BALANCE_NOT_EVIDENCED" ? hasReceipt : !OPERATIONS_CLEARS.has(code));
   // The next thing this viewer does here: its form opens and carries the panel's one primary button.
   // Operations' acts in the order they happen: the reservation and the letter, then (still in travel coordination) the travel plan
   // and the arrival, then what the backend's step names. B-5-1 would name the reservation and the letter as steps too.
@@ -159,22 +168,33 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
       </div>
 
       {/* UX 5-2/5-3: at the cashier Operations reads one line, what the patient pays, above the file that records it; every
-          other figure is one click away. */}
-      {role === "operations" && voucher && (
+          other figure is one click away (UX 5-4: under the voucher's line in the file). The line asks for money only while the
+          cashier is still owed it and no receipt waits on Finance. */}
+      {role === "operations" && voucher && (view.balanceOwedEgp ?? 0) > 0 && !hasReceipt && (
         <div className="mt-4 border-t border-line pt-3">
           <p className="text-[0.9375rem] font-semibold text-ink-900">{fillTemplate(t.money.patientPaysLine, { amount: isolate(egp(voucher.patientPaysAtFacilityEgp)) })}
             {voucher.displayCurrency && voucher.displayCurrency !== "EGP" && voucher.patientPaysAtFacilityDisplay != null && <span className="font-normal text-ink-600"> · <Money>{formatMoney(voucher.patientPaysAtFacilityDisplay, voucher.displayCurrency, locale)}</Money></span>}</p>
-          <details className="group"><Summary>{t.summary.money}</Summary><div className="pb-2">{voucherFacts}</div></details>
         </div>
       )}
       {role === "operations" ? <>
         <OperationsFile t={t} locale={locale} view={view} caseId={caseId} caseStatus={stage} next={next} documents={documents} facilities={facilities} busy={busy} act={act}
-          travel={travel} day={day} egp={egp}/>
-        {(view.letterReferenceMaxEgp != null || view.pointOfNoReturnAt) && (
-          <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-3">
-            {view.letterReferenceMaxEgp != null && <Fact label={t.referenceMax}><Money>{egp(view.letterReferenceMaxEgp)}</Money></Fact>}
-            {view.pointOfNoReturnAt && <Fact label={t.pointOfNoReturn}>{when(view.pointOfNoReturnAt)} <span className="font-normal text-ink-600">· {view.pointOfNoReturnApproved ? t.pnrApproved : t.pnrPending}</span></Fact>}
-          </dl>
+          travel={travel} day={day} when={when} egp={egp} money={voucherFacts}
+          appointment={reserved && !cleared && !appointmentSet ? <FirstAppointment t={t} caseId={caseId} set={false} busy={busy} act={act}/> : null}/>
+        {/* UX 5-4: the file is Operations' checklist; what stands before admission and is someone else's to clear is said once. */}
+        {!cleared && waitingOnOthers.length > 0 && (
+          <div className="mt-3">
+            <h4 id={`${id}-waiting`} className="flex items-start gap-2 text-[0.875rem] font-bold text-ink-800"><Clock size={16} aria-hidden className="mt-0.5 flex-none text-ink-500"/>{t.acts.waitingOn}</h4>
+            <ul aria-labelledby={`${id}-waiting`} className="mt-1 list-disc space-y-1 ps-6 text-[0.875rem] text-ink-700">{waitingOnOthers.map(code => <li key={code}>{pick(t.checklist.blockers, code)}</li>)}</ul>
+          </div>
+        )}
+        {view.emergencyOverride && <p className="mt-2 text-[0.875rem] font-semibold text-alert-800">{t.emergencyRecorded}</p>}
+        {/* The record — the first appointment and the evidence trail — behind one disclosure. */}
+        {view.evidence.length > 0 && (
+          <details className="group mt-1">
+            <Summary>{t.acts.history} ({view.evidence.length})</Summary>
+            {!cleared && appointmentSet && <FirstAppointment t={t} caseId={caseId} set busy={busy} act={act}/>}
+            <Trail t={t} evidence={view.evidence} when={when} egp={egp}/>
+          </details>
         )}
       </> : !reserved ? <p className="mt-2 text-[0.875rem] text-ink-600">{t.notReserved}</p> : (
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-3">
@@ -187,39 +207,18 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         </dl>
       )}
 
-      {!(role === "operations" && voucher) && (voucherFacts ? <div className="mt-4 border-t border-line pt-3">{voucherFacts}</div>
-        : reserved && <p className="mt-4 border-t border-line pt-3 text-[0.875rem] text-ink-600">{t.noVoucher}</p>)}
+      {role !== "operations" && <>
+        {voucherFacts ? <div className="mt-4 border-t border-line pt-3">{voucherFacts}</div>
+          : reserved && <p className="mt-4 border-t border-line pt-3 text-[0.875rem] text-ink-600">{t.noVoucher}</p>}
 
-      <div className="mt-4 border-t border-line pt-3">
-        <h4 className="text-[0.875rem] font-bold text-ink-800">{t.checklist.title}</h4>
-        {view.admissionBlockers.length === 0
-          ? <p className="mt-1 text-[0.875rem] text-ink-700">{t.checklist.clear}</p>
-          : <ul className="mt-1.5 list-disc space-y-1 ps-5 text-[0.875rem] text-ink-700">{view.admissionBlockers.map(code => <li key={code}>{pick(t.checklist.blockers, code)}</li>)}</ul>}
-        {view.emergencyOverride && <p className="mt-2 text-[0.875rem] font-semibold text-alert-800">{t.emergencyRecorded}</p>}
-      </div>
-
-      {/* Operations' side tasks: none is a step of its own, so none carries the filled button. */}
-      {role === "operations" && (
-        <div className="mt-2">
-          {reserved && !voucher && (
-            <Task title={t.forms.voucher} next={false}>
-              <p className="max-w-[65ch] text-[0.8125rem] leading-5 text-ink-600">{t.forms.voucherHint}</p>
-              <button type="button" className="btn-secondary mt-3" disabled={busy} onClick={() => void act(`/operations/cases/${caseId}/admission/voucher`)}>{t.forms.voucher}</button>
-            </Task>
-          )}
-          {reserved && !cleared && !view.pointOfNoReturnApproved && (
-            <Task title={t.forms.pnr} next={false}>
-              <p className="max-w-[65ch] text-[0.8125rem] leading-5 text-ink-600">{t.forms.pnrHint}</p>
-              <ActForm className="mt-3 flex flex-col items-start gap-3" refused={t.forms.refused} retry={t.forms.refusedRetry}
-                confirm={{ title: data => fillTemplate(t.forms.pnrConfirm, { time: isolate(when(instant(data.get("at")))) }), body: t.forms.pnrHint, confirm: t.forms.pnr, cancel: t.cancel }}
-                action={data => act(`/operations/cases/${caseId}/admission/point-of-no-return`, { at: instant(data.get("at")) })}>
-                <TimeField label={t.forms.pnrAt} name="at" hint={t.forms.timeHint}/>
-                <button className="btn-secondary" disabled={busy}>{t.forms.pnr}</button>
-              </ActForm>
-            </Task>
-          )}
+        <div className="mt-4 border-t border-line pt-3">
+          <h4 className="text-[0.875rem] font-bold text-ink-800">{t.checklist.title}</h4>
+          {view.admissionBlockers.length === 0
+            ? <p className="mt-1 text-[0.875rem] text-ink-700">{t.checklist.clear}</p>
+            : <ul className="mt-1.5 list-disc space-y-1 ps-5 text-[0.875rem] text-ink-700">{view.admissionBlockers.map(code => <li key={code}>{pick(t.checklist.blockers, code)}</li>)}</ul>}
+          {view.emergencyOverride && <p className="mt-2 text-[0.875rem] font-semibold text-alert-800">{t.emergencyRecorded}</p>}
         </div>
-      )}
+      </>}
 
       {role === "finance" && (
         <div className="mt-2">
@@ -248,38 +247,14 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         </div>
       )}
 
-      {/* The first appointment sets the refund cutoff: Operations meets it before admission, not at every stage after. */}
-      {(role === "coordinator" || (role === "operations" && !cleared)) && (
-        <Task title={appointmentSet ? t.firstAppointment.correct : t.firstAppointment.title} next={false}>
-          <p className="mb-3 max-w-[65ch] text-[0.875rem] text-ink-600">{t.firstAppointment.hint}</p>
-          <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.forms.refused} retry={t.forms.refusedRetry} action={data => act(`/cases/${caseId}/first-confirmed-appointment`, { appointmentDate: text(data.get("appointmentDate")), reason: text(data.get("reason")) })}>
-            <label className="block text-sm font-semibold">{t.firstAppointment.date}<input className="field" name="appointmentDate" type="date" required dir="ltr"/></label>
-            <label className="block text-sm font-semibold">{t.firstAppointment.reason}<input className="field" name="reason" maxLength={500} required dir="auto"/></label>
-            <div className="sm:col-span-2"><button className="btn-secondary" disabled={busy}>{appointmentSet ? t.firstAppointment.correct : t.firstAppointment.record}</button></div>
-          </ActForm>
-        </Task>
-      )}
+      {role === "coordinator" && <FirstAppointment t={t} caseId={caseId} set={appointmentSet} busy={busy} act={act}/>}
 
-      <details className="group mt-3 border-t border-line pt-1">
-        <Summary>{t.trail.title} ({view.evidence.length})</Summary>
-        {view.evidence.length === 0 ? <p className="pb-2 text-[0.875rem] text-ink-500">{t.trail.empty}</p> : (
-          <ol className="divide-y divide-line text-[0.875rem]">
-            {view.evidence.map(row => (
-              <li key={row.id} className={`py-2 ${row.superseded ? "text-ink-500" : "text-ink-800"}`}>
-                <p className="flex flex-wrap items-baseline justify-between gap-x-3">
-                  <span className="font-semibold">{pick(t.trail.kinds, row.kind)}{row.amountEgp != null && <> · <Money>{egp(row.amountEgp)}</Money></>}{row.reference && <> · <bdi dir="ltr">{row.reference}</bdi></>}</span>
-                  <span className="text-ink-500">{when(row.effectiveAt ?? row.recordedAt)}</span>
-                </p>
-                <p className="text-[0.8125rem] text-ink-600">
-                  {fillTemplate(t.trail.recorded, { role: pick(t.trail.roles, row.recordedRole ?? "SYSTEM") })} · {when(row.recordedAt)}
-                  {" · "}{row.countersignedAt ? `${fillTemplate(t.trail.countersigned, { role: pick(t.trail.roles, row.countersignedRole ?? "FINANCE") })} · ${when(row.countersignedAt)}` : t.trail.awaiting}
-                  {row.superseded && <> · <strong className="font-semibold">{t.trail.superseded}</strong></>}
-                </p>
-              </li>
-            ))}
-          </ol>
-        )}
-      </details>
+      {role !== "operations" && (
+        <details className="group mt-3 border-t border-line pt-1">
+          <Summary>{t.trail.title} ({view.evidence.length})</Summary>
+          <Trail t={t} evidence={view.evidence} when={when} egp={egp}/>
+        </details>
+      )}
     </section>
   );
 }
@@ -290,9 +265,11 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
  * correction behind a disclosure while it still takes one); only the current act is open, carrying the view's one filled button;
  * a later act is named so the order is plain. Presentation only: the backend decides every rule.
  */
-function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, facilities, busy, act, travel, day, egp }: {
+function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, facilities, busy, act, travel, day, when, egp, appointment, money }: {
   t: Copy; locale: Locale; view: AdmissionView; caseId: string; caseStatus: string; next: string | null; documents: Doc[]; facilities: DirectoryFacility[]; busy: boolean;
-  act: (path: string, body?: unknown) => Promise<boolean>; travel?: (current: boolean) => ReactNode; day: Intl.DateTimeFormat; egp: (n?: number | null) => string;
+  act: (path: string, body?: unknown) => Promise<boolean>; travel?: (current: boolean) => ReactNode; day: Intl.DateTimeFormat; when: (iso?: string | null) => string; egp: (n?: number | null) => string;
+  /** UX 5-4: the first confirmed appointment while it is still owed (it sets the refund cutoff). */ appointment: ReactNode;
+  /** The voucher's money, behind the voucher's own line. */ money: ReactNode;
 }) {
   const id = useId();
   // The cashier records a payment that has just happened: "paid at" starts at now, and moves on to now each time the
@@ -332,10 +309,15 @@ function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, 
     </ActForm>
   );
   const letterForm = (
-    <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.forms.refused} retry={t.forms.refusedRetry} action={data => act(`/operations/cases/${caseId}/admission/letter`, { documentId: data.get("documentId"), quotedPackageEgp: Number(data.get("quotedPackageEgp")), reference: text(data.get("reference")) })}>
+    <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.forms.refused} retry={t.forms.refusedRetry} action={data => act(`/operations/cases/${caseId}/admission/letter`, { documentId: data.get("documentId"), quotedPackageEgp: readAmount(data.get("quotedPackageEgp")), reference: text(data.get("reference")) })}>
       {view.letterCheck === "REFUSED" && <p className="text-[0.875rem] font-semibold text-alert-800 sm:col-span-2">{t.letterCheck.REFUSED}</p>}
       <DocumentPicker name="documentId" label={t.forms.document} empty={t.forms.chooseDocument} documents={documents} required/>
-      <label className="block text-sm font-semibold">{t.forms.quoted}<input className="field" name="quotedPackageEgp" type="number" inputMode="decimal" min="0" step="0.01" required dir="ltr"/></label>
+      <div>
+        <label htmlFor={`${id}-quoted`} className="block text-sm font-semibold">{t.forms.quoted}</label>
+        <AmountInput id={`${id}-quoted`} name="quotedPackageEgp" invalid={t.forms.amountInvalid} describedBy={view.letterReferenceMaxEgp != null ? `${id}-quoted-hint` : undefined}/>
+        {/* UX 5-4: the estimate the letter is checked against, where the price is typed (was a fact below the file). */}
+        {view.letterReferenceMaxEgp != null && <p id={`${id}-quoted-hint`} className="mt-1 text-[0.8125rem] text-ink-600">{fillTemplate(t.forms.quotedHint, { amount: isolate(egp(view.letterReferenceMaxEgp)) })}</p>}
+      </div>
       <label className="block text-sm font-semibold">{t.forms.reference}<input className="field" name="reference" maxLength={160} autoComplete="off" spellCheck={false} dir="auto"/></label>
       {!documents.some(d => d.status === "CLEAN") && <p className="text-[0.8125rem] text-ink-600 sm:col-span-2">{t.forms.noDocuments}</p>}
       <div className="sm:col-span-2"><button className={btn("letter")} disabled={busy}>{t.forms.recordLetter}</button></div>
@@ -345,13 +327,12 @@ function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, 
   // and the copy are behind one disclosure.
   const receiptForm = (
     <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.forms.refused} retry={t.forms.refusedRetry} onFocusCapture={freshPaidAt} action={data => act(`/operations/cases/${caseId}/admission/balance`, {
-      receiptNumber: data.get("receiptNumber"), amountEgp: Number(data.get("amountEgp")), paidAt: instant(data.get("paidAt")), method: data.get("method"),
+      receiptNumber: data.get("receiptNumber"), amountEgp: readAmount(data.get("amountEgp")), paidAt: instant(data.get("paidAt")), method: data.get("method"),
       documentId: data.get("documentId") || null, paidCurrency: text(data.get("paidCurrency")), paidAmount: data.get("paidAmount") ? Number(data.get("paidAmount")) : null })}>
       <label className="block text-sm font-semibold">{t.forms.receiptNumber}<input className="field" name="receiptNumber" maxLength={160} required autoComplete="off" spellCheck={false} dir="ltr"/></label>
       <div>
         <label htmlFor={`${id}-amount`} className="block text-sm font-semibold">{t.forms.amountEgp}</label>
-        <input id={`${id}-amount`} className="field" name="amountEgp" type="number" inputMode="decimal" min="0.01" step="0.01" required dir="ltr"
-               defaultValue={owed > 0 ? owed.toFixed(2) : undefined} aria-describedby={owed > 0 ? `${id}-amount-hint` : undefined}/>
+        <AmountInput id={`${id}-amount`} name="amountEgp" invalid={t.forms.amountInvalid} defaultValue={owed > 0 ? owed : undefined} describedBy={owed > 0 ? `${id}-amount-hint` : undefined}/>
         {owed > 0 && <p id={`${id}-amount-hint`} className="mt-1 text-[0.8125rem] text-ink-600">{fillTemplate(t.forms.amountHint, { amount: isolate(egp(owed)) })}</p>}
       </div>
       <TimeField label={t.forms.paidAt} name="paidAt" hint={t.forms.paidAtHint} defaultValue={openedAt}/>
@@ -389,8 +370,26 @@ function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, 
   const letterWaits = view.letterCheck === "CHECK_PENDING" || view.letterCheck === "VARIANCE_OPEN";
   // A task brings its own rule; a done or later act takes one, so each act is ruled once.
   const ruled = (task: boolean) => task ? undefined : "border-t border-line";
+  // UX 5-4: the voucher is issued on its own once the letter is checked and any final quote accepted; by hand it is an act only
+  // when that is possible now (the backend refuses it otherwise), and a later act until then.
+  const voucherNow = reserved && LETTER_CHECKED.has(view.letterCheck ?? "") && !view.admissionBlockers.includes("FINAL_QUOTE_NOT_ACCEPTED");
+  // The point of no return is set once a hospital is reserved, and changed until Finance has approved it.
+  const pnrForm = (
+    <ActForm className="flex flex-col items-start gap-3" refused={t.forms.refused} retry={t.forms.refusedRetry}
+      confirm={{ title: data => fillTemplate(t.forms.pnrConfirm, { time: isolate(when(instant(data.get("at")))) }), body: t.forms.pnrHint, confirm: t.forms.pnr, cancel: t.cancel }}
+      action={data => act(`/operations/cases/${caseId}/admission/point-of-no-return`, { at: instant(data.get("at")) })}>
+      <p className="max-w-[65ch] text-[0.8125rem] leading-5 text-ink-600">{t.forms.pnrHint}</p>
+      <TimeField label={t.forms.pnrAt} name="at" hint={t.forms.timeHint} defaultValue={localInput(view.pointOfNoReturnAt)}/>
+      <button className="btn-secondary" disabled={busy}>{t.forms.pnr}</button>
+    </ActForm>
+  );
 
-  return (
+  // UX 5-4: acts possible now that are not a step of the sequence (the point of no return before it is set, the first appointment
+  // while owed) sit together under the file, so the list reads as the acts in order and an open act never looks like an edit.
+  const pnrOpen = reserved && !cleared && !view.pointOfNoReturnAt;
+  const sideActs = pnrOpen || !!appointment;
+
+  return (<>
     <ol aria-label={t.acts.title} className="mt-3 border-b border-line">
       {(reserved || !cleared) && <li className={ruled(!reserved)}>{reserved
         ? <DoneAct fact={fillTemplate(t.acts.reserved, { hospital, date: isolate(view.plannedAdmissionAt ? day.format(new Date(view.plannedAdmissionAt)) : "—") })}
@@ -401,7 +400,19 @@ function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, 
         : letterOwed ? <Task title={t.forms.letter} next={next === "letter"}>{letterForm}</Task>
         : <DoneAct tone={view.letterCheck === "VARIANCE_OPEN" ? "warning" : letterWaits ? "waiting" : "done"} fact={<>{t.letter} · <span className={letterTone(view.letterCheck) === "warning" ? "text-alert-800" : undefined}>{pick(t.letterCheck, view.letterCheck ?? "NONE")}</span></>}
             change={!cleared ? t.forms.newLetter : undefined}>{letterForm}</DoneAct>}</li>}
-      {travelNode && <li className="border-t border-line py-2">{travelNode}</li>}
+      {reserved && view.pointOfNoReturnAt && <li className={ruled(false)}>
+        <DoneAct tone={view.pointOfNoReturnApproved ? "done" : "waiting"} fact={<>{t.forms.pnrAt} {isolate(when(view.pointOfNoReturnAt))} · {view.pointOfNoReturnApproved ? t.pnrApproved : t.pnrPending}</>}
+          change={!cleared && !view.pointOfNoReturnApproved ? t.forms.changePnr : undefined}>{pnrForm}</DoneAct></li>}
+      {travelNode && <li className="border-t border-line">{travelNode}</li>}
+      {!view.voucher && !cleared && <li className={ruled(voucherNow)}>{voucherNow
+        ? <Task title={t.forms.voucher} next={false}>
+            <p className="max-w-[65ch] text-[0.8125rem] leading-5 text-ink-600">{t.forms.voucherHint}</p>
+            <button type="button" className="btn-secondary mt-3" disabled={busy} onClick={() => void act(`/operations/cases/${caseId}/admission/voucher`)}>{t.forms.voucher}</button>
+          </Task>
+        : <LaterAct notYet={t.acts.notYet}>{t.forms.voucher}</LaterAct>}</li>}
+      {/* UX 5-4: an issued voucher stays a step of the sequence, its money behind its own line. */}
+      {view.voucher && <li className={ruled(false)}><DoneAct fact={<>{t.voucher} <bdi dir="ltr" translate="no">{view.voucher.voucherNumber}</bdi> · {fillTemplate(t.voucherRevision, { revision: String(view.voucher.revision) })}</>}
+        change={t.summary.money}>{money}</DoneAct></li>}
       {/* A cleared case without a receipt needed none (nothing was owed at the cashier). */}
       {(next === "receipt" || receipt || receiptOpen || !cleared) && <li className={ruled(next === "receipt" || receiptOpen)}>{next === "receipt" ? <Task title={t.forms.receipt} next>{receiptForm}</Task>
         : receipt ? <DoneAct tone={receipt.countersignedAt ? "done" : "waiting"} fact={<>{t.acts.receipt} · <Money>{egp(receipt.amountEgp)}</Money> · {receipt.countersignedAt ? t.acts.checked : t.acts.awaitingCheck}</>}
@@ -413,6 +424,52 @@ function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, 
         : cleared ? <Task title={t.forms.number} next={false}>{numberForm}</Task>
         : <LaterAct notYet={t.acts.notYet}>{t.forms.number}</LaterAct>}</li>
     </ol>
+    {sideActs && (
+      <details className="group border-b border-line">
+        {/* Says what it holds, so a closed group is never a mystery. */}
+        <Summary>{t.acts.alsoNow}: {[pnrOpen && t.pointOfNoReturn, appointment && t.firstAppointment.title].filter(Boolean).join(" · ")}</Summary>
+        <div className="ps-6">
+          {pnrOpen && <Task title={t.forms.pnr} next={false}>{pnrForm}</Task>}
+          {appointment}
+        </div>
+      </details>
+    )}
+  </>);
+}
+
+/** An EGP amount copied from paper: plain digits, or thousands grouped by commas throughout, with up to two decimals. */
+const AMOUNT = /^(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]{1,2})?$/;
+const WHOLE = new Intl.NumberFormat("en-US");
+const CENTS = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Grouped with Latin digits, as `formatMoney` writes amounts in both languages; cents kept when there are any. */
+const groupAmount = (value: number) => (Number.isInteger(value) ? WHOLE : CENTS).format(value);
+/**
+ * The amount typed, or NaN when it is not one. Arabic-Indic digits and separators read as Latin (an Arabic keypad types them)
+ * and a currency word around the figure is dropped ("EGP 195,500"); anything else ambiguous — "195,50", "1,2" — is refused,
+ * never re-read as another amount.
+ */
+function readAmount(value: FormDataEntryValue | string | null) {
+  const latin = String(value ?? "").trim()
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/٫/g, ".").replace(/٬/g, ",").replace(/^[\p{L}\p{Sc}\s]+|[\p{L}\p{Sc}\s.]+$/gu, "");
+  return AMOUNT.test(latin) ? Number(latin.replaceAll(",", "")) : Number.NaN;
+}
+
+/**
+ * UX 5-4: an EGP amount the officer copies from the hospital's paper (the letter's price, the cashier's receipt). It reads as
+ * printed ("195,500.00"), is grouped again when left, and says in the page's language when it is not an amount above zero.
+ */
+function AmountInput({ id, name, invalid, defaultValue, describedBy }: { id: string; name: string; invalid: string; defaultValue?: number; describedBy?: string }) {
+  const check = (field: HTMLInputElement) => {
+    const value = readAmount(field.value);
+    field.setCustomValidity(field.value.trim() && !(value > 0) ? invalid : "");
+    return value;
+  };
+  return (
+    <input id={id} className="field tabular-nums" name={name} type="text" inputMode="decimal" required dir="ltr" autoComplete="off" spellCheck={false}
+           defaultValue={defaultValue != null ? groupAmount(defaultValue) : undefined} aria-describedby={describedBy}
+           onChange={event => { check(event.currentTarget); }}
+           onBlur={event => { const value = check(event.currentTarget); if (value > 0) event.currentTarget.value = groupAmount(value); }}/>
   );
 }
 
@@ -446,6 +503,42 @@ function VoucherFacts({ t, locale, voucher, view, egp }: { t: Copy; locale: Loca
           date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${voucher.fxRateDate}T00:00:00Z`)) })}</p>
       )}
     </>
+  );
+}
+
+/** The first appointment sets the refund cutoff: recorded before admission, corrected with a reason. */
+function FirstAppointment({ t, caseId, set, busy, act }: { t: Copy; caseId: string; set: boolean; busy: boolean; act: (path: string, body?: unknown) => Promise<boolean> }) {
+  return (
+    <Task title={set ? t.firstAppointment.correct : t.firstAppointment.title} next={false}>
+      <p className="mb-3 max-w-[65ch] text-[0.875rem] text-ink-600">{t.firstAppointment.hint}</p>
+      <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.forms.refused} retry={t.forms.refusedRetry} action={data => act(`/cases/${caseId}/first-confirmed-appointment`, { appointmentDate: text(data.get("appointmentDate")), reason: text(data.get("reason")) })}>
+        <label className="block text-sm font-semibold">{t.firstAppointment.date}<input className="field" name="appointmentDate" type="date" required dir="ltr"/></label>
+        <label className="block text-sm font-semibold">{t.firstAppointment.reason}<input className="field" name="reason" maxLength={500} required dir="auto"/></label>
+        <div className="sm:col-span-2"><button className="btn-secondary" disabled={busy}>{set ? t.firstAppointment.correct : t.firstAppointment.record}</button></div>
+      </ActForm>
+    </Task>
+  );
+}
+
+/** The evidence trail: every recorded fact, who recorded and who countersigned it, the superseded ones greyed. */
+function Trail({ t, evidence, when, egp }: { t: Copy; evidence: AdmissionEvidence[]; when: (iso?: string | null) => string; egp: (n?: number | null) => string }) {
+  if (evidence.length === 0) return <p className="pb-2 text-[0.875rem] text-ink-500">{t.trail.empty}</p>;
+  return (
+    <ol aria-label={t.trail.title} className="divide-y divide-line text-[0.875rem]">
+      {evidence.map(row => (
+        <li key={row.id} className={`py-2 ${row.superseded ? "text-ink-500" : "text-ink-800"}`}>
+          <p className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <span className="font-semibold">{pick(t.trail.kinds, row.kind)}{row.amountEgp != null && <> · <Money>{egp(row.amountEgp)}</Money></>}{row.reference && <> · <bdi dir="ltr">{row.reference}</bdi></>}</span>
+            <span className="text-ink-500">{when(row.effectiveAt ?? row.recordedAt)}</span>
+          </p>
+          <p className="text-[0.8125rem] text-ink-600">
+            {fillTemplate(t.trail.recorded, { role: pick(t.trail.roles, row.recordedRole ?? "SYSTEM") })} · {when(row.recordedAt)}
+            {" · "}{row.countersignedAt ? `${fillTemplate(t.trail.countersigned, { role: pick(t.trail.roles, row.countersignedRole ?? "FINANCE") })} · ${when(row.countersignedAt)}` : t.trail.awaiting}
+            {row.superseded && <> · <strong className="font-semibold">{t.trail.superseded}</strong></>}
+          </p>
+        </li>
+      ))}
+    </ol>
   );
 }
 
