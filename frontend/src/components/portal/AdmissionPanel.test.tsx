@@ -53,10 +53,12 @@ describe("AdmissionPanel — Operations", () => {
     expect(await screen.findByText("Reserve the hospital")).toBeTruthy();
     expect(load).toHaveBeenCalledWith("/operations/cases/c1/admission");
     expect(screen.getByText("The final quote is not accepted")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Save" }).filter(b => b.className.includes("btn-primary"))).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Save the reservation" }).filter(b => b.className.includes("btn-primary"))).toHaveLength(1);
+    // UX 5-2: the date says whose clock it reads.
+    expect(screen.getByLabelText("Planned admission")).toHaveAccessibleDescription("Date and time on this device's clock.");
     fireEvent.change(screen.getByRole("combobox", { name: "Hospital" }), { target: { value: "f1" } });
     fireEvent.change(screen.getByLabelText("Planned admission"), { target: { value: "2026-10-20T10:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save the reservation" }));
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/admission", { facilityId: "f1", plannedAdmissionAt: new Date("2026-10-20T10:00").toISOString() }));
   });
 
@@ -64,20 +66,23 @@ describe("AdmissionPanel — Operations", () => {
     const { mutate } = setup("operations", reserved, { currentCode: "RECORD_HOSPITAL_BALANCE" });
     expect(await screen.findByText("RS-V-RS-2026-000123-1")).toBeTruthy();
     expect(screen.getAllByText("EGP 195,432.10").length).toBeGreaterThan(0);
-    expect(screen.getByText("$3,987.65")).toBeTruthy();
+    expect(screen.getAllByText("$3,987.65").length).toBeGreaterThan(0);
     expect(screen.getByText("The hospital balance is not evidenced (cashier receipt countersigned by Finance)")).toBeTruthy();
     // The receipt is the next thing to do: its form is open and its button is the panel's primary.
     const receipt = screen.getByText("Record the hospital receipt").closest("details")!;
     expect(receipt.open).toBe(true);
     const form = within(receipt);
     fireEvent.change(form.getByLabelText("Receipt number"), { target: { value: "CASH-991" } });
-    fireEvent.change(form.getByLabelText("Amount (EGP)"), { target: { value: "195432.10" } });
+    // UX 5-2: the amount starts at the balance still owed, and says so.
+    expect(form.getByLabelText("Amount (EGP)")).toHaveValue(195432.1);
+    expect(form.getByLabelText("Amount (EGP)")).toHaveAccessibleDescription(/balance still owed/);
+    expect((form.getByLabelText("Paid at") as HTMLInputElement).value).not.toBe("");
     fireEvent.change(form.getByLabelText("Paid at"), { target: { value: "2026-10-19T09:30" } });
     fireEvent.change(form.getByLabelText("Method"), { target: { value: "CARD" } });
     fireEvent.change(form.getByLabelText("Receipt copy (optional)"), { target: { value: "d1" } });
-    fireEvent.change(form.getByLabelText("Paid in currency (optional)"), { target: { value: "usd" } });
+    fireEvent.change(form.getByLabelText("Paid in currency (optional)"), { target: { value: "USD" } });
     fireEvent.change(form.getByLabelText("Amount paid in that currency (optional)"), { target: { value: "3987.65" } });
-    const record = form.getByRole("button", { name: "Record" });
+    const record = form.getByRole("button", { name: "Record the receipt" });
     expect(record.className).toContain("btn-primary");
     fireEvent.click(record);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/admission/balance", {
@@ -93,7 +98,7 @@ describe("AdmissionPanel — Operations", () => {
     const form = within(letter);
     fireEvent.change(form.getByLabelText("Letter (a checked document on the case)"), { target: { value: "d1" } });
     fireEvent.change(form.getByLabelText("Quoted package (EGP)"), { target: { value: "230000" } });
-    fireEvent.click(form.getByRole("button", { name: "Record" }));
+    fireEvent.click(form.getByRole("button", { name: "Record the letter" }));
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/admission/letter", { documentId: "d1", quotedPackageEgp: 230000, reference: null }));
     expect(screen.getByText("Refused by Finance — a new letter is needed")).toBeTruthy();
   });
@@ -107,7 +112,11 @@ describe("AdmissionPanel — Operations", () => {
     // B-3-1b: on a cleared case the number starts treatment, and the field says so.
     expect(screen.getByLabelText("Hospital admission number")).toHaveAccessibleDescription("Recording it starts treatment.");
     fireEvent.change(screen.getByLabelText("Hospital admission number"), { target: { value: " ADM-5521 " } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Record the admission number" }));
+    // UX 5-2: it moves the case on, so it asks first and repeats the number.
+    const dialog = screen.getByRole("alertdialog", { name: /Record admission number .*ADM-5521/ });
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(dialog.querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/admission/number", { admissionNumber: "ADM-5521" }));
   });
 });
@@ -165,7 +174,7 @@ describe("AdmissionPanel — Operations' hospital file", () => {
     const acts = await screen.findByRole("list", { name: "Hospital file" });
     expect(acts.textContent).not.toContain("Admission letter");
     expect(container.querySelectorAll(".btn-primary")).toHaveLength(1);
-    expect(screen.getByText("Record the admission number").closest("details")).toHaveAttribute("open");
+    expect(screen.getByText("Record the admission number", { selector: "summary" }).closest("details")).toHaveAttribute("open");
   });
 
   it("says a recorded receipt and its countersignature as one line", async () => {
@@ -222,7 +231,7 @@ describe("AdmissionPanel — Finance", () => {
     const form = within(fee);
     fireEvent.change(form.getByLabelText("Payment reference"), { target: { value: "TRF-12" } });
     fireEvent.change(form.getByLabelText("Received at"), { target: { value: "2026-10-18T12:00" } });
-    fireEvent.click(form.getByRole("button", { name: "Record" }));
+    fireEvent.click(form.getByRole("button", { name: "Record the fee balance" }));
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/admission/fee-balance", { reference: "TRF-12", amountEgp: 1250, receivedAt: new Date("2026-10-18T12:00").toISOString() }));
   });
 
@@ -278,6 +287,7 @@ describe("AdmissionPanel — the Consultant's summary (UX 3-2)", () => {
     expect(field).toHaveAccessibleDescription(/it starts treatment/);
     fireEvent.change(field, { target: { value: " NHH-ADM-10 " } });
     fireEvent.click(screen.getByRole("button", { name: "Record the admission number" }));
+    fireEvent.click(screen.getByRole("alertdialog").querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/doctor/cases/c1/admission/number", { admissionNumber: "NHH-ADM-10" }));
   });
 
@@ -288,3 +298,82 @@ describe("AdmissionPanel — the Consultant's summary (UX 3-2)", () => {
   });
 });
 
+/** UX 5-2: the cashier on a phone — one money line, a short receipt, refusals at the form, confirmations for what moves the case. */
+describe("AdmissionPanel — the cashier (UX 5-2)", () => {
+  afterEach(cleanup);
+
+  it("shows Operations what the patient pays as one line, every other figure behind a closed disclosure", async () => {
+    setup("operations", reserved, { currentCode: "RECORD_HOSPITAL_BALANCE" });
+    const line = (await screen.findByText(/^Patient pays at the cashier:/, { selector: "p" }));
+    expect(line.textContent?.replace(/[⁨⁩]/g, "").replace(/ /g, " ")).toBe("Patient pays at the cashier: EGP 195,432.10 · $3,987.65");
+    const all = screen.getByText("The voucher and what is owed", { selector: "summary" }).closest("details")!;
+    expect(all.open).toBe(false);
+    expect(within(all).getByText("RS-V-RS-2026-000123-1")).toBeInTheDocument();
+  });
+
+  it("keeps another currency and the copy behind one disclosure, the currency a list with the patient's first", async () => {
+    setup("operations", reserved, { currentCode: "RECORD_HOSPITAL_BALANCE" });
+    const other = (await screen.findByText("Paid in another currency or with a copy", { selector: "summary" })).closest("details")!;
+    expect(other.open).toBe(false);
+    const currency = within(other).getByLabelText("Paid in currency (optional)");
+    const options = within(currency).getAllByRole("option").map(o => o.getAttribute("value"));
+    expect(options.slice(0, 2)).toEqual(["", "USD"]);
+    expect(options).not.toContain("EGP");
+  });
+
+  it("says a refused receipt at the form, keeps what was typed and moves focus to the refusal", async () => {
+    const { mutate } = setup("operations", reserved, { currentCode: "RECORD_HOSPITAL_BALANCE" });
+    mutate.mockResolvedValue(null);
+    const form = within((await screen.findByText("Record the hospital receipt")).closest("details")!);
+    fireEvent.change(form.getByLabelText("Receipt number"), { target: { value: "CASH-991" } });
+    fireEvent.click(form.getByRole("button", { name: "Record the receipt" }));
+    const alert = await form.findByRole("alert");
+    expect(alert).toHaveTextContent("Not saved. Check the form, then try again.");
+    expect(form.getByLabelText("Receipt number")).toHaveValue("CASH-991");
+    await waitFor(() => expect(document.activeElement).toBe(alert));
+    // Correcting the form clears the refusal.
+    fireEvent.input(form.getByLabelText("Receipt number"), { target: { value: "CASH-992" } });
+    expect(form.queryByRole("alert")).toBeNull();
+  });
+
+  it("asks for the amount once another currency is chosen", async () => {
+    setup("operations", reserved, { currentCode: "RECORD_HOSPITAL_BALANCE" });
+    const other = (await screen.findByText("Paid in another currency or with a copy", { selector: "summary" })).closest("details")!;
+    const amount = within(other).getByLabelText("Amount paid in that currency (optional)");
+    expect(amount).not.toBeRequired();
+    fireEvent.change(within(other).getByLabelText("Paid in currency (optional)"), { target: { value: "USD" } });
+    expect(amount).toBeRequired();
+  });
+
+  it("sets the point of no return only after a confirmation that names the time and what it commits", async () => {
+    const { mutate } = setup("operations", reserved);
+    fireEvent.click(await screen.findByText("Set the point of no return", { selector: "summary" }));
+    const at = screen.getByLabelText("No refund for travel after");
+    expect(at).toHaveAccessibleDescription("Date and time on this device's clock.");
+    fireEvent.change(at, { target: { value: "2026-10-19T18:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Set the point of no return" }));
+    const dialog = screen.getByRole("alertdialog", { name: /Set the point of no return to/ });
+    expect(dialog).toHaveAccessibleDescription(/not refunded after this time/);
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(dialog.querySelector(".btn-primary") as HTMLElement);
+    await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/admission/point-of-no-return", { at: new Date("2026-10-19T18:00").toISOString() }));
+  });
+
+  it("corrects an admission number without asking again", async () => {
+    const { mutate } = setup("operations", { ...reserved, caseStatus: "TREATMENT_IN_PROGRESS", admissionNumber: "ADM-1", balanceOwedEgp: 0, admissionBlockers: [] });
+    fireEvent.click(await screen.findByText("Correct the admission number", { selector: "summary" }));
+    fireEvent.change(screen.getByLabelText("Hospital admission number"), { target: { value: "ADM-2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save the corrected number" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/admission/number", { admissionNumber: "ADM-2" }));
+  });
+
+  it("offers Operations the first confirmed appointment only before admission, as a correction once recorded", async () => {
+    setup("operations", { ...reserved, evidence: [...reserved.evidence, { id: "e5", kind: "FIRST_CONFIRMED_APPOINTMENT", recordedRole: "OPERATIONS", recordedAt: "2026-10-12T10:00:00Z", superseded: false }] });
+    expect(await screen.findByText("Correct the first confirmed appointment", { selector: "summary" })).toBeInTheDocument();
+    cleanup();
+    setup("operations", { ...reserved, caseStatus: "TREATMENT_IN_PROGRESS", admissionNumber: "ADM-1", balanceOwedEgp: 0, admissionBlockers: [] });
+    expect(await screen.findByText("Correct the admission number", { selector: "summary" })).toBeInTheDocument();
+    expect(screen.queryByText(/first confirmed appointment/i)).toBeNull();
+  });
+});

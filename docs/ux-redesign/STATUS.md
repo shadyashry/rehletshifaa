@@ -1377,6 +1377,61 @@ four picker keys were removed.
 
 **Next:** slice 5-2 — the cashier, started in a new session from this branch.
 
+## UX area 5 — slice 5-2 the cashier (2026-10-28, worktree `kind-shtern-f926c7`, branch `claude/kind-shtern-f926c7` fast-forwarded to 5-1 @ `7f6798c6`)
+
+Plan direction 3 (`plans/operations-workspace.md`); no owner gate (standing instruction).
+
+**The receipt on a phone.** Four visible fields: receipt number, amount prefilled with the hospital balance still owed (its
+hint says so and names the figure), paid-at prefilled with now, method. "Paid at" moves on to now each time the officer comes
+back to the receipt while it is untouched, so a file left open never records an old time. Currency, the amount in that
+currency and the receipt copy sit behind "Paid in another currency or with a copy". The currency is a list (the patient's
+currency first, then the platform's others, labelled per locale); choosing one makes its amount required; a field refused
+inside the closed disclosure opens it. Money and date inputs are `dir="ltr"`.
+
+**The voucher as one line.** Operations reads "Patient pays at the cashier: EGP 195,500 · $3,988.20" (a template, so the
+Arabic order is the copy's); every other figure, the voucher number and the frozen rate are behind "The voucher and what is
+owed". Finance and the coordinator keep the full facts.
+
+**What moves the case asks first.** The admission number on a cleared case (Operations, and the Consultant after an
+emergency admission) confirms with the number typed and its effect ("Recording it starts treatment: the case moves to
+Treatment in progress…"); a correction does not ask. The point of no return says its effect above the field and confirms
+with the time.
+
+**Shared (`panel-parts.tsx`).** `ActForm`: a backend refusal is said at the form ("Not saved." + the portal's own reason,
+which on a phone is scrolled out of view), focus moves to that line, typing clears it, and what was typed stays; an optional
+`confirm` asks first. `TimeField`: every `datetime-local` in the panel carries its clock hint (reservation, receipt, point of
+no return, Finance's fee balance). `Summary`'s chevron now reads its own `<details>`, not a `group`, so a closed disclosure
+inside an open one no longer shows the open marker (found on the shots).
+
+**5-2 backlog rows done.** Refusals at the form with focus (every form in the panel); specific submit labels ("Save the
+reservation", "Record the letter", "Record the receipt", "Record the admission number" / "Save the corrected number", "Set the
+point of no return", "Record the appointment", "Record the fee balance"; `forms.save` / `forms.record` removed); the
+reservation's date hint; `paidCurrency` is a list; "First confirmed appointment" for Operations only before admission, and
+"Correct the first confirmed appointment" once recorded; the PNR says its effect.
+
+Copy en + ar, inserted textually: `admission.forms.{saveReservation,recordLetter,recordReceipt,amountHint,timeHint,
+paidAtHint,otherCurrency,egpOnly,pnrHint,pnrConfirm,numberConfirm,numberConfirmBody,saveNumber,refused,refusedRetry}`,
+`admission.money.patientPaysLine`, `admission.firstAppointment.{record,correct}`, `admission.finance.recordFee`; Arabic
+"وقت الدفع" / "وقت الاستلام" for the date-and-time fields.
+
+**Reviews** (four read-only reviewers): RB + composition: no CRITICAL/HIGH (MEDIUM fixed: the stale paid-at; LOW fixed: a
+rejected command now shows the refusal). Web design guidelines: HIGH ×2 fixed (the refusal pointed "above" with no reason at
+the form; the alert was cut off by the focus move to the field — focus now goes to the alert). MEDIUMs fixed: currency and
+amount tied, `toFixed(2)` prefill. RTL/i18n: no CRITICAL/HIGH; fixed the one-line template, the PNR hint, «عند», the amount
+hint, «وقت». Pro Max: HIGH ×2 fixed (the same refusal reason; the stale paid-at); MEDIUMs fixed (the PNR button aligned under
+its hint, the closed disclosure opening for an invalid field, the refusal clearing on input). The rest is in backlog.md
+"Area 5 — Operations" (the currency list is not the rated FX list: Operations has no FX read; no pending text; enterKeyHint;
+the collapsed disclosure's contents). Design hook 0 on the touched files.
+
+**Verify.** `pnpm typecheck` ok; eslint on the touched files clean; vitest 97 files / 786 tests, 785 pass (the known
+`StaffOperationalUi` W-44); `AdmissionPanel.test.tsx` 28/28 (new "the cashier" block: one money line, the disclosure and the
+currency list, the refusal at the form with focus and clearing, currency → amount required, PNR confirmation, a correction
+without a confirmation, the first appointment before admission only). Playwright on a production build on :3173 (rerun after
+the chevron fix; the first run on :3172 was also 58/58): operations-shots (`AREA5_SHOTS=5-2`), consultant-shots,
+staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58. Overwritten shots restored. Shots: `screenshots/area-5/5-2/`.
+
+**Next:** slice 5-3 — going home + close (re-critique, after shots, area closed), started in a new session from this branch.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

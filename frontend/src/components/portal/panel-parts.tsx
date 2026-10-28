@@ -1,9 +1,9 @@
 "use client";
 
-import { Component, useState, type FormEvent, type ReactNode } from "react";
+import { Component, use, useEffect, useId, useRef, useState, type FocusEventHandler, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronDown, Circle, CircleAlert, Clock } from "lucide-react";
 
-import { ConfirmDialog } from "@/components/portal/portal-ui";
+import { ConfirmDialog, FeedbackContext } from "@/components/portal/portal-ui";
 
 /**
  * The small pieces the staff evidence panels share (P1-15 "Admission & money", P1-16 "Treatment"): a recording task that
@@ -65,12 +65,12 @@ export function LaterAct({ notYet, children }: { notYet: string; children: React
   return <p className="flex items-start gap-2 py-2 text-[0.875rem] text-ink-500"><Circle size={16} aria-hidden className="mt-0.5 flex-none"/><span className="min-w-0 [overflow-wrap:anywhere]"><span className="sr-only">{notYet} </span>{children}</span></p>;
 }
 
-/** A disclosure's summary with a drawn marker that turns as it opens (the native marker is gone once it is a flex box). Its
- * `<details>` carries `group`. */
+/** A disclosure's summary with a drawn marker that turns as its own `<details>` opens (the native marker is gone once it is a
+ * flex box). It reads its parent, not a `group`, so a closed disclosure inside an open one keeps its closed marker (UX 5-2). */
 export function Summary({ children }: { children: ReactNode }) {
   return (
     <summary className="inline-flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2 text-sm font-bold text-brand-700 hover:text-brand-900 [&::-webkit-details-marker]:hidden">
-      <ChevronDown size={16} aria-hidden className="flex-none transition-transform group-open:rotate-180 motion-reduce:transition-none"/>{children}
+      <ChevronDown size={16} aria-hidden className="flex-none transition-transform motion-reduce:transition-none [details[open]>summary>&]:rotate-180"/>{children}
     </summary>
   );
 }
@@ -123,6 +123,57 @@ export function localInput(iso?: string | null) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 export function text(value: FormDataEntryValue | null) { const v = String(value ?? "").trim(); return v || null; }
+
+/** UX 5-2: a `datetime-local` field with its clock hint (the field has no zone, so it says whose clock it reads). */
+export function TimeField({ label, name, hint, defaultValue, required = true }: { label: string; name: string; hint: string; defaultValue?: string; required?: boolean }) {
+  const id = useId();
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-semibold">{label}</label>
+      <input id={id} className="field" name={name} type="datetime-local" required={required} dir="ltr" defaultValue={defaultValue} aria-describedby={`${id}-hint`}/>
+      <p id={`${id}-hint`} className="mt-1 text-[0.8125rem] text-ink-600">{hint}</p>
+    </div>
+  );
+}
+
+/**
+ * UX 5-2: a recording form whose refusal is said in place. When the command fails, the form keeps what was typed and says,
+ * above its fields, that nothing was saved and why (the portal's own message, which on a phone is scrolled out of view);
+ * focus moves to that line, so it is read before the fields. `confirm`, when given, asks first, its title worded from what
+ * was typed: for a recording that moves the case on.
+ */
+export function ActForm({ action, refused, retry, confirm, className, onFocusCapture, children }: {
+  action: (data: FormData) => Promise<boolean>; /** "Not saved." */ refused: string; /** Said when the portal gave no reason. */ retry: string;
+  confirm?: { title: (data: FormData) => string; body: string; confirm: string; cancel: string };
+  className?: string; onFocusCapture?: FocusEventHandler<HTMLFormElement>; children: ReactNode;
+}) {
+  const { error } = use(FeedbackContext);
+  const form = useRef<HTMLFormElement>(null);
+  const alert = useRef<HTMLParagraphElement>(null);
+  const [failed, setFailed] = useState(false);
+  const [asking, setAsking] = useState<FormData | null>(null);
+  useEffect(() => { if (failed) alert.current?.focus(); }, [failed]);
+  function run(data: FormData) {
+    void action(data).catch(() => false).then(done => {
+      if (done) form.current?.reset(); else setFailed(true);
+    });
+  }
+  return (
+    <>
+      <form ref={form} className={className} onFocusCapture={onFocusCapture} onInput={() => { if (failed) setFailed(false); }} onSubmit={event => {
+        event.preventDefault(); setFailed(false);
+        const data = new FormData(event.currentTarget);
+        if (confirm) setAsking(data); else run(data);
+      }}>
+        {failed && <p ref={alert} tabIndex={-1} role="alert" className="col-span-full flex w-full items-start gap-2 text-[0.875rem] font-semibold text-alert-800 outline-none">
+          <CircleAlert size={16} aria-hidden className="mt-0.5 flex-none"/><span>{refused} {error || retry}</span></p>}
+        {children}
+      </form>
+      {asking && confirm && <ConfirmDialog title={confirm.title(asking)} body={confirm.body} confirm={confirm.confirm} cancel={confirm.cancel}
+                                           onConfirm={() => { setAsking(null); run(asking); }} onCancel={() => setAsking(null)}/>}
+    </>
+  );
+}
 /** Submits a form's data; the form is cleared once the command succeeded. */
 export function submit(action: (data: FormData) => Promise<boolean>) {
   return (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; void action(new FormData(form)).then(done => { if (done) form.reset(); }); };

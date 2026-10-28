@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FocusEvent, type ReactNode } from "react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
-import { DocumentPicker, DoneAct, Fact, LaterAct, Money, Summary, Task as PanelTask, instant, localInput, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
+import { ActForm, DocumentPicker, DoneAct, Fact, LaterAct, Money, Summary, Task as PanelTask, TimeField, instant, localInput, pick, text, type PanelDocument } from "@/components/portal/panel-parts";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
-import type { AdmissionEvidence, AdmissionView, DirectoryFacility, Mutate } from "@/components/portal/portal-model";
+import { CURRENCY_LABELS, type AdmissionEvidence, type AdmissionView, type DirectoryFacility, type Mutate } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["admission"];
 type Doc = PanelDocument;
@@ -95,6 +95,7 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
     ? openRows.find(row => row.kind === "FACILITY_ADMISSION_LETTER" && !row.countersignedAt) ?? null : null;
   const toCountersign = role === "finance" ? openRows.filter(row => COUNTERSIGNED_HERE.has(row.kind) && !row.countersignedAt) : [];
   const feeOwed = (view.feeBalanceOwedEgp ?? 0) > 0;
+  const appointmentSet = openRows.some(row => row.kind === "FIRST_CONFIRMED_APPOINTMENT");
   // The next thing this viewer does here: its form opens and carries the panel's one primary button.
   // Operations' acts in the order they happen: the reservation and the letter, then (still in travel coordination) the travel plan
   // and the arrival, then what the backend's step names. B-5-1 would name the reservation and the letter as steps too.
@@ -140,12 +141,12 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         onRecord={reason => act(`/doctor/cases/${caseId}/emergency-admission`, { reason })}/>}
       {/* B-3-1b: after the emergency admission the Consultant records the hospital's number, which starts treatment. */}
       {caseStatus === "ADMISSION_READY" && view.emergencyOverride && (
-        <form className="mt-3 flex flex-wrap items-end gap-3 border-t border-line pt-3"
-          onSubmit={submit(data => act(`/doctor/cases/${caseId}/admission/number`, { admissionNumber: String(data.get("admissionNumber") ?? "").trim() }))}>
+        <ActForm className="mt-3 flex flex-wrap items-end gap-3 border-t border-line pt-3" refused={t.forms.refused} retry={t.forms.refusedRetry} confirm={numberConfirm(t)}
+          action={data => act(`/doctor/cases/${caseId}/admission/number`, { admissionNumber: String(data.get("admissionNumber") ?? "").trim() })}>
           <p id={`${id}-number-hint`} className="w-full max-w-[65ch] text-[0.875rem] text-ink-600">{t.summary.emergencyNumber}</p>
           <label className="block text-sm font-semibold">{t.forms.numberField}<input className="field" name="admissionNumber" maxLength={80} required autoComplete="off" spellCheck={false} dir="ltr" aria-describedby={`${id}-number-hint`}/></label>
           <button className="btn-primary" disabled={busy}>{t.forms.number}</button>
-        </form>
+        </ActForm>
       )}
     </section>
   );
@@ -158,7 +159,7 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
       </div>
 
       {role === "operations" ? <>
-        <OperationsFile t={t} view={view} caseId={caseId} caseStatus={stage} next={next} documents={documents} facilities={facilities} busy={busy} act={act}
+        <OperationsFile t={t} locale={locale} view={view} caseId={caseId} caseStatus={stage} next={next} documents={documents} facilities={facilities} busy={busy} act={act}
           travel={travel} day={day} egp={egp}/>
         {(view.letterReferenceMaxEgp != null || view.pointOfNoReturnAt) && (
           <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-3">
@@ -177,7 +178,14 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         </dl>
       )}
 
-      {voucherFacts ? <div className="mt-4 border-t border-line pt-3">{voucherFacts}</div>
+      {/* UX 5-2: at the cashier Operations reads one line, what the patient pays; every other figure is one click away. */}
+      {role === "operations" && voucher ? (
+        <div className="mt-4 border-t border-line pt-3">
+          <p className="text-[0.9375rem] font-semibold text-ink-900">{fillTemplate(t.money.patientPaysLine, { amount: isolate(egp(voucher.patientPaysAtFacilityEgp)) })}
+            {voucher.displayCurrency && voucher.displayCurrency !== "EGP" && voucher.patientPaysAtFacilityDisplay != null && <span className="font-normal text-ink-600"> · <Money>{formatMoney(voucher.patientPaysAtFacilityDisplay, voucher.displayCurrency, locale)}</Money></span>}</p>
+          <details className="group"><Summary>{t.summary.money}</Summary><div className="pb-2">{voucherFacts}</div></details>
+        </div>
+      ) : voucherFacts ? <div className="mt-4 border-t border-line pt-3">{voucherFacts}</div>
         : reserved && <p className="mt-4 border-t border-line pt-3 text-[0.875rem] text-ink-600">{t.noVoucher}</p>}
 
       <div className="mt-4 border-t border-line pt-3">
@@ -199,10 +207,13 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
           )}
           {reserved && !cleared && !view.pointOfNoReturnApproved && (
             <Task title={t.forms.pnr} next={false}>
-              <form className="flex flex-wrap items-end gap-3" onSubmit={submit(data => act(`/operations/cases/${caseId}/admission/point-of-no-return`, { at: instant(data.get("at")) }))}>
-                <label className="block text-sm font-semibold">{t.forms.pnrAt}<input className="field" name="at" type="datetime-local" required dir="ltr"/></label>
-                <button className="btn-secondary" disabled={busy}>{t.forms.save}</button>
-              </form>
+              <p className="max-w-[65ch] text-[0.8125rem] leading-5 text-ink-600">{t.forms.pnrHint}</p>
+              <ActForm className="mt-3 flex flex-col items-start gap-3" refused={t.forms.refused} retry={t.forms.refusedRetry}
+                confirm={{ title: data => fillTemplate(t.forms.pnrConfirm, { time: isolate(when(instant(data.get("at")))) }), body: t.forms.pnrHint, confirm: t.forms.pnr, cancel: t.cancel }}
+                action={data => act(`/operations/cases/${caseId}/admission/point-of-no-return`, { at: instant(data.get("at")) })}>
+                <TimeField label={t.forms.pnrAt} name="at" hint={t.forms.timeHint}/>
+                <button className="btn-secondary" disabled={busy}>{t.forms.pnr}</button>
+              </ActForm>
             </Task>
           )}
         </div>
@@ -223,26 +234,27 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
           )}
           {feeOwed && (
             <Task title={t.finance.feeTitle} next={next === "fee"}>
-              <form className="grid gap-3 sm:grid-cols-3" onSubmit={submit(data => act(`/finance/cases/${caseId}/admission/fee-balance`, { reference: String(data.get("reference") ?? "").trim(), amountEgp: Number(data.get("amountEgp")), receivedAt: instant(data.get("receivedAt")) }))}>
-                <label className="block text-sm font-semibold">{t.finance.reference}<input className="field" name="reference" maxLength={160} required autoComplete="off" spellCheck={false}/></label>
-                <label className="block text-sm font-semibold">{t.forms.amountEgp}<input className="field" name="amountEgp" type="number" inputMode="decimal" min="0.01" step="0.01" required defaultValue={view.feeBalanceOwedEgp ?? undefined}/></label>
-                <label className="block text-sm font-semibold">{t.finance.receivedAt}<input className="field" name="receivedAt" type="datetime-local" required/></label>
+              <ActForm className="grid gap-3 sm:grid-cols-3" refused={t.forms.refused} retry={t.forms.refusedRetry} action={data => act(`/finance/cases/${caseId}/admission/fee-balance`, { reference: String(data.get("reference") ?? "").trim(), amountEgp: Number(data.get("amountEgp")), receivedAt: instant(data.get("receivedAt")) })}>
+                <label className="block text-sm font-semibold">{t.finance.reference}<input className="field" name="reference" maxLength={160} required autoComplete="off" spellCheck={false} dir="ltr"/></label>
+                <label className="block text-sm font-semibold">{t.forms.amountEgp}<input className="field" name="amountEgp" type="number" inputMode="decimal" min="0.01" step="0.01" required dir="ltr" defaultValue={view.feeBalanceOwedEgp ?? undefined}/></label>
+                <TimeField label={t.finance.receivedAt} name="receivedAt" hint={t.forms.timeHint}/>
                 <p className="text-[0.8125rem] text-ink-500 sm:col-span-3">{t.finance.freshSignIn}</p>
-                <div className="sm:col-span-3"><button className={btn("fee")} disabled={busy}>{t.forms.record}</button></div>
-              </form>
+                <div className="sm:col-span-3"><button className={btn("fee")} disabled={busy}>{t.finance.recordFee}</button></div>
+              </ActForm>
             </Task>
           )}
         </div>
       )}
 
-      {(role === "operations" || role === "coordinator") && (
-        <Task title={t.firstAppointment.title} next={false}>
-          <p className="mb-3 text-[0.875rem] text-ink-600">{t.firstAppointment.hint}</p>
-          <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(data => act(`/cases/${caseId}/first-confirmed-appointment`, { appointmentDate: text(data.get("appointmentDate")), reason: text(data.get("reason")) }))}>
-            <label className="block text-sm font-semibold">{t.firstAppointment.date}<input className="field" name="appointmentDate" type="date" required /></label>
-            <label className="block text-sm font-semibold">{t.firstAppointment.reason}<input className="field" name="reason" maxLength={500} required /></label>
-            <div className="sm:col-span-2"><button className="btn-secondary" disabled={busy}>{t.forms.record}</button></div>
-          </form>
+      {/* The first appointment sets the refund cutoff: Operations meets it before admission, not at every stage after. */}
+      {(role === "coordinator" || (role === "operations" && !cleared)) && (
+        <Task title={appointmentSet ? t.firstAppointment.correct : t.firstAppointment.title} next={false}>
+          <p className="mb-3 max-w-[65ch] text-[0.875rem] text-ink-600">{t.firstAppointment.hint}</p>
+          <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.forms.refused} retry={t.forms.refusedRetry} action={data => act(`/cases/${caseId}/first-confirmed-appointment`, { appointmentDate: text(data.get("appointmentDate")), reason: text(data.get("reason")) })}>
+            <label className="block text-sm font-semibold">{t.firstAppointment.date}<input className="field" name="appointmentDate" type="date" required dir="ltr"/></label>
+            <label className="block text-sm font-semibold">{t.firstAppointment.reason}<input className="field" name="reason" maxLength={500} required dir="auto"/></label>
+            <div className="sm:col-span-2"><button className="btn-secondary" disabled={busy}>{appointmentSet ? t.firstAppointment.correct : t.firstAppointment.record}</button></div>
+          </ActForm>
         </Task>
       )}
 
@@ -276,21 +288,35 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
  * correction behind a disclosure while it still takes one); only the current act is open, carrying the view's one filled button;
  * a later act is named so the order is plain. Presentation only: the backend decides every rule.
  */
-function OperationsFile({ t, view, caseId, caseStatus, next, documents, facilities, busy, act, travel, day, egp }: {
-  t: Copy; view: AdmissionView; caseId: string; caseStatus: string; next: string | null; documents: Doc[]; facilities: DirectoryFacility[]; busy: boolean;
+function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, facilities, busy, act, travel, day, egp }: {
+  t: Copy; locale: Locale; view: AdmissionView; caseId: string; caseStatus: string; next: string | null; documents: Doc[]; facilities: DirectoryFacility[]; busy: boolean;
   act: (path: string, body?: unknown) => Promise<boolean>; travel?: (current: boolean) => ReactNode; day: Intl.DateTimeFormat; egp: (n?: number | null) => string;
 }) {
   const id = useId();
+  // The cashier records a payment that has just happened: "paid at" starts at now, and moves on to now each time the
+  // officer comes back to the receipt while nobody has changed it (so a file left open never records an old time).
+  const [openedAt] = useState(() => localInput(new Date().toISOString()));
+  const [paidIn, setPaidIn] = useState("");
+  const freshPaidAt = (event: FocusEvent<HTMLFormElement>) => {
+    const at = event.currentTarget.elements.namedItem("paidAt");
+    if (!(at instanceof HTMLInputElement) || (event.target as EventTarget) === at || at.value !== at.defaultValue) return;
+    at.defaultValue = at.value = localInput(new Date().toISOString());
+  };
   const reserved = !!view.admissionId;
   const cleared = ["ADMISSION_READY", "TREATMENT_IN_PROGRESS"].includes(caseStatus);
   const letterOwed = ["NONE", "REFUSED"].includes(view.letterCheck ?? "NONE");
   const receipt = view.evidence.find(row => row.kind === "BALANCE_EVIDENCED" && !row.superseded) ?? null;
-  const receiptOpen = !receipt && !!view.voucher && (view.balanceOwedEgp ?? 0) > 0;
+  const owed = view.balanceOwedEgp ?? 0;
+  const receiptOpen = !receipt && !!view.voucher && owed > 0;
   const btn = (key: string) => next === key ? "btn-primary" : "btn-secondary";
   const travelNode = travel?.(next === "travel");
+  // The patient's own currency first, then the platform's other rated currencies.
+  const currencies = [...new Set([view.voucher?.displayCurrency, ...Object.keys(CURRENCY_LABELS)])].filter((code): code is string => !!code && code !== "EGP");
+  // Recording the number on a cleared case starts treatment, so it asks first; a correction does not.
+  const numberStarts = caseStatus === "ADMISSION_READY" && !view.admissionNumber;
 
   const reserveForm = (
-    <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(data => act(`/operations/cases/${caseId}/admission`, { facilityId: data.get("facilityId"), plannedAdmissionAt: instant(data.get("plannedAdmissionAt")) }))}>
+    <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.forms.refused} retry={t.forms.refusedRetry} action={data => act(`/operations/cases/${caseId}/admission`, { facilityId: data.get("facilityId"), plannedAdmissionAt: instant(data.get("plannedAdmissionAt")) })}>
       <div>
         <label htmlFor={`${id}-hospital`} className="block text-sm font-semibold">{t.facility}</label>
         <select id={`${id}-hospital`} className="field" name="facilityId" required defaultValue={view.facilityId ?? ""} aria-describedby={facilities.length === 0 ? `${id}-no-hospitals` : undefined}>
@@ -299,42 +325,62 @@ function OperationsFile({ t, view, caseId, caseStatus, next, documents, faciliti
         </select>
         {facilities.length === 0 && <p id={`${id}-no-hospitals`} className="mt-1 text-[0.8125rem] text-ink-600">{t.forms.noHospitals}</p>}
       </div>
-      <label className="block text-sm font-semibold">{t.plannedAt}<input className="field" name="plannedAdmissionAt" type="datetime-local" dir="ltr" required defaultValue={localInput(view.plannedAdmissionAt)}/></label>
-      <div className="sm:col-span-2"><button className={btn("reserve")} disabled={busy}>{t.forms.save}</button></div>
-    </form>
+      <TimeField label={t.plannedAt} name="plannedAdmissionAt" hint={t.forms.timeHint} defaultValue={localInput(view.plannedAdmissionAt)}/>
+      <div className="sm:col-span-2"><button className={btn("reserve")} disabled={busy}>{t.forms.saveReservation}</button></div>
+    </ActForm>
   );
   const letterForm = (
-    <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(data => act(`/operations/cases/${caseId}/admission/letter`, { documentId: data.get("documentId"), quotedPackageEgp: Number(data.get("quotedPackageEgp")), reference: text(data.get("reference")) }))}>
+    <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.forms.refused} retry={t.forms.refusedRetry} action={data => act(`/operations/cases/${caseId}/admission/letter`, { documentId: data.get("documentId"), quotedPackageEgp: Number(data.get("quotedPackageEgp")), reference: text(data.get("reference")) })}>
       {view.letterCheck === "REFUSED" && <p className="text-[0.875rem] font-semibold text-alert-800 sm:col-span-2">{t.letterCheck.REFUSED}</p>}
       <DocumentPicker name="documentId" label={t.forms.document} empty={t.forms.chooseDocument} documents={documents} required/>
       <label className="block text-sm font-semibold">{t.forms.quoted}<input className="field" name="quotedPackageEgp" type="number" inputMode="decimal" min="0" step="0.01" required dir="ltr"/></label>
       <label className="block text-sm font-semibold">{t.forms.reference}<input className="field" name="reference" maxLength={160} autoComplete="off" spellCheck={false} dir="auto"/></label>
       {!documents.some(d => d.status === "CLEAN") && <p className="text-[0.8125rem] text-ink-600 sm:col-span-2">{t.forms.noDocuments}</p>}
-      <div className="sm:col-span-2"><button className={btn("letter")} disabled={busy}>{t.forms.record}</button></div>
-    </form>
+      <div className="sm:col-span-2"><button className={btn("letter")} disabled={busy}>{t.forms.recordLetter}</button></div>
+    </ActForm>
   );
+  // UX 5-2: on a phone at the cashier the receipt is four fields, the amount and the time already in them; another currency
+  // and the copy are behind one disclosure.
   const receiptForm = (
-    <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(data => act(`/operations/cases/${caseId}/admission/balance`, {
+    <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.forms.refused} retry={t.forms.refusedRetry} onFocusCapture={freshPaidAt} action={data => act(`/operations/cases/${caseId}/admission/balance`, {
       receiptNumber: data.get("receiptNumber"), amountEgp: Number(data.get("amountEgp")), paidAt: instant(data.get("paidAt")), method: data.get("method"),
-      documentId: data.get("documentId") || null, paidCurrency: text(data.get("paidCurrency"))?.toUpperCase() ?? null, paidAmount: data.get("paidAmount") ? Number(data.get("paidAmount")) : null }))}>
+      documentId: data.get("documentId") || null, paidCurrency: text(data.get("paidCurrency")), paidAmount: data.get("paidAmount") ? Number(data.get("paidAmount")) : null })}>
       <label className="block text-sm font-semibold">{t.forms.receiptNumber}<input className="field" name="receiptNumber" maxLength={160} required autoComplete="off" spellCheck={false} dir="ltr"/></label>
-      <label className="block text-sm font-semibold">{t.forms.amountEgp}<input className="field" name="amountEgp" type="number" inputMode="decimal" min="0.01" step="0.01" required dir="ltr"/></label>
-      <label className="block text-sm font-semibold">{t.forms.paidAt}<input className="field" name="paidAt" type="datetime-local" required dir="ltr"/></label>
+      <div>
+        <label htmlFor={`${id}-amount`} className="block text-sm font-semibold">{t.forms.amountEgp}</label>
+        <input id={`${id}-amount`} className="field" name="amountEgp" type="number" inputMode="decimal" min="0.01" step="0.01" required dir="ltr"
+               defaultValue={owed > 0 ? owed.toFixed(2) : undefined} aria-describedby={owed > 0 ? `${id}-amount-hint` : undefined}/>
+        {owed > 0 && <p id={`${id}-amount-hint`} className="mt-1 text-[0.8125rem] text-ink-600">{fillTemplate(t.forms.amountHint, { amount: isolate(egp(owed)) })}</p>}
+      </div>
+      <TimeField label={t.forms.paidAt} name="paidAt" hint={t.forms.paidAtHint} defaultValue={openedAt}/>
       <label className="block text-sm font-semibold">{t.forms.method}
         <select className="field" name="method" defaultValue="CASH">{(["CASH", "CARD", "BANK_TRANSFER"] as const).map(m => <option key={m} value={m}>{t.forms.methods[m]}</option>)}</select>
       </label>
-      <DocumentPicker name="documentId" label={t.forms.receiptDocument} empty={t.forms.none} documents={documents}/>
-      <label className="block text-sm font-semibold">{t.forms.paidCurrency}<input className="field" name="paidCurrency" maxLength={3} pattern="[A-Za-z]{3}" autoComplete="off" spellCheck={false} dir="ltr"/></label>
-      <label className="block text-sm font-semibold">{t.forms.paidAmount}<input className="field" name="paidAmount" type="number" inputMode="decimal" min="0" step="0.01" dir="ltr"/></label>
-      <div className="sm:col-span-2"><button className={btn("receipt")} disabled={busy}>{t.forms.record}</button></div>
-    </form>
+      {/* A field the browser refuses inside a closed disclosure could not be shown: the disclosure opens for it. */}
+      <details className="group sm:col-span-2" onInvalidCapture={event => { event.currentTarget.open = true; }}>
+        <Summary>{t.forms.otherCurrency}</Summary>
+        <div className="grid gap-3 pb-1 sm:grid-cols-2">
+          <label className="block text-sm font-semibold">{t.forms.paidCurrency}
+            <select className="field" name="paidCurrency" value={paidIn} onChange={event => setPaidIn(event.target.value)}>
+              <option value="">{t.forms.egpOnly}</option>
+              {currencies.map(code => <option key={code} value={code}>{CURRENCY_LABELS[code]?.[locale] ?? code}</option>)}
+            </select>
+          </label>
+          {/* A currency needs its amount: the two are recorded together. */}
+          <label className="block text-sm font-semibold">{t.forms.paidAmount}<input className="field" name="paidAmount" type="number" inputMode="decimal" min="0.01" step="0.01" dir="ltr" required={!!paidIn}/></label>
+          <DocumentPicker name="documentId" label={t.forms.receiptDocument} empty={t.forms.none} documents={documents}/>
+        </div>
+      </details>
+      <div className="sm:col-span-2"><button className={btn("receipt")} disabled={busy}>{t.forms.recordReceipt}</button></div>
+    </ActForm>
   );
   const numberForm = (
-    <form className="flex flex-wrap items-end gap-3" onSubmit={submit(data => act(`/operations/cases/${caseId}/admission/number`, { admissionNumber: String(data.get("admissionNumber") ?? "").trim() }))}>
-      <label className="block text-sm font-semibold">{t.forms.numberField}<input className="field" name="admissionNumber" maxLength={80} required autoComplete="off" spellCheck={false} dir="ltr" defaultValue={view.admissionNumber ?? ""} aria-describedby={view.caseStatus === "ADMISSION_READY" ? `${id}-number-hint` : undefined}/></label>
-      <button className={btn("number")} disabled={busy}>{t.forms.save}</button>
-      {view.caseStatus === "ADMISSION_READY" && <p id={`${id}-number-hint`} className="w-full text-[0.8125rem] text-ink-500">{t.forms.numberHint}</p>}
-    </form>
+    <ActForm className="flex flex-wrap items-end gap-3" refused={t.forms.refused} retry={t.forms.refusedRetry} confirm={numberStarts ? numberConfirm(t) : undefined}
+      action={data => act(`/operations/cases/${caseId}/admission/number`, { admissionNumber: String(data.get("admissionNumber") ?? "").trim() })}>
+      <label className="block text-sm font-semibold">{t.forms.numberField}<input className="field" name="admissionNumber" maxLength={80} required autoComplete="off" spellCheck={false} dir="ltr" defaultValue={view.admissionNumber ?? ""} aria-describedby={numberStarts ? `${id}-number-hint` : undefined}/></label>
+      <button className={btn("number")} disabled={busy}>{view.admissionNumber ? t.forms.saveNumber : t.forms.number}</button>
+      {numberStarts && <p id={`${id}-number-hint`} className="w-full text-[0.8125rem] text-ink-600">{t.forms.numberHint}</p>}
+    </ActForm>
   );
   // Name and city each isolated: an Arabic name with a Latin city keeps each in its own direction.
   const hospital = !view.facilityName ? "—" : view.facilityCity ? fillTemplate(t.forms.hospitalOption, { name: isolate(view.facilityName), city: isolate(view.facilityCity) }) : isolate(view.facilityName);
@@ -370,6 +416,12 @@ function OperationsFile({ t, view, caseId, caseStatus, next, documents, faciliti
 
 /** A name or date set inside a sentence of the other script, isolated so it never reorders its neighbours. */
 const isolate = (value: string) => `⁨${value}⁩`;
+
+/** The admission number starts treatment: the confirmation repeats the number typed and says what it moves. */
+const numberConfirm = (t: Copy) => ({
+  title: (data: FormData) => fillTemplate(t.forms.numberConfirm, { number: isolate(String(data.get("admissionNumber") ?? "").trim()) }),
+  body: t.forms.numberConfirmBody, confirm: t.forms.number, cancel: t.cancel,
+});
 
 /** The frozen voucher: its number, what each side pays, what is still owed, and the rate it was frozen at. */
 function VoucherFacts({ t, locale, voucher, view, egp }: { t: Copy; locale: Locale; voucher: NonNullable<AdmissionView["voucher"]>; view: AdmissionView; egp: (n?: number | null) => string }) {
