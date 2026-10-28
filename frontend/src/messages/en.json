@@ -1244,14 +1244,24 @@
       },
       "logistics": {
         "title": "Destination & treatment",
-        "facility": "Facility",
+        "facility": "Hospital",
         "notChosen": "Not chosen yet",
+        "admission": "Planned admission",
+        "notPlanned": "Not planned yet",
+        "stage": {
+          "ARRIVAL_CONFIRMED": "Arrived, before admission",
+          "ADMISSION_READY": "Arrived, cleared for admission",
+          "TREATMENT_IN_PROGRESS": "In hospital for treatment",
+          "DISCHARGED": "Discharged",
+          "FOLLOW_UP": "Discharged, in follow-up",
+          "CLOSED": "Case closed"
+        },
         "travelStatus": "Travel status",
         "plannedArrival": "Planned arrival",
         "confirmedArrival": "Confirmed arrival",
         "travel": {
           "PLANNING": "Planning",
-          "CONFIRMED": "Confirmed booking",
+          "CONFIRMED": "Booked",
           "ARRIVED": "Arrived"
         }
       },
@@ -1370,7 +1380,9 @@
         "notRequired": "Not required",
         "waiting": "Waiting",
         "done": "Complete",
-        "hint": "Release unlocks once every required step is complete."
+        "hint": "Release unlocks once every required step is complete.",
+        "operationsPlan": "The travel package for the proposal",
+        "operationsPlanHint": "What the package includes and what it costs. It goes into the proposal before it is released."
       }
     },
     "safety": {
@@ -3590,10 +3602,6 @@
         "CONFIRMED": "Booked",
         "ARRIVED": "Arrived"
       },
-      "hospital": "Hospital",
-      "chooseHospital": "Choose a hospital",
-      "hospitalOption": "{name} · {city}",
-      "noHospitals": "No active hospital is set up yet. Ask Consultant Operations to add one in the Control Center.",
       "plannedArrival": "Planned arrival",
       "timeHint": "Date and time on this device's clock.",
       "arrivalRequired": "Add the planned arrival before confirming the booking.",
@@ -3611,6 +3619,12 @@
       "confirmed": "Booked and confirmed",
       "confirmedHint": "Confirming needs a planned arrival. The patient's identity, consents and deposit are checked first.",
       "save": "Save the travel plan",
+      "change": "Change the travel plan",
+      "start": "Plan the travel",
+      "nothingYet": "Nothing planned yet.",
+      "noArrivalYet": "No arrival date yet.",
+      "arriving": "Planned arrival: {at}",
+      "arrived": "Arrived · {at}",
       "arrival": {
         "title": "Record the arrival",
         "at": "Arrived at",
@@ -3621,10 +3635,19 @@
         "cancel": "Cancel",
         "needsPlan": "Save the travel plan first.",
         "missing": "Enter when the patient arrived.",
-        "future": "The arrival cannot be in the future."
+        "future": "The arrival cannot be in the future.",
+        "failed": "The arrival was not recorded. Read the message above, check the time, then try again."
       }
     },
     "admission": {
+      "acts": {
+        "title": "Hospital file",
+        "notYet": "Later:",
+        "reserved": "Reserved · {hospital} · admission {date}",
+        "receipt": "Cashier receipt recorded",
+        "checked": "countersigned by Finance",
+        "awaitingCheck": "waiting for Finance's countersignature"
+      },
       "summary": {
         "title": "Admission",
         "waiting": "Before treatment can start:",
@@ -3692,9 +3715,12 @@
       "forms": {
         "reserve": "Reserve the hospital",
         "changeReservation": "Change the reservation",
+        "hospitalOption": "{name} · {city}",
+        "noHospitals": "No active hospital is set up yet. Ask Consultant Operations to add one in the Control Center.",
         "chooseFacility": "Choose a hospital",
         "save": "Save",
         "letter": "Record the admission letter",
+        "newLetter": "Record a new letter",
         "document": "Letter (a checked document on the case)",
         "chooseDocument": "Choose the document",
         "noDocuments": "Upload the hospital's letter to the case first; it can be chosen once it is checked.",
@@ -3704,6 +3730,7 @@
         "voucher": "Issue the voucher",
         "voucherHint": "The voucher is issued on its own once the final quote is accepted and the letter is checked. Issue it by hand only for a case without a final quote.",
         "receipt": "Record the hospital receipt",
+        "anotherReceipt": "Record another receipt",
         "receiptNumber": "Receipt number",
         "amountEgp": "Amount (EGP)",
         "paidAt": "Paid at",
@@ -3721,7 +3748,8 @@
         "pnrAt": "No refund for travel after",
         "number": "Record the admission number",
         "numberField": "Hospital admission number",
-        "numberHint": "Recording it starts treatment."
+        "numberHint": "Recording it starts treatment.",
+        "correctNumber": "Correct the admission number"
       },
       "finance": {
         "letterTitle": "Check the admission letter",

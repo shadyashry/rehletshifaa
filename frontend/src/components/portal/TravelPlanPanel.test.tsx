@@ -7,10 +7,9 @@ beforeAll(() => {
   HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new Event("close")); };
 });
 
-import { TravelPlanPanel } from "./TravelPlanPanel";
+import { TravelAct, TravelPlanPanel } from "./TravelPlanPanel";
 import { renderWithWork } from "./test-copy";
 
-const facilities = [{ id: "f1", name: "Nile Heart Hospital", city: "Cairo", kind: "HOSPITAL", accreditationStatus: "CURRENT", packages: [] }];
 const stored = { id: "t1", status: "PLANNING", plannedArrival: "2026-11-02T10:30:00Z", confirmedArrival: null, visaStatus: "Applied", flightDetails: "MS 912",
   airportReception: "Driver with a sign", accommodation: null, localTransport: null, companionDetails: "One adult", facilityId: "f1", facilityName: "Nile Heart Hospital",
   exceptions: "Wheelchair at the gate", updatedAt: "2026-10-28T08:00:00Z" };
@@ -19,20 +18,17 @@ const stored = { id: "t1", status: "PLANNING", plannedArrival: "2026-11-02T10:30
 describe("TravelPlanPanel", () => {
   afterEach(cleanup);
 
-  it("picks the hospital from the directory and sends the whole plan", () => {
+  it("has no hospital picker of its own and starts a plan with nothing chosen", () => {
     const mutate = vi.fn().mockResolvedValue({ id: "t1" });
-    renderWithWork(<TravelPlanPanel caseId="c1" plan={null} facilities={facilities} busy={false} mutate={mutate}/>);
-    const picker = screen.getByLabelText("Hospital");
-    expect(screen.getByRole("option", { name: /Nile Heart Hospital.*·.*Cairo/ })).toBeInTheDocument();
-    fireEvent.change(picker, { target: { value: "f1" } });
+    renderWithWork(<TravelPlanPanel caseId="c1" plan={null} busy={false} mutate={mutate}/>);
+    expect(screen.queryByLabelText("Hospital")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save the travel plan" }));
-    expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/travel", expect.objectContaining({ facilityId: "f1", status: "PLANNING", confirmedArrival: null }), "PUT");
+    expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/travel", expect.objectContaining({ facilityId: null, status: "PLANNING", confirmedArrival: null }), "PUT");
   });
 
   it("reopens on everything stored and sends back what the form does not show", () => {
     const mutate = vi.fn().mockResolvedValue({ id: "t1" });
-    renderWithWork(<TravelPlanPanel caseId="c1" plan={stored} facilities={facilities} busy={false} mutate={mutate}/>);
-    expect((screen.getByLabelText("Hospital") as HTMLSelectElement).value).toBe("f1");
+    renderWithWork(<TravelPlanPanel caseId="c1" plan={stored} busy={false} mutate={mutate}/>);
     expect((screen.getByLabelText("Flight") as HTMLInputElement).value).toBe("MS 912");
     expect((screen.getByLabelText("Visa") as HTMLInputElement).value).toBe("Applied");
     expect((screen.getByLabelText("Planned arrival") as HTMLInputElement).value).not.toBe("");
@@ -45,7 +41,7 @@ describe("TravelPlanPanel", () => {
 
   it("refuses to confirm a booking without a planned arrival, at the field", () => {
     const mutate = vi.fn();
-    renderWithWork(<TravelPlanPanel caseId="c1" plan={null} facilities={facilities} busy={false} mutate={mutate}/>);
+    renderWithWork(<TravelPlanPanel caseId="c1" plan={null} busy={false} mutate={mutate}/>);
     fireEvent.click(screen.getByRole("radio", { name: "Booked and confirmed" }));
     fireEvent.click(screen.getByRole("button", { name: "Save the travel plan" }));
     expect(mutate).not.toHaveBeenCalled();
@@ -55,7 +51,7 @@ describe("TravelPlanPanel", () => {
 
   it("records the arrival only after a confirmation, keeping the plan", () => {
     const mutate = vi.fn().mockResolvedValue({ id: "t1" });
-    const { container } = renderWithWork(<TravelPlanPanel caseId="c1" plan={{ ...stored, status: "CONFIRMED" }} facilities={facilities} busy={false} mutate={mutate}/>);
+    const { container } = renderWithWork(<TravelPlanPanel caseId="c1" plan={{ ...stored, status: "CONFIRMED" }} busy={false} mutate={mutate}/>);
     // Booked: the arrival is the next act and carries the panel's one filled button.
     expect(container.querySelectorAll(".btn-primary")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Record the arrival" })).toHaveClass("btn-primary");
@@ -71,7 +67,7 @@ describe("TravelPlanPanel", () => {
 
   it("never records the arrival when the confirmation is cancelled, and refuses an empty or future time in place", () => {
     const mutate = vi.fn();
-    renderWithWork(<TravelPlanPanel caseId="c1" plan={{ ...stored, status: "CONFIRMED" }} facilities={facilities} busy={false} mutate={mutate}/>);
+    renderWithWork(<TravelPlanPanel caseId="c1" plan={{ ...stored, status: "CONFIRMED" }} busy={false} mutate={mutate}/>);
     fireEvent.click(screen.getByRole("button", { name: "Record the arrival" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Enter when the patient arrived.");
     expect(screen.getByLabelText("Arrived at")).toHaveAttribute("aria-invalid", "true");
@@ -85,24 +81,54 @@ describe("TravelPlanPanel", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it("keeps the stored hospital when the directory arrives after the case", () => {
-    const mutate = vi.fn().mockResolvedValue({ id: "t1" });
-    const { rerender } = renderWithWork(<TravelPlanPanel caseId="c1" plan={stored} facilities={[]} busy={false} mutate={mutate}/>);
-    expect((screen.getByLabelText("Hospital") as HTMLSelectElement).value).toBe("f1");
-    rerender(<TravelPlanPanel caseId="c1" plan={stored} facilities={facilities} busy={false} mutate={mutate}/>);
-    expect((screen.getByLabelText("Hospital") as HTMLSelectElement).value).toBe("f1");
-    fireEvent.click(screen.getByRole("button", { name: "Save the travel plan" }));
-    expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/travel", expect.objectContaining({ facilityId: "f1" }), "PUT");
-  });
-
   it("re-seeds the fields from a newer stored plan", () => {
-    const { rerender } = renderWithWork(<TravelPlanPanel caseId="c1" plan={stored} facilities={facilities} busy={false} mutate={vi.fn()}/>);
-    rerender(<TravelPlanPanel caseId="c1" plan={{ ...stored, flightDetails: "MS 914", updatedAt: "2026-10-28T09:00:00Z" }} facilities={facilities} busy={false} mutate={vi.fn()}/>);
+    const { rerender } = renderWithWork(<TravelPlanPanel caseId="c1" plan={stored} busy={false} mutate={vi.fn()}/>);
+    rerender(<TravelPlanPanel caseId="c1" plan={{ ...stored, flightDetails: "MS 914", updatedAt: "2026-10-28T09:00:00Z" }} busy={false} mutate={vi.fn()}/>);
     expect((screen.getByLabelText("Flight") as HTMLInputElement).value).toBe("MS 914");
   });
 
+  it("keeps the arrangements closed once the officer closes them, through a re-seed", () => {
+    const { rerender, container } = renderWithWork(<TravelPlanPanel caseId="c1" plan={stored} busy={false} mutate={vi.fn()}/>);
+    const arrangements = () => container.querySelector("details:has(textarea[name=airportReception])") as HTMLDetailsElement;
+    expect(arrangements().open).toBe(true);
+    arrangements().open = false;
+    fireEvent(arrangements(), new Event("toggle"));
+    rerender(<TravelPlanPanel caseId="c1" plan={{ ...stored, updatedAt: "2026-10-28T09:00:00Z" }} busy={false} mutate={vi.fn()}/>);
+    expect(arrangements().open).toBe(false);
+  });
+
+  it("says at the field when the arrival was not recorded", async () => {
+    const mutate = vi.fn().mockResolvedValue(null);
+    renderWithWork(<TravelPlanPanel caseId="c1" plan={{ ...stored, status: "CONFIRMED" }} busy={false} mutate={mutate}/>);
+    fireEvent.change(screen.getByLabelText("Arrived at"), { target: { value: "2026-10-20T12:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Record the arrival" }));
+    fireEvent.click(screen.getByRole("alertdialog").querySelector(".btn-primary") as HTMLElement);
+    expect(await screen.findByRole("alert")).toHaveTextContent("The arrival was not recorded. Read the message above, check the time, then try again.");
+  });
+
+  it("as a later act of the hospital file: one line, the forms behind disclosures, no filled button", () => {
+    const { container } = renderWithWork(<TravelAct caseId="c1" plan={stored} current={false} busy={false} mutate={vi.fn()}/>);
+    expect(screen.getByRole("heading", { level: 4, name: "Travel and arrival" })).toBeInTheDocument();
+    expect(screen.getByText(/^Planned arrival: .*2026/)).toBeInTheDocument();
+    expect(container.querySelectorAll(".btn-primary")).toHaveLength(0);
+    expect(screen.getByText("Change the travel plan").closest("details")).not.toHaveAttribute("open");
+  });
+
+  it("as an act of the file, still resends the stored hospital with the plan", () => {
+    const mutate = vi.fn().mockResolvedValue({ id: "t1" });
+    renderWithWork(<TravelAct caseId="c1" plan={stored} current busy={false} mutate={mutate}/>);
+    fireEvent.click(screen.getByRole("button", { name: "Save the travel plan" }));
+    expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/travel", expect.objectContaining({ facilityId: "f1", exceptions: "Wheelchair at the gate" }), "PUT");
+  });
+
+  it("as the current act with nothing planned: the form open with its one filled Save", () => {
+    const { container } = renderWithWork(<TravelAct caseId="c1" plan={null} current busy={false} mutate={vi.fn()}/>);
+    expect(container.querySelectorAll(".btn-primary")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Save the travel plan" })).toHaveClass("btn-primary");
+  });
+
   it("speaks Arabic from the messages", () => {
-    renderWithWork(<TravelPlanPanel caseId="c1" plan={null} facilities={facilities} busy={false} mutate={vi.fn()}/>, "ar");
+    renderWithWork(<TravelPlanPanel caseId="c1" plan={null} busy={false} mutate={vi.fn()}/>, "ar");
     expect(screen.getByRole("heading", { name: "السفر والوصول" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "حفظ خطة السفر" })).toHaveClass("btn-primary");
   });

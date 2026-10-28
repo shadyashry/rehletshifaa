@@ -50,7 +50,7 @@ describe("AdmissionPanel — Operations", () => {
 
   it("reads its own role's view and opens the reservation as the one primary action", async () => {
     const { mutate, load } = setup("operations", empty);
-    expect(await screen.findByText("No hospital is reserved yet.")).toBeTruthy();
+    expect(await screen.findByText("Reserve the hospital")).toBeTruthy();
     expect(load).toHaveBeenCalledWith("/operations/cases/c1/admission");
     expect(screen.getByText("The final quote is not accepted")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Save" }).filter(b => b.className.includes("btn-primary"))).toHaveLength(1);
@@ -109,6 +109,71 @@ describe("AdmissionPanel — Operations", () => {
     fireEvent.change(screen.getByLabelText("Hospital admission number"), { target: { value: " ADM-5521 " } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/admission/number", { admissionNumber: "ADM-5521" }));
+  });
+});
+
+/** UX 5-1: Operations' hospital file — reserve, letter, travel, receipt, admission number; one act open, one filled button. */
+describe("AdmissionPanel — Operations' hospital file", () => {
+  afterEach(cleanup);
+
+  function file(view: AdmissionView, currentCode?: string) {
+    const travel = vi.fn((current: boolean) => <button type="button" className={current ? "btn-primary" : "btn-secondary"}>Travel act</button>);
+    const load = vi.fn().mockResolvedValue(view) as unknown as <T>(path: string) => Promise<T>;
+    const onView = vi.fn();
+    const { container } = renderWithWork(<AdmissionPanel locale="en" role="operations" caseId="c1" caseStatus={view.caseStatus ?? "TRAVEL_COORDINATION"} currentCode={currentCode}
+      documents={documents} facilities={facilities} busy={false} mutate={vi.fn()} load={load} travel={travel} onView={onView}/>);
+    return { travel, container, onView };
+  }
+  const travelling: AdmissionView = { ...reserved, caseStatus: "TRAVEL_COORDINATION", letterCheck: "NONE", voucher: null, balanceOwedEgp: null, evidence: [] };
+
+  it("orders the acts and opens only the letter while the reservation stands as one line", async () => {
+    const { travel, container, onView } = file(travelling);
+    const acts = await screen.findByRole("list", { name: "Hospital file" });
+    const items = within(acts).getAllByRole("listitem").map(li => li.textContent ?? "");
+    expect(items[0]).toMatch(/^Reserved · ⁨Nile Heart Hospital⁩ · ⁨Cairo⁩ · admission .*2026/);
+    expect(items[1]).toContain("Record the admission letter");
+    expect(items[2]).toBe("Travel act");
+    expect(items[3]).toBe("Later: Record the hospital receipt");
+    expect(items[4]).toBe("Later: Record the admission number");
+    expect(screen.getByText("Record the admission letter").closest("details")).toHaveAttribute("open");
+    expect(travel).toHaveBeenLastCalledWith(false);
+    expect(container.querySelectorAll(".btn-primary")).toHaveLength(1);
+    expect(onView).toHaveBeenCalledWith(travelling);
+  });
+
+  it("hands the filled button to the travel act once the letter is recorded", async () => {
+    const { travel, container } = file({ ...travelling, letterCheck: "CHECK_PENDING" });
+    const acts = await screen.findByRole("list", { name: "Hospital file" });
+    expect(within(acts).getAllByRole("listitem")[1].textContent).toMatch(/^Admission letter · Waiting for Finance's check/);
+    expect(travel).toHaveBeenLastCalledWith(true);
+    expect(container.querySelectorAll(".btn-primary")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Travel act" })).toHaveClass("btn-primary");
+    expect(screen.getByText("Record a new letter").closest("details")).not.toHaveAttribute("open");
+  });
+
+  it("keeps the travel act standing when the reservation cannot be read", async () => {
+    const travel = vi.fn(() => <p>Travel act</p>);
+    const load = vi.fn().mockRejectedValue(new Error("down")) as unknown as <T>(path: string) => Promise<T>;
+    renderWithWork(<AdmissionPanel locale="en" role="operations" caseId="c1" caseStatus="TRAVEL_COORDINATION" busy={false} mutate={vi.fn()} load={load} travel={travel}/>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("The admission details could not be loaded.");
+    expect(screen.getByText("Travel act")).toBeInTheDocument();
+  });
+
+  it("on an emergency-cleared case with no letter, shows no letter act and opens the admission number", async () => {
+    const { container } = file({ ...reserved, caseStatus: "ADMISSION_READY", letterCheck: "NONE", emergencyOverride: true, voucher: null, balanceOwedEgp: null, admissionBlockers: [], evidence: [] },
+      "RECORD_ADMISSION_NUMBER");
+    const acts = await screen.findByRole("list", { name: "Hospital file" });
+    expect(acts.textContent).not.toContain("Admission letter");
+    expect(container.querySelectorAll(".btn-primary")).toHaveLength(1);
+    expect(screen.getByText("Record the admission number").closest("details")).toHaveAttribute("open");
+  });
+
+  it("says a recorded receipt and its countersignature as one line", async () => {
+    file({ ...reserved, evidence: [...reserved.evidence, { id: "e2", kind: "BALANCE_EVIDENCED", reference: "CASH-1", amountEgp: 195432.1, recordedRole: "OPERATIONS",
+      recordedAt: "2026-10-19T09:00:00Z", superseded: false }] });
+    const acts = await screen.findByRole("list", { name: "Hospital file" });
+    expect(screen.getByText("Record another receipt")).toBeInTheDocument();
+    expect(within(acts).getAllByRole("listitem").map(li => li.textContent).join("|")).toMatch(/\|Cashier receipt recorded · EGP\s195,432\.10 · waiting for Finance's countersignatureRecord another receipt/);
   });
 });
 

@@ -1315,6 +1315,68 @@ fieldset fix 4/4. Overwritten shots restored. Shots: `screenshots/area-5/before/
 
 **Next:** slice 5-1 — the hospital file, started in a new session from this branch.
 
+## UX area 5 — slice 5-1 the hospital file (2026-10-28, worktree `elastic-lederberg-eace3a`, branch `claude/elastic-lederberg-eace3a` from 5-0 @ `da2f014c`)
+
+Plan direction 2 (`plans/operations-workspace.md`); no owner gate (standing instruction), assumptions as planned.
+
+**One hospital file.** For Operations the "Admission & money" panel opens on an ordered list of acts (`OperationsFile` in
+`AdmissionPanel.tsx`, `aria-label` "Hospital file"): reserve → admission letter → travel and arrival → cashier receipt →
+admission number. Only the current act is open and it carries the view's one filled button. The travel plan is part of
+that count: in travel coordination it is an act in the file, drawn through a `travel` slot that StaffCaseView fills with
+`TravelAct`, and it is current once the reservation and the letter are in. A done act is one line with its correction behind
+a disclosure ("Reserved · Nile Heart Hospital · Cairo · admission 30 Oct 2026" / "Change the reservation"; "Admission letter ·
+Waiting for Finance's check" / "Record a new letter"; "Arrived · …"; "Cashier receipt recorded · EGP … · waiting for
+Finance's countersignature" / "Record another receipt"; "Admission number …" / "Correct the admission number"). A recorded act
+that still waits on someone else shows a clock, and a variance shows an alert icon. A later act is named, muted, with an sr-only
+"Later:". The voucher, the point of no return and the first appointment follow as side tasks, and none of them is primary. The
+reference maximum and the point of no return stay as facts. The act now sits about 1,000px higher on the cashier case
+(case-balance-en-1440). New shared pieces in `panel-parts.tsx`: `DoneAct` (tone done / waiting / warning), `LaterAct`, and
+`localInput` (moved from the travel form). The reservation's form now reopens on its stored date.
+- `next` for Operations: reserve (unless cleared) → letter (unless cleared: an emergency admission can clear a case with no
+  letter, and then no letter act shows) → travel (in travel coordination, when the slot is offered) → what the backend's step
+  names (receipt, number). One stage (`view.caseStatus ?? caseStatus`) decides both `next` and `cleared`.
+- When an act is recorded its form is replaced by its fact, so focus moves on to the act that is now open, or to the panel's
+  heading.
+- When the admission view cannot be read, the travel act still stands under the error.
+
+**The reservation owns the hospital.** The travel form no longer has a hospital picker. It resends the stored `facilityId`
+with everything else, because the PUT replaces the whole plan. `TravelPlanPanel` (its own card, h3) is now used only before a
+reservation can exist (ACCEPTED). `TravelAct` (h4, not a landmark) is the act in the file: when it is not current it is one line
+("Planned arrival: …"), with the form behind "Change the travel plan" / "Plan the travel" and no filled button.
+
+**Stage-true logistics.** "Destination & treatment" reads the reservation back from the admission panel (`onView`, held through
+a ref so the reads never re-run): it shows the hospital · city and the planned admission. The travel line follows the stage
+(Arrived, before admission / cleared for admission / In hospital / Discharged / in follow-up / Case closed), so it never says
+"Arrived" after discharge. Dates go through `intlLocale`. "Facility" is now "Hospital", and the booking reads "Booked" in both
+places. The card states the hospital only when it knows it.
+
+**5-1 backlog items.** Done: the arrangements disclosure keeps the officer's open/closed state through a re-seed; a refused
+arrival is reported at the field ("…Read the message above, check the time, then try again."); the pre-release Operations plan
+textarea has a visible label and a hint. **B-5-1 was recorded, not built.** It touches `CaseActionService`, stage work and
+`WorkCopy`, `SlaPolicy`, `JourneyStageRegistry` and the parity tests, so it is not small. Details are in backlog.md
+"Area 5 — Operations"; until it lands, the strip says "Arrange travel and arrival" while the file opens the reservation or the
+letter.
+
+Copy is in en + ar, inserted textually: `admission.acts.*` and `admission.forms.{hospitalOption,noHospitals,newLetter,
+anotherReceipt,correctNumber}`; `travelPlan.{change,start,nothingYet,noArrivalYet,arriving,arrived,arrival.failed}`;
+`caseView.logistics.{admission,notPlanned,stage.*}`; `caseView.release.{operationsPlan,operationsPlanHint}`. The travel form's
+four picker keys were removed.
+
+**Reviews** (four read-only reviewers):
+- RB + composition: HIGH ×1 fixed (an emergency-cleared case with no letter left the view with no primary and a "done" letter).
+  MEDIUMs fixed: the travel act was offered as current with no slot; a partial or wrong receipt could not be recorded again;
+  `onView` sat in the read effects' deps.
+- Web design guidelines: HIGH ×1 fixed (focus dropped to `<body>` when an act became its fact). MEDIUMs fixed: the waiting /
+  warning icon on the letter, and the arrival failure copy.
+- RTL/i18n: no CRITICAL/HIGH. Fixed: `dir` on the receipt, number and date inputs; name and city isolated separately; the
+  Arabic wording (تم الحجز · موعد الدخول, اعتماد المالية, إيصال خزينة المستشفى, خرج من المستشفى, "خطوة لاحقة:").
+- Pro Max: no CRITICAL/HIGH. Contrast passes (ink-500 7.5:1 on paper). Fixed: wrapping of long facts.
+- The rest is in backlog.md "Area 5 — Operations". Detector 0 on the four files.
+
+**Verify.** `pnpm typecheck` ok; eslint on the touched files clean; vitest 97 files / 779 tests, 778 pass (the known `StaffOperationalUi` W-44); `AdmissionPanel.test.tsx` 21/21 (new "hospital file" block: order and one primary, travel handed the primary after the letter, travel standing on a failed read, emergency-cleared without a letter, receipt as one line with "Record another receipt"), `TravelPlanPanel.test.tsx` 12/12 (no picker, stored hospital resent from the act, arrangements state through a re-seed, arrival failure at the field, the act not current / current). Playwright on :3162 (production build): operations-shots (`AREA5_SHOTS=5-1`), consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58. Overwritten shots restored. Shots: `screenshots/area-5/5-1/`.
+
+**Next:** slice 5-2 — the cashier, started in a new session from this branch.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

@@ -1,7 +1,7 @@
 "use client";
 
 import { Component, useState, type FormEvent, type ReactNode } from "react";
-import { ChevronDown, CircleAlert } from "lucide-react";
+import { Check, ChevronDown, Circle, CircleAlert, Clock } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/portal/portal-ui";
 
@@ -38,6 +38,31 @@ export function Task({ title, next, anchor, children }: { title: string; next: b
       <div className="pb-3">{children}</div>
     </details>
   );
+}
+
+/**
+ * UX 5-1: an act already done, said as one line ("Reserved · Nile Heart Hospital · 30 Oct 2026"); a correction, when the act
+ * still takes one, sits behind its own disclosure.
+ */
+export function DoneAct({ fact, tone = "done", change, children }: {
+  fact: ReactNode; /** "waiting": recorded, someone else still checks it; "warning": recorded, with a problem the fact names. */ tone?: "done" | "waiting" | "warning";
+  /** The correction's disclosure label. */ change?: string; children?: ReactNode;
+}) {
+  const Icon = tone === "warning" ? CircleAlert : tone === "waiting" ? Clock : Check;
+  return (
+    <div className="py-2">
+      <p className="flex items-start gap-2 text-[0.875rem] text-ink-800">
+        <Icon size={16} aria-hidden className={`mt-0.5 flex-none ${tone === "warning" ? "text-alert-800" : tone === "waiting" ? "text-ink-500" : "text-brand-600"}`}/>
+        <span className="min-w-0 [overflow-wrap:anywhere]">{fact}</span>
+      </p>
+      {change && children && <details className="group ps-6"><Summary>{change}</Summary><div className="pb-3">{children}</div></details>}
+    </div>
+  );
+}
+
+/** UX 5-1: an act that comes later, named so the order is plain; `notYet` is read first by screen readers. */
+export function LaterAct({ notYet, children }: { notYet: string; children: ReactNode }) {
+  return <p className="flex items-start gap-2 py-2 text-[0.875rem] text-ink-500"><Circle size={16} aria-hidden className="mt-0.5 flex-none"/><span className="min-w-0 [overflow-wrap:anywhere]"><span className="sr-only">{notYet} </span>{children}</span></p>;
 }
 
 /** A disclosure's summary with a drawn marker that turns as it opens (the native marker is gone once it is a flex box). Its
@@ -89,6 +114,14 @@ export function ConfirmAction({ label, context, title, body, confirm, cancel, pr
 /** A code's words from a copy table, or the code itself in plain lower case when the table does not know it yet. */
 export const pick = (table: Record<string, string>, key: string) => Object.hasOwn(table, key) ? table[key] : key.replaceAll("_", " ").toLowerCase();
 export function instant(value: FormDataEntryValue | null) { return value ? new Date(String(value)).toISOString() : null; }
+/** An instant as a `datetime-local` value on this device's clock (the field has no zone; `instant()` reads it back the same way). */
+export function localInput(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 export function text(value: FormDataEntryValue | null) { const v = String(value ?? "").trim(); return v || null; }
 /** Submits a form's data; the form is cleared once the command succeeded. */
 export function submit(action: (data: FormData) => Promise<boolean>) {

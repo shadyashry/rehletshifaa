@@ -5,13 +5,13 @@ import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { createContext, use, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
-import { TravelPlanPanel, TRAVEL_STAGES } from "@/components/portal/TravelPlanPanel";
+import { TravelAct, TravelDone, TravelPlanPanel, TRAVEL_STAGES } from "@/components/portal/TravelPlanPanel";
 import { AdmissionPanel, ADMISSION_STAGES, ADMISSION_WORK, type AdmissionRole } from "@/components/portal/AdmissionPanel";
 import { TreatmentPanel, TREATMENT_WORK } from "@/components/portal/TreatmentPanel";
 import { DischargePanel, DISCHARGE_STAGES, DISCHARGE_WORK, type DischargeRole } from "@/components/portal/DischargePanel";
 import { ReconciliationPanel, SETTLEMENT_STAGES, SETTLEMENT_WORK, type SettlementRole } from "@/components/portal/ReconciliationPanel";
 import { FollowUpPanel, FOLLOW_UP_STAGES, FOLLOW_UP_WORK } from "@/components/portal/FollowUpPanel";
-import { PanelBoundary } from "@/components/portal/panel-parts";
+import { DoneAct, PanelBoundary } from "@/components/portal/panel-parts";
 import { BASE, CaseEvidence, DecisionSummary, EstimateLines, RecommendationFields, currencyName, useClinicalDecision } from "@/components/portal/ClinicalDecision";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
@@ -39,7 +39,7 @@ import type { PortalView as RoleKey } from "@/lib/access";
 import { scrollIntoView } from "@/lib/scroll";
 import { countryName } from "@/lib/countries";
 import { PROPOSAL_PAYMENT_TERMS_RECORD } from "@/lib/commercial-terms";
-import { type CaseView, type CatalogService, type DirectoryFacility, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
+import { type CaseView, type CatalogService, type DirectoryFacility, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, type AdmissionView, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
 import { useShortcutsEnabled, useStaffShortcut } from "@/components/portal/StaffShortcuts";
 import { copy, FeedbackContext, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, LockedSection } from "@/components/portal/portal-ui";
 
@@ -114,12 +114,20 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   // Only a real consultant assignment earns a second identity row. Falling back to the coordinator
   // here printed the same person twice under two labels, one of them the internal word "assignee".
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
- // UX 5-0: Operations' travel plan, while the backend offers it (ACCEPTED, TRAVEL_COORDINATION); the other roles' work is driven by the
- // current action and the stage panels.
- const workflowBlock=role==="operations"&&showActions&&available.includes("UPDATE_TRAVEL_PLAN")&&TRAVEL_STAGES.has(c.status)?<div id="case-actions"><PanelBoundary key={c.id} title={work.travelPlan.title} message={fillTemplate(cv.panelFailed,{panel:work.travelPlan.title})}><TravelPlanPanel caseId={c.id} plan={value.travelPlan??null} facilities={facilities} busy={busy} mutate={mutate}/></PanelBoundary></div>:null;
  // P1-15: the reservation, the voucher, the balance and its evidence, for every staff role on the case from travel coordination to treatment.
  const admissionRole=(["operations","finance","coordinator","doctor"] as string[]).includes(role)?role as AdmissionRole:null;
- const admissionPanel=admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview?<PanelBoundary key={c.id} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
+ const admissionShown=!!admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview;
+ // UX 5-0/5-1: Operations' travel plan, while the backend offers it (ACCEPTED, TRAVEL_COORDINATION). Once a reservation can exist it
+ // is an act of the hospital file (the admission panel), in its place between the letter and the receipt; before that, its own
+ // card. After travel coordination the file keeps the arrival as a done act. The other roles' work is driven by the current action.
+ const travelLive=role==="operations"&&showActions&&available.includes("UPDATE_TRAVEL_PLAN")&&TRAVEL_STAGES.has(c.status);
+ const travelBoundary=(node:ReactNode)=><PanelBoundary key={c.id} title={work.travelPlan.title} message={fillTemplate(cv.panelFailed,{panel:work.travelPlan.title})}>{node}</PanelBoundary>;
+ const workflowBlock=travelLive&&!admissionShown?<div id="case-actions">{travelBoundary(<TravelPlanPanel caseId={c.id} plan={value.travelPlan??null} busy={busy} mutate={mutate}/>)}</div>:null;
+ const travelAct=role!=="operations"?undefined:travelLive?(currentAct:boolean)=>travelBoundary(<TravelAct caseId={c.id} plan={value.travelPlan??null} current={currentAct} busy={busy} mutate={mutate}/>)
+  :value.travelPlan?.confirmedArrival?()=><DoneAct fact={<TravelDone plan={value.travelPlan??null}/>}/>:undefined;
+ // The reservation the admission panel last showed, read back by the logistics card (the reservation owns the hospital).
+ const [reservation,setReservation]=useState<AdmissionView|null>(null);
+ const admissionPanel=admissionShown?<PanelBoundary key={c.id} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load} travel={travelAct} onView={setReservation}/></PanelBoundary>:null;
  // P1-16: milestones, change orders, the running money and the evidence checklist while the patient is in treatment (and for an
  // open Treatment work item afterwards, such as Finance's emergency change-order review, which survives the case's exit).
  const treatmentPanel=admissionRole&&!value.preview&&(c.status==="TREATMENT_IN_PROGRESS"||TREATMENT_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.treatment.title} message={fillTemplate(cv.panelFailed,{panel:work.treatment.title})}><TreatmentPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
@@ -142,15 +150,22 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   {key:"treatment",work:TREATMENT_WORK,node:treatmentPanel},
   {key:"admission",work:ADMISSION_WORK,node:admissionPanel||workflowBlock?<>{admissionPanel}{workflowBlock}</>:null},
  ].filter(panel=>panel.node).map(panel=>({...panel,rank:panel.work.has(stepCode)?0:1+stageOrder.indexOf(panel.key)})).toSorted((a,b)=>a.rank-b.rank):null;
- // P0-5: the destination read back with its facility named, for every staff role on the case.
- const when=(v?:string|null)=>v?new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
- const logistics=value.travelPlan?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{cv.logistics.title}</h3>
-  {value.travelPlan&&<dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-4">
-   <div><dt className="text-ink-500">{cv.logistics.facility}</dt><dd className="font-semibold text-ink-900">{value.travelPlan.facilityName??cv.logistics.notChosen}</dd></div>
-   <div><dt className="text-ink-500">{cv.logistics.travelStatus}</dt><dd className="font-semibold text-ink-900">{label(cv.logistics.travel,value.travelPlan.status)}</dd></div>
-   <div><dt className="text-ink-500">{cv.logistics.plannedArrival}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.plannedArrival)}</dd></div>
-   <div><dt className="text-ink-500">{cv.logistics.confirmedArrival}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.confirmedArrival)}</dd></div>
-  </dl>}
+ // P0-5, UX 5-1: the destination read back for every staff role on the case. The reservation names the hospital (the travel plan's
+ // own facility only until one is read); the travel line follows the stage, so it never says "Arrived" once the patient has left.
+ const when=(v?:string|null)=>v?new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
+ const plan=value.travelPlan??null;
+ const reserved=reservation?.caseId===c.id&&reservation.admissionId?reservation:null;
+ const stageLine=cv.logistics.stage as Record<string,string>;
+ const travelLine=Object.hasOwn(stageLine,c.status)?stageLine[c.status]:plan?label(cv.logistics.travel,plan.status):cv.logistics.notPlanned;
+ const logistics=plan||reserved?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{cv.logistics.title}</h3>
+  <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-4">
+   {/* "Not chosen yet" only while one can still be chosen; later, a hospital not read here is left unsaid rather than denied. */}
+   {(reserved||plan?.facilityName||TRAVEL_STAGES.has(c.status))&&<div><dt className="text-ink-500">{cv.logistics.facility}</dt><dd className="font-semibold text-ink-900">{reserved?<><bdi>{reserved.facilityName??"—"}</bdi>{reserved.facilityCity&&<span className="font-normal text-ink-600"> · <bdi>{reserved.facilityCity}</bdi></span>}</>:plan?.facilityName?<bdi>{plan.facilityName}</bdi>:cv.logistics.notChosen}</dd></div>}
+   {reserved?.plannedAdmissionAt&&<div><dt className="text-ink-500">{cv.logistics.admission}</dt><dd className="font-semibold text-ink-900">{when(reserved.plannedAdmissionAt)}</dd></div>}
+   <div><dt className="text-ink-500">{cv.logistics.travelStatus}</dt><dd className="font-semibold text-ink-900">{travelLine}</dd></div>
+   {plan?.confirmedArrival?<div><dt className="text-ink-500">{cv.logistics.confirmedArrival}</dt><dd className="font-semibold text-ink-900">{when(plan.confirmedArrival)}</dd></div>
+    :<div><dt className="text-ink-500">{cv.logistics.plannedArrival}</dt><dd className="font-semibold text-ink-900">{when(plan?.plannedArrival)}</dd></div>}
+  </dl>
  </section>:null;
  const recommendationBlock=approved&&(approved.recommendedTreatment||approved.risksAndLimitations)?<div className="border-b border-line pb-4"><p className="mb-2 label-micro text-brand-700">{cv.recommendation}</p>{approved.recommendedTreatment&&<div className="mb-3"><p className="text-sm font-bold text-ink-800">{t.reviewTreatment}</p><p className="mt-0.5 whitespace-pre-wrap text-ink-700">{approved.recommendedTreatment}</p></div>}{approved.risksAndLimitations&&<div><p className="text-sm font-bold text-ink-800">{t.reviewRisks}</p><p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-600">{approved.risksAndLimitations}</p></div>}</div>:null;
  // The proposal is the coordinator's work while it is being prepared or released (or, at arrival, finalised);
@@ -203,7 +218,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   // the move short before the control is on screen.
   const panelStep=current.workType==="DEPOSIT_RECORD"||[ADMISSION_WORK,TREATMENT_WORK,DISCHARGE_WORK,SETTLEMENT_WORK,FOLLOW_UP_WORK].some(set=>set.has(current.workType??current.code));
   const toDecision=isDoctor&&!panelStep&&(decisionSheet||secondOpinionOnly);
-  const focusAction=()=>{setTab(toDecision?"clinical":"overview");requestAnimationFrame(()=>{const target=(toDecision?(document.getElementById("clinical-decision")??document.getElementById("case-actions")):(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(current.workType??current.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel"))??document.getElementById("case-tab-panel");const control=target?.querySelector<HTMLElement>("textarea,select,input,button")??target;scrollIntoView(control,{behavior:"instant",block:"center"});control?.focus({preventScroll:true});});};
+  const focusAction=()=>{setTab(toDecision?"clinical":"overview");requestAnimationFrame(()=>{const target=(toDecision?(document.getElementById("clinical-decision")??document.getElementById("case-actions")):(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(role==="operations"&&TRAVEL_STAGES.has(c.status)?document.getElementById("admission-next")??document.getElementById("travel-plan-next")??document.getElementById("travel-arrival-next"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(current.workType??current.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel"))??document.getElementById("case-tab-panel");const control=target?.querySelector<HTMLElement>("textarea,select,input,button")??target;scrollIntoView(control,{behavior:"instant",block:"center"});control?.focus({preventScroll:true});});};
   const completeWork=(evidence:string)=>{if(current.workItemId!=null)void mutate(`/tasks/${current.workItemId}/cases/${c.id}/complete`,{evidence,expectedVersion:current.workItemVersion??0});};
   const openMessages=()=>setOverlay("messages");
   // When the step is the patient's reply (the backend's action, never the stage) and this viewer is the one who answers the
@@ -776,7 +791,7 @@ export function RoleActions({role,t,c,proposal,gates,availableActions,mutate,app
  const gl=useWorkCopy().caseView.release;
  const badge=(required:boolean,done:boolean)=><StatusBadge tone={!required?"neutral":done?"success":"warning"}>{!required?gl.notRequired:done?gl.done:gl.waiting}</StatusBadge>;
  const checklist=gates&&["coordinator","operations","finance"].includes(role)?<div className="mt-4 border-t border-line pt-3"><p className="mb-2 text-sm font-bold text-ink-800">{gl.checklist}</p><div className="space-y-1.5 text-sm"><div className="flex items-center justify-between gap-2"><span>{gl.operations}</span>{badge(gates.operationsRequired,gates.operationsCompleted)}</div><div className="flex items-center justify-between gap-2"><span>{gl.finance}</span>{badge(gates.financeRequired,gates.financeCompleted)}</div></div>{gates.financeRequired&&gates.financeReasons.length>0&&<p className="mt-2 text-[0.8125rem] text-ink-500">{gates.financeReasons.join(" ")}</p>}</div>:null;
- if(role==="operations")return <>{checklist}{(availableActions.includes("PREPARE_TRAVEL_PACKAGE")||availableActions.includes("UPDATE_TRAVEL_PLAN"))&&proposal?.status==="CLINICALLY_APPROVED"?<div className="mt-4 space-y-3"><textarea className="field min-h-28" aria-label={t.operationsComplete} maxLength={30000} required value={operationsPlan} onChange={event=>setOperationsPlan(event.target.value)}/><button className="btn-primary" disabled={!operationsPlan.trim()} onClick={()=>void mutate(`/operations/cases/${c.id}/proposals/${proposal.versionId}/complete`,{plan:operationsPlan.trim()})}>{t.operationsComplete}</button></div>:null}</>;
+ if(role==="operations")return <>{checklist}{(availableActions.includes("PREPARE_TRAVEL_PACKAGE")||availableActions.includes("UPDATE_TRAVEL_PLAN"))&&proposal?.status==="CLINICALLY_APPROVED"?<div className="mt-4 space-y-3"><div><label htmlFor={`${c.id}-operations-plan`} className="block text-sm font-semibold">{gl.operationsPlan}</label><p id={`${c.id}-operations-plan-hint`} className="mt-0.5 max-w-[65ch] text-[0.8125rem] text-ink-600">{gl.operationsPlanHint}</p><textarea id={`${c.id}-operations-plan`} className="field min-h-28" aria-describedby={`${c.id}-operations-plan-hint`} maxLength={30000} required dir="auto" value={operationsPlan} onChange={event=>setOperationsPlan(event.target.value)}/></div><button className="btn-primary" disabled={!operationsPlan.trim()} onClick={()=>void mutate(`/operations/cases/${c.id}/proposals/${proposal.versionId}/complete`,{plan:operationsPlan.trim()})}>{t.operationsComplete}</button></div>:null}</>;
  if(role==="finance")return <>{checklist}{availableActions.includes("APPROVE_COMMERCIAL_TERMS")&&proposal&&!approvalInCard?<button className="btn-primary mt-4" onClick={()=>void mutate(`/finance/cases/${c.id}/proposals/${proposal.versionId}/approve`)}>{t.financeApprove}</button>:null}</>;
  if(role==="coordinator")return <>{checklist}{gates?.readyForRelease&&proposal?<div className="mt-4"><button className="btn-primary" onClick={()=>void mutate(`/coordinator/cases/${c.id}/proposals/${proposal.versionId}/release`)}>{t.release}</button><p className="mt-2 text-[0.8125rem] text-ink-500">{gl.hint}</p></div>:(gates&&!gates.readyForRelease?<p className="mt-3 text-[0.8125rem] text-ink-500">{gl.hint}</p>:null)}</>;
  return null;
