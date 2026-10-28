@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { latinDigits } from "@/lib/i18n";
 
 /** The step's words; each secure link passes its own (from `secureLink.*`), so the wording stays the page's. */
 export type OneTimeCodeCopy = {
@@ -15,13 +16,6 @@ export type OneTimeCodeCopy = {
   /** Said under the field when Verify is pressed with fewer than six digits. A link that passes it keeps Verify enabled. */
   incomplete?: string;
 };
-
-/** Arabic-Indic and Persian digits (common on Arabic phone keyboards) as ASCII, so a code typed either way is kept. */
-function asciiDigits(value: string) {
-  return value
-    .replace(/[٠-٩]/g, digit => String(digit.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, digit => String(digit.charCodeAt(0) - 0x06f0));
-}
 
 /**
  * The one-time-code step shared by the three secure links (status, proposal, profile activation). Possession of a link
@@ -93,7 +87,7 @@ export function OneTimeCodeStep({ copy, destination, sent, busy, onSend, onVerif
           <input ref={fieldRef} id={fieldId} className="field mt-2 max-w-[16rem] text-center text-2xl tabular-nums tracking-[0.4em]" dir="ltr"
                  name="one-time-code" inputMode="numeric" autoComplete="one-time-code" spellCheck={false} enterKeyHint="done" autoFocus
                  aria-invalid={problem ? true : undefined} aria-describedby={[destination ? destinationId : "", problem ? errorId : ""].join(" ").trim() || undefined}
-                 value={code} onChange={event => { setShort(false); setCode(asciiDigits(event.target.value).replace(/\D/g, "").slice(0, 6)); }}/>
+                 value={code} onChange={event => { setShort(false); setCode(latinDigits(event.target.value).replace(/\D/g, "").slice(0, 6)); }}/>
           {message}
           {/* Always rendered so the confirmation is announced when it appears. */}
           <p role="status" className={!problem && !busy && notice ? "mt-3 text-[0.9375rem] leading-6 text-brand-800" : "sr-only"}>

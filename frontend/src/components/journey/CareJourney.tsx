@@ -60,7 +60,7 @@ function StageBlock({ number, stage, labels, tone = "clinical", strong = false, 
       {branch && <span aria-hidden className={`absolute top-4 hidden h-px bg-brand-300 lg:block ${branch}`} />}
       <span aria-hidden className={`journey-marker relative z-[1] ${marker}`}>{String(number).padStart(2, "0")}</span>
       <div className="min-w-0 pt-0.5">
-        <h3 id={id} className="text-[1.1875rem] font-semibold leading-[1.3] tracking-[-0.01em] text-brand-900 lg:text-[1.3rem]">{stage.title}</h3>
+        <h3 id={id} className="text-[1.1875rem] font-semibold leading-[1.3] tracking-[-0.01em] text-brand-900 lg:text-[1.3rem] rtl:text-[1.0625rem] rtl:leading-[1.4] rtl:tracking-normal lg:rtl:text-[1.25rem]">{stage.title}</h3>
         <p className="mt-2 max-w-[46ch] text-[0.95rem] leading-6 text-ink-600 sm:text-[1rem] sm:leading-7">{stage.what}</p>
         <StageNotes stage={stage} labels={labels} />
         {children}

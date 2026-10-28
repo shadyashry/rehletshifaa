@@ -259,7 +259,7 @@ export function RecommendationScene({ s, step, dir, validUntil }: { s: Story; st
         <dl className="grid grid-cols-3 gap-1.5">
           {t.facts.map((fact, index) => (
             <div key={fact.label} className={`s-rise rounded-[0.5rem] px-2.5 py-1.5 ${index === 2 ? "bg-[color-mix(in_srgb,var(--color-coral)_14%,white)]" : "bg-surface-pearl"}`} style={at(1.1 + index * 0.15)}>
-              <dt className={`text-[0.625rem] font-bold uppercase leading-4 rtl:text-[0.6875rem] rtl:normal-case ${index === 2 ? "text-alert-700" : "text-ink-500"}`}>{fact.label}</dt>
+              <dt className={`text-[0.625rem] font-bold uppercase leading-4 rtl:text-[0.75rem] rtl:normal-case ${index === 2 ? "text-alert-700" : "text-ink-500"}`}>{fact.label}</dt>
               <dd className="text-[0.8125rem] font-bold leading-5 text-brand-900">{fact.value}</dd>
             </div>
           ))}

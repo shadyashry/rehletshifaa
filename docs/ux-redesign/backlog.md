@@ -799,3 +799,19 @@ are 7-1's scope; template rows are 7-2/7-3's.
 | LOW | `webauthnRegister.js` still receives `initLabelPrompt` but no longer uses it (QA W-40 copy); `login-otp`/`config-totp` code fields could carry `required` | 7-3 RB, WG | `resources/js/webauthnRegister.js`, templates | 7-3 close done (`required` added too) |
 | LOW | `deploy/oracle/keycloak/themes` is an older copy of the theme; sync per `themes/README.md` before the next Oracle deploy | 7-3 | `deploy/oracle/keycloak/themes` | 7-3 close done (synced) |
 | LOW | Live check of the area: Keycloak on :8180 serves the main checkout's theme; walk sign-in, setup link, OTP and passkey (`login-error.spec.ts`, `mfa-live.spec.ts`) once this branch is the mounted theme | 7-3 close | live | the only remaining check: walk sign-in, setup link, OTP and passkey live once this branch is the mounted theme |
+
+## Area X — Arabic first (2026-10-29, plan `plans/arabic-first.md`, critique 26/40)
+
+| Severity | Finding | Source | Where | Status |
+|---|---|---|---|---|
+| HIGH | The deposit has four Arabic names («الوديعة», «العربون», «الدفعة المقدمة», «دفعة التنسيق») and two of them prejudge the refund terms | X critique A | `messages/ar.json` | X-2 («دفعة التنسيق»), legal + native sign-off |
+| MEDIUM | `fillTemplate` leaves `{amount}`/`{caseNumber}`/`{date}` raw inside Arabic sentences (49 components; 5 isolates in ar.json); the FX keys are written both ways | X critique A | `lib/*`, messages | X-1 |
+| MEDIUM | Staff amount fields are `type="number"` and throw Arabic-Indic digits away; VirtualClinic hours stored raw | X-0 WG, Pro Max | `AdmissionPanel:333`, `DischargePanel:247`, `StaffCaseView:791`, `TreatmentPanel:453`, `VirtualClinic:274` | X-1 |
+| LOW | Arabic body text in the portal keeps the Latin 1.65 leading (`.portal-shell` sets it at the same layer as `[dir=rtl] body` 1.85) | X-0 RTL | `globals.css` `.portal-shell` | X-1 (decide: 1.85 or a named Operate exception) |
+| LOW | `panel-parts` regroups typed amounts with a hard-coded `en-US` (same digits; the rule says `intlLocale`) | X-0 RTL | `portal/panel-parts.tsx:136` | X-1 |
+| LOW | Home story captions at 11px and «أنت» at 9px in Arabic (`text-[0.6875rem]`, `text-[0.5625rem]`); below the 12px picture-of-a-page floor | X critique B | `home/CareSystemsGrid.tsx`, `home/story/StoryScenes.tsx:346` | X-1 |
+| LOW | Contrast candidates on the dark story panel and coral chips at 11–13px (`text-white/60`, "صالح حتى…", "فحص واحد عند الوصول"); script could not resolve alpha layers — check by hand | X critique B | home story | X-1 (manual check) |
+| LOW | Consultant avatars on /ar show Latin initials ("AA", "HA") | X critique B | `home/CareSystemsGrid.tsx:73` | native review (Arabic initials or a mark) |
+| LOW | The caret jumps to the end when an Arabic digit is typed mid-number in the phone fields (the value is rewritten) | X-0 RB | `CaseForm.tsx:433`, `TrackCaseLanding.tsx:351` | accepted for short fields |
+| LOW | `divide-x` on HeroStats/PromiseSection flagged as physical; Tailwind v4's `divide-x` uses logical borders, no change | X-0 RTL | `HeroStats.tsx:8`, `PromiseSection.tsx:89` | no change needed |
+| LOW | theme-petrol `bounce-easing` (detector advisory) | X critique B | `theme-petrol.css:1173` | out of scope |

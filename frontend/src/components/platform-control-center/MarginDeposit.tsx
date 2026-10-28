@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { getDictionary } from "@/lib/dictionary";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
@@ -81,7 +81,7 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   };
   const named = (slug: string) => { const found = careAreas.find((c) => c.slug === slug); return found ? (ar ? found.nameAr : found.nameEn) : careAreaLabel(slug, locale); };
   const area = (a?: string) => (a ? named(a) : ar ? "الافتراضي (كل مجالات الرعاية)" : "Default (all care areas)");
-  const since = (d?: string) => d ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(d)) : null;
+  const since = (d?: string) => d ? new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(d)) : null;
   const title = ar ? "الهامش والدفعة المقدمة" : "Margin & Deposit";
   // UX 4-3: where Finance reads its margin and deposit policies, the page is in Petrol & Paper (the rest of the Control Center is area 6).
   const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="marginDeposit" title={title} className="cc-petrol"

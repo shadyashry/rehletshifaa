@@ -132,7 +132,7 @@ export function ProposalVisual({ v }: { v: How["proposalVisual"] }) {
 export function DecisionGate({ v }: { v: How["gate"] }) {
   return (
     <div aria-hidden className="select-none">
-      <p className="text-center text-[0.8rem] font-bold uppercase tracking-[0.1em] text-brand-800 rtl:text-[0.95rem] rtl:normal-case rtl:tracking-normal">{v.decide}</p>
+      <p className="text-center text-[0.8rem] font-bold uppercase tracking-[0.1em] text-brand-800 rtl:text-[0.9375rem] rtl:normal-case rtl:tracking-normal">{v.decide}</p>
       <Stem h="h-3" />
       <div className="mx-[25%] h-px bg-brand-400" />
       <div className="grid grid-cols-2 gap-x-4">

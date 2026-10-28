@@ -153,9 +153,15 @@
     font-weight: 600;
     letter-spacing: -0.025em;
   }
+  /* DESIGN.md's Arabic scale: no tracking, display 1.3 and headline 1.36 (phones take globals.css's own values). */
   :root[data-brand-theme="petrol"][dir="rtl"] :is(.display, .headline) {
     letter-spacing: 0;
-    line-height: 1.25;
+  }
+  :root[data-brand-theme="petrol"][dir="rtl"] .display {
+    line-height: 1.3;
+  }
+  :root[data-brand-theme="petrol"][dir="rtl"] .headline {
+    line-height: 1.36;
   }
   :root[data-brand-theme="petrol"] .eyebrow {
     color: var(--color-brand-600);

@@ -1,4 +1,4 @@
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { COUNTRIES } from "@/lib/countries";
 
 /**
@@ -152,7 +152,7 @@ const careAreas: Record<string, [string, string]> = {
 export const CARE_AREAS = Object.keys(careAreas);
 export const careAreaLabel = (slug: string | null | undefined, locale: Locale) => (slug ? careAreas[slug]?.[locale === "ar" ? 1 : 0] ?? slug.replace(/-/g, " ") : "—");
 
-export const formatDate = (iso: string | null | undefined, locale: Locale) => (iso ? new Date(iso).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
+export const formatDate = (iso: string | null | undefined, locale: Locale) => (iso ? new Date(iso).toLocaleDateString(locale === "ar" ? intlLocale("ar") : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
 
 /** A licensing country for people: the localized country name, never the bare ISO code the backend stores. */
 export function countryName(code: string | null | undefined, locale: Locale) {

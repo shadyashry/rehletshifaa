@@ -3,7 +3,7 @@ import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useSta
 import Script from "next/script";
 import { ArrowLeft, ArrowRight, CheckCircle2, FileUp, FileText, LockKeyhole, ChevronDown, Search, Check, X, Trash2, Plus, UserRound, Users } from "lucide-react";
 import type { Dictionary } from "@/lib/dictionary";
-import { intlLocale, type Locale } from "@/lib/i18n";
+import { intlLocale, latinDigits, type Locale } from "@/lib/i18n";
 import { AGE_BANDS, buildCaseSchema, filesAreValid, RELATIONSHIPS, type AgeBand, type Relationship } from "@/lib/case-form-schema";
 import { track } from "@/lib/analytics";
 import { whatsappEntry } from "@/lib/links";
@@ -302,7 +302,7 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
         </>}
         {!someoneElse && ageBandField()}
         <fieldset className="mt-7 min-w-0 border-0 p-0">
-          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.aboutThisCase : (ar ? "عن حالتك الجديدة" : "About your new case")}</legend>
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700 rtl:normal-case rtl:tracking-normal">{someoneElse ? t.aboutThisCase : (ar ? "عن حالتك الجديدة" : "About your new case")}</legend>
           {caseFields()}
         </fieldset>
         {consentField()}
@@ -317,7 +317,7 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
   function whoForField() {
     return <>
         <fieldset className="min-w-0 border-0 p-0">
-          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{t.whoTitle}</legend>
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700 rtl:normal-case rtl:tracking-normal">{t.whoTitle}</legend>
           <div className="mt-3 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t.whoTitle}>
             {([["MYSELF", t.myself, t.myselfHelp, UserRound], ["SOMEONE_ELSE", t.someoneElse, t.someoneElseHelp, Users]] as const).map(([key, label, help, Icon]) => {
               const selected = values.caseFor === key;
@@ -335,7 +335,7 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
   function patientFields() {
     return <>
         <fieldset className="mt-7 min-w-0 border-0 p-0">
-          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.patientSection : t.patientSectionSelf}</legend>
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700 rtl:normal-case rtl:tracking-normal">{someoneElse ? t.patientSection : t.patientSectionSelf}</legend>
           <p className="mt-1 text-sm text-ink-500">{t.namesHelp}</p>
           <div className="mt-4 grid gap-6 sm:grid-cols-2">
             <Field label={d.form.name} required requiredMark={t.requiredMark} valid={valid.givenName && !!values.givenName} error={fieldError("givenName")}>
@@ -415,7 +415,7 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
         {patientFields()}
 
         {someoneElse && <fieldset className="mt-7 min-w-0 rounded-lg border border-line bg-surface-pearl p-5">
-          <legend className="px-1 text-sm font-bold uppercase tracking-wide text-accent-700">{t.repSection}</legend>
+          <legend className="px-1 text-sm font-bold uppercase tracking-wide text-accent-700 rtl:normal-case rtl:tracking-normal">{t.repSection}</legend>
           <div className="mt-2 grid gap-6 sm:grid-cols-2">
             <Field label={t.repName} required requiredMark={t.requiredMark} valid={valid.representativeName && !!values.representativeName} error={fieldError("representativeName")}>
               <input className={`field ${fieldError("representativeName") ? "field-error" : ""}`} autoComplete="name" value={values.representativeName} onChange={e => update("representativeName", e.target.value)} onBlur={() => touch("representativeName")} />
@@ -425,12 +425,12 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
         </fieldset>}
 
         <fieldset className="mt-7 min-w-0 border-0 p-0">
-          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? t.contactSectionRep : t.contactSection}</legend>
+          <legend className="text-sm font-bold uppercase tracking-wide text-accent-700 rtl:normal-case rtl:tracking-normal">{someoneElse ? t.contactSectionRep : t.contactSection}</legend>
           {someoneElse && <p className="mt-1 text-sm text-ink-500">{t.contactRepHint}</p>}
           <div className="mt-4 grid gap-6 sm:grid-cols-2">
             <Field label={d.form.phone} required requiredMark={t.requiredMark} valid={valid.whatsappNumber} error={fieldError("whatsappNumber")} hint={d.form.phoneHint}>
               <div className={`flex items-stretch overflow-hidden rounded-[0.55rem] border ${fieldError("whatsappNumber") ? "border-alert-700" : "border-[var(--field-border)] focus-within:border-brand-600 focus-within:shadow-[0_0_0_3px_var(--color-brand-100)]"}`} dir="ltr">
-                <input className="min-w-0 flex-1 bg-white px-3 py-2.5 text-ink-900 outline-none" inputMode="tel" autoComplete="tel-national" placeholder={dialCountry ? "100 000 0000" : d.form.dialCodeChoose} aria-label={t.localNumber} value={phoneLocal} onChange={e => { begin(); setPhoneLocal(e.target.value.replace(/[^\d\s()-]/g, "")); }} onBlur={() => touch("whatsappNumber")} />
+                <input className="min-w-0 flex-1 bg-white px-3 py-2.5 text-ink-900 outline-none" inputMode="tel" autoComplete="tel-national" placeholder={dialCountry ? "100 000 0000" : d.form.dialCodeChoose} aria-label={t.localNumber} value={phoneLocal} onChange={e => { begin(); setPhoneLocal(latinDigits(e.target.value).replace(/[^\d\s()-]/g, "")); }} onBlur={() => touch("whatsappNumber")} />
                 {/* The visible prefix is drawn; a transparent native select over it does the choosing, so keyboards,
                     screen readers and phone pickers all get the platform control. It comes after the number in the DOM
                     (shown first with `order-first`) so the field label still targets the number input. */}
@@ -458,7 +458,7 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
 
       {/* Section 2 — the case */}
       {step===2&&<fieldset className="min-w-0 border-0 p-0">
-        <legend className="text-sm font-bold uppercase tracking-wide text-accent-700">{someoneElse ? (ar ? "عن حالة المريض" : "About the patient's case") : (ar ? "عن حالتك" : "About your case")}</legend>
+        <legend className="text-sm font-bold uppercase tracking-wide text-accent-700 rtl:normal-case rtl:tracking-normal">{someoneElse ? (ar ? "عن حالة المريض" : "About the patient's case") : (ar ? "عن حالتك" : "About your case")}</legend>
         {caseFields()}
       </fieldset>}
 

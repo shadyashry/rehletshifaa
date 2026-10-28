@@ -1,4 +1,4 @@
-import { intlLocale, type Locale } from "@/lib/i18n";
+import { intlLocale, latinDigits, type Locale } from "@/lib/i18n";
 
 /**
  * The one money format for every page: whole amounts without decimals, any other amount at the currency's own precision
@@ -19,9 +19,7 @@ export function formatMoney(amount: number, currency: string, locale: Locale) {
 
 /** An amount typed with Western or Arabic-Indic digits (and the Arabic decimal and thousands marks); NaN when empty. */
 export function parseAmount(raw: string) {
-  const western = raw.trim()
-    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+  const western = latinDigits(raw.trim())
     .replace(/٫/g, ".").replace(/[٬,\s]/g, "");
   return western ? Number(western) : Number.NaN;
 }

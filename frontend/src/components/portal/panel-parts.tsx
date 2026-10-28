@@ -3,7 +3,7 @@
 import { Component, use, useEffect, useId, useRef, useState, type FocusEventHandler, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronDown, CircleAlert, CircleDashed, CircleDot, Clock } from "lucide-react";
 
-import { intlLocale, type Locale } from "@/lib/i18n";
+import { intlLocale, latinDigits, type Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { ConfirmDialog, FeedbackContext } from "@/components/portal/portal-ui";
 
@@ -144,8 +144,7 @@ const groupAmount = (value: number) => (Number.isInteger(value) ? WHOLE : CENTS)
  */
 export function readAmount(value: FormDataEntryValue | string | null, signed = false) {
   const strip = (text: string) => text.replace(/^[\p{L}\p{Sc}\s]+|[\p{L}\p{Sc}\s.]+$/gu, "");
-  let latin = String(value ?? "").trim()
-    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+  let latin = latinDigits(String(value ?? "").trim())
     .replace(/٫/g, ".").replace(/٬/g, ",");
   // UX 4-2: an invoice's discount line is negative ("-1,200", "−1,200", "-EGP 1,200" or "EGP -1,200"), only where the field says so.
   const minus = /^[-−]/;

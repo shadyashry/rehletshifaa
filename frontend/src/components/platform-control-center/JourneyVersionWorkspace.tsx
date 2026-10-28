@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { apiFetchAs } from "@/lib/api";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { FocusTrapDialog } from "./FocusTrapDialog";
 import { JourneyAdmissionPolicyPanel } from "./JourneyAdmissionPolicyPanel";
@@ -18,7 +18,7 @@ import "./journey-designer.css";
 const TONE: Record<string, Tone> = { PUBLISHED: "success", RETIRED: "neutral", PENDING_APPROVAL: "warning", SIMULATED: "info", VALIDATED: "info", DRAFT: "neutral" };
 /** Governed actions that ask the person for a reason (J-1: stored with the action since V52; older entries have none). */
 const REASONED = new Set(["JOURNEY_VERSION_CREATED", "JOURNEY_DRAFT_UPDATED", "JOURNEY_VALIDATED", "JOURNEY_SIMULATED", "JOURNEY_SUBMITTED", "JOURNEY_RETURNED", "JOURNEY_PUBLISHED", "JOURNEY_RETIRED"]);
-const when = (iso: string | null | undefined, locale: Locale) => (iso ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "—");
+const when = (iso: string | null | undefined, locale: Locale) => (iso ? new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "—");
 
 /**
  * One Care Journey: what is published, what is being changed (and its next step), whether new patient cases use Care

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess, type ControlCenterAccess } from "./control-center-access";
 import { useAdminApi, type AdminApi } from "./admin-api";
@@ -115,7 +115,7 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
           {waiting.map(({ source, found }) => (
             <li key={source.key}>
               <Link href={found!.href}>
-                <span className="cc-attention-count">{found!.count.toLocaleString(locale)}</span>
+                <span className="cc-attention-count">{found!.count.toLocaleString(intlLocale(locale))}</span>
                 <span className="cc-attention-text"><strong>{pick(source.label, locale)}</strong>
                   <span>{groupLabel(source.group)}</span></span>
                 <Next size={18} aria-hidden className="cc-attention-go" />

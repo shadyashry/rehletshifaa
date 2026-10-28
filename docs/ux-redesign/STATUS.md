@@ -2211,6 +2211,44 @@ changed files clean; no portal test pins the two changed values. Shots re-taken 
 **The only remaining check is the live walk**: Keycloak on :8180 mounts the main checkout's theme, and it is never rebuilt
 from here. Also still owed by people, not code: the native Arabic sign-off.
 
+## UX area X — Arabic first: critique, plan, slice X-0 the scale and the digits (2026-10-29, worktree `strange-vaughan-5ab689`, branch `claude/strange-vaughan-5ab689` from `feat/review-p0` @ `307ddbc1`)
+
+**Critique** (dual-agent, `.impeccable/critique/2026-10-29T03-20-00Z__frontend-src-messages-ar-json.md`): **26/40**. P1: Arabic-Indic
+digits deleted by the case form, track-case and activation phone/case-number fields; the deposit named four ways, two of which
+prejudge the refund terms. P2: theme-petrol's Arabic leading (1.25) beat DESIGN's 1.3/1.36 on desktop; 15.68px phone lead;
+Arabic statements kept Latin tracking and could outgrow headlines; CaseForm legends uppercase + tracked in Arabic; the Control
+Center printed Arabic-Indic digits.
+
+**Plan** `plans/arabic-first.md`: decisions (Latin digits; Arabic its own scale; one term per concept), the glossary, slices
+X-0..X-3, the backlog's 17 native-review rows mapped to slices or the gate. **Gate doc** `native-arabic-review.md`: reviewer
+checklist, sign-off record (pending), changed-strings table (filled per slice). No native sign-off claimed.
+
+**X-0 delivered.**
+- `DESIGN.md`: "Arabic scale" (table per role, desktop/phone/leading, hierarchy and 12–13px floor rules), "Numerals and
+  isolation" (one digit set, `intlLocale`, inputs accept ٠–٩/۰–۹ and are `type="text"`, `<bdi dir="ltr">` / LRI…PDI, a rate is
+  one run, identifiers never break), "The One Digit Rule"; front-matter `*-ar` roles added/snapped.
+- `globals.css` / `theme-petrol.css` aligned: petrol's RTL display 1.3 / headline 1.36 (was 1.25); Arabic headline 24→28
+  (wider never smaller than the phone's 24→26); Arabic statement 18→24 (phone 20), tracking 0; title 17→20; phone lead 16px;
+  `[dir=rtl] .portal-shell` headline 22→28 / title 17; the dead `[dir=rtl] .text-2xl…` overrides removed (utilities outrank the
+  component layer).
+- `latinDigits` in `lib/i18n.ts` (replaces the copies in OneTimeCodeStep, money, panel-parts) applied to the case form phone,
+  track-case case number and WhatsApp, and profile activation phone; tests `lib/i18n.test.ts`, `TrackCaseLanding.test.ts`.
+- RTL: CaseForm legends `rtl:normal-case rtl:tracking-normal`; CareJourney stage title on the Arabic title role; two off-ladder
+  Arabic sizes (11→12px, 15.2→15px).
+- Control Center: 11 `Intl` calls through `intlLocale` (staff and patients now read the same digits; review HIGH).
+
+**Reviews** (four, read-only). Fixed: activation phone digits (RB, WG HIGH), CC `ar-EG`/raw `ar` (RTL HIGH), dead text-2xl block
+(Pro Max, RTL), headline floor (Pro Max), phone statement 20px (Pro Max), title clamp reaching 20px (RTL), CareJourney title
+size (WG, Pro Max), DESIGN's input-alignment sentence corrected (WG). Deferred to backlog "Area X": staff `type="number"` fields,
+portal Arabic leading, `panel-parts` en-US, story captions, contrast candidates, caret jump; `divide-x` checked (logical in v4).
+
+**Verify.** `tsc` clean; eslint on the touched files 0 errors (4 pre-existing warnings); vitest 809/810 on the full run (the known
+`StaffOperationalUi` W-44), CC 166/166; Playwright (a11y en + ar, track-case, proposal-otp, status-access, activation-flow,
+home-quality, home-visual, how-it-works-visual, public-batch-3, my-care-polish, staff-home, portal-p2-pass-3): see below.
+The specs' documentation PNGs were restored, not updated.
+
+**Next:** X-1 isolation and digits everywhere (plan row).
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

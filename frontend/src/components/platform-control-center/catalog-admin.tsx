@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Download, Plus } from "lucide-react";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import type { AdminApi } from "./admin-api";
 import { ActionMenu, EmptyState, ErrorNotice, Field, SectionTabs, StatusBadge, SuccessNotice } from "./cc-ui";
 import { careAreaLabel } from "./admin-labels";
@@ -21,7 +21,7 @@ type TemplateItem = { serviceCode: string; serviceName: string; category?: strin
 
 const CURRENCY_NAMES: Record<string, [string, string]> = { USD: ["US Dollar", "دولار أمريكي"], EUR: ["Euro", "يورو"], EGP: ["Egyptian Pound", "جنيه مصري"], AED: ["UAE Dirham", "درهم إماراتي"], SAR: ["Saudi Riyal", "ريال سعودي"], GBP: ["British Pound", "جنيه إسترليني"], KWD: ["Kuwaiti Dinar", "دينار كويتي"], QAR: ["Qatari Riyal", "ريال قطري"], JOD: ["Jordanian Dinar", "دينار أردني"] };
 const currencyName = (c: string, locale: Locale) => `${c} — ${CURRENCY_NAMES[c]?.[locale === "ar" ? 1 : 0] ?? c}`;
-export function money(amount: number, currency: string, locale: Locale) { try { return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount); } catch { return `${amount.toLocaleString(locale)} ${currency}`; } }
+export function money(amount: number, currency: string, locale: Locale) { try { return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency }).format(amount); } catch { return `${amount.toLocaleString(intlLocale(locale))} ${currency}`; } }
 const json = (method: string, body?: unknown) => ({ method, ...(body !== undefined ? { body } : {}) });
 
 /** One direct consultant's own EGP price list: derive from the care-area template, edit, import from CSV, view in other currencies. */

@@ -58,7 +58,7 @@ new mark, delivered as SVG in EN/AR lockups, with the favicon, the Keycloak them
 | 5 | **Operations**: reservation, admission letter, balance receipt, travel plan, departure | `TravelPlanPanel.tsx`, `AdmissionPanel.tsx`, `DischargePanel.tsx` | **after P1-15** | 1–2 | **Closed 2026-10-28** (5-0..5-4 + B-5-1, merged at `5a411c70`; re-critique 29/40 from 19 at 5-3, 30/40 at 5-4 before B-5-1) |
 | 6 | **Control Center** convergence to Petrol & Paper (D-07) and the 13 lint errors; Compliance screens (scorecards, audit samples) | `platform-control-center/*`, `control-center-nav.ts` | P1-19 for Compliance screens | 3 | — |
 | 7 | **Keycloak theme** parity (login, setup, OTP, passkey; EN/AR) | `infrastructure/keycloak/themes/rehletshifaa` | — | 4 | **Closed 2026-10-29** on the static harness (7-0..7-3 and every open point; re-critique 30/40 from 17); the only remaining check is the live walk (:8180 mounts the main checkout's theme); native Arabic sign-off pending |
-| X | **Cross-cutting**: Arabic-first copy pass, Arabic type scale and numeral rule in DESIGN.md (ex P2-21); native review as a launch gate | `DESIGN.md`, `messages/*.json`, `theme-petrol.css` | — | 2 | — |
+| X | **Cross-cutting**: Arabic-first copy pass, Arabic type scale and numeral rule in DESIGN.md (ex P2-21); native review as a launch gate | `DESIGN.md`, `messages/*.json`, `theme-petrol.css` | — | 4 | **In progress 2026-10-29** (`plans/arabic-first.md`; critique 26/40; X-0 the scale and the digits done; next X-1; gate `native-arabic-review.md`) |
 
 Recommended sequence: 1 → 2 → 3 → 7 → X → 6 → (after P1-15) 5 → (after P1-17) 4 → 1b when consent arrives.
 

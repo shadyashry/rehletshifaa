@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
@@ -91,8 +91,8 @@ export function FacilityCatalog({ locale, suspensionCopy }: { locale: Locale; su
   };
 
   const areaName = (slug: string) => { const found = careAreas.find((c) => c.slug === slug); return found ? (ar ? found.nameAr : found.nameEn) : slug; };
-  const date = (d?: string | null) => d ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(d)) : null;
-  const egp = new Intl.NumberFormat(ar ? "ar-EG" : "en-EG", { style: "currency", currency: "EGP", maximumFractionDigits: 0 });
+  const date = (d?: string | null) => d ? new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(d)) : null;
+  const egp = new Intl.NumberFormat(ar ? intlLocale("ar") : "en-EG", { style: "currency", currency: "EGP", maximumFractionDigits: 0 });
   const range = (p: Package) => `${egp.format(p.minEgp)} – ${egp.format(p.maxEgp)}`;
   const daysLeft = (expiresOn: string) => Math.ceil((new Date(expiresOn).getTime() - now) / DAY_MS);
   const label = (map: Record<string, string>, key: string) => map[key] ?? key;

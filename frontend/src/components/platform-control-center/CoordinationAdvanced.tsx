@@ -5,10 +5,11 @@ import { EmptyState, ErrorNotice, Field, Section, StatusBadge, SuccessNotice } f
 import { CARE_AREAS, careAreaLabel, formatDate } from "./admin-labels";
 import { coordCopy, exclusionLabel, LANGUAGES, languageLabel, pathLabel } from "./coordination-copy";
 import { FocusTrapDialog } from "./FocusTrapDialog";
+import { intlLocale } from "@/lib/i18n";
 import type { CoordinationContext } from "./CareCoordinationWorkspace";
 import type { CaseFacts, ConsultantRouting, CoordinationDecision, CoordinationOverview, DecisionEntry, Policy, QueueItem, SimulationResult } from "./coordination-types";
 
-const when = (iso: string | null, locale: string) => (iso ? new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)) : "—");
+const when = (iso: string | null, locale: string) => (iso ? new Intl.DateTimeFormat(locale === "ar" ? intlLocale("ar") : "en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)) : "—");
 
 /**
  * Advanced: diagnostics for people who configure routing. Every block is separately capability-gated, and nothing

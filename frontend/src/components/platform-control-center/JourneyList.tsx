@@ -6,14 +6,14 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { apiFetchAs } from "@/lib/api";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { ControlCenterShell } from "./ControlCenterShell";
 import { StatusBadge } from "./cc-ui";
 import { journeyCopy, journeyStatusLabel } from "./journey-copy";
 import type { JourneyDetail, JourneySummary } from "./journey-types";
 import "./journey-designer.css";
 
-const when = (iso: string | null, locale: Locale) => (iso ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso)) : "—");
+const when = (iso: string | null, locale: Locale) => (iso ? new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(iso)) : "—");
 
 /**
  * Care Journeys list: per journey what is published, what is being changed and whether anything needs review — from one

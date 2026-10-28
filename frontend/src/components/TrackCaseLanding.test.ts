@@ -22,4 +22,9 @@ describe("formatCaseId", () => {
     expect(formatCaseId("RS-2026-0001234567")).toBe("RS-2026-000123");
     expect(formatCaseId("RS/2026.000123")).toBe("RS-2026-000123");
   });
+
+  it("reads a case number typed on an Arabic keypad", () => {
+    expect(formatCaseId("RS-٢٠٢٦-٠٠٠١٢٣")).toBe("RS-2026-000123");
+    expect(formatCaseId("۲۰۲۶۰۰۰۱۲۳")).toBe("RS-2026-000123");
+  });
 });

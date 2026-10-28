@@ -60,7 +60,7 @@ typography:
     letterSpacing: "-0.03em"
   display-ar:
     fontFamily: "Alexandria, Cairo, Tahoma, sans-serif"
-    fontSize: "clamp(1.65rem, 1.3rem + 1.3vw, 2.35rem)"
+    fontSize: "clamp(1.625rem, 1.3rem + 1.3vw, 2.375rem)"
     fontWeight: 600
     lineHeight: 1.3
     letterSpacing: "0"
@@ -72,7 +72,7 @@ typography:
     letterSpacing: "-0.025em"
   headline-ar:
     fontFamily: "Alexandria, Cairo, Tahoma, sans-serif"
-    fontSize: "clamp(1.4rem, 1.2rem + 0.75vw, 1.75rem)"
+    fontSize: "clamp(1.5rem, 1.25rem + 0.6vw, 1.75rem)"
     fontWeight: 600
     lineHeight: 1.36
     letterSpacing: "0"
@@ -82,12 +82,24 @@ typography:
     fontWeight: 600
     lineHeight: 1.32
     letterSpacing: "-0.014em"
+  statement-ar:
+    fontFamily: "Alexandria, Cairo, Tahoma, sans-serif"
+    fontSize: "clamp(1.125rem, 1rem + 0.6vw, 1.5rem)"
+    fontWeight: 600
+    lineHeight: 1.5
+    letterSpacing: "0"
   title:
     fontFamily: "Plus Jakarta Sans, Segoe UI, sans-serif"
     fontSize: "clamp(1.15rem, 1.09rem + 0.25vw, 1.3rem)"
     fontWeight: 600
     lineHeight: 1.4
     letterSpacing: "-0.008em"
+  title-ar:
+    fontFamily: "Cairo, Plus Jakarta Sans, Segoe UI, Tahoma, sans-serif"
+    fontSize: "clamp(1.0625rem, 0.85rem + 0.45vw, 1.25rem)"
+    fontWeight: 600
+    lineHeight: 1.4
+    letterSpacing: "0"
   body:
     fontFamily: "Plus Jakarta Sans, Segoe UI, system-ui, sans-serif"
     fontSize: "clamp(1rem, 0.97rem + 0.14vw, 1.0625rem)"
@@ -103,6 +115,11 @@ typography:
     fontSize: "clamp(1rem, 0.98rem + 0.15vw, 1.0625rem)"
     fontWeight: 400
     lineHeight: 1.65
+  lead-ar:
+    fontFamily: "Cairo, Plus Jakarta Sans, Segoe UI, Tahoma, sans-serif"
+    fontSize: "clamp(1rem, 0.98rem + 0.1vw, 1.0625rem)"
+    fontWeight: 400
+    lineHeight: 1.85
   label:
     fontFamily: "Plus Jakarta Sans, Segoe UI, sans-serif"
     fontSize: "0.8125rem"
@@ -292,22 +309,76 @@ logo speak in one voice. Jakarta keeps body copy open and modern. Cairo's larger
 smaller with more leading. All faces are self-hosted (`frontend/src/lib/fonts.ts`).
 
 ### Hierarchy
-- **Display** (600, fluid 32→48px, 1.04): the one page headline per hero. Arabic: 26→38px, 1.3 leading. Phones:
-  32px (Arabic 28px).
-- **Headline** (600, fluid 26→34px, 1.16): section headings; they settle into place once on arrival. Arabic:
-  22→28px, 1.36.
+- **Display** (600, fluid 32→48px, 1.04): the one page headline per hero. Phones: 32px.
+- **Headline** (600, fluid 26→34px, 1.16): section headings; they settle into place once on arrival.
 - **Statement** (600, fluid 20→28px, 1.32): editorial supporting statements, lighter than a heading.
 - **Title** (600, fluid 18→21px, 1.4): card and step titles.
-- **Body** (400, 16→17px, 1.7): running text, `text-wrap: pretty`. Arabic 16px, 1.85.
+- **Body** (400, 16→17px, 1.7): running text, `text-wrap: pretty`.
 - **Lead** (400, 16→17px, 1.65): intro paragraphs under headings.
-- **Label** (700, 13px, 0.12em, uppercase): eyebrows, opened by the coral rule. Arabic: 14px, no tracking, no case.
+- **Label** (700, 13px, 0.12em, uppercase): eyebrows, opened by the coral rule.
+
+### Arabic scale (area X, 2026-10-29)
+Arabic is its own scale, not the Latin one shrunk: Cairo and Alexandria's Arabic sit larger on the line and carry dots
+and marks above and below it, so every role steps down and opens its leading. Letter-spacing is 0 and case is never
+transformed. Fixed sizes sit on the ladder; fluid sizes start and end on a ladder or even-pixel value.
+
+| Role | Face | Arabic desktop | Arabic phone (≤640px) | Leading |
+|---|---|---|---|---|
+| Display | Alexandria | 26→38px | 28px | 1.3 |
+| Home title (named exception) | Alexandria | 30→44px | 30px | 1.3 |
+| Headline | Alexandria | 24→28px | 24→26px | 1.36 (phone 1.38) |
+| Portal headline | Alexandria | 22→28px | the site's phone headline | 1.36 |
+| Statement | Alexandria | 18→24px | 20px | 1.5 |
+| Title | Cairo | 17→20px | 17px | 1.4 |
+| Lead | Cairo | 16→17px | 16px | 1.85 (phone 1.8) |
+| Body | Cairo | 16px | 16px | 1.85 |
+| Label / eyebrow | Cairo 700 | 14px | 14px | 1.4 |
+| Micro label | Cairo 700 | 13px | 13px | 1.4 |
+
+The hierarchy must survive the step-down: in Arabic a statement stays smaller than a headline, and a title smaller
+than a statement, and a wider screen never sets a role smaller than a phone does. A component that sizes a heading
+with a utility sets its Arabic size at the call site (`rtl:text-[…]`): utilities outrank the component layer, so a
+`[dir="rtl"] .text-2xl` rule in CSS never applies (`text-2xl`, 24px, is already inside the Arabic headline range). Below 13px Arabic is set only for badges, initials and figures (12px); the home story scenes may draw
+at 12px because they are pictures of a page, not text to read.
+
+### Numerals and isolation (area X, 2026-10-29)
+**One digit set: Latin digits (0–9) in both languages.** Every amount, date, time, count, percentage, case number,
+phone number, code and reference is written with Latin digits and comma grouping, Arabic included. The patients'
+countries do not agree (CLDR defaults: Libya Latin with dot grouping; Sudan, Iraq, Yemen and Egypt Arabic-Indic), but
+every patient meets Latin digits on the phone keypad, in WhatsApp, in bank and mobile-money messages and in passports,
+and the identifiers we give them must match what they type back. One set also avoids a page that mixes both. This
+stays the owner's default (GATE 2, 2026-10-07) until the native Arabic review; that review may move counts and dates in
+running Arabic prose to Arabic-Indic, which is one change in `intlLocale`. **Identifiers never change**: case numbers
+(`RS-YYYY-NNNNNN`), one-time codes, transfer references, phone numbers and amounts the patient types stay Latin.
+
+- **Format through one helper.** Every `Intl.*` constructor and `toLocale*String` takes `intlLocale(locale)`
+  (`"ar-u-nu-latn"` for Arabic); never pass `"ar"`, `"ar-EG"` or a hard-coded `"en-US"` for Arabic text. Money goes
+  through `formatMoney`. Month names follow the Egyptian set (أكتوبر, not تشرين الأول); the native review checks this
+  for Iraqi readers.
+- **Accept both on input.** Fields that take digits (amounts, codes, phone numbers) accept Latin, Arabic-Indic and
+  Persian digits and the Arabic decimal and thousands marks, and normalise to Latin; they are `type="text"` with an
+  `inputmode` (a `type="number"` field throws ٠–٩ away before any code sees it) and stay `dir="ltr"`, so the value
+  reads in order from the field's left edge in both languages.
+- **Isolate every left-to-right run.** In markup: amounts, case numbers, codes, phone numbers, emails and rates in
+  `<bdi dir="ltr">` (amounts also `tabular-nums` when they line up in a column); names and free text in `<bdi>` or
+  `dir="auto"`. Where markup cannot go (`aria-label`, `title`, `<option>`, emails, WhatsApp, Keycloak bundles), wrap
+  the run in Unicode isolates: LRI…PDI (U+2066…U+2069) for a left-to-right value, FSI…PDI (U+2068…U+2069) for a
+  name. Never fix an order with LRM/RLM marks or with `dir="ltr"` on a whole line.
+- **A rate is one run.** An exchange rate is one isolated equation, `1 USD = 50.25 EGP`, the same way round in both
+  languages, with ISO currency codes; the Arabic sentence around it carries the date.
+- **Never break an identifier.** Case numbers, codes and amounts are `white-space: nowrap`; a long Arabic line wraps
+  around them, not through them.
 
 ### Named Rules
 **The Ladder Rule.** Fixed sizes come from one ladder: 12 (badges and initials only), 13 (smallest label), 14, 15,
 16, 17, 18 and 20px, with the fluid roles above. Map any new size onto it.
 
-**The Arabic Is Not Latin Rule.** Arabic never inherits negative tracking or uppercase. Display, headline, title and
-label reset letter-spacing to 0, and Arabic sizes step down with leading opened up.
+**The Arabic Is Not Latin Rule.** Arabic never inherits negative tracking or uppercase. Display, headline, statement,
+title, lead and label reset letter-spacing to 0, and Arabic sizes step down with leading opened up (the Arabic scale
+above). A component that sets its own tracking adds `rtl:tracking-normal`.
+
+**The One Digit Rule.** Latin digits in both languages, formatted through `intlLocale`, isolated in `<bdi dir="ltr">`
+or LRI…PDI; identifiers never switch digit sets (Numerals and isolation, above).
 
 ## Layout
 
@@ -439,7 +510,7 @@ dense-table tokens in `docs/ux-redesign/token-proposals.md` (B2, B3) are deferre
 - **Do** give every control at least a 44×44px hit area — tabs, row checkboxes, icon buttons, chip removes — by
   expanding the hit area (padding with a negative margin) rather than the visual.
 - **Do** isolate left-to-right runs inside Arabic: amounts and case numbers in `<bdi dir="ltr">`, names and staff
-  free text in `<bdi>` or `dir="auto"`.
+  free text in `<bdi>` or `dir="auto"`, and LRI…PDI where markup cannot go (Numerals and isolation).
 - **Do** read labels from the viewer's side: "you" only for the person actually waited on or responsible, counts
   through `Intl.PluralRules`, and enum values always as words.
 - **Do** take every colour from the tokens above; propose any new token explicitly before using it.

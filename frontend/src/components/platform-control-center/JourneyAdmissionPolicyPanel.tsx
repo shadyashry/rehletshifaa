@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import { FocusTrapDialog } from "./FocusTrapDialog";
 import { Section, StatusBadge } from "./cc-ui";
 import type { JourneyReadiness, JourneyVersion } from "./journey-types";
@@ -99,7 +99,7 @@ export function JourneyAdmissionPolicyPanel({ locale, definitionId, versions, pe
   };
   const open = (action: "approve" | "reject" | "pause", policy: JourneyAdmissionPolicy) => { setDecision({ action, policy }); setDecisionReason(""); };
   const actionLabel = (action: "approve" | "reject" | "pause") => t[action];
-  const when = (value: string) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  const when = (value: string) => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
   const evidence = (label: string, actor: string | null, why: string | null, at: string | null) => actor && <p className="cc-meta">{label}: <bdi>{actor}</bdi> · {at ? when(at) : "—"}<br /><bdi>{why}</bdi></p>;
 
   return <Section title={t.title} id="journey-admission-policy">

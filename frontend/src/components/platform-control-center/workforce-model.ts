@@ -1,4 +1,4 @@
-import type { Locale } from "@/lib/i18n";
+import { intlLocale, type Locale } from "@/lib/i18n";
 import type { Tone } from "./admin-labels";
 
 /** Typed off the backend records (access.platform, workforce). Subjects are for commands only; people are names. */
@@ -68,7 +68,7 @@ export const lifecycleBadge = (value: string, locale: Locale): { label: string; 
 };
 
 export const when = (iso: string | null | undefined, locale: Locale) =>
-  iso ? new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "—";
+  iso ? new Intl.DateTimeFormat(locale === "ar" ? intlLocale("ar") : "en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "—";
 
 /** Platform ownership (GOV-04): the current owner and the three-party transfers, with what this viewer may do. */
 export type OwnerParty = { subject: string; name: string | null };

@@ -8,7 +8,7 @@ import {
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 
 import { JourneyLine } from "@/components/home/JourneyConnector";
-import type { Locale } from "@/lib/i18n";
+import { latinDigits, type Locale } from "@/lib/i18n";
 import { whatsappEntry } from "@/lib/links";
 import { apiUrl } from "@/lib/api";
 
@@ -127,7 +127,7 @@ const RESEND_SECONDS = 60;
 
 /** Shapes typed or pasted input into RS-YYYY-NNNNNN: "rs 2026 123" or "2026123" both become RS-2026-123. */
 export function formatCaseId(raw: string): string {
-  const compact = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const compact = latinDigits(raw).toUpperCase().replace(/[^A-Z0-9]/g, "");
   const digits = compact.replace(/^R?S?/, "").replace(/\D/g, "").slice(0, 10);
   if (!digits) return compact.startsWith("RS") ? "RS" : compact.startsWith("R") ? "R" : "";
   return `RS-${digits.slice(0, 4)}${digits.length > 4 ? `-${digits.slice(4)}` : ""}`;
@@ -348,7 +348,7 @@ export function TrackCaseLanding({ locale }: { locale: Locale }) {
                     aria-invalid={showWhatsappError}
                     aria-describedby={ids.whatsappHint}
                     value={whatsappNumber}
-                    onChange={(event) => setWhatsappNumber(event.target.value.replace(/[^\d\s()+-]/g, ""))}
+                    onChange={(event) => setWhatsappNumber(latinDigits(event.target.value).replace(/[^\d\s()+-]/g, ""))}
                     onBlur={() => setTouched((v) => ({ ...v, whatsapp: true }))}
                     className={`${input(showWhatsappError)} mt-2 text-start`}
                   />

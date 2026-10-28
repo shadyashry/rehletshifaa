@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Check, CircleCheck, Info, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
 
 import { COUNTRIES, flagEmoji } from "@/lib/countries";
-import { intlLocale, type Locale } from "@/lib/i18n";
+import { intlLocale, latinDigits, type Locale } from "@/lib/i18n";
 import { apiUrl } from "@/lib/api";
 import { CoordinationDepositTerms } from "@/components/CoordinationDepositTerms";
 import { DEPOSIT_TERMS_CONSENT } from "@/lib/commercial-terms";
@@ -481,7 +481,7 @@ export function ProfileActivation({ locale, token, copy: t, guardianConsent }: {
                   <div className="mt-3">
                     <Field htmlFor={fieldId("phone")} label={repOwned ? `${t.yourOwnPhone} (${t.phoneOptional})` : t.phone} required={!repOwned} requiredLabel={t.required} help={t.phoneHelp} error={errorOf("phone")}>
                       <input id={fieldId("phone")} type="tel" maxLength={32} className={`field ${fieldErrors.phone ? "field-error" : ""}`} dir="ltr" inputMode="tel" autoComplete="tel" {...invalidProps("phone", true)}
-                             value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value, mobileOwner: form.mobileOwner || "PATIENT" })} />
+                             value={form.phone} onChange={e => setForm({ ...form, phone: latinDigits(e.target.value), mobileOwner: form.mobileOwner || "PATIENT" })} />
                     </Field>
                   </div>
                 )}
