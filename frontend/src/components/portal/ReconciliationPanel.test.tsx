@@ -36,11 +36,11 @@ const awaiting: ReconciliationView = { ...open, status: "AWAITING_COUNTERSIGN", 
   ] };
 const settled: ReconciliationView = { ...awaiting, status: "DISPUTED", needsCountersign: false, settledAt: "2026-10-26T09:00:00Z", statements: [statement] };
 
-function setup(role: SettlementRole, props: { currentCode?: string; data?: ReconciliationView; onLead?: (code: string | null) => void } = {}) {
+function setup(role: SettlementRole, props: { currentCode?: string; data?: ReconciliationView } = {}) {
   const data = props.data ?? notOpened;
   const mutate = vi.fn().mockResolvedValue(data);
   const load = vi.fn().mockResolvedValue(data) as unknown as <T>(path: string) => Promise<T>;
-  renderWithWork(<ReconciliationPanel locale="en" role={role} caseId="c1" caseStatus="DISCHARGED" currentCode={props.currentCode} busy={false} mutate={mutate} load={load} onLead={props.onLead}/>, "en");
+  renderWithWork(<ReconciliationPanel locale="en" role={role} caseId="c1" caseStatus="DISCHARGED" currentCode={props.currentCode} busy={false} mutate={mutate} load={load}/>, "en");
   return { mutate, load };
 }
 const primaries = () => [...document.querySelectorAll("#reconciliation-panel .btn-primary")];
@@ -177,24 +177,19 @@ describe("ReconciliationPanel — Finance Manager", () => {
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/statements/s1/e-invoice", { reference: "ETA-77" }));
   });
 
-  // UX 4-3: with no step named (B-4-1 has no code for it yet), the e-invoice owed on the current statement is the panel's act, and
-  // the page hears it so the strip can say it.
-  it("leads with the e-invoice when no step is named, and tells the page", async () => {
-    const onLead = vi.fn();
-    setup("finance", { currentCode: "NONE", data: { ...settled, status: "CLOSED", disputeOutcome: "FACILITY_WITHDREW" }, onLead });
+  // B-4-1: the current statement's e-invoice reference is the backend's step; the panel leads with it on that code.
+  it("leads on RECORD_E_INVOICE", async () => {
+    setup("finance", { currentCode: "RECORD_E_INVOICE", data: { ...settled, status: "CLOSED", disputeOutcome: "FACILITY_WITHDREW" } });
     const save = await screen.findByRole("button", { name: "Record the reference" });
     expect(primaries()).toEqual([save]);
     expect(save.closest("details")).toBeNull();
     expect(document.getElementById("reconciliation-next")?.contains(screen.getByLabelText("E-invoice reference"))).toBe(true);
-    await waitFor(() => expect(onLead).toHaveBeenLastCalledWith("RECORD_E_INVOICE"));
   });
 
   it("keeps the e-invoice behind its disclosure while another step is named", async () => {
-    const onLead = vi.fn();
-    setup("finance", { currentCode: "FACILITY_DISPUTE", data: settled, onLead });
+    setup("finance", { currentCode: "FACILITY_DISPUTE", data: settled });
     await screen.findByRole("button", { name: "Record the outcome" });
     expect(screen.getByRole("button", { name: "Record the reference" }).closest("details")).not.toBeNull();
-    expect(onLead).not.toHaveBeenCalledWith("RECORD_E_INVOICE");
   });
 
   it("is read-only for the coordinator (Operations reads it as the Discharge panel's state line)", async () => {

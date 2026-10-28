@@ -52,7 +52,6 @@ const item = (id: string) => {
   const w = workItems.find(row => row.id === id)!;
   return { code: "WORK_ITEM", kind: "FOCUS", title: w.title, context: w.context, workItemId: w.id, workItemVersion: 0, workType: w.type, dueAt: w.dueAt, overdue: w.overdue };
 };
-const none = { code: "NONE", kind: "NONE" };
 const timeline = [{ type: "STATUS", label: "Received", status: "RECEIVED", occurredAt: at(900) }, { type: "STATUS", label: "Accepted", status: "ACCEPTED", occurredAt: at(400) }];
 const travelPlan = (status: string, arrival: number | null, confirmed: number | null) =>
   ({ facilityId: "f1", facilityName: "Nile Heart Hospital", status, plannedArrival: arrival == null ? null : at(arrival), confirmedArrival: confirmed == null ? null : at(confirmed) });
@@ -91,11 +90,11 @@ const caseView = (id: FinanceCaseId) => {
       actions: actions("PROPOSAL_PREPARATION", { code: "APPROVE_COMMERCIAL_TERMS", kind: "FOCUS" }, ["APPROVE_COMMERCIAL_TERMS"]) };
     case "letter": return { ...common, ...accepted, travelPlan: travelPlan("CONFIRMED", -72, null), actions: actions("TRAVEL_COORDINATION", item("fw3")) };
     case "receipt": return { ...common, ...accepted, travelPlan: travelPlan("ARRIVED", 30, 28), actions: actions("ARRIVAL_CONFIRMED", item("fw4")) };
-    case "fee": return { ...common, ...accepted, travelPlan: travelPlan("ARRIVED", 30, 28), actions: actions("ARRIVAL_CONFIRMED", none) };
+    case "fee": return { ...common, ...accepted, travelPlan: travelPlan("ARRIVED", 30, 28), actions: actions("ARRIVAL_CONFIRMED", { code: "RECORD_FEE_BALANCE", kind: "FOCUS" }) };
     case "change": return { ...common, ...accepted, travelPlan: travelPlan("ARRIVED", 120, 118), actions: actions("TREATMENT_IN_PROGRESS", item("fw5")) };
     case "reconcile": return { ...common, ...accepted, travelPlan: travelPlan("ARRIVED", 400, 398), actions: actions("DISCHARGED", item("fw6")) };
     case "variance": return { ...common, ...accepted, travelPlan: travelPlan("ARRIVED", 400, 398), actions: actions("DISCHARGED", item("fw7")) };
-    case "statement": return { ...common, ...accepted, travelPlan: travelPlan("ARRIVED", 700, 698), actions: actions("FOLLOW_UP", none) };
+    case "statement": return { ...common, ...accepted, travelPlan: travelPlan("ARRIVED", 700, 698), actions: actions("FOLLOW_UP", { code: "RECORD_E_INVOICE", kind: "FOCUS" }) };
   }
 };
 

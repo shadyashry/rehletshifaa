@@ -265,7 +265,8 @@ describe("AdmissionPanel — Finance", () => {
 
   it("derives the fee balance and records it after a question with the amount and the reference", async () => {
     const feeVoucher = { ...voucher, depositPaidEgp: 28750, depositCreditEgp: 0, feeBalanceEgp: 1250, feeBalanceDisplay: 25.5 };
-    const { mutate } = setup("finance", { ...reserved, balanceOwedEgp: 0, voucher: feeVoucher, feeBalanceOwedEgp: 1250, admissionBlockers: ["FEE_BALANCE_DUE"] });
+    const { mutate } = setup("finance", { ...reserved, balanceOwedEgp: 0, voucher: feeVoucher, feeBalanceOwedEgp: 1250, admissionBlockers: ["FEE_BALANCE_DUE"] },
+      { currentCode: "RECORD_FEE_BALANCE" });
     const fee = (await screen.findByText("Record the platform fee balance")).closest("details")!;
     expect(fee.open).toBe(true);
     const form = within(fee);

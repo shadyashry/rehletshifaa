@@ -65,11 +65,13 @@ public class StatementService {
     private final com.rehletshifaa.settlement.infrastructure.ReconciliationRepository reconciliations;
     private final PublicCaseAccessService publicAccess;
     private final ObjectMapper json;
+    private final com.rehletshifaa.journey.application.StaffWorkService work;
 
     public StatementService(Authority authority, Clock clock, AuditTrail auditTrail, SettlementBasis basis, StatementRepository statements,
                             ReconciliationLineRepository lines, PublicCaseAccessService publicAccess, ObjectMapper json,
-                            com.rehletshifaa.settlement.infrastructure.ReconciliationRepository reconciliations) {
-        this.reconciliations = reconciliations;
+                            com.rehletshifaa.settlement.infrastructure.ReconciliationRepository reconciliations,
+                            com.rehletshifaa.journey.application.StaffWorkService work) {
+        this.reconciliations = reconciliations; this.work = work;
         this.authority = authority; this.clock = clock; this.auditTrail = auditTrail; this.basis = basis; this.statements = statements; this.lines = lines;
         this.publicAccess = publicAccess; this.json = json;
     }
@@ -140,6 +142,7 @@ public class StatementService {
                 subject, now));
         auditTrail.event("STATEMENT_ISSUED").actor(subject, "SYSTEM".equals(subject) ? "SYSTEM" : "FINANCE").caseId(caseId).entity("Statement", statement.getId()).action("ISSUE")
                 .reason(statement.getStatementNumber() + " total EGP " + total.toPlainString() + " balance EGP " + net.toPlainString()).record();
+        work.changed(caseId); // B-4-1: the new statement's e-invoice is Finance's step
         return statement;
     }
 
@@ -154,6 +157,7 @@ public class StatementService {
         statements.saveAndFlush(statement);
         auditTrail.event("STATEMENT_E_INVOICE_RECORDED").actor(actor.subject(), actor.label()).caseId(caseId).entity("Statement", statementId)
                 .action("UPDATE").reason(statement.getStatementNumber()).record();
+        work.changed(caseId); // B-4-1: the e-invoice step is done
         return view(statement, true);
     }
 

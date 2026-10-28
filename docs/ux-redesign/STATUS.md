@@ -1919,6 +1919,35 @@ recovery stays at 2: a panel that fails to load has no retry.
 - **B-4-1:** step codes `RECORD_FEE_BALANCE`/`RECORD_E_INVOICE` from `CaseActionService`; this retires `LeadSignal`.
 - **B-4-2:** overdue first in `QUEUE_ORDER`, if the owner wants it.
 
+## Backend follow-up B-4-1: Finance's fee balance and e-invoice as steps (2026-10-28, worktree `b-4-1-finance-step-codes-e8707c`, branch `claude/b-4-1-finance-step-codes-e8707c` from `feat/review-p0` @ `37f602d7`)
+
+Retires 4-3's `LeadSignal` stopgap: the strip now words Finance's two money acts from the backend's own step.
+- **Backend.** `CaseActionService.stageFallback` gives Finance `RECORD_FEE_BALANCE` (FOCUS) from treatment coordination to
+  treatment while the issued voucher leaves a fee balance not yet recorded (`AdmissionReadiness.feeBalanceOwed`, the admission
+  view's `feeBalanceOwedEgp`), and `RECORD_E_INVOICE` (FOCUS) in DISCHARGED, FOLLOW_UP and CLOSED while the current (newest)
+  statement has no `eInvoiceRef`. Journey cannot import settlement (the module cycle rule), so the statement is read through a
+  journey port, `EInvoiceReader`, implemented by settlement's `StatementEInvoiceReader` (the `SettlementCreditReader` pattern).
+  A work item still outranks both (`currentAction` reaches the stage fallback only without one).
+- **My work and waiting-on**, as B-3-1a and B-5-1: both codes are stage work, one item each for the Finance member active on the
+  case (`STAGE_WORK`, English text, `WorkCopy`), out of the queue while they hold other work on the case. `syncStageWork` now
+  also runs on `AdmissionEvidenceChanged` (the voucher, a fee receipt); `StatementService` raises `WorkChanged` when it issues a
+  statement and when the e-invoice is recorded; `closeObsoleteWork` closes the fee item outside the hospital-file stages and the
+  e-invoice item outside settlement. `reconcileWaitingOn` is unchanged: the strip reads a FOCUS step as "Waiting on: You".
+  SLA rows: 1 working day each.
+- **Frontend.** `LeadSignal`, the `onLead` props and the page's `leads`/`leadOf`/`panelLead`/`transferWaits` state are gone;
+  the strip renders `current`. The panels' `next` rules key on the codes: `AdmissionPanel` leads with the fee on
+  `RECORD_FEE_BALANCE`, `ReconciliationPanel` with the e-invoice on `RECORD_E_INVOICE` (a waiting transfer is the backend's
+  `DEPOSIT_RECORD` item, which outranks). Work copy added in en + ar (`currentAction.work`, `workTitles`, `workCopy.items`);
+  the step's states/actions copy existed since 4-3. `finance-fixture.ts`'s fee and statement cases send the codes.
+
+**Verify.** New `FinanceStepTest` (fee step on the strip and in My work, the receipt's countersign item outranks it, gone once
+recorded; no fee step when the deposit covers the fee; the e-invoice step after the statement, gone once recorded; not shown to
+Operations or the coordinator). Backend `mvn -o test` over the journey and settlement packages + `ArchitectureRulesTest`: 629
+tests, 0 failures, 1 environment skip. `pnpm typecheck` and eslint on the touched files clean. vitest 97 files: 96 pass, plus
+the known `StaffOperationalUi` W-44 (`ReconciliationPanel.test.tsx`: "leads on RECORD_E_INVOICE"; `AdmissionPanel.test.tsx`'s
+fee test passes the step). Playwright on a production build on :3241: finance-workspace, finance-shots (`AREA4_SHOTS=b-4-1`),
+staff-chrome, a11y en+ar — 99/99. Shots in `screenshots/area-4/b-4-1/`; overwritten shots restored.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

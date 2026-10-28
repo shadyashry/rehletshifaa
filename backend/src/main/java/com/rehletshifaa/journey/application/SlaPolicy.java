@@ -51,6 +51,9 @@ public class SlaPolicy {
             Map.entry("UPDATE_TRAVEL_PLAN", 2),
             Map.entry("RESERVE_HOSPITAL", 2),
             Map.entry("RECORD_ADMISSION_LETTER", 2),
+            // B-4-1: Finance records the platform fee balance and a statement's e-invoice reference in one working day.
+            Map.entry("RECORD_FEE_BALANCE", 1),
+            Map.entry("RECORD_E_INVOICE", 1),
             Map.entry("CLINICAL_REVIEW", 2),
             Map.entry("ASSIGN_CONSULTANT", 1),
             Map.entry("REVIEW_PATIENT_RESPONSE", 1),

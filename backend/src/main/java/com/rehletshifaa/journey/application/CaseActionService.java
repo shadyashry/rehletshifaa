@@ -93,6 +93,7 @@ public class CaseActionService {
     private final EvidenceLedger ledger;
     private final com.rehletshifaa.journey.infrastructure.CaseOutcomeRepository outcomes;
     private final com.rehletshifaa.journey.infrastructure.ClinicalReviewVersionRepository clinicalReviews;
+    private final EInvoiceReader eInvoices;
 
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
                              StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock,
@@ -100,8 +101,8 @@ public class CaseActionService {
                              TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla, AdmissionReadiness admission,
                              com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders, DischargeReadiness discharge, EvidenceLedger ledger,
                              com.rehletshifaa.journey.infrastructure.CaseOutcomeRepository outcomes,
-                             com.rehletshifaa.journey.infrastructure.ClinicalReviewVersionRepository clinicalReviews) {
-        this.outcomes = outcomes; this.clinicalReviews = clinicalReviews;
+                             com.rehletshifaa.journey.infrastructure.ClinicalReviewVersionRepository clinicalReviews, EInvoiceReader eInvoices) {
+        this.outcomes = outcomes; this.clinicalReviews = clinicalReviews; this.eInvoices = eInvoices;
         this.admission = admission; this.changeOrders = changeOrders; this.discharge = discharge; this.ledger = ledger;
         this.exitReasons = exitReasons; this.travelPlans = travelPlans; this.statusChanges = statusChanges; this.sla = sla;
         this.workforce = workforce;
@@ -306,7 +307,21 @@ public class CaseActionService {
                 && !proposal.financeDone() && (!f.travelPackage() || proposal.operationsDone())
                 && Set.of("CLINICALLY_APPROVED", "OPERATIONS_COMPLETED").contains(proposal.status()))
             return simple("APPROVE_COMMERCIAL_TERMS", "FOCUS");
+        // B-4-1: Finance records the platform fee balance the deposit did not cover while the hospital file is open, and the
+        // current statement's e-invoice reference once it is issued.
+        if (role == Role.FINANCE && FEE_BALANCE_STAGES.contains(s) && feeBalanceDue(caseId)) return simple(RECORD_FEE_BALANCE, "FOCUS");
+        if (role == Role.FINANCE && E_INVOICE_STAGES.contains(s) && eInvoices.eInvoiceOwed(caseId)) return simple(RECORD_E_INVOICE, "FOCUS");
         return none();
+    }
+
+    /** B-4-1: Finance's two money steps after the proposal, and the stages each is owed in. */
+    static final String RECORD_FEE_BALANCE = "RECORD_FEE_BALANCE", RECORD_E_INVOICE = "RECORD_E_INVOICE";
+    private static final Set<String> FEE_BALANCE_STAGES = Set.of("TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "ADMISSION_READY", "TREATMENT_IN_PROGRESS");
+    private static final Set<String> E_INVOICE_STAGES = Set.of("DISCHARGED", "FOLLOW_UP", "CLOSED");
+
+    /** The issued voucher leaves part of the platform fee to the patient, and Finance has not recorded all of it. */
+    private boolean feeBalanceDue(UUID caseId) {
+        return admission.currentVoucher(caseId).map(v -> admission.feeBalanceOwed(caseId, v).signum() > 0).orElse(false);
     }
 
     /** An approved review written since the case entered its current stage (arrival): the final assessment is on file. */
@@ -504,26 +519,28 @@ public class CaseActionService {
     /**
      * Steps a stage owes one named person that no event raises work for: the coordinator's intake review and internal
      * sign-off steps up to the release (#3, #3b), Finance's approval and Operations' plans and hospital file once they have accepted, and the
-     * Consultant's final assessment at arrival (B-3-1a). Each is
+     * Consultant's final assessment at arrival (B-3-1a), Finance's fee balance and e-invoice reference (B-4-1). Each is
      * carried by one work item named after the step, so My work, "At a glance" and the current action read one source. The
      * step is still decided by {@link #stageFallback}; the item is its queue entry, and the current action keeps the step's
      * own code and form.
      */
     static final Set<String> STAGE_WORK = Set.of("ASSIGN_CONSULTANT", "ASSIGN_OPERATIONS_PLAN", "ASSIGN_FINANCE", "RELEASE_PROPOSAL",
             "APPROVE_COMMERCIAL_TERMS", "PREPARE_TRAVEL_PACKAGE", AdmissionReadiness.RESERVE_HOSPITAL, AdmissionReadiness.RECORD_ADMISSION_LETTER,
-            "UPDATE_TRAVEL_PLAN", "RECORD_FINAL_ASSESSMENT");
+            "UPDATE_TRAVEL_PLAN", "RECORD_FINAL_ASSESSMENT", RECORD_FEE_BALANCE, RECORD_E_INVOICE);
     /** English title and context of each stage step's item; the portal words it from the step's code (EN/AR). */
-    private static final Map<String, List<String>> STAGE_WORK_TEXT = Map.of(
-            "ASSIGN_CONSULTANT", List.of("Prepare the case for a Consultant", "Complete anything missing, then assign a Consultant for this care area."),
-            "ASSIGN_OPERATIONS_PLAN", List.of("Plan the travel package with Operations", "The patient asked for a travel package. Assign Operations to plan and price it before the proposal is released."),
-            "ASSIGN_FINANCE", List.of("Finance must approve the commercial terms", "A manually priced service needs Finance sign-off before release. Assign who should approve it."),
-            "RELEASE_PROPOSAL", List.of("Release the proposal to the patient", "Every internal sign-off is in. Check the release requirements, then release the secure link."),
-            "APPROVE_COMMERCIAL_TERMS", List.of("Approve the commercial terms", "Review the manually priced services before the proposal can be released."),
-            "PREPARE_TRAVEL_PACKAGE", List.of("Plan the travel package", "Describe the travel package for the proposal before it is released. Bookings and arrival are arranged only after the patient's deposit."),
-            AdmissionReadiness.RESERVE_HOSPITAL, List.of("Reserve the hospital", "Reserve the hospital and the planned admission date with the facility."),
-            AdmissionReadiness.RECORD_ADMISSION_LETTER, List.of("Record the admission letter", "Record the hospital's admission letter with its quoted package price, so Finance can check it."),
-            "UPDATE_TRAVEL_PLAN", List.of("Arrange travel and arrival", "Keep the travel plan current; confirm it once every requirement is met."),
-            "RECORD_FINAL_ASSESSMENT", List.of("Record the final assessment", "The patient has arrived. Examine them, then confirm or change your recommendation and its estimate lines."));
+    private static final Map<String, List<String>> STAGE_WORK_TEXT = Map.ofEntries(
+            Map.entry("ASSIGN_CONSULTANT", List.of("Prepare the case for a Consultant", "Complete anything missing, then assign a Consultant for this care area.")),
+            Map.entry("ASSIGN_OPERATIONS_PLAN", List.of("Plan the travel package with Operations", "The patient asked for a travel package. Assign Operations to plan and price it before the proposal is released.")),
+            Map.entry("ASSIGN_FINANCE", List.of("Finance must approve the commercial terms", "A manually priced service needs Finance sign-off before release. Assign who should approve it.")),
+            Map.entry("RELEASE_PROPOSAL", List.of("Release the proposal to the patient", "Every internal sign-off is in. Check the release requirements, then release the secure link.")),
+            Map.entry("APPROVE_COMMERCIAL_TERMS", List.of("Approve the commercial terms", "Review the manually priced services before the proposal can be released.")),
+            Map.entry("PREPARE_TRAVEL_PACKAGE", List.of("Plan the travel package", "Describe the travel package for the proposal before it is released. Bookings and arrival are arranged only after the patient's deposit.")),
+            Map.entry(AdmissionReadiness.RESERVE_HOSPITAL, List.of("Reserve the hospital", "Reserve the hospital and the planned admission date with the facility.")),
+            Map.entry(AdmissionReadiness.RECORD_ADMISSION_LETTER, List.of("Record the admission letter", "Record the hospital's admission letter with its quoted package price, so Finance can check it.")),
+            Map.entry("UPDATE_TRAVEL_PLAN", List.of("Arrange travel and arrival", "Keep the travel plan current; confirm it once every requirement is met.")),
+            Map.entry("RECORD_FINAL_ASSESSMENT", List.of("Record the final assessment", "The patient has arrived. Examine them, then confirm or change your recommendation and its estimate lines.")),
+            Map.entry(RECORD_FEE_BALANCE, List.of("Record the platform fee balance", "The deposit did not cover the platform fee. Record the balance the patient paid, with its reference.")),
+            Map.entry(RECORD_E_INVOICE, List.of("Record the e-invoice reference", "The statement is issued. Record the tax authority's document id for it; it can be recorded once.")));
     /** Cases this thread is syncing: a change the sync makes announces itself again, and the outer pass already covers it. */
     private final ThreadLocal<Set<UUID>> syncing = ThreadLocal.withInitial(HashSet::new);
 
@@ -531,6 +548,10 @@ public class CaseActionService {
 
     @EventListener
     public void on(CaseEvents.WorkChanged event) { syncStageWork(event.caseId()); }
+
+    /** B-4-1: the voucher (and its fee balance) or a fee receipt changed: Finance's fee step may be owed or done. */
+    @EventListener
+    public void on(CaseEvents.AdmissionEvidenceChanged event) { syncStageWork(event.caseId()); }
 
     /**
      * Keep exactly one open item per stage step owed now, owned by whoever owes it: open a missing one, close one the stage
@@ -608,6 +629,10 @@ public class CaseActionService {
             work.closeWorkItems(caseId, CaseHandoffService.DEPOSIT_RECORD_WORK, "Superseded — the case is past the deposit stage", false);
         if (!"ARRIVAL_CONFIRMED".equals(status))
             work.closeWorkItems(caseId, "RECORD_FINAL_ASSESSMENT", "Superseded — the patient is past the final assessment", false);
+        if (!FEE_BALANCE_STAGES.contains(status))
+            work.closeWorkItems(caseId, RECORD_FEE_BALANCE, "Superseded — the hospital file is closed", false);
+        if (!Set.of("DISCHARGED", "FOLLOW_UP").contains(status))
+            work.closeWorkItems(caseId, RECORD_E_INVOICE, "Superseded — the case is not in settlement", false);
         // P1-16: the milestone clock runs only while the patient is in treatment.
         if (!"TREATMENT_IN_PROGRESS".equals(status)) {
             work.closeWorkItems(caseId, TreatmentMilestoneService.RECORD_MILESTONE, "Superseded — the patient is no longer in treatment", false);

@@ -1972,6 +1972,8 @@
         "ADMISSION_VOUCHER_BLOCKED": "افتح الدخول والمدفوعات",
         "RECORD_MILESTONE": "سجّل مرحلة",
         "RECORD_FINAL_ASSESSMENT": "سجّل التقييم النهائي",
+        "RECORD_FEE_BALANCE": "سجّل المتبقي من الرسوم",
+        "RECORD_E_INVOICE": "سجّل مرجع الفاتورة الإلكترونية",
         "COUNTERSIGN_MILESTONE": "راجع المرحلة",
         "PRICE_CHANGE_ORDER": "سعّر أمر التغيير",
         "EMERGENCY_CHANGE_ORDER_REVIEW": "سعّر وراجع",
@@ -3074,6 +3076,8 @@
       "ADMISSION_VOUCHER_BLOCKED": "تعذّر إصدار قسيمة الدخول",
       "RECORD_MILESTONE": "سجّل المرحلة التالية من العلاج",
       "RECORD_FINAL_ASSESSMENT": "سجّل التقييم النهائي بعد فحص المريض",
+      "RECORD_FEE_BALANCE": "سجّل المتبقي من رسوم المنصة",
+      "RECORD_E_INVOICE": "سجّل مرجع الفاتورة الإلكترونية",
       "COUNTERSIGN_MILESTONE": "وقّع على مرحلة علاج",
       "PRICE_CHANGE_ORDER": "سعّر أمر تغيير",
       "EMERGENCY_CHANGE_ORDER_REVIEW": "راجع أمر تغيير طارئًا",
@@ -3477,6 +3481,14 @@
         "RECORD_FINAL_ASSESSMENT": {
           "title": "سجّل التقييم النهائي",
           "context": "وصل المريض. افحصه، ثم أكّد توصيتك وبنود تقديرها أو عدّلها."
+        },
+        "RECORD_FEE_BALANCE": {
+          "title": "سجّل المتبقي من رسوم المنصة",
+          "context": "لم تغطِّ الوديعة رسوم المنصة. سجّل المبلغ المتبقي الذي دفعه المريض والرقم المرجعي للدفعة."
+        },
+        "RECORD_E_INVOICE": {
+          "title": "سجّل مرجع الفاتورة الإلكترونية",
+          "context": "صدر كشف الحساب. سجّل رقم المستند لدى مصلحة الضرائب؛ لا يمكن تسجيله إلا مرة واحدة."
         },
         "RELEASE_PROPOSAL": {
           "title": "أصدر العرض للمريض",

@@ -107,15 +107,6 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   const actions:CaseActions=value.actions??{journeyStage:c.status,waitingOn:c.waitingOn,currentAction:{code:"NONE",kind:"NONE"},blockers:[],availableActions:[]};
   const current=actions.currentAction;
   const available=actions.availableActions;
- // UX 4-3: until the fee balance and the e-invoice have step codes (B-4-1), the act a Finance panel leads with while no step is
- // named is the strip's step, so the strip says what the page shows. The panels decide it; the page only hears it.
- // Kept with the case it was heard on, so a case just opened never reads the last case's lead for a paint.
- const [leads,setLeads]=useState<{caseId:string|null;admission:string|null;reconciliation:string|null}>({caseId:null,admission:null,reconciliation:null});
- const leadOf=(panel:"admission"|"reconciliation")=>(code:string|null)=>setLeads(prev=>prev.caseId===c.id&&prev[panel]===code?prev
-  :{...(prev.caseId===c.id?prev:{admission:null,reconciliation:null}),caseId:c.id,[panel]:code});
- const transferWaits=value.deposit?.transfer?.status==="SUBMITTED"&&(value.deposit.status==="REQUESTED"||value.deposit.status==="PARTIALLY_PAID");
- const panelLead=role==="finance"&&current.kind==="NONE"&&!transferWaits&&leads.caseId===c.id?leads.admission??leads.reconciliation:null;
- const step:CurrentActionView=panelLead?{code:panelLead,kind:"FOCUS"}:current;
  // Evidence panels are reused so the consultant reads them before deciding, while the coordinator keeps
  // them below the action panels. Rendered once (the guards below are mutually exclusive by role).
  const intakePanel=value.intakeSummary?.trim()?<Panel title={cv.intakeSummary}><p className="whitespace-pre-wrap break-words text-ink-700">{value.intakeSummary}</p></Panel>:null;
@@ -136,7 +127,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   :value.travelPlan?.confirmedArrival?()=><DoneAct fact={<TravelDone plan={value.travelPlan??null}/>}/>:undefined;
  // The reservation the admission panel last showed, read back by the logistics card (the reservation owns the hospital).
  const [reservation,setReservation]=useState<AdmissionView|null>(null);
- const admissionPanel=admissionShown?<PanelBoundary key={`admission-${c.id}`} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load} travel={travelAct} onView={setReservation} onLead={role==="finance"?leadOf("admission"):undefined}/></PanelBoundary>:null;
+ const admissionPanel=admissionShown?<PanelBoundary key={`admission-${c.id}`} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load} travel={travelAct} onView={setReservation}/></PanelBoundary>:null;
  // P1-16: milestones, change orders, the running money and the evidence checklist while the patient is in treatment (and for an
  // open Treatment work item afterwards, such as Finance's emergency change-order review, which survives the case's exit).
  const treatmentPanel=admissionRole&&!value.preview&&(c.status==="TREATMENT_IN_PROGRESS"||TREATMENT_WORK.has(current.workType??""))?<PanelBoundary key={`treatment-${c.id}`} title={work.treatment.title} message={fillTemplate(cv.panelFailed,{panel:work.treatment.title})}><TreatmentPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
@@ -144,14 +135,14 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  // invoice in the reconciliation instead); and the reconciliation and statements once discharged, or for an open Finance item.
  const dischargePanel=admissionRole&&admissionRole!=="finance"&&!value.preview&&(DISCHARGE_STAGES.has(c.status)||DISCHARGE_WORK.has(current.workType??""))?<PanelBoundary key={`discharge-${c.id}`} title={work.discharge.title} message={fillTemplate(cv.panelFailed,{panel:work.discharge.title})}><DischargePanel key={c.id} locale={locale} role={admissionRole as DischargeRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} dischargedAt={value.timeline.find(entry=>entry.status==="DISCHARGED")?.occurredAt??null} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // UX 5-3: Operations reads the reconciliation as the Discharge panel's state line; the workbench is Finance's and the coordinator's.
- const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&admissionRole!=="operations"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<PanelBoundary key={`reconciliation-${c.id}`} title={work.reconciliation.title} message={fillTemplate(cv.panelFailed,{panel:work.reconciliation.title})}><ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load} onLead={role==="finance"?leadOf("reconciliation"):undefined}/></PanelBoundary>:null;
+ const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&admissionRole!=="operations"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<PanelBoundary key={`reconciliation-${c.id}`} title={work.reconciliation.title} message={fillTemplate(cv.panelFailed,{panel:work.reconciliation.title})}><ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // P1-18: the follow-up window, contacts, check-ins, outcomes and what holds the case open, for the case's Consultant and coordinator
  // (never Finance or Operations), from discharge to a closed case, or for an open follow-up item (a review outlives the exit).
  const followUpPanel=(isDoctor||isCoordinator)&&!value.preview&&(FOLLOW_UP_STAGES.has(c.status)||FOLLOW_UP_WORK.has(current.workType??""))?<PanelBoundary key={`followUp-${c.id}`} title={work.followUp.title} message={fillTemplate(cv.panelFailed,{panel:work.followUp.title})}><FollowUpPanel key={c.id} locale={locale} role={isDoctor?"doctor":"coordinator"} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // UX 3-2: the Consultant's panels in the order of their work — the panel holding the current step first, then the stage's
  // own order (after discharge, Follow-up before Discharge; in treatment, Treatment before Discharge, the Admission summary last).
  // The Start treatment act stays with the admission it depends on. Presentation only: the panels still decide what they show.
- const stepCode=step.workType??step.code;
+ const stepCode=current.workType??current.code;
  const afterDischarge=["DISCHARGED","FOLLOW_UP","CLOSED"].includes(c.status);
  const stageOrder=afterDischarge?["followUp","discharge","treatment","admission"]:["treatment","discharge","admission","followUp"];
  const consultantPanels=isDoctor?[
@@ -192,7 +183,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  const proposalIsWork=isCoordinator&&owned&&(["PREPARE_PROPOSAL","RELEASE_PROPOSAL","WAIT_INTERNAL_APPROVAL","ASSIGN_FINANCE"].includes(current.code)||["PREPARE_PROPOSAL","PROPOSAL_REVISION"].includes(current.workType??"")||(!!approved&&!value.proposal)||c.status==="ARRIVAL_CONFIRMED");
  const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm estimate={approved} onSend={sendProposal}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions reviewId={approved?.id} proposal={value.proposal} gates={value.gates}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}{showActions&&dim&&<p className="mt-4 text-[0.875rem] text-ink-600">{cv.handoffLocked}</p>}{showActions&&<LockedSection locked={dim}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} mutate={mutate} approvalInCard={financeApproval}/></LockedSection>}</Panel>;
  // UX 4-3, Finance's sheet: the money act of this moment opens it — a transfer to confirm, a quote to re-price, or the panel that
- // holds the step (or leads while none is named) — then the other panels in the order the money happens. The proposal folds to one
+ // holds the step — then the other panels in the order the money happens. The proposal folds to one
  // line below them, with the deposit as its line once its own moment is over; only the approval keeps the release checklist.
  const deposit=value.deposit??null;
  const depositOpen=!!deposit&&(deposit.status==="REQUESTED"||deposit.status==="PARTIALLY_PAID");
@@ -204,7 +195,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  const [overlay,setOverlay]=useState<CaseOverlay|null>(null);
  const financeSheet=role==="finance"?[
   {key:"deposit",act:depositLeads,node:depositLeads&&deposit?<FinanceDepositCard deposit={deposit} onClosed={()=>setDepositClosedOn(c.id)}/>:null},
-  {key:"fx",act:fxPending&&(step.kind==="NONE"||stepCode==="FX_REAPPROVAL"),node:fxPending&&value.proposal?<FxReapproval locale={locale} copy={proposalCopy.price.fxReapproval} caseId={c.id} versionId={value.proposal.versionId} currency={value.proposal.currency} commercial={value.commercial}
+  {key:"fx",act:fxPending&&(current.kind==="NONE"||stepCode==="FX_REAPPROVAL"),node:fxPending&&value.proposal?<FxReapproval locale={locale} copy={proposalCopy.price.fxReapproval} caseId={c.id} versionId={value.proposal.versionId} currency={value.proposal.currency} commercial={value.commercial}
     total={value.proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0)} busy={busy} mutate={mutate}/>:null},
   {key:"admission",act:ADMISSION_WORK.has(stepCode),node:admissionPanel},
   {key:"treatment",act:TREATMENT_WORK.has(stepCode),node:treatmentPanel},
@@ -253,9 +244,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   // The step's control: the Consultant's clinical step lands in the decision sheet (Clinical tab) — the recommendation
   // field — while a panel's step lands on that panel's next task. Instant scrolls, so the page's smooth scrolling never cuts
   // the move short before the control is on screen.
-  const panelStep=step.workType==="DEPOSIT_RECORD"||[ADMISSION_WORK,TREATMENT_WORK,DISCHARGE_WORK,SETTLEMENT_WORK,FOLLOW_UP_WORK].some(set=>set.has(step.workType??step.code));
+  const panelStep=current.workType==="DEPOSIT_RECORD"||[ADMISSION_WORK,TREATMENT_WORK,DISCHARGE_WORK,SETTLEMENT_WORK,FOLLOW_UP_WORK].some(set=>set.has(current.workType??current.code));
   const toDecision=isDoctor&&!panelStep&&(decisionSheet||secondOpinionOnly);
-  const focusAction=()=>{setTab(toDecision?"clinical":"overview");requestAnimationFrame(()=>{const target=(toDecision?(document.getElementById("clinical-decision")??document.getElementById("case-actions")):(step.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(role==="operations"&&TRAVEL_STAGES.has(c.status)?document.getElementById("admission-next")??document.getElementById("travel-plan-next")??document.getElementById("travel-arrival-next"):null)??(ADMISSION_WORK.has(step.workType??step.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(step.workType??step.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(step.workType??step.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(step.workType??step.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(step.workType??step.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel"))??document.getElementById("case-tab-panel");const control=target?.querySelector<HTMLElement>("textarea,select,input,button")??target;scrollIntoView(control,{behavior:"instant",block:"center"});control?.focus({preventScroll:true});});};
+  const focusAction=()=>{setTab(toDecision?"clinical":"overview");requestAnimationFrame(()=>{const target=(toDecision?(document.getElementById("clinical-decision")??document.getElementById("case-actions")):(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(role==="operations"&&TRAVEL_STAGES.has(c.status)?document.getElementById("admission-next")??document.getElementById("travel-plan-next")??document.getElementById("travel-arrival-next"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(current.workType??current.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel"))??document.getElementById("case-tab-panel");const control=target?.querySelector<HTMLElement>("textarea,select,input,button")??target;scrollIntoView(control,{behavior:"instant",block:"center"});control?.focus({preventScroll:true});});};
   const completeWork=(evidence:string)=>{if(current.workItemId!=null)void mutate(`/tasks/${current.workItemId}/cases/${c.id}/complete`,{evidence,expectedVersion:current.workItemVersion??0});};
   const openMessages=()=>setOverlay("messages");
   // When the step is the patient's reply (the backend's action, never the stage) and this viewer is the one who answers the
@@ -274,7 +265,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
 
   // The cover's strip (UX area 2): who the case waits on, said once on the page, and — for the coordinator — what the
   // patient's own page says now (the backend's patient step; never inferred here). No field, no line.
-  const waitingText=actions.waitingOn&&actions.waitingOn!=="NONE"?waitingLabel(actions.waitingOn,work.waiting,{role,ownsCase:owned,action:value.actions?step:null}):null;
+  const waitingText=actions.waitingOn&&actions.waitingOn!=="NONE"?waitingLabel(actions.waitingOn,work.waiting,{role,ownsCase:owned,action:value.actions?current:null}):null;
   const patientStep=!value.preview?actions.patientStep??null:null;
   const facts=waitingText||patientStep?<CoverFacts waiting={waitingText} actions={actions} step={patientStep} proposal={value.patientProposal}/>:undefined;
   // My work's order is the backend's; the next item is the first one after this case's items that belongs to another case,
@@ -329,7 +320,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
    </div>
 
    <div className="mt-5 border-t border-line pt-5">
-  <CurrentActionPanel locale={locale} role={role} action={step} facts={facts}
+  <CurrentActionPanel locale={locale} role={role} action={current} facts={facts}
    response={current.workType==="REVIEW_PATIENT_RESPONSE"?{message:latestPatientMessage?.body,documentName:newestDocument?.fileName}:null}
    busy={busy} secondary={replyFromStrip} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
    respondBy={myPending?.offerExpiresAt??null}
@@ -342,7 +333,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
    {alsoOpen.length>0&&<AlsoOpen items={alsoOpen}/>}
   </section>
   {/* Once the cover has scrolled away, the case and its step stay in one slim line under the site header. */}
-  {line.gone&&<CaseLine top={line.top} action={step} title={actionTitle(step,role,work)} next={nextItem&&openNext?{item:nextItem,onOpen:openNext}:null}/>}
+  {line.gone&&<CaseLine top={line.top} action={current} title={actionTitle(current,role,work)} next={nextItem&&openNext?{item:nextItem,onOpen:openNext}:null}/>}
 
   {/* P1-13: a closed case is reopened into follow-up by a manager or the case's own Consultant; one quiet line, never on another stage. */}
   {c.status==="CLOSED"&&!value.preview&&(isDoctor||(isCoordinator&&canReopen))&&<ReopenCase locale={locale} caseId={c.id} side={isDoctor?"doctor":"coordinator"} busy={busy} mutate={mutate} load={load}/>}

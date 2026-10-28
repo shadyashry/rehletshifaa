@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
-import { ActForm, AmountInput, DocumentPicker, DoneAct, Fact, LaterAct, LeadSignal, Money, ReasonField, Summary, Task as PanelTask, TimeField, instant, localInput, pick, quotedRate, readAmount, text, type PanelDocument } from "@/components/portal/panel-parts";
+import { ActForm, AmountInput, DocumentPicker, DoneAct, Fact, LaterAct, Money, ReasonField, Summary, Task as PanelTask, TimeField, instant, localInput, pick, quotedRate, readAmount, text, type PanelDocument } from "@/components/portal/panel-parts";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { CURRENCY_LABELS, type AdmissionEvidence, type AdmissionView, type DirectoryFacility, type Mutate } from "@/components/portal/portal-model";
 
@@ -43,7 +43,7 @@ const LETTER_DONE = new Set([...LETTER_CHECKED, "REFUSED"]);
  * decides every rule; the panel offers one primary action — the next one — and keeps the rest one click away. For Operations
  * (UX 5-1) the recordings are one hospital file in the order they happen, with the travel plan in its place among them.
  */
-export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, documents = [], facilities = [], busy, mutate, load, travel, onView, onLead }: {
+export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, documents = [], facilities = [], busy, mutate, load, travel, onView }: {
   locale: Locale; role: AdmissionRole; caseId: string; caseStatus: string;
   /** The viewer's current action code or work type, which picks the form that opens first. */
   currentCode?: string | null;
@@ -52,8 +52,6 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
   travel?: (current: boolean) => ReactNode;
   /** Told each view the panel shows, so the page can read the reservation back (the logistics card). */
   onView?: (view: AdmissionView | null) => void;
-  /** UX 4-3: told the act Finance's file leads with when no step names it (the fee balance), so the strip can say it. */
-  onLead?: (code: string | null) => void;
 }) {
   const t = useWorkCopy().admission;
   const id = useId();
@@ -122,7 +120,7 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
       : !reserved && !cleared ? "reserve" : ["NONE", "REFUSED"].includes(view.letterCheck ?? "NONE") && !cleared ? "letter"
       : currentCode === "RECORD_HOSPITAL_BALANCE" ? "receipt" : currentCode === "RECORD_ADMISSION_NUMBER" ? "number" : null)
     // In treatment, Finance's current work may be the Treatment panel's (P1-16): this panel then leads only for its own work.
-    : role === "finance" && (caseStatus !== "TREATMENT_IN_PROGRESS" || ADMISSION_WORK.has(currentCode ?? "")) ? (pendingLetter ? "decide" : toCountersign.length > 0 ? `countersign:${toCountersign[0].id}` : feeOwed ? "fee" : null)
+    : role === "finance" && (caseStatus !== "TREATMENT_IN_PROGRESS" || ADMISSION_WORK.has(currentCode ?? "")) ? (pendingLetter ? "decide" : toCountersign.length > 0 ? `countersign:${toCountersign[0].id}` : feeOwed && currentCode === "RECORD_FEE_BALANCE" ? "fee" : null)
     : null;
   const voucherFacts = voucher && <VoucherFacts t={t} locale={locale} voucher={voucher} view={view} egp={egp}/>;
 
@@ -202,11 +200,10 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
             <Trail t={t} evidence={view.evidence} when={when} egp={egp}/>
           </details>
         )}
-      </> : role === "finance" ? (<>
-        <LeadSignal code={next === "fee" && (!currentCode || currentCode === "NONE") ? "RECORD_FEE_BALANCE" : null} onLead={onLead}/>
+      </> : role === "finance" ? (
         <FinanceFile t={t} locale={locale} view={view} caseId={caseId} next={next} busy={busy} act={act} when={when} egp={egp} money={voucherFacts}
           pendingLetter={pendingLetter} toCountersign={toCountersign} cleared={cleared}/>
-      </>) : !reserved ? <p className="mt-2 text-[0.875rem] text-ink-600">{t.notReserved}</p> : (
+      ) : !reserved ? <p className="mt-2 text-[0.875rem] text-ink-600">{t.notReserved}</p> : (
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-3">
           <Fact label={t.facility}><bdi>{view.facilityName ?? "—"}</bdi>{view.facilityCity && <span className="font-normal text-ink-600"> · <bdi>{view.facilityCity}</bdi></span>}</Fact>
           <Fact label={t.plannedAt}>{when(view.plannedAdmissionAt)}</Fact>

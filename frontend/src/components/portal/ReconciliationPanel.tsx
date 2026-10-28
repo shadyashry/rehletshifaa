@@ -9,7 +9,7 @@ import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { StatementSheet } from "@/components/portal/GoingHomeStory";
-import { ActForm, AmountInput, ConfirmAction, Fact, LeadSignal, Money, ReasonField, Summary, Task as PanelTask, pick, readAmount, text } from "@/components/portal/panel-parts";
+import { ActForm, AmountInput, ConfirmAction, Fact, Money, ReasonField, Summary, Task as PanelTask, pick, readAmount, text } from "@/components/portal/panel-parts";
 import type { InvoiceLine, Mutate, QuoteLine, ReconciliationView, StaffStatement } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["reconciliation"];
@@ -35,12 +35,10 @@ const isolate = (value: string) => `⁨${value}⁩`;
  * verdict against the band ("EGP 7,660 above the band") before the Manager's decision, which comes before the evidence; Approve
  * and Return are two equal acts. On a phone the invoice lines are stacked rows.
  */
-export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentCode, busy, mutate, load, onLead }: {
+export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentCode, busy, mutate, load }: {
   locale: Locale; role: SettlementRole; caseId: string; caseStatus: string;
   /** The viewer's current action code or work type, which picks what opens first (and which Finance Manager work is theirs). */
   currentCode?: string | null; busy: boolean; mutate: Mutate; load: <T>(path: string) => Promise<T>;
-  /** UX 4-3: told the act this panel leads with when no step names it (the e-invoice), so the strip can say it. */
-  onLead?: (code: string | null) => void;
 }) {
   const work = useWorkCopy();
   const t = work.reconciliation;
@@ -83,20 +81,19 @@ export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentC
   const managerCountersign = finance && awaiting && currentCode === "COUNTERSIGN_RECONCILIATION";
   const managerDispute = finance && disputeOpen && currentCode === "FACILITY_DISPUTE";
   const current = view.statements.find(s => s.current) ?? null;
-  // The next thing this viewer does here: it opens first and carries the panel's one primary button. UX 4-3: the current
-  // statement's e-invoice reference has no step of its own yet (B-4-1), so it leads while no other step is named.
+  // The next thing this viewer does here: it opens first and carries the panel's one primary button. The current statement's
+  // e-invoice reference leads when it is the step (B-4-1).
   const eInvoiceOwed = finance && !!current && !current.eInvoiceRef;
   const next = !finance ? null
     : currentCode === "RECONCILE_INVOICE" ? (canOpen ? "open" : canSubmit ? "submit" : null)
     : managerCountersign ? "countersign" : managerDispute ? "dispute"
-    : eInvoiceOwed && (!currentCode || currentCode === "NONE" || currentCode === "RECORD_E_INVOICE") ? "einvoice" : null;
+    : eInvoiceOwed && currentCode === "RECORD_E_INVOICE" ? "einvoice" : null;
   const hospital = !view.facilityName ? null
     : view.facilityCity ? fillTemplate(t.hospital, { name: isolate(view.facilityName), city: isolate(view.facilityCity) }) : isolate(view.facilityName);
   const verdict = view.reconciliationId ? varianceVerdict(t, view.varianceEgp, view.bandLimitEgp, egp) : null;
 
   return (
     <section id="reconciliation-panel" aria-labelledby={`${id}-title`} className="card p-5">
-      <LeadSignal code={next === "einvoice" && currentCode !== "RECORD_E_INVOICE" ? "RECORD_E_INVOICE" : null} onLead={onLead}/>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3 id={`${id}-title`} tabIndex={-1} className="title text-base outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600">{t.title}</h3>
         <StatusBadge tone={statusTone(view.status)}>{view.status ? pick(t.status, view.status) : t.notOpened}</StatusBadge>
