@@ -158,6 +158,15 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         {view.admissionStatus && <StatusBadge tone={view.admissionStatus === "CANCELLED" ? "neutral" : view.admissionStatus === "RESERVED" ? "info" : "success"}>{pick(t.admissionStatus, view.admissionStatus)}</StatusBadge>}
       </div>
 
+      {/* UX 5-2/5-3: at the cashier Operations reads one line, what the patient pays, above the file that records it; every
+          other figure is one click away. */}
+      {role === "operations" && voucher && (
+        <div className="mt-4 border-t border-line pt-3">
+          <p className="text-[0.9375rem] font-semibold text-ink-900">{fillTemplate(t.money.patientPaysLine, { amount: isolate(egp(voucher.patientPaysAtFacilityEgp)) })}
+            {voucher.displayCurrency && voucher.displayCurrency !== "EGP" && voucher.patientPaysAtFacilityDisplay != null && <span className="font-normal text-ink-600"> · <Money>{formatMoney(voucher.patientPaysAtFacilityDisplay, voucher.displayCurrency, locale)}</Money></span>}</p>
+          <details className="group"><Summary>{t.summary.money}</Summary><div className="pb-2">{voucherFacts}</div></details>
+        </div>
+      )}
       {role === "operations" ? <>
         <OperationsFile t={t} locale={locale} view={view} caseId={caseId} caseStatus={stage} next={next} documents={documents} facilities={facilities} busy={busy} act={act}
           travel={travel} day={day} egp={egp}/>
@@ -178,15 +187,8 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         </dl>
       )}
 
-      {/* UX 5-2: at the cashier Operations reads one line, what the patient pays; every other figure is one click away. */}
-      {role === "operations" && voucher ? (
-        <div className="mt-4 border-t border-line pt-3">
-          <p className="text-[0.9375rem] font-semibold text-ink-900">{fillTemplate(t.money.patientPaysLine, { amount: isolate(egp(voucher.patientPaysAtFacilityEgp)) })}
-            {voucher.displayCurrency && voucher.displayCurrency !== "EGP" && voucher.patientPaysAtFacilityDisplay != null && <span className="font-normal text-ink-600"> · <Money>{formatMoney(voucher.patientPaysAtFacilityDisplay, voucher.displayCurrency, locale)}</Money></span>}</p>
-          <details className="group"><Summary>{t.summary.money}</Summary><div className="pb-2">{voucherFacts}</div></details>
-        </div>
-      ) : voucherFacts ? <div className="mt-4 border-t border-line pt-3">{voucherFacts}</div>
-        : reserved && <p className="mt-4 border-t border-line pt-3 text-[0.875rem] text-ink-600">{t.noVoucher}</p>}
+      {!(role === "operations" && voucher) && (voucherFacts ? <div className="mt-4 border-t border-line pt-3">{voucherFacts}</div>
+        : reserved && <p className="mt-4 border-t border-line pt-3 text-[0.875rem] text-ink-600">{t.noVoucher}</p>)}
 
       <div className="mt-4 border-t border-line pt-3">
         <h4 className="text-[0.875rem] font-bold text-ink-800">{t.checklist.title}</h4>

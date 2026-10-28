@@ -139,8 +139,8 @@ describe("ReconciliationPanel — Finance Manager", () => {
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/statements/s1/e-invoice", { reference: "ETA-77" }));
   });
 
-  it("is read-only for Operations", async () => {
-    setup("operations", { data: settled });
+  it("is read-only for the coordinator (Operations reads it as the Discharge panel's state line)", async () => {
+    setup("coordinator", { data: settled });
     expect(await screen.findByText("Disputed with the hospital")).toBeTruthy();
     expect(screen.getByText("A Finance Manager settles it with the hospital.")).toBeTruthy();
     expect(document.querySelectorAll("#reconciliation-panel form")).toHaveLength(0);

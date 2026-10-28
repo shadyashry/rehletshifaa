@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, type FocusEvent, type ReactNode } from "react";
 import { Check, X } from "lucide-react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
@@ -10,10 +10,12 @@ import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { LetterBlock } from "@/components/portal/GoingHomeStory";
 import { CaseStamp } from "@/components/brand/CaseStamp";
-import { DocumentPicker, Fact, Money, Summary, Task as PanelTask, instant, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
+import { ActForm, DocumentPicker, DoneAct, Fact, LaterAct, Money, Summary, Task as PanelTask, TimeField, instant, localInput, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
 import type { DischargePackItem, DischargeView, Mutate } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["discharge"];
+/** The refusal, clock hint and cancel wording the recording forms share with the hospital file (UX 5-2). */
+type FormCopy = { refused: string; retry: string; timeHint: string; cancel: string };
 export type DischargeRole = "operations" | "coordinator" | "doctor";
 
 /** Current actions and work types whose work is done in this panel, so "do it" lands on its next form (P1-17). */
@@ -32,7 +34,9 @@ const ANCHOR = "discharge-next";
  * generates the letter; Operations records the final invoice, confirms the return (a flight needs a valid fit to fly) and the
  * departure. One primary action — the viewer's next one — and the rest one click away. Once the patient is discharged the
  * panel carries the file's stamp on the day the case recorded it (UX 3-2), and for the Consultant, whose work has moved to
- * Follow-up, the rest folds into one line.
+ * Follow-up, the rest folds into one line. Operations reads its part as acts in the order they happen (UX 5-3): the final
+ * invoice, the return, the departure — a done act one line, the current one open with the view's one filled button — with the
+ * pack and the letter as summary lines and their detail one click away.
  */
 export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, dischargedAt, documents = [], busy, mutate, load }: {
   locale: Locale; role: DischargeRole; caseId: string; caseStatus: string;
@@ -42,7 +46,10 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
   currentCode?: string | null;
   documents?: PanelDocument[]; busy: boolean; mutate: Mutate; load: <T>(path: string) => Promise<T>;
 }) {
-  const t = useWorkCopy().discharge;
+  const work = useWorkCopy();
+  const t = work.discharge;
+  const forms: FormCopy = useMemo(() => ({ refused: work.admission.forms.refused, retry: work.admission.forms.refusedRetry, timeHint: work.admission.forms.timeHint,
+    cancel: work.admission.cancel }), [work]);
   const id = useId();
   const [view, setView] = useState<DischargeView | null | undefined>(undefined);
   const dateTime = useMemo(() => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeStyle: "short" }), [locale]);
@@ -61,8 +68,15 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
     const result: unknown = await mutate(path, body);
     if (!result) return false;
     if (typeof result === "object" && result !== null && "pack" in result && "blockers" in result) setView(result as DischargeView); else await read();
+    // A recorded act becomes its one-line fact and its form goes: focus moves on to the act now open (or the panel's heading),
+    // never to the page's top (UX 5-3, as the hospital file does).
+    requestAnimationFrame(() => {
+      const lost = document.activeElement;
+      if (lost && lost !== document.body && lost.isConnected) return;
+      (document.getElementById(ANCHOR)?.querySelector<HTMLElement>("select,input,textarea,button") ?? document.getElementById(`${id}-title`))?.focus();
+    });
     return true;
-  }, [mutate, read]);
+  }, [mutate, read, id]);
 
   if (view === undefined) return null;
   if (view === null) return <section id="discharge-panel" className="card p-5"><h3 className="title text-base">{t.title}</h3><p role="alert" className="mt-2 text-[0.875rem] text-alert-800">{t.loadFailed}</p></section>;
@@ -70,40 +84,20 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
   const status = view.caseStatus ?? caseStatus;
   const discharged = status === "DISCHARGED" || status === "FOLLOW_UP";
   const recordable = RECORDABLE.has(status);
-  const fitToFly = view.pack.find(item => item.kind === "FIT_TO_FLY" && item.status === "DONE") ?? null;
   const missingKind = view.pack.find(item => item.status === "MISSING")?.kind ?? null;
   // The next thing this viewer does here: it opens first and carries the panel's one primary button.
   const doctorWork = currentCode === "COMPLETE_DISCHARGE_PACK" || currentCode === "DISCHARGE_PACK";
   const next = role === "doctor" && recordable && doctorWork ? (missingKind ? "pack" : !view.followUpPlan ? "plan" : null)
     : role === "operations" ? (currentCode === "RECORD_FINAL_INVOICE" && !view.finalInvoice ? "invoice"
-      : currentCode === "CONFIRM_RETURN" && !view.departedAt ? "return"
-      : currentCode === "CONFIRM_DEPARTURE" && view.returnTravel && !view.departedAt ? "departure" : null)
+      : currentCode === "CONFIRM_RETURN" && !view.returnTravel && !view.departedAt ? "return"
+      : (currentCode === "CONFIRM_RETURN" || currentCode === "CONFIRM_DEPARTURE") && view.returnTravel && !view.departedAt ? "departure" : null)
     : null;
   const stateLine = !discharged ? (view.readyForDischarge ? t.state.ready : null)
     : view.reconciliationSettled ? t.state.settled : t.state.awaitingSettlement;
 
-  return (
-    <section id="discharge-panel" aria-labelledby={`${id}-title`} className="card p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 id={`${id}-title`} className="title text-base">{t.title}</h3>
-        {discharged && (dischargedAt ? <CaseStamp label={t.state.discharged} date={dischargedAt} locale={locale} variant="line"/>
-          : <StatusBadge tone="success">{t.state.discharged}</StatusBadge>)}
-      </div>
-      {stateLine && <p className="mt-1 text-[0.875rem] text-ink-700">{stateLine}</p>}
-      <Fold fold={discharged && role === "doctor"} label={t.details}>
-
-      {/* WHAT BLOCKS DISCHARGE — instead of a button: discharge happens on its own once this list is empty. */}
-      {!discharged && view.blockers.length > 0 && (
-        <div className="mt-3">
-          <p className="text-[0.875rem] font-bold text-ink-800">{t.state.blocked}</p>
-          <ul className="mt-1 space-y-1 text-[0.875rem] text-ink-700">
-            {view.blockers.map(b => <li key={b.code} className="flex items-start gap-2"><span aria-hidden className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-ink-400"/>{pick(t.blockers, b.code)}</li>)}
-          </ul>
-          <p className="mt-1.5 max-w-[65ch] text-[0.8125rem] text-ink-600">{t.automatic}</p>
-        </div>
-      )}
-
-      {/* THE PACK */}
+  // The pack, the follow-up plan and the letter: the Consultant's record, read by everyone.
+  const packAndLetter = (
+    <>
       <h4 className="mt-4 text-[0.875rem] font-bold text-ink-800">{t.pack.title}</h4>
       <ul className="mt-1 divide-y divide-line">
         {view.pack.map(item => <PackRow key={item.kind} t={t} item={item} when={when}/>)}
@@ -126,6 +120,34 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
           </button>
         )}
       </div>
+    </>
+  );
+
+  return (
+    <section id="discharge-panel" aria-labelledby={`${id}-title`} className="card p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h3 id={`${id}-title`} tabIndex={-1} className="title rounded-sm text-base outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600">{t.title}</h3>
+        {discharged && (dischargedAt ? <CaseStamp label={t.state.discharged} date={dischargedAt} locale={locale} variant="line"/>
+          : <StatusBadge tone="success">{t.state.discharged}</StatusBadge>)}
+      </div>
+      {stateLine && <p className="mt-1 text-[0.875rem] text-ink-700">{stateLine}</p>}
+      {/* WHAT BLOCKS DISCHARGE — instead of a button: discharge happens on its own once this list is empty. */}
+      {!discharged && view.blockers.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[0.875rem] font-bold text-ink-800">{t.state.blocked}</p>
+          <ul className="mt-1 space-y-1 text-[0.875rem] text-ink-700">
+            {view.blockers.map(b => <li key={b.code} className="flex items-start gap-2"><span aria-hidden className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-ink-400"/>{pick(t.blockers, b.code)}</li>)}
+          </ul>
+          <p className="mt-1.5 max-w-[65ch] text-[0.8125rem] text-ink-600">{t.automatic}</p>
+        </div>
+      )}
+
+      {role === "operations" ? (
+        <OperationsHome t={t} forms={forms} view={view} caseId={caseId} status={status} next={next} documents={documents} busy={busy} act={act} when={when} egp={egp}
+                        packAndLetter={packAndLetter}/>
+      ) : (
+      <Fold fold={discharged && role === "doctor"} label={t.details}>
+      {packAndLetter}
 
       {/* THE FINAL INVOICE AND THE JOURNEY HOME */}
       <div className="mt-4 border-t border-line pt-3">
@@ -154,14 +176,14 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
       {role === "doctor" && recordable && (
         <div className="mt-3">
           <Task title={t.packForm.title} next={next === "pack"}>
-            <PackForm key={missingKind ?? "all"} t={t} documents={documents} busy={busy} primary={next === "pack"} initialKind={doctorWork ? missingKind ?? "" : ""}
+            <PackForm key={missingKind ?? "all"} t={t} documents={documents} busy={busy} primary={next === "pack"} initialKind={doctorWork ? missingKind ?? "" : ""} timeHint={forms.timeHint}
                       fitToFlyHours={view.fitToFlyHours} onRecord={body => act(`/doctor/cases/${caseId}/discharge/pack`, body)}/>
           </Task>
           {!view.followUpPlan && (
             <Task title={t.followUp.form} next={next === "plan"}>
               <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(data => act(`/doctor/cases/${caseId}/follow-ups`, {
                 dueAt: instant(data.get("dueAt")), mode: data.get("mode"), requiredTests: text(data.get("tests")), instructions: text(data.get("instructions")) }))}>
-                <label className="block text-sm font-semibold">{t.followUp.dueAt}<input className="field" name="dueAt" type="datetime-local" required/></label>
+                <TimeField label={t.followUp.dueAt} name="dueAt" hint={forms.timeHint}/>
                 <label className="block text-sm font-semibold">{t.followUp.mode}
                   <select className="field" name="mode" defaultValue="VIDEO">{(["VIDEO", "PHONE", "IN_PERSON"] as const).map(m => <option key={m} value={m}>{t.followUp.modes[m]}</option>)}</select>
                 </label>
@@ -174,40 +196,8 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
         </div>
       )}
 
-      {/* RECORDING — Operations */}
-      {role === "operations" && (
-        <div className="mt-3">
-          {recordable && !view.reconciliationSettled && (
-            <Task title={view.finalInvoice ? t.invoice.formCorrect : t.invoice.form} next={next === "invoice"}>
-              <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(data => act(`/operations/cases/${caseId}/discharge/final-invoice`, {
-                documentId: data.get("documentId"), invoiceNumber: String(data.get("invoiceNumber") ?? "").trim(), amountEgp: Number(data.get("amountEgp")),
-                issuedAt: instant(data.get("issuedAt")), replaces: view.finalInvoice?.id ?? null }))}>
-                <DocumentPicker name="documentId" label={t.invoice.document} empty={t.invoice.chooseDocument} documents={documents} required/>
-                <label className="block text-sm font-semibold">{t.invoice.number}<input className="field" name="invoiceNumber" maxLength={80} required autoComplete="off" spellCheck={false}/></label>
-                <label className="block text-sm font-semibold">{t.invoice.amountEgp}<input className="field" name="amountEgp" type="number" inputMode="decimal" min="0" step="0.01" required dir="ltr"/></label>
-                <label className="block text-sm font-semibold">{t.invoice.issuedAt}<input className="field" name="issuedAt" type="datetime-local" required/></label>
-                {!documents.some(d => d.status === "CLEAN") && <p className="text-[0.8125rem] text-ink-600 sm:col-span-2">{t.packForm.noDocuments}</p>}
-                <div className="sm:col-span-2"><button className={next === "invoice" ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.invoice.record}</button></div>
-              </form>
-            </Task>
-          )}
-          {DISCHARGE_STAGES.has(status) && !view.departedAt && (
-            <Task title={t.travel.form} next={next === "return"}>
-              <ReturnForm t={t} fitToFly={fitToFly} when={when} busy={busy} primary={next === "return"}
-                          onConfirm={body => act(`/operations/cases/${caseId}/discharge/return`, body)}/>
-            </Task>
-          )}
-          {discharged && view.returnTravel && !view.departedAt && (
-            <Task title={t.travel.departureForm} next={next === "departure"}>
-              <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(data => act(`/operations/cases/${caseId}/discharge/departure`, { departedAt: instant(data.get("departedAt")) }))}>
-                <label className="block text-sm font-semibold">{t.travel.departedAt}<input className="field" name="departedAt" type="datetime-local" required/></label>
-                <div className="sm:col-span-2"><button className={next === "departure" ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.travel.confirmDeparture}</button></div>
-              </form>
-            </Task>
-          )}
-        </div>
-      )}
       </Fold>
+      )}
     </section>
   );
 }
@@ -220,6 +210,85 @@ function Fold({ fold, label, children }: { fold: boolean; label: string; childre
 
 function Task({ title, next, children }: { title: string; next: boolean; children: ReactNode }) {
   return <PanelTask title={title} next={next} anchor={ANCHOR}>{children}</PanelTask>;
+}
+
+/** A run of text that keeps its own direction inside a sentence of the other script (references, amounts, times). */
+const isolate = (value: string) => `⁨${value}⁩`;
+
+/**
+ * UX 5-3: Operations' part of going home, as acts in the order they happen — the hospital's final invoice, the return, the
+ * departure (which ends Operations' part, so it asks first). A done act is one line, with its correction behind a disclosure
+ * while it still takes one; only the current act is open, with the view's one filled button; a later act is named so the order
+ * is plain. Then the pack and the letter as summary lines, their detail one click away. Presentation only: the backend decides.
+ */
+function OperationsHome({ t, forms, view, caseId, status, next, documents, busy, act, when, egp, packAndLetter }: {
+  t: Copy; forms: FormCopy; view: DischargeView; caseId: string; status: string; next: string | null; documents: PanelDocument[]; busy: boolean;
+  act: (path: string, body?: unknown) => Promise<boolean>; when: (iso?: string | null) => string; egp: (amount?: number | null) => string; packAndLetter: ReactNode;
+}) {
+  const a = t.acts;
+  const discharged = status === "DISCHARGED" || status === "FOLLOW_UP";
+  const invoiceOpen = RECORDABLE.has(status) && !view.reconciliationSettled;
+  const returnOpen = DISCHARGE_STAGES.has(status) && !view.departedAt;
+  const departureOpen = discharged && !!view.returnTravel && !view.departedAt;
+  const invoice = view.finalInvoice;
+  const back = view.returnTravel;
+  const fitToFly = view.pack.find(item => item.kind === "FIT_TO_FLY" && item.status === "DONE") ?? null;
+  const owed = view.pack.filter(item => item.status !== "NOT_REQUIRED");
+  const recorded = owed.filter(item => item.status === "DONE").length;
+  // A task brings its own rule; a done or later act takes one, so each act is ruled once.
+  const ruled = (task: boolean) => task ? undefined : "border-t border-line";
+
+  const invoiceForm = (
+    <ActForm key={invoice?.id ?? "new"} className="grid gap-3 sm:grid-cols-2" refused={forms.refused} retry={forms.retry} action={data => act(`/operations/cases/${caseId}/discharge/final-invoice`, {
+      documentId: data.get("documentId"), invoiceNumber: String(data.get("invoiceNumber") ?? "").trim(), amountEgp: Number(data.get("amountEgp")),
+      issuedAt: instant(data.get("issuedAt")), replaces: invoice?.id ?? null })}>
+      <DocumentPicker name="documentId" label={t.invoice.document} empty={t.invoice.chooseDocument} documents={documents} required/>
+      <label className="block text-sm font-semibold">{t.invoice.number}<input className="field" name="invoiceNumber" maxLength={80} required autoComplete="off" spellCheck={false} dir="ltr" defaultValue={invoice?.reference ?? ""}/></label>
+      <label className="block text-sm font-semibold">{t.invoice.amountEgp}<input className="field" name="amountEgp" type="number" inputMode="decimal" min="0" step="0.01" required dir="ltr"
+                                                                  defaultValue={invoice?.amountEgp ?? undefined}/></label>
+      <TimeField label={t.invoice.issuedAt} name="issuedAt" hint={forms.timeHint} defaultValue={localInput(invoice?.effectiveAt ?? invoice?.recordedAt)}/>
+      {!documents.some(d => d.status === "CLEAN") && <p className="text-[0.8125rem] text-ink-600 sm:col-span-2">{t.packForm.noDocuments}</p>}
+      <div className="sm:col-span-2"><button className={next === "invoice" ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.invoice.record}</button></div>
+    </ActForm>
+  );
+  const returnForm = <ReturnForm key={back?.evidenceId ?? "new"} t={t} forms={forms} stored={back ?? null} fitToFly={fitToFly} when={when} busy={busy} primary={next === "return"}
+                                 onConfirm={body => act(`/operations/cases/${caseId}/discharge/return`, body)}/>;
+  const returnLine = back && <>{fillTemplate(t.travel.returnLine, { mode: pick(t.travel.modes, back.mode), when: isolate(when(back.departureAt)) })}
+    {back.reference && <> · {t.travel.reference} <bdi dir="ltr" translate="no">{back.reference}</bdi></>}</>;
+
+  return (
+    <>
+      <ol role="list" aria-label={a.title} className="mt-3 border-b border-line">
+        <li className={ruled(!invoice && invoiceOpen)}>{invoice
+          ? <DoneAct tone={invoice.countersignedAt ? "done" : "waiting"} change={invoiceOpen ? t.invoice.formCorrect : undefined}
+              fact={<>{fillTemplate(a.invoice, { number: isolate(invoice.reference ?? "—"), amount: isolate(egp(invoice.amountEgp)) })} · {invoice.countersignedAt ? a.countersigned : a.awaitingCheck}</>}>{invoiceForm}</DoneAct>
+          : invoiceOpen ? <Task title={t.invoice.form} next={next === "invoice"}>{invoiceForm}</Task>
+          : <LaterAct notYet={a.notYet}>{t.invoice.form}</LaterAct>}</li>
+        <li className={ruled(!back && returnOpen)}>{back
+          ? <DoneAct fact={<>{a.returned} · {returnLine}</>} change={returnOpen ? a.changeReturn : undefined}>{returnForm}</DoneAct>
+          : returnOpen ? <Task title={t.travel.form} next={next === "return"}>{returnForm}</Task>
+          : <LaterAct notYet={a.notYet}>{t.travel.form}</LaterAct>}</li>
+        <li className={ruled(departureOpen)}>{view.departedAt
+          ? <DoneAct fact={<>{fillTemplate(t.travel.departed, { when: isolate(when(view.departedAt)) })} · {a.ended}</>}/>
+          : departureOpen ? <Task title={t.travel.departureForm} next={next === "departure"}>
+              <DepartureForm t={t} forms={forms} busy={busy} primary={next === "departure"} when={when}
+                             onConfirm={departedAt => act(`/operations/cases/${caseId}/discharge/departure`, { departedAt })}/>
+            </Task>
+          : <LaterAct notYet={a.notYet}>{t.travel.departureForm}</LaterAct>}</li>
+      </ol>
+
+      {/* THE PACK AND THE LETTER — the Consultant's, read here as two lines. */}
+      <ul role="list" className="mt-3 space-y-1 text-[0.875rem] text-ink-700">
+        <li>{fillTemplate(a.pack, { done: String(recorded), total: String(owed.length) })}
+          {fitToFly?.validUntil && <> · {fillTemplate(a.fitToFly, { when: isolate(when(fitToFly.validUntil)) })}</>}</li>
+        <li>{view.handoverLetter ? fillTemplate(a.letter, { when: isolate(when(view.handoverLetter.generatedAt)) }) : a.noLetter}</li>
+      </ul>
+      <details className="mt-2 border-t border-line">
+        <Summary>{a.details}</Summary>
+        <div className="pb-2">{packAndLetter}</div>
+      </details>
+    </>
+  );
 }
 
 function packTone(status: string): StatusTone {
@@ -304,8 +373,8 @@ type PackBody = { kind: string; documentId: string | null; diagnosis: string | n
   medications: Record<string, string>[] | null; implants: Record<string, string | null>[] | null; examinedAt: string | null; note: string | null };
 
 /** The Consultant's pack form: a typed clean document plus the facts each kind owes (the backend checks them again). */
-function PackForm({ t, documents, busy, primary, initialKind, fitToFlyHours, onRecord }: {
-  t: Copy; documents: PanelDocument[]; busy: boolean; primary: boolean; initialKind: string; fitToFlyHours: number; onRecord: (body: PackBody) => Promise<boolean>;
+function PackForm({ t, documents, busy, primary, initialKind, timeHint, fitToFlyHours, onRecord }: {
+  t: Copy; documents: PanelDocument[]; busy: boolean; primary: boolean; initialKind: string; timeHint: string; fitToFlyHours: number; onRecord: (body: PackBody) => Promise<boolean>;
 }) {
   const f = t.packForm;
   const [kind, setKind] = useState(initialKind);
@@ -348,7 +417,7 @@ function PackForm({ t, documents, busy, primary, initialKind, fitToFlyHours, onR
       </>}
       {kind === "IMPLANT_RECORD" && <Rows legend={t.pack.implants} rowLabel={f.implant} removeLabel={f.removeImplant} addLabel={f.addImplant} fields={implantFields} rows={implants} setRows={setImplants} max={20}/>}
       {kind === "FIT_TO_FLY" && <>
-        <label className="block text-sm font-semibold">{f.examinedAt}<input className="field" name="examinedAt" type="datetime-local" required/></label>
+        <TimeField label={f.examinedAt} name="examinedAt" hint={timeHint}/>
         <p className="self-end text-[0.8125rem] text-ink-600">{fillTemplate(f.fitToFlyHint, { hours: String(fitToFlyHours) })}</p>
       </>}
       <label className="block text-sm font-semibold sm:col-span-2">{f.note}<textarea className="field" name="note" rows={2} maxLength={2000} dir="auto"/></label>
@@ -368,18 +437,21 @@ function WarningSigns({ t }: { t: Copy }) {
   );
 }
 
-/** Operations confirms the return: a flight says which fit to fly it rests on, or that the Consultant must record one first. */
-function ReturnForm({ t, fitToFly, when, busy, primary, onConfirm }: {
-  t: Copy; fitToFly: DischargePackItem | null; when: (iso?: string | null) => string; busy: boolean; primary: boolean;
+/**
+ * Operations confirms the return: a flight says which fit to fly it rests on, or that the Consultant must record one first. A
+ * change reopens on the return as stored (keyed on it, so a newer return reseeds it).
+ */
+function ReturnForm({ t, forms, stored, fitToFly, when, busy, primary, onConfirm }: {
+  t: Copy; forms: FormCopy; stored: DischargeView["returnTravel"] | null; fitToFly: DischargePackItem | null; when: (iso?: string | null) => string; busy: boolean; primary: boolean;
   onConfirm: (body: { mode: string; departureAt: string | null; reference: string | null }) => Promise<boolean>;
 }) {
-  const [mode, setMode] = useState("FLIGHT");
+  const [mode, setMode] = useState(stored?.mode ?? "FLIGHT");
   return (
-    <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(async data => {
+    <ActForm className="grid gap-3 sm:grid-cols-2" refused={forms.refused} retry={forms.retry} action={async data => {
       const done = await onConfirm({ mode, departureAt: instant(data.get("departureAt")), reference: text(data.get("reference")) });
-      if (done) setMode("FLIGHT");
+      if (done) setMode(stored?.mode ?? "FLIGHT");
       return done;
-    })}>
+    }}>
       <fieldset className="sm:col-span-2">
         <legend className="text-sm font-semibold">{t.travel.mode}</legend>
         <div className="mt-1 flex flex-wrap gap-x-6">
@@ -391,10 +463,35 @@ function ReturnForm({ t, fitToFly, when, busy, primary, onConfirm }: {
         </div>
       </fieldset>
       {mode === "FLIGHT" && <p className="text-[0.8125rem] text-ink-700 sm:col-span-2">
-        {fitToFly?.validUntil ? fillTemplate(t.travel.flightNeeds, { when: when(fitToFly.validUntil) }) : t.travel.flightMissing}</p>}
-      <label className="block text-sm font-semibold">{t.travel.departureAt}<input className="field" name="departureAt" type="datetime-local" required/></label>
-      <label className="block text-sm font-semibold">{t.travel.referenceField}<input className="field" name="reference" maxLength={160} autoComplete="off" spellCheck={false}/></label>
-      <div className="sm:col-span-2"><button className={primary ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.travel.confirm}</button></div>
-    </form>
+        {fitToFly?.validUntil ? fillTemplate(t.travel.flightNeeds, { when: isolate(when(fitToFly.validUntil)) }) : t.travel.flightMissing}</p>}
+      <TimeField label={t.travel.departureAt} name="departureAt" hint={forms.timeHint} defaultValue={localInput(stored?.departureAt)}/>
+      <label className="block text-sm font-semibold">{t.travel.referenceField}
+        <input className="field" name="reference" maxLength={160} autoComplete="off" spellCheck={false} dir="ltr" defaultValue={stored?.reference ?? ""}/></label>
+      <div className="sm:col-span-2"><button className={primary ? "btn-primary" : "btn-secondary"} disabled={busy}>{stored ? t.acts.saveReturn : t.travel.confirm}</button></div>
+    </ActForm>
+  );
+}
+
+/**
+ * The patient has left: the time, prefilled with now (moved on to now each time the officer comes back to the form while it
+ * is untouched, so a page left open never confirms an old time), and a confirmation, because it ends Operations' part.
+ */
+function DepartureForm({ t, forms, busy, primary, when, onConfirm }: {
+  t: Copy; forms: FormCopy; busy: boolean; primary: boolean; when: (iso?: string | null) => string; onConfirm: (departedAt: string | null) => Promise<boolean>;
+}) {
+  const [openedAt] = useState(() => localInput(new Date().toISOString()));
+  const freshNow = (event: FocusEvent<HTMLFormElement>) => {
+    const at = event.currentTarget.elements.namedItem("departedAt");
+    if (!(at instanceof HTMLInputElement) || (event.target as EventTarget) === at || at.value !== at.defaultValue) return;
+    at.defaultValue = at.value = localInput(new Date().toISOString());
+  };
+  return (
+    <ActForm className="flex flex-col items-start gap-3" refused={forms.refused} retry={forms.retry} onFocusCapture={freshNow}
+      confirm={{ title: data => fillTemplate(t.acts.departureConfirm, { time: isolate(when(instant(data.get("departedAt")))) }), body: t.acts.departureConfirmBody,
+        confirm: t.travel.confirmDeparture, cancel: forms.cancel }}
+      action={data => onConfirm(instant(data.get("departedAt")))}>
+      <TimeField label={t.travel.departedAt} name="departedAt" hint={forms.timeHint} defaultValue={openedAt}/>
+      <button className={primary ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.travel.confirmDeparture}</button>
+    </ActForm>
   );
 }

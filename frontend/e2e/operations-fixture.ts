@@ -7,7 +7,8 @@ import { setupPortal } from "./portal-fixture";
 // later answer first). Every name, number and reference here is invented.
 const at = (hoursAgo: number) => new Date(Date.UTC(2026, 9, 28, 9) - hoursAgo * 3600000).toISOString();
 const coordinator = { coordinatorSubject: "owner", coordinatorName: "Layla Hassan" };
-const base = { country: "Libya", careCategory: "cardiology", preferredLanguage: "ar", createdAt: at(600), updatedAt: at(4), version: 5, travelPackageRequested: true, ...coordinator };
+// `myWorkCount`: each case holds one item of My work, as the backend counts it per case (the summary line reads it).
+const base = { country: "Libya", careCategory: "cardiology", preferredLanguage: "ar", createdAt: at(600), updatedAt: at(4), version: 5, travelPackageRequested: true, myWorkCount: 1, ...coordinator };
 
 export type OperationsCaseId = "plan" | "letter" | "balance" | "admit" | "depart";
 const cases: Record<OperationsCaseId, Record<string, unknown>> = {

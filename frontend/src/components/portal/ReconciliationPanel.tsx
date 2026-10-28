@@ -14,7 +14,8 @@ import { ConfirmAction, Fact, Money, Task as PanelTask, pick, submit, text } fro
 import type { InvoiceLine, Mutate, QuoteLine, ReconciliationView, StaffStatement } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["reconciliation"];
-export type SettlementRole = "finance" | "coordinator" | "operations";
+/** Operations reads the reconciliation only as the Discharge panel's state line (UX 5-3). */
+export type SettlementRole = "finance" | "coordinator";
 
 /** Work types whose work is done in this panel, so "do it" lands on its next form (P1-17). */
 export const SETTLEMENT_WORK: ReadonlySet<string> = new Set(["RECONCILE_INVOICE", "COUNTERSIGN_RECONCILIATION", "FACILITY_DISPUTE", "REFUND_CREDIT"]);

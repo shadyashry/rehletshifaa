@@ -21,7 +21,7 @@ import { IntakeHistory } from "@/components/portal/IntakeHistory";
 import type { ConversationDetail } from "@/components/portal/ConversationsView";
 import type { ProposalCopy } from "@/components/portal/PatientProposal";
 import { JourneyPulse, FullJourneyDialog } from "@/components/portal/JourneySnapshot";
-import { CurrentActionPanel, actionTitle, focusCurrentAction, isOwnStep, stepLabel, type CaseActions, type CurrentActionView } from "@/components/portal/CurrentAction";
+import { CurrentActionPanel, actionTitle, focusCurrentAction, isOwnStep, isStepItem, stepLabel, type CaseActions, type CurrentActionView } from "@/components/portal/CurrentAction";
 import type { WorkItem } from "@/components/portal/MyWork";
 import { patientStepText } from "@/components/portal/patient-step";
 import { FinanceApproval } from "@/components/portal/FinanceApproval";
@@ -134,7 +134,8 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  // P1-17: the discharge pack, the final invoice and the journey home, from treatment until the patient has left (Finance reads the
  // invoice in the reconciliation instead); and the reconciliation and statements once discharged, or for an open Finance item.
  const dischargePanel=admissionRole&&admissionRole!=="finance"&&!value.preview&&(DISCHARGE_STAGES.has(c.status)||DISCHARGE_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.discharge.title} message={fillTemplate(cv.panelFailed,{panel:work.discharge.title})}><DischargePanel key={c.id} locale={locale} role={admissionRole as DischargeRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} dischargedAt={value.timeline.find(entry=>entry.status==="DISCHARGED")?.occurredAt??null} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
- const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.reconciliation.title} message={fillTemplate(cv.panelFailed,{panel:work.reconciliation.title})}><ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
+ // UX 5-3: Operations reads the reconciliation as the Discharge panel's state line; the workbench is Finance's and the coordinator's.
+ const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&admissionRole!=="operations"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.reconciliation.title} message={fillTemplate(cv.panelFailed,{panel:work.reconciliation.title})}><ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // P1-18: the follow-up window, contacts, check-ins, outcomes and what holds the case open, for the case's Consultant and coordinator
  // (never Finance or Operations), from discharge to a closed case, or for an open follow-up item (a review outlives the exit).
  const followUpPanel=(isDoctor||isCoordinator)&&!value.preview&&(FOLLOW_UP_STAGES.has(c.status)||FOLLOW_UP_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.followUp.title} message={fillTemplate(cv.panelFailed,{panel:work.followUp.title})}><FollowUpPanel key={c.id} locale={locale} role={isDoctor?"doctor":"coordinator"} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
@@ -247,7 +248,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   const openNext=nextItem&&openCaseById?()=>openCaseById(nextItem.caseId):null;
   // `n` (UX 2-2) is the same Next in My work, through the same leave guard.
   useStaffShortcut("KeyN",openNext);
-  const alsoOpen=workItems.filter(item=>item.caseId===c.id&&item.id!==current.workItemId);
+  const alsoOpen=workItems.filter(item=>item.caseId===c.id&&!isStepItem(current,item));
   const coverRef=useRef<HTMLElement>(null);
   const line=useCoverGone(coverRef);
 

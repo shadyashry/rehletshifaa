@@ -4249,6 +4249,24 @@
         "departureForm": "Confirm the departure",
         "departedAt": "The patient left at",
         "confirmDeparture": "Confirm the departure"
+      },
+      "acts": {
+        "title": "Going home",
+        "notYet": "Later:",
+        "invoice": "Final invoice {number} · {amount}",
+        "countersigned": "countersigned by Finance",
+        "awaitingCheck": "waiting for Finance's countersignature",
+        "returned": "Return confirmed",
+        "changeReturn": "Change the return",
+        "saveReturn": "Save the return",
+        "ended": "Operations' part is done",
+        "departureConfirm": "Confirm the patient left at {time}?",
+        "departureConfirmBody": "This ends Operations' part of the case: the return and the departure can no longer be changed here.",
+        "pack": "Discharge pack: {done} of {total} recorded",
+        "fitToFly": "fit to fly valid until {when}",
+        "letter": "Handover letter generated on {when}",
+        "noLetter": "Handover letter not generated yet",
+        "details": "The pack, the follow-up plan and the letter"
       }
     },
     "reconciliation": {

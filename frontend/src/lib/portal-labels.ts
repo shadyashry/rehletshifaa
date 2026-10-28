@@ -41,14 +41,18 @@ export function workCopyText(copy: WorkItemCopy | null | undefined, messages: Wo
 
 /**
  * A My work item in this locale: from its wording code when the copy knows it; otherwise the backend's English, titled by
- * its work type in Arabic. Shared by My work and the case cover's "Also open on this case".
+ * its work type in Arabic (or, for a type named after a step, the step's own title: UX 5-3). Shared by My work and the case
+ * cover's "Also open on this case".
  */
 export function workItemText(item: { copy?: WorkItemCopy | null; type: string; title: string; context: string | null },
-                             locale: Locale, work: Pick<WorkCopy, "workCopy" | "workTitles">) {
+                             locale: Locale, work: Pick<WorkCopy, "workCopy" | "workTitles" | "currentAction">) {
   const known = workCopyText(item.copy, work.workCopy);
   if (known) return known;
   const titles: Record<string, string> = work.workTitles;
-  const localized = Object.hasOwn(titles, item.type) ? titles[item.type] : undefined;
+  // Only a step's own title: never a state that describes waiting or nothing to do.
+  const steps: Record<string, { title: string }> = work.currentAction.states;
+  const step = Object.hasOwn(steps, item.type) && !/^(WAIT_|VIEW_ONLY|default$)/.test(item.type) ? steps[item.type].title : undefined;
+  const localized = Object.hasOwn(titles, item.type) ? titles[item.type] : step;
   return { title: (locale === "ar" ? localized : undefined) ?? (item.title || localized || ""), context: item.context };
 }
 

@@ -1432,6 +1432,60 @@ staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58. Overwritten shots 
 
 **Next:** slice 5-3 — going home + close (re-critique, after shots, area closed), started in a new session from this branch.
 
+## UX area 5 — slice 5-3 going home + close; area 5 closed (2026-10-28, worktree `infallible-fermi-5c9b5b`, branch `claude/infallible-fermi-5c9b5b` fast-forwarded to 5-2 @ `78f86a4c`)
+
+Plan direction 4 (`plans/operations-workspace.md`); no owner gate (standing instruction).
+
+**Going home, as Operations' acts.** For Operations the Discharge panel opens on an ordered list (`OperationsHome` in
+`DischargePanel.tsx`, `aria-label` "Going home"): the hospital's final invoice → the return → the departure. A done act is one line
+("Final invoice NHH-INV-9031 · EGP 204,000 · countersigned by Finance"; "Return confirmed · Flight, leaving … · reference MS-912";
+"The patient left … · Operations' part is done"), with its correction behind a disclosure while it still takes one ("Correct the final
+invoice" reopens on the stored invoice; "Change the return" on the stored return, keyed on it). Only the current act is open with the
+view's one filled button; a later act is named ("Later: Confirm the departure"). The departure starts at now (moved on to now while
+untouched), carries its clock hint and asks first — "Confirm the patient left at …?" — because it ends Operations' part. Every form is an
+`ActForm` (refusal said at the form, focus to it) with `TimeField`; once an act becomes its fact, focus moves to the act now open or the
+panel's heading. A step that still names a stored return hands the primary to the departure. The pack and the letter are two summary
+lines ("Discharge pack: 4 of 4 recorded · fit to fly valid until …"; "Handover letter generated on …") with the detail behind "The pack,
+the follow-up plan and the letter". The Consultant and the coordinator keep their layout; the Consultant's follow-up and fit-to-fly
+times moved onto `TimeField`.
+
+**Reconciliation for Operations** is its status line only: the workbench card is no longer drawn for Operations (presentation; the
+Discharge panel's state line says it is being reconciled or reconciled). `SettlementRole` is now Finance and coordinator.
+
+**"Also open on this case"** never repeats the step: `isStepItem` (`CurrentAction.tsx`) matches by id when the step is a work item, and
+by the step's code or work type when the backend resolved the step from the stage (a stage-step item is set aside there, so the step has
+no item id) — only for the viewer's own step. Its titles are Arabic on the Arabic page: `workItemText` falls back to the step's own
+title (`currentAction.states`, never a waiting state) when a type has no work title.
+
+**From the re-critique.** The cashier line ("Patient pays at the cashier …") now sits above the hospital file, so the officer reads the
+total before the form that records it. The shots fixture carries `myWorkCount` per case as the backend does (My work said "No cases
+need action" above five items).
+
+Copy en + ar, inserted textually: `discharge.acts.*` (16 keys); Arabic `discharge.invoice.countersigned` aligned to «اعتمدتها المالية».
+
+**Reviews** (four read-only reviewers): RB + composition: no CRITICAL/HIGH; MEDIUMs fixed (the stale-step primary, `ReturnForm` keyed on
+the stored return, `isStepItem` only for the viewer's own step); LOWs fixed (stale departure time, invoice correction prefill, `forms`
+memoized). Web design guidelines: no CRITICAL/HIGH; fixed focus after an act, the hidden primary, `role="list"`, the Arabic «في». RTL/i18n:
+no CRITICAL/HIGH; fixed «أُكِّدت العودة», «العودة إلى البلد», «تعديل/حفظ بيانات العودة», the countersign wording, the fallback's waiting
+states. Pro Max: HIGH ×1 fixed (the primary inside a closed disclosure on a stale `CONFIRM_RETURN`); contrast, focus, motion, targets
+pass. The rest is in backlog.md "Area 5 — Operations". Detector 0.
+
+**Re-critique: 29/40** (from 19; target ≥ 28), dual-agent,
+`.impeccable/critique/2026-10-28T11-53-36Z__frontend-src-components-portal-admissionpanel-tsx.md`. The first A pass on the pre-fix
+shots scored 27; its two cheap P1s were fixed (the cashier line, the fixture) and A ran again on the final shots. Detector 0; one filled
+button per Operations view (was 2–3); 0 inline copy; 0 money inputs without `dir="ltr"`. Open P1s: the strip names the stage, not the
+act (B-5-1); the cards around the file repeat it. Both are in backlog.md "Area 5 — Operations".
+
+**Verify.** `pnpm typecheck` ok; eslint on the touched files clean; vitest 97 files / 791 tests, 790 pass (the known `StaffOperationalUi`
+W-44); `DischargePanel.test.tsx` 13/13 (new: the acts in order with one primary and the summaries, the stale return step, the departure's
+confirmation and refusal at the form, the part done after departure), `portal-labels.test.ts` (new: `isStepItem`, the Arabic fallback),
+`ReconciliationPanel.test.tsx` (read-only case now the coordinator's). Playwright on a production build on :3185 (first run :3184, also
+58/58): operations-shots (`AREA5_SHOTS=after`), consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58. Overwritten
+shots restored. After shots: `screenshots/area-5/after/`.
+
+**Area 5 closed.** 5-0 travel plan (`da2f014c`), 5-1 hospital file (`7f6798c6`), 5-2 cashier (`78f86a4c`), 5-3 going home + close (this
+commit). Follow-ups: B-5-1 (backend step codes), the reservation summary on the workspace, folding the side cards into the file.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The
