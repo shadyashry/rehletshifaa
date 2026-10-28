@@ -6,5 +6,6 @@ import { isLocale } from "@/lib/i18n";
 export default async function VirtualClinicPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  return <VirtualClinic locale={locale} affiliationsCopy={getDictionary(locale).portalWork.affiliations} />;
+  const work = getDictionary(locale).portalWork;
+  return <VirtualClinic locale={locale} copy={work.virtualClinic} navCopy={work.nav} affiliationsCopy={work.affiliations} />;
 }

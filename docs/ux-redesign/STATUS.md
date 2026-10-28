@@ -1120,6 +1120,66 @@ a11y en+ar — 61/61. Overwritten area-2 shots restored.
 filled action, "Credentials reviewed", manager permission line, Affiliations on P1-19's contract), started in a new session from
 this branch.
 
+## UX area 3 — slice 3-3: the Virtual Clinic (2026-10-28, worktree `ux-3-3-virtual-clinic-aaa37c`, branch `claude/ux-3-3-virtual-clinic-aaa37c` from 3-2 @ `a1339b2f`)
+
+**Built (enhances the accepted layout; Petrol & Paper unchanged, no new token).**
+- **The portal shell**: `PortalFrame` moved out of `Portal.tsx` into `portal/PortalFrame.tsx` and shared, so the clinic has the
+  portal's paper page (no gradient), `#portal-title` h1 "Virtual Clinic" and the lead as its subtitle. A Consultant gets the staff
+  navigation (My work · My cases · Virtual Clinic, the clinic `aria-current="page"`; `StaffViewLinks` takes `current: "clinic"`) in
+  the header and inline on phones, and the account menu (`PortalAccount`, preferences, Control Center entry). A practice manager
+  has no case work, so no navigation; the account menu stays.
+- **Tabs with keys**: one underline tab style (the case page's), roving `tabIndex`, arrows mirrored in Arabic, Home/End
+  (`tabKeyTarget`), `aria-controls`/`tabpanel`; icons dropped; scrolls on phones.
+- **Hairline sections**: each section is one white sheet of `Part`s parted by hairlines (`clinic-parts.tsx`: `Part`, `Fact`,
+  `AlertLine`, `DoneLine`, `QUIET`); no card in a card, no tinted draft box, notices as hairline lines with a drawn icon. Field
+  labels without tracking or capitals (Arabic-safe).
+- **Services as a hairline list**: name, kind, "From {date}" in words, code and version de-emphasised, the price in Egyptian
+  pounds (`formatMoney`, `<bdi dir="ltr">`), Active/Retired as `StatusBadge`; Edit/Retire/History as named quiet actions; history
+  opens under its own row. Changes waiting come first for the Consultant (Approve secondary with a check, Reject quiet, then its
+  reason and a secondary "Reject the change"); a manager reads them after the list under "Changes waiting for the Consultant".
+  The service form checks prices at the field (Arabic digits read; upper price must be higher) and focuses its heading on open.
+- **Confirmations** (native `<dialog>` ConfirmDialog, worded in messages): retire a service (a manager's version says it goes for
+  approval), cancel a slot ("Keep the slot"), revoke a manager, discard a profile draft.
+- **One filled action per section**: Approve and publish (draft), Save the change (service form), Add slot, Send invitation, File
+  declaration; Save availability, Approve, Publish now and Save permissions are secondary.
+- **Wording**: "Credentials reviewed · current" / "Credentials not reviewed yet · renewal due" (PRODUCT: never "Verified");
+  history events in words (14 `CLINIC_*` codes, en+ar), not the code lower-cased; backend refusals by code
+  (`CLINIC_VERSION_CONFLICT` also reloads, `CLINIC_ACCESS_DENIED`), English messages only in English.
+- **Manager permission line**: under the Consultant's name, "{name} has allowed you to {permissions}." (`Intl.ListFormat`) and
+  whether service changes wait for approval or apply at once (the Consultant's setting).
+- **Dates and digits**: one rule, `intlLocale` everywhere (Latin digits in both languages, as the portal); calendar dates by
+  `formatCalendarDate`, slots by `formatRange`; review hours validated 1–720 at the field. `formatEgp` removed.
+- **Affiliations on P1-19's real contract** (`AffiliationsView`): the status as a `StatusBadge` with filed/renew-by dates and the
+  declared lines; no current declaration as an alert line; facilities used before they were declared as a hairline list with
+  "Not declared yet" as a warning badge; the yearly form's rows as hairline rows; earlier declarations; the overview's
+  declaration prompt sits above the sheet (a renewal in ink with a calendar icon, a missing one in alert ink).
+- **Copy**: VirtualClinic's inline en/ar table moved to `portalWork.virtualClinic` (inserted textually before `affiliations`;
+  en/ar key parity checked, JSON valid).
+- **Fixture**: `consultant-fixture.ts` answers `/clinics/pr-1/affiliations` (a current declaration renewing within the month, the
+  one it replaced, an open undeclared-facility flag); the shots spec asserts the clinic is the current place, End on the tabs,
+  and shoots the Affiliations tab.
+
+**Reviews** (Impeccable, react-best-practices, composition-patterns and web-design-guidelines loaded at batch start; in-thread
+review of the diff): role-based branches inside the sections, shared `Part` instead of new boolean props; the visual pass on the
+shots caught doubled hairlines where a list met the next part and the declaration prompt boxed inside the sheet (both fixed).
+Impeccable detector: 0 findings; off-ladder sizes in the touched files: 0.
+
+**Verify.** `pnpm typecheck` ok; eslint 0 on the touched files (baseline 0); vitest 97 files / 766 tests, 765 pass — the one
+failure is the known `StaffOperationalUi.test.tsx` W-44 test (fails on the clean base). VirtualClinic tests rewritten (17/17 with
+Affiliations): tab keys (en + mirrored ar), "Credentials reviewed", manager line, retire and revoke confirmations, price and date,
+review-hours refusal, version conflict. Playwright on :3117 (production build): consultant-shots, hospital-agreement-audit,
+a11y en+ar, staff-chrome — 54/54. Overwritten area-2 shots restored.
+
+**Screenshots:** `screenshots/area-3/3-3/` — my-work, case-review/assess/treat/discharge/follow, clinic-overview/services/
+affiliations × en/ar × 390/1440.
+
+**Follow-ups (backlog, not blocking):** the clinic's section is not in the URL (tabs, as the plan allowed; place links if a
+deep link is wanted); the notification bell is not on the clinic page; "Not declared yet" could link to the form row;
+B-3-1a/B-3-1b and G-2 stay open.
+
+**Next:** slice 3-4 — the closing pass (re-critique, target ≥ 28/40; after shots `AREA3_SHOTS=after`; the STATUS section closing
+area 3), started in a new session from this branch.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

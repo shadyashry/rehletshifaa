@@ -25,7 +25,8 @@ export function StaffNav({ locale, label, items, current, clinic, onSelect, href
 }
 
 type StaffNavProps = {
-  label: string; items: StaffViewItem[]; current?: StaffViewId | null;
+  /** The place on screen; "clinic" when the page is the Virtual Clinic (UX 3-3), which shares this navigation. */
+  label: string; items: StaffViewItem[]; current?: StaffViewId | "clinic" | null;
   clinic?: { href: string; label: string } | null; onSelect: (id: StaffViewId) => void;
   /** The view's own URL, so it opens in a new tab and can be shared; a plain click still switches in place. */
   hrefFor?: (id: StaffViewId) => string;
@@ -59,7 +60,7 @@ export function StaffViewLinks({ locale, label, items, current, clinic, onSelect
             )}
           </li>
         ))}
-        {clinic && <li><a href={clinic.href} className={`${base} ${tone(false)}`}>{clinic.label}</a></li>}
+        {clinic && <li className="flex-none whitespace-nowrap"><a href={clinic.href} aria-current={current === "clinic" ? "page" : undefined} className={`${base} ${tone(current === "clinic")}`}>{clinic.label}</a></li>}
       </ul>
     </nav>
   );

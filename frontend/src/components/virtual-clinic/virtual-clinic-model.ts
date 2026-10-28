@@ -60,7 +60,7 @@ export type AffiliationsView = {
   history: Declaration[]; flags: AffiliationFlag[];
 };
 
-export const SERVICE_KINDS =["INITIAL_CASE_REVIEW", "VIDEO_CONSULTATION", "IN_PERSON_CONSULTATION", "FOLLOW_UP_CONSULTATION", "PROFESSIONAL_FEE", "OTHER_PROFESSIONAL_SERVICE"] as const;
+export const SERVICE_KINDS = ["INITIAL_CASE_REVIEW", "VIDEO_CONSULTATION", "IN_PERSON_CONSULTATION", "FOLLOW_UP_CONSULTATION", "PROFESSIONAL_FEE", "OTHER_PROFESSIONAL_SERVICE"] as const;
 
 export const virtualClinicHref = (locale: Locale, practitionerId?: string) =>
   `/${locale}/portal/virtual-clinic${practitionerId ? `?clinic=${encodeURIComponent(practitionerId)}` : ""}`;
@@ -84,9 +84,4 @@ export function useVirtualClinics(enabled = true) {
   }, [key]);
   const current = result && result.key === key ? result : null;
   return { clinics: current?.clinics ?? [], loading: key !== null && !current };
-}
-
-export function formatEgp(value: number | null | undefined, locale: Locale) {
-  if (value === null || value === undefined) return "";
-  return new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-EG", { style: "currency", currency: "EGP", maximumFractionDigits: 2 }).format(value);
 }

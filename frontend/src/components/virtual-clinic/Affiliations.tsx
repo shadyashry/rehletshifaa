@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
-import { AlertTriangle, Plus, X } from "lucide-react";
+import { CalendarClock, Plus, X } from "lucide-react";
 import type { Dictionary } from "@/lib/dictionary";
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { fillTemplate } from "@/lib/portal-labels";
 import type { DirectoryFacility } from "@/components/portal/portal-model";
+import { StatusBadge } from "@/components/portal/StatusBadge";
+import { AlertLine, DoneLine, Part, QUIET } from "./clinic-parts";
 import { AFFILIATION_KINDS, type AffiliationKind, type AffiliationsView, type Declaration } from "./virtual-clinic-model";
 
 export type AffiliationCopy = Dictionary["portalWork"]["affiliations"];
@@ -54,10 +56,10 @@ export function Affiliations({ locale, copy, practitionerId, call, onFiled }: {
     return () => { live = false; };
   }, [call, base, attempt]);
 
-  if (failed && !view) return <p role="alert" className="rounded-xl bg-alert-50 p-4 text-sm text-alert-800">{copy.loadFailed} <button type="button" className="link-cta" onClick={() => setAttempt((n) => n + 1)}>{copy.retry}</button></p>;
-  if (!view) return <p role="status" className="text-sm text-ink-500">{copy.loading}</p>;
+  if (failed && !view) return <AlertLine>{copy.loadFailed} <button type="button" className={QUIET} onClick={() => setAttempt((n) => n + 1)}>{copy.retry}</button></AlertLine>;
+  if (!view) return <p role="status" className="text-[0.9375rem] text-ink-500">{copy.loading}</p>;
   return <>
-    {filed && <p role="status" className="rounded-lg bg-brand-50 p-3 text-sm font-semibold text-brand-800">{copy.saved}</p>}
+    {filed && <div className="pb-5"><DoneLine>{copy.saved}</DoneLine></div>}
     <AffiliationsBody key={view.current?.id ?? "none"} locale={locale} copy={copy} view={view} directory={directory} base={base} call={call}
       onEdit={() => setFiled(false)} onFiled={(next) => { setView(next); setFiled(true); onFiled?.(); }} />
   </>;
@@ -115,44 +117,36 @@ function AffiliationsBody({ locale, copy, view, directory, base, call, onEdit, o
 
   const current = view.current;
   return <>
-    <section className="card p-4 sm:p-5" aria-labelledby={`${id}-status`}>
-      <h2 id={`${id}-status`} className="font-bold text-brand-900">{copy.title}</h2>
-      <p className="mt-1 max-w-[70ch] text-sm text-ink-600">{copy.lead}</p>
+    <Part title={copy.title} lead={copy.lead}>
       {view.declarationCurrent && current ? <div className="mt-4">
-        <p className="text-sm font-bold text-ink-800">{copy.current}</p>
-        <p className="mt-0.5 text-sm text-ink-600">{fillTemplate(copy.filed, { date: day(current.declaredAt) })} · {fillTemplate(copy.renewBy, { date: day(view.renewBy ?? current.validUntil) })}</p>
+        <StatusBadge tone="success">{copy.current}</StatusBadge>
+        <p className="mt-1.5 text-[0.875rem] text-ink-600">{fillTemplate(copy.filed, { date: day(current.declaredAt) })} · {fillTemplate(copy.renewBy, { date: day(view.renewBy ?? current.validUntil) })}</p>
         <DeclaredLines copy={copy} declaration={current} nameOf={nameOf} />
-      </div> : <div role="status" className="mt-4 flex items-start gap-2.5 rounded-lg bg-alert-50 p-3 text-alert-800">
-        <AlertTriangle size={18} aria-hidden className="mt-0.5 flex-none" />
-        <div><p className="font-bold">{copy.none}</p><p className="mt-0.5 text-sm">{copy.noneBody}</p></div>
-      </div>}
-    </section>
+      </div> : <div className="mt-4"><AlertLine role="status" title={copy.none}><p className="mt-0.5">{copy.noneBody}</p></AlertLine></div>}
+    </Part>
 
-    {view.flags.length > 0 && <section className="card p-4 sm:p-5" aria-labelledby={`${id}-flags`}>
-      <h2 id={`${id}-flags`} className="font-bold text-brand-900">{copy.flagsTitle}</h2>
-      <p className="mt-1 max-w-[70ch] text-sm text-ink-600">{copy.flagsIntro}</p>
-      <ul className="mt-3 divide-y divide-line border-y border-line">
-        {view.flags.map((flag) => <li key={flag.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5 text-sm">
-          <span><bdi dir="ltr" className="font-semibold text-ink-900">{flag.caseNumber}</bdi> · <bdi>{nameOf(flag.facilityId, flag.facilityName)}</bdi></span>
-          <span className="text-ink-600">{fillTemplate(copy.flagRaised, { date: day(flag.raisedAt) })} · {flag.clearedAt ? fillTemplate(copy.flagCleared, { date: day(flag.clearedAt) }) : <strong className="text-alert-800">{copy.flagOpen}</strong>}</span>
+    {view.flags.length > 0 && <Part title={copy.flagsTitle} lead={copy.flagsIntro}>
+      <ul className="mt-3 divide-y divide-line border-t border-line">
+        {view.flags.map((flag) => <li key={flag.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 text-[0.9375rem]">
+          <span className="min-w-0"><bdi dir="ltr" className="font-semibold tabular-nums text-ink-900">{flag.caseNumber}</bdi> · <bdi>{nameOf(flag.facilityId, flag.facilityName)}</bdi>
+            <span className="block text-[0.8125rem] text-ink-500">{fillTemplate(copy.flagRaised, { date: day(flag.raisedAt) })}{flag.clearedAt && <> · {fillTemplate(copy.flagCleared, { date: day(flag.clearedAt) })}</>}</span></span>
+          {!flag.clearedAt && <StatusBadge tone="warning">{copy.flagOpen}</StatusBadge>}
         </li>)}
       </ul>
-    </section>}
+    </Part>}
 
-    <section className="card p-4 sm:p-5" aria-labelledby={`${id}-form`}>
-      <h2 id={`${id}-form`} className="font-bold text-brand-900">{current ? copy.renewTitle : copy.formTitle}</h2>
-      <p className="mt-1 max-w-[70ch] text-sm text-ink-600">{copy.formIntro}</p>
+    <Part title={current ? copy.renewTitle : copy.formTitle} lead={copy.formIntro}>
       <form className="mt-4 space-y-4" onSubmit={(e) => void submit(e)} noValidate>
-        {rows.length === 0 && <p className="text-sm text-ink-700">{copy.noLines}</p>}
+        {rows.length === 0 && <p className="text-[0.9375rem] text-ink-700">{copy.noLines}</p>}
         {rows.map((row) => {
           const name = nameOf(row.facilityId);
           const kindError = touched && rowMissingKind(row);
           const noteError = touched && rowMissingNote(row);
-          return <fieldset key={row.facilityId} id={`${id}-${row.facilityId}-kinds`} className="relative min-w-0 rounded-lg border border-line p-3 sm:p-4"
+          return <fieldset key={row.facilityId} id={`${id}-${row.facilityId}-kinds`} className="relative min-w-0 border-t border-line pt-3"
             aria-describedby={kindError ? `${id}-${row.facilityId}-kinds-error` : `${id}-${row.facilityId}-hint`}>
             <legend className="sr-only">{fillTemplate(copy.relationship, { facility: name })}</legend>
-            <p aria-hidden className="pe-10 text-sm font-bold text-ink-800">{fillTemplate(copy.relationship, { facility: name })}</p>
-            <button type="button" className="absolute end-1 top-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-ink-600 hover:text-alert-800"
+            <p aria-hidden className="pe-12 text-[0.9375rem] font-bold text-ink-800">{fillTemplate(copy.relationship, { facility: name })}</p>
+            <button type="button" className="absolute end-0 top-0.5 inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-ink-600 hover:text-alert-800"
               aria-label={fillTemplate(copy.remove, { facility: name })} onClick={() => setRows((all) => all.filter((r) => r.facilityId !== row.facilityId))}><X size={18} aria-hidden /></button>
             <div className="mt-2 grid gap-1 sm:grid-cols-2">
               {AFFILIATION_KINDS.map((kind) => <label key={kind} className="flex min-h-11 items-start gap-2.5 py-1.5 text-sm text-ink-800">
@@ -193,34 +187,33 @@ function AffiliationsBody({ locale, copy, view, directory, base, call, onEdit, o
           {touched && !attested && <p id={`${id}-attest-error`} className="error-text mt-1 ms-7">{copy.attestRequired}</p>}
         </div>
 
-        {error && <p ref={errorRef} tabIndex={-1} role="alert" className="rounded-lg bg-alert-50 p-3 text-sm text-alert-800 outline-none">{error}</p>}
+        {error && <div ref={errorRef} tabIndex={-1} className="outline-none"><AlertLine>{error}</AlertLine></div>}
         <button type="submit" className="btn-primary" disabled={busy}>{copy.submit}</button>
       </form>
-    </section>
+    </Part>
 
-    <section className="card p-4 sm:p-5" aria-labelledby={`${id}-history`}>
-      <h2 id={`${id}-history`} className="font-bold text-brand-900">{copy.history}</h2>
-      {view.history.length === 0 ? <p className="mt-1 text-sm text-ink-500">{copy.noHistory}</p>
-        : <ul className="mt-3 divide-y divide-line border-y border-line">
-          {view.history.map((d) => <li key={d.id} className="py-2.5 text-sm">
-            <p className="text-ink-700">{fillTemplate(copy.filed, { date: day(d.declaredAt) })}{d.supersededAt ? ` · ${fillTemplate(copy.replaced, { date: day(d.supersededAt) })}` : ""}</p>
+    <Part title={copy.history}>
+      {view.history.length === 0 ? <p className="mt-1 text-[0.9375rem] text-ink-600">{copy.noHistory}</p>
+        : <ul className="mt-3 divide-y divide-line border-t border-line">
+          {view.history.map((d) => <li key={d.id} className="py-3 text-[0.9375rem]">
+            <p className="text-[0.875rem] text-ink-600">{fillTemplate(copy.filed, { date: day(d.declaredAt) })}{d.supersededAt ? ` · ${fillTemplate(copy.replaced, { date: day(d.supersededAt) })}` : ""}</p>
             <DeclaredLines copy={copy} declaration={d} nameOf={nameOf} />
           </li>)}
         </ul>}
-    </section>
+    </Part>
   </>;
 }
 
 /** A declaration's facilities with their relationships in words; an empty declaration says what it means. */
 function DeclaredLines({ copy, declaration, nameOf }: { copy: AffiliationCopy; declaration: Declaration; nameOf: (id: string, fallback?: string | null) => string }) {
-  if (!declaration.lines.length) return <p className="mt-1.5 text-sm text-ink-700">{copy.usesNone}</p>;
+  if (!declaration.lines.length) return <p className="mt-1.5 text-[0.9375rem] text-ink-700">{copy.usesNone}</p>;
   const byFacility = new Map<string, { name: string; kinds: string[] }>();
   for (const line of declaration.lines) {
     const entry = byFacility.get(line.facilityId) ?? { name: nameOf(line.facilityId, line.facilityName), kinds: [] };
     entry.kinds.push((copy.kindsShort as Record<string, string>)[line.kind] ?? line.kind);
     byFacility.set(line.facilityId, entry);
   }
-  return <ul className="mt-1.5 space-y-0.5 text-sm">
+  return <ul className="mt-1.5 space-y-0.5 text-[0.9375rem]">
     {[...byFacility.entries()].map(([facilityId, entry]) => <li key={facilityId}><bdi className="font-semibold text-ink-900">{entry.name}</bdi> <span className="text-ink-600">· {entry.kinds.join(" · ")}</span></li>)}
   </ul>;
 }
@@ -252,12 +245,11 @@ export function DeclarationPrompt({ locale, copy, view, now, onOpen }: { locale:
   const renewBy = view.renewBy ? new Date(view.renewBy) : null;
   if (view.declarationCurrent && !(renewBy && renewBy.getTime() - now < RENEW_NOTICE_MS)) return null;
   const first = !view.current && view.history.length === 0;
-  const action = <button type="button" className="link-cta mt-2 inline-flex min-h-11 items-center" onClick={onOpen}>{words.action}</button>;
-  if (view.declarationCurrent && renewBy) return <div role="status" className="rounded-lg border border-line bg-brand-50 p-3 text-sm text-ink-800">
-    <p>{fillTemplate(words.renewSoon, { date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(renewBy) })}</p>{action}
+  const action = <button type="button" className={QUIET} onClick={onOpen}>{words.action}</button>;
+  // Hairline notices (UX 3-3): a renewal is a reminder in ink; a missing declaration stops new cases, so it is said in alert ink.
+  if (view.declarationCurrent && renewBy) return <div role="status" className="flex items-start gap-2.5 border-y border-line py-3 text-[0.9375rem] leading-6 text-ink-800">
+    <CalendarClock size={18} aria-hidden className="mt-0.5 flex-none text-brand-700" />
+    <div><p>{fillTemplate(words.renewSoon, { date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(renewBy) })}</p>{action}</div>
   </div>;
-  return <div role="status" className="flex items-start gap-2.5 rounded-lg bg-alert-50 p-3 text-alert-800">
-    <AlertTriangle size={18} aria-hidden className="mt-0.5 flex-none" />
-    <div><p className="font-bold">{first ? words.firstTitle : words.lapsedTitle}</p><p className="mt-0.5 text-sm">{first ? words.firstBody : words.lapsedBody}</p>{action}</div>
-  </div>;
+  return <AlertLine role="status" title={first ? words.firstTitle : words.lapsedTitle}><p className="mt-0.5">{first ? words.firstBody : words.lapsedBody}</p>{action}</AlertLine>;
 }

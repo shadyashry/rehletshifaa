@@ -48,6 +48,14 @@ for (const locale of ["en", "ar"] as const) for (const width of [390, 1440]) {
       await page.screenshot({ path: shot(`clinic-overview-${locale}-${width}`), fullPage: true });
       const services = page.getByRole("tab", { name: locale === "ar" ? "الخدمات والأسعار" : "Services & prices" });
       if (await services.count()) { await services.click(); await settle(page); await page.screenshot({ path: shot(`clinic-services-${locale}-${width}`), fullPage: true }); }
+      // UX 3-3: the clinic sits in the portal shell (its place current in the staff navigation) and its sections answer the tab keys.
+      await expect(page.locator(`nav[aria-label="${locale === "ar" ? "أقسام العمل" : "Your work"}"] a[aria-current="page"]`).first()).toHaveText(locale === "ar" ? "العيادة الافتراضية" : "Virtual Clinic");
+      await services.press("End");
+      await expect(page.getByRole("tab", { name: locale === "ar" ? "سجل التغييرات" : "Change history" })).toHaveAttribute("aria-selected", "true");
+      await page.getByRole("tab", { name: locale === "ar" ? "الارتباطات" : "Affiliations" }).click();
+      await expect(page.getByText("Garden City Clinic")).toBeVisible();
+      await settle(page);
+      await page.screenshot({ path: shot(`clinic-affiliations-${locale}-${width}`), fullPage: true });
     }
   });
 }

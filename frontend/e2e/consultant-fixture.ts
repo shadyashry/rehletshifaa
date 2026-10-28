@@ -148,6 +148,19 @@ const clinic = {
   slots: [{ id: "sl1", startsAt: at(-26), endsAt: at(-26.5), mode: "VIDEO", status: "OPEN", note: null, version: 0 }, { id: "sl2", startsAt: at(-50), endsAt: at(-50.5), mode: "IN_PERSON", status: "OPEN", note: "Room 4", version: 0 }],
   managers: [{ id: "pm-1", name: "Rana Example", email: "rana@example.test", status: "ACTIVE", permissions: ["SCHEDULE", "PROFILE"], invitedAt: at(1000), version: 1 }],
 };
+// P1-19's real contract (`AffiliationsView`, UX 3-3): a current declaration ending within the month, an earlier one it replaced, and one
+// facility used before it was declared. The review fields are null for the Consultant, as the backend sends them.
+const declared = (id: string, hoursAgo: number, validHoursAhead: number, lines: { facilityId: string; facilityName: string; kind: string }[], supersededAt: string | null) => ({
+  id, practitionerId: "pr-1", consultantName: "Dr Samir Example", declaredAt: at(hoursAgo), validUntil: at(-validHoursAhead), current: !supersededAt, supersededAt,
+  attestationVersion: "affiliation-attestation-2026-10", reviewStatus: null, reviewedAt: null, reviewNote: null, lines });
+const affiliations = {
+  practitionerId: "pr-1", declarationCurrent: true, renewBy: at(-24 * 14), attestationVersion: "affiliation-attestation-2026-10",
+  current: declared("dc2", 24 * 351, 24 * 14, [{ facilityId: "f1", facilityName: "Nile Heart Hospital", kind: "PRIVILEGES" },
+    { facilityId: "f9", facilityName: "Delta Imaging Centre", kind: "NONE_DECLARED" }], null),
+  history: [declared("dc1", 24 * 720, -24 * 340, [{ facilityId: "f1", facilityName: "Nile Heart Hospital", kind: "PRIVILEGES" }], at(24 * 351))],
+  flags: [{ id: "af1", caseId: "treat", caseNumber: "RS-2026-000412", practitionerId: "pr-1", consultantName: "Dr Samir Example", facilityId: "f8", facilityName: "Garden City Clinic",
+    code: "UNDECLARED_FACILITY", raisedAt: at(30), clearedAt: null }],
+};
 const audit = [{ event: "CLINIC_SERVICE_CHANGE_PROPOSED", action: "PROPOSE", actorName: "Rana Example", actorRole: "PRACTICE_MANAGER", occurredAt: at(20) },
   { event: "CLINIC_PROFILE_PUBLISHED", action: "PUBLISH", actorName: "Dr Samir Example", actorRole: "DOCTOR", occurredAt: at(900) }];
 
@@ -178,6 +191,7 @@ export async function setupConsultantDay(page: Page) {
     if (api === "/clinics/mine") return reply([{ practitionerId: "pr-1", consultantName: "Dr Samir Example", relation: "OWNER", permissions: [] }]);
     if (api === "/clinics/pr-1") return reply(clinic);
     if (api === "/clinics/pr-1/audit") return reply(audit);
+    if (api === "/clinics/pr-1/affiliations") return reply(affiliations);
     return route.fallback();
   });
   return portal;
