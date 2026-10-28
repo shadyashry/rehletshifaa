@@ -2050,6 +2050,47 @@ Native Arabic review still pending. Shots: `screenshots/area-7/7-1/` (13 pages �
 **Next:** slice 7-2 — the setup moments (`info.ftl`, `error.ftl`, `login-update-password.ftl`, plus `login-verify-email.ftl`
 for the "Click here" link), in a new session from this branch.
 
+### Slice 7-2 — the setup moments (2026-10-29, same worktree and branch, on 7-1 `223dcbda`)
+
+**What Keycloak really sends** (read from the 26.7.3 `keycloak-services` bytecode in the local image, `docker create`/`cp`
+only): the setup start page is `setSuccess(confirmExecutionOfActions)` with `actionUri` and `requiredActions` and **no**
+`messageHeader` (the harness had one, which hid the stock page's repeated heading and orphan colon); the done page is
+`messageHeader=accountUpdatedTitle`, `setSuccess(accountUpdatedMessage)` and `pageRedirectUri` (the backend sends a
+`redirect_uri`); `passwordPolicies` (`PasswordPoliciesBean`, nullable Integers) reaches every login template. Harness
+scenarios now match, plus `setup-start-two` (verify email + password), `setup-password-error` (policy refusal) and
+`verify-email-sent` (16 pages × en/ar).
+
+Template overrides in `themes/rehletshifaa/login/` (each starts from Keycloak's base template):
+- `info.ftl`: the heading says the moment once ("Finish setting up your account" / «أكمل إعداد حسابك», right for one step or
+  two); the step follows as a sentence ("Next step: Create your password.") or a numbered list, no orphan colon; the way on
+  is one primary button that names the step ("Create your password", "Start setup", "Continue to the case"); the done page
+  adds what is now possible instead of repeating "Your account is ready".
+- `error.ftl`: the message and one primary button (the expired link already names the coordinator, 7-1); trace id quiet.
+- `login-update-password.ftl`: the intro Keycloak sends as a warning alert is plain text; the password rule is built from the
+  realm's own policy before the first try (none in dev, 12+ / A–Z / a–z / 0–9 / symbol / not the email in production), tied
+  to the field with `aria-describedby` (the error first when there is one); refusals in the rule's words; the second show
+  button names the confirmation field; "Save password"; a hidden `username` field so password managers file it under the
+  email; `aria-invalid` only on the field at fault.
+- `login-verify-email.ftl`: the carried 7-1 HIGH — the link is "Send the link" / "Send the link again" (by state), not
+  "Click here" + "to re-send the email."; the spec now flags "click here" / «انقر هنا» anywhere.
+- `login-reset-password.ftl`: the hint above the field and tied to it (it was in the footer under the button), the field an
+  email field to the browser (`autocomplete=username`, `inputmode=email`, no spellcheck/capitalise), "Send reset link".
+- CSS (block "UX 7-2"): the info/error button full-width at the control height, the step and rule lists; tokens only, logical
+  properties only. The PatternFly float column (`kcFormButtonsClass`) is not used on these pages: it let the button fall
+  out of the card.
+
+**Reviews.** RB: no HIGH; heading/list contradiction fixed, `verify-email-sent` scenario added, notEmail comment; the rest in
+backlog. WG: no HIGH; its MEDIUMs fixed (field-level `aria-invalid`, password-manager username, reset hint + autocomplete,
+Send vs Send again, step-naming button, count-neutral heading). RTL: no HIGH; parity, CRLF, logical properties hold; Arabic
+rule as noun phrases; Latin ranges dropped from the Arabic rule (bidi flipped "0–9"). Pro Max: no HIGH; contrast 7.38:1 on
+the new buttons, focus ring, no overflow at 375/768/1024/1440; button height and the last physical margin fixed.
+
+**Verify.** `keycloak-theme.spec.ts` 11/11 (32 pages × 390/1440, words en/ar, stock keys — `doClickHere` no longer needed);
+eslint and `tsc` clean. Not live-checked (Keycloak :8180 serves the main checkout's theme). Shots: `screenshots/area-7/7-2/`.
+
+**Next:** slice 7-3 — the second factor + close (`login-otp.ftl`, `login-config-totp.ftl` incl. the manual-key view,
+`webauthn-register.ftl`, `webauthn-authenticate.ftl`; re-critique ≥ 28/40, after shots, live walk), in a new session.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

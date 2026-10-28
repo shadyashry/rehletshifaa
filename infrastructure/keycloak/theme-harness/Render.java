@@ -118,23 +118,41 @@ public class Render {
                 m.put("login", Map.of("username", USER));
             }),
             new Scenario("reset-password", "login-reset-password.ftl", m -> {}),
+            // As Keycloak 26.7.3's ExecuteActionsActionTokenHandler: setSuccess(confirmExecutionOfActions), no messageHeader.
             new Scenario("setup-start", "info.ftl", m -> {
-                m.put("messageHeader", "confirmExecutionOfActions");
-                m.put("message", message(m, "info", null));
+                m.put("message", message(m, "success", "confirmExecutionOfActions"));
                 m.put("requiredActions", List.of("UPDATE_PASSWORD"));
                 m.put("actionUri", "#");
             }),
-            new Scenario("setup-password", "login-update-password.ftl", m -> m.put("message", message(m, "warning", "updatePasswordMessage"))),
+            // An account whose email is not verified yet gets both steps (KeycloakPatientIdentityService).
+            new Scenario("setup-start-two", "info.ftl", m -> {
+                m.put("message", message(m, "success", "confirmExecutionOfActions"));
+                m.put("requiredActions", List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+                m.put("actionUri", "#");
+            }),
+            new Scenario("setup-password", "login-update-password.ftl", m -> {
+                m.put("message", message(m, "warning", "updatePasswordMessage"));
+                m.put("passwordPolicies", policy());
+            }),
+            new Scenario("setup-password-error", "login-update-password.ftl", m -> {
+                m.put("message", message(m, "error", "invalidPasswordMinUpperCaseCharsMessage"));
+                m.put("messagesPerField", new Fields(m, Map.of("password", "invalidPasswordMinUpperCaseCharsMessage")));
+                m.put("passwordPolicies", policy());
+            }),
+            // As AuthenticationManager.finishedRequiredActions: messageHeader accountUpdatedTitle, setSuccess(accountUpdatedMessage),
+            // and pageRedirectUri because the backend sends a redirect_uri with the setup email.
             new Scenario("setup-done", "info.ftl", m -> {
                 m.put("messageHeader", "accountUpdatedTitle");
-                m.put("message", message(m, "info", "accountUpdatedMessage"));
-                m.put("client", Map.of("baseUrl", "#"));
+                m.put("message", message(m, "success", "accountUpdatedMessage"));
+                m.put("pageRedirectUri", "#");
             }),
             new Scenario("setup-expired", "error.ftl", m -> {
                 m.put("message", message(m, "error", "expiredActionMessage"));
                 m.put("client", Map.of("baseUrl", "#"));
             }),
             new Scenario("verify-email", "login-verify-email.ftl", m -> m.put("user", Map.of("email", USER))),
+            // After Keycloak has sent the email: the resend link says "again".
+            new Scenario("verify-email-sent", "login-verify-email.ftl", m -> { m.put("user", Map.of("email", USER)); m.put("verifyEmail", USER); }),
             new Scenario("otp-setup", "login-config-totp.ftl", m -> {
                 m.put("totp", totp(qr));
                 m.put("auth", new Auth(true));
@@ -202,8 +220,14 @@ public class Render {
 
     static Map<String, Object> message(Map<String, Object> m, String type, String key) {
         Properties messages = (Properties) m.get("_messages");
-        String summary = key == null ? "" : text(messages, (Locale) m.get("_locale"), key, USER);
+        String summary = key == null ? "" : text(messages, (Locale) m.get("_locale"), key, key.startsWith("invalidPasswordMin") ? "1" : USER);
         return Map.of("type", type, "summary", summary);
+    }
+
+    /** The production realm's policy (deploy/oracle/keycloak/rehletshifaa-realm.json), as Keycloak's PasswordPoliciesBean. */
+    static Map<String, Object> policy() {
+        return Map.of("length", 12, "upperCase", 1, "lowerCase", 1, "digits", 1, "specialChars", 1, "passwordHistory", 5,
+            "notUsername", true, "notEmail", false);
     }
 
     static Map<String, Object> totp(String qr) {
@@ -296,7 +320,7 @@ public class Render {
             return "";
         }
         public String printIfExists(String field, String value) { return errors.containsKey(field) ? value : ""; }
-        private String text(String key) { return key == null ? "" : Render.text(messages, locale, key); }
+        private String text(String key) { return key == null ? "" : Render.text(messages, locale, key, "1"); }
     }
 
     static Map<String, String> toMap(Properties p) {

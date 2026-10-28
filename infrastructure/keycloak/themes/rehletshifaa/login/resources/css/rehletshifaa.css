@@ -519,6 +519,54 @@ a:focus-visible {
   min-block-size: 2.75rem;
 }
 
+/* The way on from an info or error page is one primary button (UX 7-2), not a link in the text. */
+#kc-info-message a.pf-c-button,
+#kc-error-message a.pf-c-button {
+  display: flex;
+  justify-content: center;
+  inline-size: 100%;
+  min-block-size: var(--rs-control-height);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+/* ---- Setup moments (UX 7-2): the next steps and the password rule, quiet text before the action ---- */
+.rs-required-actions,
+.rs-password-rule ul {
+  margin-block: 0.25rem 0;
+  margin-inline: 0;
+  padding-inline-start: 1.25rem;
+  color: var(--color-ink-600);
+}
+
+.rs-required-actions {
+  list-style: decimal;
+}
+
+.rs-password-rule ul {
+  list-style: disc;
+}
+
+.rs-required-actions li,
+.rs-password-rule li {
+  margin-block: 0.125rem;
+}
+
+.rs-password-rule {
+  margin-block-end: 0.75rem;
+  font-size: 0.9375rem;
+}
+
+#kc-content .rs-password-rule p {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+#kc-content .rs-quiet {
+  color: var(--color-ink-600);
+  font-size: 0.875rem;
+}
+
 /* ---- Info footer: paper, inside the card, edged by a hairline ---- */
 #kc-info {
   margin: 1.75rem calc(-1 * var(--rs-card-pad)) calc(-1 * var(--rs-card-pad));

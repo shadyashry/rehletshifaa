@@ -16,8 +16,9 @@ const shot = (name: string) => path.join(repo, "docs/ux-redesign/screenshots/are
 
 // Keep in step with Render.java's scenarios.
 const PAGES = [
-  "login", "login-error", "reset-password", "setup-start", "setup-password", "setup-done", "setup-expired",
-  "verify-email", "otp-setup", "otp", "otp-error", "passkey-setup", "passkey",
+  "login", "login-error", "reset-password", "setup-start", "setup-start-two", "setup-password", "setup-password-error",
+  "setup-done", "setup-expired",
+  "verify-email", "verify-email-sent", "otp-setup", "otp", "otp-error", "passkey-setup", "passkey",
 ] as const;
 const LOCALES = ["en", "ar"] as const;
 
@@ -101,15 +102,14 @@ test.describe("Keycloak theme", () => {
   // 7-1: every string comes from our bundles in the page's language. A raw message key means a missing message;
   // Keycloak's own voice (« » arrows, "We are sorry…", Submit, barcode, OTP devices) must not reach either locale.
   const RAW_KEY = /\b[a-z]+(?:[A-Z][A-Za-z]+)+\d*\b|\b[a-z]+(?:-[a-z]+){2,}\b|\b[a-z]\w*\.[A-Za-z_-]{3,}\b/;
-  const KEYCLOAK_VOICE = /[«»]|we are sorry|\bsubmit\b|barcode|device name|\botp\b|webauthn|click here to proceed|نعتذر/i;
+  const KEYCLOAK_VOICE = /[«»]|we are sorry|\bsubmit\b|barcode|device name|\botp\b|webauthn|click here|نعتذر|انقر هنا/i;
   // Text that is not copy: the account's email and the authenticator apps' own names.
   const NOT_COPY = [/\S+@\S+/g, /FreeOTP|Google Authenticator|Microsoft Authenticator/g];
   // Keys a page may still take from Keycloak's own bundles (Render.java lists them in stock-keys.txt): reviewed as
-  // plain enough, or app names. doClickHere ("Click here" on verify-email) is shared with other pages, so 7-2 replaces
-  // the link through login-verify-email.ftl instead of the message.
+  // plain enough, or app names.
   const STOCK_OK = new Set([
     "showPassword", "hidePassword", "passwordConfirm", "logoutOtherSessions",
-    "totpAppFreeOTPName", "totpAppGoogleName", "totpAppMicrosoftAuthenticatorName", "doClickHere",
+    "totpAppFreeOTPName", "totpAppGoogleName", "totpAppMicrosoftAuthenticatorName",
   ]);
 
   test("words: stock Keycloak keys are reviewed ones", () => {
