@@ -15,7 +15,6 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
 @Table(name = "follow_up_plans")
 public class FollowUpPlan extends AssignedIdEntity {
     @Column(name = "case_id", nullable = false) private UUID caseId;
-    @Column(name = "treatment_episode_id") private UUID treatmentEpisodeId;
     @Column(name = "practitioner_id") private UUID practitionerId;
     @Column(name = "due_at", nullable = false) private Instant dueAt;
     @Column(nullable = false, length = 40) private String mode;
@@ -29,10 +28,10 @@ public class FollowUpPlan extends AssignedIdEntity {
 
     protected FollowUpPlan() {}
 
-    public FollowUpPlan(UUID id, UUID caseId, UUID treatmentEpisodeId, UUID practitionerId, Instant dueAt, String mode, String requiredTests,
+    public FollowUpPlan(UUID id, UUID caseId, UUID practitionerId, Instant dueAt, String mode, String requiredTests,
                         String instructions, Instant now) {
         super(id);
-        this.caseId = caseId; this.treatmentEpisodeId = treatmentEpisodeId; this.practitionerId = practitionerId; this.dueAt = micros(dueAt);
+        this.caseId = caseId; this.practitionerId = practitionerId; this.dueAt = micros(dueAt);
         this.mode = mode; this.requiredTests = requiredTests; this.instructions = instructions; this.status = "PLANNED";
         this.createdAt = micros(now); this.updatedAt = micros(now);
     }

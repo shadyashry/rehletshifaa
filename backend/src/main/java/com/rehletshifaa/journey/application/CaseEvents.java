@@ -40,10 +40,11 @@ public final class CaseEvents {
     public record AdmissionEvidenceChanged(UUID caseId) {}
 
     /**
-     * P1-16: the treatment episode moved the case into TREATMENT_IN_PROGRESS (the Consultant, with the hospital's admission
-     * number). {@link TreatmentMilestoneService} records the {@code ADMITTED} milestone and starts the Consultant's milestone clock.
+     * P1-16: the hospital's admission number moved a cleared case into TREATMENT_IN_PROGRESS (B-3-1b: Operations, or the
+     * Consultant after an emergency admission). {@link TreatmentMilestoneService} records the {@code ADMITTED} milestone and
+     * starts the Consultant's milestone clock.
      */
-    public record TreatmentStarted(UUID caseId, String subject) {}
+    public record TreatmentStarted(UUID caseId) {}
 
     /**
      * P1-17: evidence the discharge gate or the settlement gate reads changed (a pack item, the follow-up plan, the final invoice,

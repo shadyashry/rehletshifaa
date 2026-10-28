@@ -151,21 +151,22 @@ public class TreatmentMilestoneService {
     }
 
     /**
-     * The treatment episode opened treatment (the Consultant, with the admission number): the ADMITTED milestone is recorded for
-     * the Consultant and their milestone clock starts. Runs inside the episode's transaction; idempotent.
+     * The admission number opened treatment (B-3-1b): the ADMITTED milestone is the system's, read from that number (whose ledger
+     * row names who recorded it), so it never waits for a countersignature; the Consultant's milestone clock starts. Runs inside
+     * the admission's transaction; idempotent.
      */
     @Transactional
-    public void onTreatmentStarted(UUID caseId, String subject) {
+    public void onTreatmentStarted(UUID caseId) {
         Instant now = clock.instant();
         if (ledger.latest(caseId, Kind.MILESTONE_ADMITTED).isEmpty()) {
             String number = ledger.latest(caseId, Kind.ADMISSION_NUMBER).map(CaseEvidence::getReference).orElse(null);
-            CaseEvidence row = ledger.record(caseId, new Fact(Kind.MILESTONE_ADMITTED, null, number, null, now, null), subject, "CONSULTANT", null);
+            CaseEvidence row = ledger.record(caseId, new Fact(Kind.MILESTONE_ADMITTED, null, number, null, now, null), "SYSTEM", "SYSTEM", null);
             notices.send(caseId, "TREATMENT", "treatment-update", "treatment-update:" + row.getId());
         }
         rotate(caseId, now, caseId, true);
     }
 
-    @EventListener public void on(CaseEvents.TreatmentStarted event) { onTreatmentStarted(event.caseId(), event.subject()); }
+    @EventListener public void on(CaseEvents.TreatmentStarted event) { onTreatmentStarted(event.caseId()); }
 
     /** Restarts the Consultant's milestone clock (closes the open item, opens the next one) while the patient is in treatment. */
     private void rotate(UUID caseId, Instant from, UUID key, boolean tell) {

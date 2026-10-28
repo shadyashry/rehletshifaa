@@ -43,7 +43,7 @@ abstract class DischargeFixture extends AdmissionFixture {
                 List.of(new Medication("Clopidogrel", "75 mg", "once a day", "12 months")), null, null, null, null));
         discharge.recordPackItem(c.caseId, new PackItemRequest("IMPLANT_RECORD", document(c.caseId), null, null, null, null, null,
                 List.of(new Implant("Drug-eluting coronary stent 3.0 x 18 mm", "Example Medical", "LOT-4411")), null, null, null));
-        journey.followUp(c.caseId, new FollowUpRequest(null, null, Instant.now().plusSeconds(14 * 86400), "VIDEO", "ECG", "Rest for a week"));
+        journey.followUp(c.caseId, new FollowUpRequest(null, Instant.now().plusSeconds(14 * 86400), "VIDEO", "ECG", "Rest for a week"));
     }
 
     PackItemRequest summary(Arrived c) {

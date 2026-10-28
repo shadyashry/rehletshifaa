@@ -41,10 +41,10 @@ class TreatmentEvidenceServiceTest extends AdmissionFixture {
 
     // ---------- milestones ----------
 
-    @Test void theEpisodeRecordsAdmittedAndEveryMilestoneRestartsTheConsultantsClockUntilDischargeIsPlanned() {
+    @Test void theAdmissionNumberRecordsAdmittedAndEveryMilestoneRestartsTheConsultantsClockUntilDischargeIsPlanned() {
         Arrived c = inTreatment();
         assertThat(jdbc.queryForMap("SELECT reference, recorded_role, recorded_by FROM case_evidence WHERE case_id=? AND kind='MILESTONE_ADMITTED'", c.caseId))
-                .containsEntry("REFERENCE", "ADM-7001").containsEntry("RECORDED_ROLE", "CONSULTANT").containsEntry("RECORDED_BY", DOCTOR);
+                .containsEntry("REFERENCE", "ADM-7001").containsEntry("RECORDED_ROLE", "SYSTEM").containsEntry("RECORDED_BY", "SYSTEM");
         assertThat(count("SELECT COUNT(*) FROM case_tasks WHERE case_id=? AND task_type='RECORD_MILESTONE' AND owner_subject=? AND status='OPEN'", c.caseId, DOCTOR)).isEqualTo(1);
         Instant due = jdbc.queryForObject("SELECT due_at FROM case_tasks WHERE case_id=? AND task_type='RECORD_MILESTONE' AND status='OPEN'", java.sql.Timestamp.class, c.caseId).toInstant();
         assertThat(due).isAfter(Instant.now()).isBeforeOrEqualTo(sla.plusWorkingHours(Instant.now(), 24));

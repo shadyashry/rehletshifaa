@@ -117,7 +117,7 @@ abstract class AdmissionFixture {
         return new Arrived(c.caseId, c.estimateVersionId, fq.versionId(), finalReview, c.facilityId);
     }
 
-    /** P1-16/P1-17: {@link #arrived} with the final quote accepted, the letter checked, consent, the receipt countersigned and the episode opened. */
+    /** P1-16/P1-17: {@link #arrived} with the final quote accepted, the letter checked, consent, the receipt countersigned and the admission number recorded. */
     Arrived inTreatment() {
         Arrived c = arrivedWithFinalQuote("17250.00");
         admissions.arrivalAttested(c.caseId, Instant.now().minusSeconds(7200), OPS);
@@ -128,8 +128,8 @@ abstract class AdmissionFixture {
         UUID receipt = latest(admissions.recordBalance(c.caseId, receipt("97750.00")), "BALANCE_EVIDENCED");
         asFinance();
         admissions.countersign(c.caseId, receipt);
-        asDoctor();
-        journey.treatment(c.caseId, episode(c, "ADM-7001"));
+        asOps();
+        admissions.recordAdmissionNumber(c.caseId, new AdmissionNumberRequest("ADM-7001"));
         assertThat(caseStatus(c.caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
         return c;
     }
@@ -156,10 +156,6 @@ abstract class AdmissionFixture {
     AdmissionView view(UUID caseId) { asOps(); return admissions.view(caseId); }
 
     static BalanceReceiptRequest receipt(String egp) { return new BalanceReceiptRequest("RCPT-" + egp, new BigDecimal(egp), Instant.now().minusSeconds(600), "CARD", null, "EGP", new BigDecimal(egp)); }
-
-    TreatmentRequest episode(Arrived c, String admissionNumber) {
-        return new TreatmentRequest(c.facilityId, null, Instant.now(), null, "IN_PROGRESS", "Angioplasty", null, null, null, false, null, admissionNumber);
-    }
 
     /** The newest live row of a kind in the view's trail. */
     static UUID latest(AdmissionView view, String kind) {

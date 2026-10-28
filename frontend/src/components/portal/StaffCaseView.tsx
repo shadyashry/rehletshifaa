@@ -115,7 +115,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   // here printed the same person twice under two labels, one of them the internal word "assignee".
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
  // Operations and consultants keep their stage forms; the coordinator's work is driven by the current action.
- const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired} travelPlan={value.travelPlan??null} busy={busy} load={load}/></div>:null;
+ const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired} travelPlan={value.travelPlan??null} busy={busy}/></div>:null;
  // P1-15: the reservation, the voucher, the balance and its evidence, for every staff role on the case from travel coordination to treatment.
  const admissionRole=(["operations","finance","coordinator","doctor"] as string[]).includes(role)?role as AdmissionRole:null;
  const admissionPanel=admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview?<PanelBoundary key={c.id} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
@@ -141,17 +141,15 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   {key:"treatment",work:TREATMENT_WORK,node:treatmentPanel},
   {key:"admission",work:ADMISSION_WORK,node:admissionPanel||workflowBlock?<>{admissionPanel}{workflowBlock}</>:null},
  ].filter(panel=>panel.node).map(panel=>({...panel,rank:panel.work.has(stepCode)?0:1+stageOrder.indexOf(panel.key)})).toSorted((a,b)=>a.rank-b.rank):null;
- // P0-5: the destination and the treatment episodes read back with their facility named, for every staff role on the case.
+ // P0-5: the destination read back with its facility named, for every staff role on the case.
  const when=(v?:string|null)=>v?new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
- const episodes=value.treatmentEpisodes??[];
- const logistics=value.travelPlan||episodes.length>0?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{cv.logistics.title}</h3>
+ const logistics=value.travelPlan?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{cv.logistics.title}</h3>
   {value.travelPlan&&<dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-4">
    <div><dt className="text-ink-500">{cv.logistics.facility}</dt><dd className="font-semibold text-ink-900">{value.travelPlan.facilityName??cv.logistics.notChosen}</dd></div>
    <div><dt className="text-ink-500">{cv.logistics.travelStatus}</dt><dd className="font-semibold text-ink-900">{label(cv.logistics.travel,value.travelPlan.status)}</dd></div>
    <div><dt className="text-ink-500">{cv.logistics.plannedArrival}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.plannedArrival)}</dd></div>
    <div><dt className="text-ink-500">{cv.logistics.confirmedArrival}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.confirmedArrival)}</dd></div>
   </dl>}
-  {episodes.length>0&&<ul className="mt-3 space-y-1.5 text-[0.875rem]" aria-label={cv.logistics.episodes}>{episodes.map(ep=><li key={ep.id} className="flex flex-wrap items-baseline justify-between gap-3 border-t border-line pt-1.5"><span className="font-semibold text-ink-900">{ep.facilityName??cv.logistics.unnamedFacility}</span><span className="text-ink-600">{label(cv.logistics.episode,ep.status)} · {when(ep.startAt)}{ep.endAt?` – ${when(ep.endAt)}`:""}</span></li>)}</ul>}
  </section>:null;
  const recommendationBlock=approved&&(approved.recommendedTreatment||approved.risksAndLimitations)?<div className="border-b border-line pb-4"><p className="mb-2 label-micro text-brand-700">{cv.recommendation}</p>{approved.recommendedTreatment&&<div className="mb-3"><p className="text-sm font-bold text-ink-800">{t.reviewTreatment}</p><p className="mt-0.5 whitespace-pre-wrap text-ink-700">{approved.recommendedTreatment}</p></div>}{approved.risksAndLimitations&&<div><p className="text-sm font-bold text-ink-800">{t.reviewRisks}</p><p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-600">{approved.risksAndLimitations}</p></div>}</div>:null;
  // The proposal is the coordinator's work while it is being prepared or released (or, at arrival, finalised);

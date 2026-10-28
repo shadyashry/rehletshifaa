@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function () { this.open = true; };
@@ -103,6 +104,8 @@ describe("AdmissionPanel — Operations", () => {
     expect(await screen.findByText("Nothing stands between the patient and admission.")).toBeTruthy();
     expect(screen.queryByText("Record the hospital receipt")).toBeNull();
     expect(screen.queryByText("Change the reservation")).toBeNull();
+    // B-3-1b: on a cleared case the number starts treatment, and the field says so.
+    expect(screen.getByLabelText("Hospital admission number")).toHaveAccessibleDescription("Recording it starts treatment.");
     fireEvent.change(screen.getByLabelText("Hospital admission number"), { target: { value: " ADM-5521 " } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/admission/number", { admissionNumber: "ADM-5521" }));
@@ -200,6 +203,23 @@ describe("AdmissionPanel — the Consultant's summary (UX 3-2)", () => {
     expect(within(money).getByText("Patient pays at the cashier")).toBeTruthy();
     expect(screen.queryByText(/^Evidence trail/)).toBeNull();
     expect(screen.queryByText("Record the emergency admission", { selector: "summary" })).toBeNull();
+    expect(screen.queryByLabelText("Hospital admission number")).toBeNull();
+  });
+
+  // B-3-1b: the emergency exception — after their emergency admission the Consultant records the number, which starts treatment.
+  it("after an emergency admission, records the hospital's admission number on the cleared case", async () => {
+    const { mutate } = setup("doctor", { ...reserved, caseStatus: "ADMISSION_READY", emergencyOverride: true, admissionBlockers: [] });
+    const field = await screen.findByLabelText("Hospital admission number");
+    expect(field).toHaveAccessibleDescription(/it starts treatment/);
+    fireEvent.change(field, { target: { value: " NHH-ADM-10 " } });
+    fireEvent.click(screen.getByRole("button", { name: "Record the admission number" }));
+    await waitFor(() => expect(mutate).toHaveBeenCalledWith("/doctor/cases/c1/admission/number", { admissionNumber: "NHH-ADM-10" }));
+  });
+
+  it("leaves the admission number to Operations when there was no emergency admission", async () => {
+    setup("doctor", { ...reserved, caseStatus: "ADMISSION_READY", admissionBlockers: [] });
+    expect(await screen.findByRole("heading", { name: "Admission" })).toBeTruthy();
+    expect(screen.queryByLabelText("Hospital admission number")).toBeNull();
   });
 });
 

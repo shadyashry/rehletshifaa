@@ -18,7 +18,6 @@ import static com.rehletshifaa.journey.api.JourneyDtos.*;
  @PostMapping("/cases/{caseId}/final-assessment")public IdResponse finalAssessment(@PathVariable UUID caseId,@Valid @RequestBody FinalAssessmentRequest request){return service.saveFinalAssessment(caseId,request);}
  @PostMapping("/cases/{caseId}/consent")public IdResponse consent(@PathVariable UUID caseId,@Valid @RequestBody ProcedureConsentRequest request){return service.captureProcedureConsent(caseId,request);}
  @PostMapping("/cases/{caseId}/emergency-override")public IdResponse emergencyOverride(@PathVariable UUID caseId,@Valid @RequestBody EmergencyOverrideRequest request){return service.emergencyOverride(caseId,request);}
- @PostMapping("/cases/{caseId}/treatment-episodes")public IdResponse treatment(@PathVariable UUID caseId,@Valid @RequestBody TreatmentRequest request){return service.treatment(caseId,request);}
  /** "No follow-up needed" on a discharged patient closes the case (P0-2). */
  @PostMapping("/cases/{caseId}/follow-ups/not-needed")public IdResponse noFollowUp(@PathVariable UUID caseId,@Valid @RequestBody NoFollowUpRequest request){return exits.closeWithoutFollowUp(caseId,request.note());}
  @PostMapping("/cases/{caseId}/follow-ups")public IdResponse followUp(@PathVariable UUID caseId,@Valid @RequestBody FollowUpRequest request){return service.followUp(caseId,request);}

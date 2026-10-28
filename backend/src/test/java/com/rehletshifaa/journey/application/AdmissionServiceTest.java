@@ -192,14 +192,36 @@ class AdmissionServiceTest extends AdmissionFixture {
         assertThat(admissions.patientView(c.caseId).cleared()).isTrue();
         assertThat(admissions.patientView(c.caseId).balanceState()).isEqualTo("PAID");
 
-        // Treatment opens with the hospital's admission number, never without it.
-        asDoctor();
-        assertThatThrownBy(() -> journey.treatment(c.caseId, episode(c, null))).isInstanceOf(ApiException.class).extracting("code").isEqualTo("ADMISSION_NUMBER_REQUIRED");
+        // B-3-1b: treatment starts on the admission — Operations records the hospital's admission number, never a blank one.
+        asOps();
+        assertThatThrownBy(() -> admissions.recordAdmissionNumber(c.caseId, new AdmissionNumberRequest(" "))).isInstanceOf(ApiException.class).extracting("code").isEqualTo("ADMISSION_NUMBER_REQUIRED");
         assertThat(caseStatus(c.caseId)).isEqualTo("ADMISSION_READY");
-        journey.treatment(c.caseId, episode(c, "ADM-778812"));
+        // The Consultant's own path is for an emergency admission only.
+        asDoctor();
+        assertThatThrownBy(() -> admissions.recordEmergencyAdmissionNumber(c.caseId, new AdmissionNumberRequest("ADM-778812"))).isInstanceOf(ApiException.class).extracting("code").isEqualTo("EMERGENCY_ADMISSION_REQUIRED");
+        asOps();
+        admissions.recordAdmissionNumber(c.caseId, new AdmissionNumberRequest("ADM-778812"));
         assertThat(caseStatus(c.caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
+        assertThat(count("SELECT COUNT(*) FROM case_status_history WHERE case_id=? AND from_status='ADMISSION_READY' AND to_status='TREATMENT_IN_PROGRESS' AND actor_subject=?", c.caseId, OPS)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT reference FROM case_evidence WHERE case_id=? AND kind='ADMISSION_NUMBER'", String.class, c.caseId)).isEqualTo("ADM-778812");
+        assertThat(jdbc.queryForObject("SELECT reference FROM case_evidence WHERE case_id=? AND kind='MILESTONE_ADMITTED'", String.class, c.caseId)).isEqualTo("ADM-778812");
         assertThat(jdbc.queryForObject("SELECT status FROM facility_admissions WHERE case_id=?", String.class, c.caseId)).isEqualTo("ADMITTED");
+        // In treatment a corrected number supersedes the old one; it moves nothing and starts nothing twice.
+        admissions.recordAdmissionNumber(c.caseId, new AdmissionNumberRequest("ADM-778813"));
+        assertThat(caseStatus(c.caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
+        assertThat(count("SELECT COUNT(*) FROM case_evidence WHERE case_id=? AND kind='MILESTONE_ADMITTED'", c.caseId)).isEqualTo(1);
+        assertThat(admissions.view(c.caseId).admissionNumber()).isEqualTo("ADM-778813");
+    }
+
+    @Test void theAdmissionNumberWaitsForTheAdmissionGate() {
+        Arrived c = arrivedWithFinalQuote("17250.00");
+        reserveAndCheckLetter(c, "100000.00");
+        acceptFinalQuote(c);
+        consent(c.caseId);
+        asOps();
+        assertThatThrownBy(() -> admissions.recordAdmissionNumber(c.caseId, new AdmissionNumberRequest("ADM-1"))).isInstanceOf(ApiException.class).extracting("code").isEqualTo("NOT_CLEARED_FOR_ADMISSION");
+        assertThat(caseStatus(c.caseId)).isEqualTo("ARRIVAL_CONFIRMED");
+        assertThat(count("SELECT COUNT(*) FROM case_evidence WHERE case_id=? AND kind='ADMISSION_NUMBER'", c.caseId)).isZero();
     }
 
     @Test void nobodyCountersignsTheirOwnReceipt() {
@@ -239,12 +261,12 @@ class AdmissionServiceTest extends AdmissionFixture {
 
     // ---------- pay to admit and the emergency path ----------
 
-    @Test void payToAdmitRefusesTheFirstEpisodeAndTheConsultantsEmergencyAdmissionOpensItWithAFinanceReview() {
+    @Test void payToAdmitHoldsTheAdmissionAndTheConsultantsEmergencyAdmissionOpensItWithAFinanceReview() {
         Arrived c = arrivedWithFinalQuote("17250.00");
         acceptFinalQuote(c);
         consent(c.caseId);
         asDoctor();
-        assertThatThrownBy(() -> journey.treatment(c.caseId, episode(c, "ADM-1"))).isInstanceOf(ApiException.class).extracting("code").isEqualTo("BALANCE_EVIDENCE_REQUIRED");
+        assertThatThrownBy(() -> admissions.recordEmergencyAdmissionNumber(c.caseId, new AdmissionNumberRequest("ADM-1"))).isInstanceOf(ApiException.class).extracting("code").isEqualTo("EMERGENCY_ADMISSION_REQUIRED");
         assertThat(caseStatus(c.caseId)).isEqualTo("ARRIVAL_CONFIRMED");
         assertThatThrownBy(() -> admissions.emergencyAdmission(c.caseId, new EmergencyAdmissionRequest(" ")))
                 .isInstanceOf(ApiException.class).extracting("code").isEqualTo("OVERRIDE_REASON_REQUIRED");
@@ -260,8 +282,10 @@ class AdmissionServiceTest extends AdmissionFixture {
         assertThat(jdbc.queryForObject("SELECT payload FROM case_evidence WHERE case_id=? AND kind='EMERGENCY_ADMISSION_OVERRIDE'", String.class, c.caseId)).doesNotContain("bleeding");
         assertThat(count("SELECT COUNT(*) FROM audit_events WHERE case_id=? AND reason LIKE '%bleeding%'", c.caseId)).isZero();
         assertThat(count("SELECT COUNT(*) FROM audit_events WHERE case_id=? AND event_type='EMERGENCY_ADMISSION_OVERRIDE'", c.caseId)).isEqualTo(1);
-        journey.treatment(c.caseId, episode(c, "ADM-2"));
+        // The emergency exception: the Consultant records the hospital's admission number, which starts treatment.
+        admissions.recordEmergencyAdmissionNumber(c.caseId, new AdmissionNumberRequest("ADM-2"));
         assertThat(caseStatus(c.caseId)).isEqualTo("TREATMENT_IN_PROGRESS");
+        assertThat(jdbc.queryForObject("SELECT recorded_role FROM case_evidence WHERE case_id=? AND kind='ADMISSION_NUMBER'", String.class, c.caseId)).isEqualTo("CONSULTANT");
         // The Finance review outlives the case's other work.
         assertThat(StaffWorkService.SURVIVES_EXIT).contains("EMERGENCY_ADMISSION_REVIEW");
     }

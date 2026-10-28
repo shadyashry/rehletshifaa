@@ -170,7 +170,7 @@ Corrections encoded in the model:
 - Recovery paths: `REVISION_REQUESTED → PROPOSAL_PREPARATION`, `EXPIRED → PROPOSAL_PREPARATION`.
 - `CANCELLED` is reachable only from coordinator-controlled states — it represents service cancellation, distinct from patient decline (`DECLINED`) and clinical unsuitability (`CLINICALLY_NOT_SUITABLE`).
 - Legacy statuses (`NEW`, `COORDINATOR_REVIEW`, `RECOMMENDATION_READY`, `TREATMENT_COORDINATION`, `CLAIM_PENDING`, `PROPOSAL_READY`) were migrated to canonical equivalents and removed from the constraint in migration V6.
-- Detailed payment/visa/booking/travel/treatment/follow-up state lives in dedicated sub-workflow tables (`travel_plans`, `treatment_episodes`, `follow_up_plans`), not the main case status.
+- Detailed payment/visa/booking/travel/treatment/follow-up state lives in dedicated sub-workflow tables (`travel_plans`, `follow_up_plans`; admission and treatment facts in the `case_evidence` ledger), not the main case status.
 
 ## Patient-facing status language
 

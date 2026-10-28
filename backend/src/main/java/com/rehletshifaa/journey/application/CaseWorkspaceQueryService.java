@@ -86,7 +86,6 @@ public class CaseWorkspaceQueryService {
     private final PortalPreferenceRepository preferences;
     private final Clock clock;
     private final com.rehletshifaa.journey.infrastructure.TravelPlanRepository travelPlans;
-    private final com.rehletshifaa.journey.infrastructure.TreatmentEpisodeRepository episodes;
     private final com.rehletshifaa.facility.application.FacilityDirectory facilityDirectory;
 
     public CaseWorkspaceQueryService(Authority authority, CaseActionService caseActions, JourneyCaseQueryService caseQueries,
@@ -96,9 +95,8 @@ public class CaseWorkspaceQueryService {
                                      DepositQueryService deposits, PatientActionQueryService patientActions, ProposalAccessService proposalAccess,
                                      CurrencyService currency, CryptoService crypto, PortalPreferenceRepository preferences, Clock clock,
                                      ReplyCoverService replyCovers, com.rehletshifaa.journey.infrastructure.TravelPlanRepository travelPlans,
-                                     com.rehletshifaa.journey.infrastructure.TreatmentEpisodeRepository episodes,
                                      com.rehletshifaa.facility.application.FacilityDirectory facilityDirectory) {
-        this.replyCovers = replyCovers; this.travelPlans = travelPlans; this.episodes = episodes; this.facilityDirectory = facilityDirectory;
+        this.replyCovers = replyCovers; this.travelPlans = travelPlans; this.facilityDirectory = facilityDirectory;
         this.authority = authority; this.caseActions = caseActions; this.caseQueries = caseQueries; this.proposals = proposals;
         this.cases = cases; this.statusHistory = statusHistory; this.tasks = tasks; this.messages = messages; this.assignments = assignments;
         this.reviews = reviews; this.estimates = estimates; this.deposits = deposits; this.patientActions = patientActions;
@@ -174,8 +172,8 @@ public class CaseWorkspaceQueryService {
                 patientActor ? null : patientReply(caseId, actor), false,
                 // QA #19: the commercial calculation only for whoever may approve it (Finance on the case).
                 latest != null && !patientActor && authority.allowed(Permission.FINANCE_SETTLE, onCase) ? proposals.commercial(latest.versionId()) : null,
-                // P0-5: the destination and the episodes, each with its facility named; staff only for now.
-                patientActor ? null : travelPlan(caseId), patientActor ? List.of() : treatmentEpisodes(caseId),
+                // P0-5: the destination, its facility named; staff only for now.
+                patientActor ? null : travelPlan(caseId),
                 // D-1: the patient's stamp dates, read from the same history the patient timeline shows.
                 patientActor ? CaseMilestoneService.from(timelineRows, patientProposal) : null);
     }
@@ -193,15 +191,6 @@ public class CaseWorkspaceQueryService {
         }).orElse(null);
     }
 
-    private List<com.rehletshifaa.journey.api.JourneyDtos.TreatmentEpisodeView> treatmentEpisodes(UUID caseId) {
-        var rows = episodes.findByCaseIdOrderByStartAtAsc(caseId);
-        if (rows.isEmpty()) return List.of();
-        var names = facilityDirectory.names(rows.stream().map(com.rehletshifaa.journey.domain.TreatmentEpisode::getFacilityId).filter(java.util.Objects::nonNull).distinct().toList());
-        return rows.stream().map(x -> new com.rehletshifaa.journey.api.JourneyDtos.TreatmentEpisodeView(x.getId(), x.getFacilityId(),
-                x.getFacilityId() == null ? null : names.get(x.getFacilityId()), x.getPractitionerId(), x.getStartAt(), x.getEndAt(), x.getStatus(),
-                x.getPlannedProcedures(), x.getActualProcedures(), x.getMilestones(), x.getComplications(), x.isDischargeReady(), x.getDischargeDocumentId())).toList();
-    }
-
     private static ProposalView withoutPlatformFee(ProposalView v) {
         return new ProposalView(v.proposalId(), v.versionId(), v.versionNumber(), v.status(), v.language(), v.currency(), v.validUntil(), v.operationalPlan(),
                 v.includedServices(), v.excludedServices(), v.paymentTerms(), v.refundTerms(), v.disclaimers(),
@@ -214,7 +203,7 @@ public class CaseWorkspaceQueryService {
         var actor = authority.authorize(Permission.CASE_DEPOSIT_READ, Resource.ofCase(caseId));
         CaseActionsView actions = caseActions.resolve(caseId, actor);
         return new CaseWorkspace(JourneyCaseQueryService.withoutStaffSubjects(caseQueries.caseView(caseId)), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null,
-                deposits.depositForCase(caseId), null, null, actions, null, List.of(), null, true, null, null, List.of(), null);
+                deposits.depositForCase(caseId), null, null, actions, null, List.of(), null, true, null, null, null);
     }
 
     /** Who answers the patient now, as the staff viewer needs it: whether they may, and who covers the owner until when. */

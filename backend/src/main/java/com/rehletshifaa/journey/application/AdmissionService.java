@@ -74,8 +74,8 @@ import static com.rehletshifaa.shared.persistence.SqlValues.micros;
  *       platform's receipt for any fee balance). When the last gate passes the handoff clears the patient for admission.</li>
  *   <li><b>Emergency</b> (Consultant): admit before the balance with a reason; Finance reviews it after. Same pattern as the
  *       emergency treatment override on consent.</li>
- *   <li><b>Admission number</b> (Operations, or the Consultant opening the treatment episode) and the point of no return
- *       (Operations sets it, Finance approves it).</li>
+ *   <li><b>Admission number</b> (Operations; the Consultant after an emergency admission): on a cleared case it starts
+ *       treatment (B-3-1b). The point of no return (Operations sets it, Finance approves it).</li>
  * </ol>
  * Every fact is an {@link EvidenceLedger} row; the case moves only through {@link CaseTransitionPolicy}. The platform never
  * holds the hospital's money: the patient pays the hospital at its cashier against the voucher (phase 1; a licensed PSP is
@@ -385,22 +385,43 @@ public class AdmissionService {
         return view(caseId, admission);
     }
 
-    /** Operations records the hospital's admission number once the patient is cleared for admission. */
+    /**
+     * Operations records the hospital's admission number once the patient is cleared for admission: on ADMISSION_READY that is
+     * the start of treatment (B-3-1b, D-D). In treatment a different number corrects the one on file.
+     */
     @Transactional
     public AdmissionView recordAdmissionNumber(UUID caseId, AdmissionNumberRequest request) {
         Actor actor = authority.authorize(Permission.ADMISSION_MANAGE, Resource.ofCase(caseId));
-        requireStage(lockStage(caseId), Set.of("ADMISSION_READY", "TREATMENT_IN_PROGRESS"), "NOT_CLEARED_FOR_ADMISSION",
-                "The admission number is recorded once the patient is cleared for admission");
-        recordAdmissionNumber(caseId, request.admissionNumber(), actor.subject(), EvidenceLedger.roleOf(actor.role()));
+        admit(caseId, request.admissionNumber(), actor.subject(), EvidenceLedger.roleOf(actor.role()));
         return view(caseId, admissions.findByCaseId(caseId).orElse(null));
     }
 
     /**
-     * The admission number as part of another act the caller has authorised (the Consultant opening the treatment episode).
-     * A different number supersedes the one on file; the same number is a no-op.
+     * The emergency exception: after the Consultant's emergency admission there may be nobody from Operations at the hospital's
+     * desk, so the Consultant records the admission number. The case is still cleared through the admission gate first.
      */
     @Transactional
-    public void recordAdmissionNumber(UUID caseId, String number, String subject, String role) {
+    public AdmissionView recordEmergencyAdmissionNumber(UUID caseId, AdmissionNumberRequest request) {
+        Actor actor = authority.authorize(Permission.CLINICAL_REVIEW, Resource.ofCase(caseId));
+        if (!readiness.emergencyOverride(caseId))
+            throw new ApiException(409, "EMERGENCY_ADMISSION_REQUIRED", "Operations records the admission number unless the Consultant recorded an emergency admission");
+        admit(caseId, request.admissionNumber(), actor.subject(), EvidenceLedger.roleOf(actor.role()));
+        return view(caseId, admissions.findByCaseId(caseId).orElse(null));
+    }
+
+    /** The admission number on a cleared case; the first one moves ADMISSION_READY to TREATMENT_IN_PROGRESS under the policy. */
+    private void admit(UUID caseId, String number, String subject, String role) {
+        String stage = lockStage(caseId);
+        requireStage(stage, Set.of("ADMISSION_READY", "TREATMENT_IN_PROGRESS"), "NOT_CLEARED_FOR_ADMISSION",
+                "The admission number is recorded once the patient is cleared for admission");
+        recordAdmissionNumber(caseId, number, subject, role);
+        if (!"ADMISSION_READY".equals(stage)) return;
+        move(caseId, "ADMISSION_READY", "TREATMENT_IN_PROGRESS", subject, role, "The hospital admitted the patient");
+        events.publishEvent(new CaseEvents.TreatmentStarted(caseId)); // P1-16: the ADMITTED milestone and the milestone clock
+    }
+
+    /** A different number supersedes the one on file; the same number is a no-op. */
+    private void recordAdmissionNumber(UUID caseId, String number, String subject, String role) {
         String value = number == null ? null : number.trim();
         if (value == null || value.isEmpty()) throw new ApiException(400, "ADMISSION_NUMBER_REQUIRED", "Record the hospital's admission number");
         Optional<CaseEvidence> current = ledger.latest(caseId, Kind.ADMISSION_NUMBER);

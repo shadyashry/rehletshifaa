@@ -309,11 +309,6 @@ public class JourneyService implements CaseDocumentAccessPolicy {
     }
 
     @Transactional
-    public IdResponse treatment(UUID caseId, TreatmentRequest request) {
-        return treatmentDelivery.treatment(caseId, request);
-    }
-
-    @Transactional
     public IdResponse captureProcedureConsent(UUID caseId, ProcedureConsentRequest request) {
         return treatmentDelivery.captureProcedureConsent(caseId, request);
     }

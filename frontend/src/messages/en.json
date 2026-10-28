@@ -1209,20 +1209,6 @@
     },
     "caseView": {
       "panelFailed": "{panel} could not be shown. The rest of the case still works; reload the page to try again.",
-      "startTreatment": {
-        "title": "Start treatment",
-        "hint": "After your final assessment, once the patient is cleared for admission, record where and when treatment starts. Milestones, the discharge pack and follow-up have their own sections.",
-        "facility": "Facility",
-        "choose": "Choose a facility",
-        "waiting": "Opens once the patient is cleared for admission; the Admission section shows what is still owed.",
-        "required": "Choose a facility and when treatment starts.",
-        "confirmTitle": "Start treatment at {facility}?",
-        "confirmBody": "The case moves into treatment with this admission recorded. Milestones then follow in the Treatment section.",
-        "keep": "Not yet",
-        "none": "No active facility is set up yet. Ask Consultant Operations to add one in the Control Center.",
-        "startsAt": "Treatment starts",
-        "save": "Start treatment"
-      },
       "reviewHistory": "Consultant reviews",
       "reviewVersion": "Version {version}",
       "tabs": {
@@ -1263,17 +1249,10 @@
         "travelStatus": "Travel status",
         "plannedArrival": "Planned arrival",
         "confirmedArrival": "Confirmed arrival",
-        "episodes": "Treatment episodes",
-        "unnamedFacility": "Unnamed facility",
         "travel": {
           "PLANNING": "Planning",
           "CONFIRMED": "Confirmed booking",
           "ARRIVED": "Arrived"
-        },
-        "episode": {
-          "PLANNED": "Planned",
-          "IN_PROGRESS": "In progress",
-          "COMPLETED": "Completed"
         }
       },
       "recommendation": "Consultant's clinical recommendation",
@@ -3606,7 +3585,8 @@
       "summary": {
         "title": "Admission",
         "waiting": "Before treatment can start:",
-        "money": "The voucher and what is owed"
+        "money": "The voucher and what is owed",
+        "emergencyNumber": "After an emergency admission you record the hospital's admission number yourself; it starts treatment."
       },
       "firstAppointment": {
         "title": "First confirmed appointment",
@@ -3698,7 +3678,7 @@
         "pnrAt": "No refund for travel after",
         "number": "Record the admission number",
         "numberField": "Hospital admission number",
-        "numberHint": "Needed before treatment starts."
+        "numberHint": "Recording it starts treatment."
       },
       "finance": {
         "letterTitle": "Check the admission letter",

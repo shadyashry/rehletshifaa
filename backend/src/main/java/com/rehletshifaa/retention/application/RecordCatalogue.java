@@ -46,7 +46,7 @@ public final class RecordCatalogue {
                 "practice_manager_delegation_history");
         put(CLINICAL_RECORD,
                 "medical_cases", "medical_documents", "clinical_review_versions", "consultant_referrals", "case_messages", "case_urgency_changes",
-                "treatment_episodes", "case_outcomes", "follow_up_plans", "follow_up_contacts", "follow_up_windows");
+                "case_outcomes", "follow_up_plans", "follow_up_contacts", "follow_up_windows");
         put(PERSONAL_IDENTITY,
                 "patient_profiles", "case_submission_contacts", "patient_representatives", "patient_onboardings", "patient_account_link_requests",
                 "portal_preferences");

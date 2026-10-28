@@ -30,7 +30,8 @@ const LETTER_DECIDABLE = new Set(["CHECK_PENDING", "VARIANCE_OPEN"]);
  * `admissionBlockers`) and the evidence trail; and it carries each role's recording: Operations reserves, records the letter,
  * the cashier receipt, the point of no return and the admission number; Finance decides the letter, countersigns and records
  * the fee balance (step-up: the portal re-signs in and replays); the Consultant reads it as a summary (UX 3-2) and records an
- * emergency admission. The backend
+ * emergency admission, then the hospital's admission number after it (B-3-1b). The admission number on a cleared case starts
+ * treatment. The backend
  * decides every rule; the panel offers one primary action — the next one — and keeps the rest one click away.
  */
 export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, documents = [], facilities = [], busy, mutate, load }: {
@@ -110,6 +111,15 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
       )}
       {caseStatus === "ARRIVAL_CONFIRMED" && !view.emergencyOverride && <EmergencyAdmission t={t} busy={busy}
         onRecord={reason => act(`/doctor/cases/${caseId}/emergency-admission`, { reason })}/>}
+      {/* B-3-1b: after the emergency admission the Consultant records the hospital's number, which starts treatment. */}
+      {caseStatus === "ADMISSION_READY" && view.emergencyOverride && (
+        <form className="mt-3 flex flex-wrap items-end gap-3 border-t border-line pt-3"
+          onSubmit={submit(data => act(`/doctor/cases/${caseId}/admission/number`, { admissionNumber: String(data.get("admissionNumber") ?? "").trim() }))}>
+          <p id={`${id}-number-hint`} className="w-full max-w-[65ch] text-[0.875rem] text-ink-600">{t.summary.emergencyNumber}</p>
+          <label className="block text-sm font-semibold">{t.forms.numberField}<input className="field" name="admissionNumber" maxLength={80} required autoComplete="off" spellCheck={false} dir="ltr" aria-describedby={`${id}-number-hint`}/></label>
+          <button className="btn-primary" disabled={busy}>{t.forms.number}</button>
+        </form>
+      )}
     </section>
   );
 
@@ -201,8 +211,9 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
           {cleared && (
             <Task title={t.forms.number} next={next === "number"}>
               <form className="flex flex-wrap items-end gap-3" onSubmit={submit(data => act(`/operations/cases/${caseId}/admission/number`, { admissionNumber: String(data.get("admissionNumber") ?? "").trim() }))}>
-                <label className="block text-sm font-semibold">{t.forms.numberField}<input className="field" name="admissionNumber" maxLength={80} required autoComplete="off" spellCheck={false} dir="ltr" defaultValue={view.admissionNumber ?? ""}/></label>
+                <label className="block text-sm font-semibold">{t.forms.numberField}<input className="field" name="admissionNumber" maxLength={80} required autoComplete="off" spellCheck={false} dir="ltr" defaultValue={view.admissionNumber ?? ""} aria-describedby={view.caseStatus === "ADMISSION_READY" ? `${id}-number-hint` : undefined}/></label>
                 <button className={btn("number")} disabled={busy}>{t.forms.save}</button>
+                {view.caseStatus === "ADMISSION_READY" && <p id={`${id}-number-hint`} className="w-full text-[0.8125rem] text-ink-500">{t.forms.numberHint}</p>}
               </form>
             </Task>
           )}

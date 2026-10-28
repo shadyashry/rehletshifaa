@@ -70,6 +70,12 @@ public class AdmissionController {
         return new IdResponse(admissions.emergencyAdmission(caseId, request), "EMERGENCY_ADMISSION_OVERRIDE");
     }
 
+    /** B-3-1b: after an emergency admission the Consultant records the hospital's admission number, which starts treatment. */
+    @PostMapping("/doctor/cases/{caseId}/admission/number")
+    public AdmissionView emergencyAdmissionNumber(@PathVariable UUID caseId, @Valid @RequestBody AdmissionNumberRequest request) {
+        return admissions.recordEmergencyAdmissionNumber(caseId, request);
+    }
+
     // ---- patient ----
 
     @GetMapping("/patient/cases/{caseId}/admission")
