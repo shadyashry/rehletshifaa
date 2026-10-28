@@ -120,13 +120,31 @@ public class ClinicalRecommendationService {
         int version=clinicalReviews.nextVersionNumber(caseId);UUID reviewId=UUID.randomUUID();
         // Carry the currency the case was already being quoted in, so the final quote cannot quietly
         // revert to the base currency after a preliminary estimate was issued in, say, USD.
-        String carriedCurrency=clinicalReviews.findLatestProposalCurrency(caseId,Limit.of(1)).stream().findFirst().orElse(null);
+        String carriedCurrency=carriedCurrency(caseId);
+        clinicalReviews.supersedeDrafts(caseId); // G-2: the saved final assessment replaces any draft of it
         clinicalReviews.saveAndFlush(ClinicalReviewVersion.approvedSuitable(reviewId,caseId,practitionerId,version,request.recommendedTreatment(),request.risksAndLimitations(),carriedCurrency,actor.subject(),now));
         saveCostEstimates(reviewId,practitionerId,request.costEstimates());
         audit("FINAL_ASSESSMENT_SAVED",actor,caseId,"ClinicalReview",reviewId.toString(),"CREATE","SUCCESS",null);
         work.changed(caseId); // B-3-1a: the final assessment step is done
         return new IdResponse(reviewId,"APPROVED");
     }
+
+    /**
+     * G-2: the final assessment's draft, kept the way the review's is. A draft is never the saved final assessment (that is an
+     * APPROVED review written since arrival), so it leaves the Consultant's step and its work item open.
+     */
+    @Transactional public IdResponse saveFinalAssessmentDraft(UUID caseId,FinalAssessmentRequest request){
+        var actor=authority.authorize(Permission.CLINICAL_APPROVE,Resource.ofCase(caseId));workflow.requireState(caseId,"ARRIVAL_CONFIRMED");
+        UUID practitionerId=practitionerId(actor.subject());String carriedCurrency=carriedCurrency(caseId);
+        int version=clinicalReviews.nextVersionNumber(caseId);UUID id=UUID.randomUUID();
+        clinicalReviews.supersedeDrafts(caseId);
+        clinicalReviews.saveAndFlush(ClinicalReviewVersion.draft(id,caseId,practitionerId,version,new ClinicalReviewVersion.Content(null,"SUITABLE",null,null,request.recommendedTreatment(),null,request.risksAndLimitations(),null,null,null),carriedCurrency,actor.subject(),clock.instant()));
+        saveCostEstimates(id,practitionerId,request.costEstimates());
+        audit("FINAL_ASSESSMENT_DRAFT_SAVED",actor,caseId,"ClinicalReview",id.toString(),"CREATE","SUCCESS",null);
+        return new IdResponse(id,"DRAFT");
+    }
+
+    private String carriedCurrency(UUID caseId){return clinicalReviews.findLatestProposalCurrency(caseId,Limit.of(1)).stream().findFirst().orElse(null);}
 
     private String requireIssuableCurrency(String requested){
         String code=hasText(requested)?requested.trim().toUpperCase(Locale.ROOT):com.rehletshifaa.shared.currency.CurrencyService.BASE;

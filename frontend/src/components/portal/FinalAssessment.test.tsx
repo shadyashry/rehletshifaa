@@ -64,13 +64,37 @@ describe("FinalAssessment", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it("keeps what was typed when a save fails", async () => {
+  it("keeps what was typed when a save fails, and says so in place", async () => {
     const mutate = setup({ mutate: vi.fn().mockResolvedValue(undefined), seed: preliminary });
     fireEvent.change(recommendation(), { target: { value: "Angioplasty with two stents." } });
     fireEvent.click(screen.getByRole("button", { name: "Save final assessment" }));
     await vi.waitFor(() => expect(mutate).toHaveBeenCalled());
+    expect(await screen.findByRole("alert")).toHaveTextContent("Not saved. What you entered is still here; try again.");
     expect(recommendation().value).toBe("Angioplasty with two stents.");
     expect(screen.getByRole("checkbox", { name: /Coronary angioplasty/ })).toBeChecked();
+  });
+
+  it("G-2: saves a draft without the final assessment's checks, and keeps it on a failed save", async () => {
+    const mutate = setup({ mutate: vi.fn().mockResolvedValue(undefined) });
+    fireEvent.change(recommendation(), { target: { value: "Angioplasty, scope to confirm" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    expect(mutate).toHaveBeenCalledWith("/doctor/cases/c1/final-assessment/draft", { recommendedTreatment: "Angioplasty, scope to confirm", risksAndLimitations: undefined, costEstimates: [] });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Not saved.");
+    expect(recommendation().value).toBe("Angioplasty, scope to confirm");
+  });
+
+  it("G-2: refuses an empty draft at the button", () => {
+    const mutate = setup();
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Add a recommendation or a line before saving a draft.");
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("G-2: reopens on the draft and says it is not saved yet", () => {
+    setup({ seed: { ...preliminary, id: "r3", versionNumber: 3, status: "DRAFT", recommendedTreatment: "Two stents, pending the angiogram.", createdAt: "2026-10-17T09:00:00Z" } });
+    expect(recommendation().value).toBe("Two stents, pending the angiogram.");
+    expect(screen.getByText(/^Draft saved on .*It is not your final assessment until you save it\.$/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save final assessment" })).toBeVisible();
   });
 
   it("sends a Finance-approved package with the expected figure inside its range as an approved line", () => {

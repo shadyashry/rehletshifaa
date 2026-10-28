@@ -279,6 +279,11 @@ public class JourneyService implements CaseDocumentAccessPolicy {
     }
 
     @Transactional
+    public IdResponse saveFinalAssessmentDraft(UUID caseId, FinalAssessmentRequest request) {
+        return clinicalRecommendations.saveFinalAssessmentDraft(caseId, request);
+    }
+
+    @Transactional
     public ProposalView createFinalQuote(UUID caseId, FinalQuoteRequest request) {
         return commercialProposals.createFinalQuote(caseId, request);
     }

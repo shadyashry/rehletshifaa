@@ -1648,6 +1648,7 @@
       "saveFinal": "Save final assessment",
       "saveFinalAgain": "Save a new version",
       "finalSaved": "Saved on {date}. The coordinator prepares the final quote from it.",
+      "finalDraftSaved": "Draft saved on {date}. It is not your final assessment until you save it.",
       "exits": {
         "toggle": "Other clinical outcome",
         "label": {
@@ -1688,6 +1689,7 @@
         "lines": "Choose at least one estimate line.",
         "range": "Set each package's expected figure inside its approved range.",
         "draft": "Add a recommendation or a line before saving a draft.",
+        "notSaved": "Not saved. What you entered is still here; try again.",
         "reason": "Add the clinical reason before you continue.",
         "offList": "Enter a service and an amount greater than zero."
       }

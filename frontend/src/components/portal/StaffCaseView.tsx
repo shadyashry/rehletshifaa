@@ -171,14 +171,17 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
      draft={reviewDraft&&{id:reviewDraft.id,recommendedTreatment:reviewDraft.recommendedTreatment,risksAndLimitations:reviewDraft.risksAndLimitations,costEstimates:reviewDraft.costEstimates,proposalCurrency:reviewDraft.proposalCurrency}}
      mutate={mutate}/>
   :null;
-  // UX 3-1, the final in-person assessment: the same decision sheet as the review. The preliminary recommendation is the
-  // latest one approved before the patient arrived (the case's own timeline says when); one approved after it is a saved final
-  // assessment, which the form then starts from. Presentation only: the backend decides what the Consultant may do.
+  // UX 3-1, the final in-person assessment: the same decision sheet as the review. One rule tells the Consultant's words apart:
+  // written since the patient arrived (the case's own timeline says when) is this stage's — a saved final assessment, or its draft
+  // (G-2) — and the latest approved before it is the preliminary recommendation. The form starts from the latest of them: saving
+  // supersedes the draft, so a draft still standing is newer than the saved one. Presentation only: the backend decides.
   const finalAssessmentOn=isDoctor&&c.status==="ARRIVAL_CONFIRMED"&&!value.preview;
   const arrivedAt=Date.parse(value.timeline.find(entry=>entry.status==="ARRIVAL_CONFIRMED")?.occurredAt??"");
-  const approvedLatestFirst=value.clinicalReviews.filter(r=>r.status==="APPROVED").sort((a,b)=>b.versionNumber-a.versionNumber);
-  const preliminary=finalAssessmentOn?approvedLatestFirst.find(r=>Number.isNaN(arrivedAt)||Date.parse(r.createdAt)<=arrivedAt)??null:null;
-  const finalSaved=finalAssessmentOn&&!Number.isNaN(arrivedAt)?approvedLatestFirst.find(r=>Date.parse(r.createdAt)>arrivedAt)??null:null;
+  const sinceArrival=(r:Review)=>!Number.isNaN(arrivedAt)&&Date.parse(r.createdAt)>arrivedAt;
+  const standingLatestFirst=finalAssessmentOn?value.clinicalReviews.filter(r=>r.status==="APPROVED"||r.status==="DRAFT").sort((a,b)=>b.versionNumber-a.versionNumber):[];
+  const preliminary=standingLatestFirst.find(r=>r.status==="APPROVED"&&!sinceArrival(r))??null;
+  const finalSaved=standingLatestFirst.find(r=>r.status==="APPROVED"&&sinceArrival(r))??null;
+  const finalLatest=standingLatestFirst.find(sinceArrival)??null;
   // The Consultant's sheet: the evidence opens it (in the case rail on large screens), then the act.
   const decisionSheet=!!clinicalReviewPanel||finalAssessmentOn;
   const evidence=decisionSheet?<CaseEvidence locale={locale} intakeSummary={value.intakeSummary} documents={documents} preliminary={preliminary} viewDoc={viewDoc} downloadDoc={downloadDoc}/>:null;
@@ -351,7 +354,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
        {doctorReviewComplete&&<div role="status" className="flex items-start gap-2 border-y border-line py-3"><Check size={18} aria-hidden className="mt-0.5 flex-none text-brand-600"/><p className="font-semibold text-brand-800">{c.status==="CLINICAL_RECOMMENDATION_READY"?t.doctorAccepted:c.status==="INFORMATION_REQUIRED"?t.doctorInfoSent:c.status==="CLINICALLY_NOT_SUITABLE"?t.doctorNotSuitable:t.doctorReturned}</p></div>}
        {evidence&&<div className="border-b border-line pb-5 lg:hidden">{evidence}</div>}
        {clinicalReviewPanel}
-       {finalAssessmentOn&&<FinalAssessment seed={finalSaved??preliminary} savedAt={finalSaved?.createdAt??null} documentsOnFile={documents.length}/>}
+       {finalAssessmentOn&&<FinalAssessment seed={finalLatest??preliminary} savedAt={finalSaved?.createdAt??null} documentsOnFile={documents.length}/>}
        {isDoctor&&<ConsultantReferrals key={c.id} locale={locale} caseId={c.id} careCategory={c.careCategory} categories={categories} canRefer={c.status==="CONSULTANT_REVIEW"&&!myPending&&!secondOpinionOnly} busy={busy} load={load} mutate={mutate}/>}
        {/* While the Consultant is composing, the evidence already shows the intake and their preliminary recommendation. */}
        {!decisionSheet&&intakePanel}
@@ -658,7 +661,8 @@ function ProposalSendForm({estimate,onSend}:{estimate:Review;onSend:(caseId:stri
  * The final in-person assessment (UX 3-1): the review's grammar — "1 Recommendation", "2 Estimate lines", a summary led by
  * the clinical text — starting from the Consultant's last word on the case (a saved final assessment, else the preliminary
  * recommendation) so they confirm or change it. It says which currency the patient's final quote is in and what that comes to
- * at today's rate; a refusal is said at its control; nothing is cleared when a save fails (there is no draft endpoint: G-2).
+ * at today's rate; a refusal is said at its control. Save draft keeps the work without saving it (G-2), and a failed save says so
+ * here with what was typed still in place.
  */
 export function FinalAssessment({seed=null,savedAt=null,documentsOnFile=0}:{seed?:Review|null;savedAt?:string|null;documentsOnFile?:number}){
  const {locale,c:{id:caseId},busy,mutate,catalog,fxRates,facilities,price}=useCaseWorkspace();const copy=useWorkCopy().clinicalDecision;
@@ -667,8 +671,12 @@ export function FinalAssessment({seed=null,savedAt=null,documentsOnFile=0}:{seed
  const currency=seed?.proposalCurrency??null;
  const fx=currency&&currency!==BASE?fxRates.find(rate=>rate.currency===currency):undefined;
  const proposal=fx?{amount:decision.lines.amountsEgp().reduce((sum,egp)=>sum+Math.round(egp*fx.rate*100)/100,0),currency:fx.currency}:null;
- const save=()=>{if(!decision.validate())return;void mutate(`/doctor/cases/${caseId}/final-assessment`,{recommendedTreatment:decision.recommendation.trim(),risksAndLimitations:decision.risks.trim()||undefined,costEstimates:decision.lines.estimates()});};
- const savedOn=savedAt?new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium"}).format(new Date(savedAt)):null;
+ const [error,setError]=useState("");
+ const send=(path:string)=>{setError("");void mutate(path,{recommendedTreatment:decision.recommendation.trim()||undefined,risksAndLimitations:decision.risks.trim()||undefined,costEstimates:decision.lines.estimates()}).then(result=>{if(!result)setError(copy.errors.notSaved);});};
+ const save=()=>{setError("");if(decision.validate())send(`/doctor/cases/${caseId}/final-assessment`);};
+ const saveDraft=()=>{if(!decision.recommendation.trim()&&decision.lines.count===0){setError(copy.errors.draft);return;}send(`/doctor/cases/${caseId}/final-assessment/draft`);};
+ const day=(at:string)=>new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium"}).format(new Date(at));
+ const savedOn=savedAt?day(savedAt):null;const draftOn=seed?.status==="DRAFT"?day(seed.createdAt):null;
  return <section id="clinical-decision" aria-labelledby="final-assessment-title" className="card p-4 sm:p-5">
   <h3 id="final-assessment-title" className="text-[1.125rem] font-bold leading-7 text-brand-900">{copy.final.title}</h3>
   <p className="mt-1 max-w-[65ch] text-[0.9375rem] leading-6 text-ink-600">{copy.final.intro}</p>
@@ -678,7 +686,9 @@ export function FinalAssessment({seed=null,savedAt=null,documentsOnFile=0}:{seed
   </EstimateLines>
   <DecisionSummary locale={locale} title={copy.summary.titleFinal} decision={decision} documentsOnFile={documentsOnFile} proposal={proposal}>
    {savedOn&&<p className="mt-3 flex items-start gap-2 text-[0.875rem] text-ink-700"><Check size={16} aria-hidden className="mt-0.5 flex-none text-brand-600"/>{fillTemplate(copy.finalSaved,{date:savedOn})}</p>}
-   <div className="mt-4"><button type="button" className="btn-primary" disabled={busy} onClick={save}>{savedOn?copy.saveFinalAgain:copy.saveFinal}</button></div>
+   {draftOn&&<p className="mt-3 max-w-[65ch] text-[0.875rem] leading-6 text-ink-700">{fillTemplate(copy.finalDraftSaved,{date:draftOn})}</p>}
+   {error&&<p role="alert" className="error-text mt-3">{error}</p>}
+   <div className="mt-4 flex flex-wrap items-center gap-2"><button type="button" className="btn-primary" disabled={busy} onClick={save}>{savedOn?copy.saveFinalAgain:copy.saveFinal}</button><button type="button" className="btn-secondary" disabled={busy} onClick={saveDraft}>{copy.saveDraft}</button></div>
   </DecisionSummary>
  </section>;
 }
