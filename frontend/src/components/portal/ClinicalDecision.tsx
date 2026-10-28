@@ -387,7 +387,7 @@ const LONG_INTAKE = 480;
 
 /**
  * The evidence that opens a Consultant's sheet: the intake summary (in the writer's direction), the documents on file and,
- * at the final assessment, the preliminary recommendation. "On file" says what is there — not that it was opened.
+ * at the final assessment, the preliminary recommendation first. "On file" says what is there — not that it was opened.
  */
 export function CaseEvidence({ locale, intakeSummary, documents, preliminary, viewDoc, downloadDoc }: {
   locale: Locale; intakeSummary?: string | null; documents: EvidenceDocument[]; preliminary?: PreliminaryView | null;
@@ -402,6 +402,29 @@ export function CaseEvidence({ locale, intakeSummary, documents, preliminary, vi
     <section aria-labelledby={id} className="min-w-0">
       <h3 id={id} className="text-[1.0625rem] font-bold text-brand-900">{t.title}</h3>
 
+      {/* At the final assessment the Consultant confirms or changes their preliminary word, so it leads the evidence. */}
+      {preliminary && (preliminary.recommendedTreatment || (preliminary.costEstimates?.length ?? 0) > 0) && (
+        <div className="mt-3 border-b border-line pb-3">
+          <h4 className="text-[0.875rem] font-bold text-ink-800">{t.preliminary}</h4>
+          {preliminary.recommendedTreatment && <p dir="auto" className="mt-1 whitespace-pre-wrap text-[0.9375rem] leading-7 text-ink-800">{preliminary.recommendedTreatment}</p>}
+          {preliminary.risksAndLimitations && <>
+            <p className="mt-2 text-[0.8125rem] font-semibold text-ink-500">{t.risks}</p>
+            <p dir="auto" className="whitespace-pre-wrap text-[0.875rem] leading-6 text-ink-700">{preliminary.risksAndLimitations}</p>
+          </>}
+          {(preliminary.costEstimates?.length ?? 0) > 0 && <>
+            <p className="mt-2 text-[0.8125rem] font-semibold text-ink-500">{t.lines}</p>
+            <ul className="mt-0.5 space-y-1 text-[0.875rem]">
+              {preliminary.costEstimates!.map((line, index) => (
+                <li key={index} className="flex items-baseline justify-between gap-3">
+                  <span dir="auto" className="min-w-0 text-ink-700">{line.serviceDescription}</span>
+                  <span className="flex-none whitespace-nowrap font-semibold tabular-nums text-ink-800"><bdi dir="ltr">{formatMoney(line.estimatedCost, line.currency, locale)}</bdi></span>
+                </li>
+              ))}
+            </ul>
+          </>}
+          {preliminary.proposalCurrency && <p className="mt-2 text-[0.8125rem] text-ink-500">{fillTemplate(t.proposalCurrency, { currency: currencyName(preliminary.proposalCurrency, locale) })}</p>}
+        </div>
+      )}
       <h4 className="mt-3 text-[0.875rem] font-bold text-ink-800">{t.intake}</h4>
       {intake
         ? <>
@@ -430,28 +453,6 @@ export function CaseEvidence({ locale, intakeSummary, documents, preliminary, vi
             ))}
           </ul>}
 
-      {preliminary && (preliminary.recommendedTreatment || (preliminary.costEstimates?.length ?? 0) > 0) && (
-        <div className="mt-4 border-t border-line pt-3">
-          <h4 className="text-[0.875rem] font-bold text-ink-800">{t.preliminary}</h4>
-          {preliminary.recommendedTreatment && <p dir="auto" className="mt-1 whitespace-pre-wrap text-[0.9375rem] leading-7 text-ink-800">{preliminary.recommendedTreatment}</p>}
-          {preliminary.risksAndLimitations && <>
-            <p className="mt-2 text-[0.8125rem] font-semibold text-ink-500">{t.risks}</p>
-            <p dir="auto" className="whitespace-pre-wrap text-[0.875rem] leading-6 text-ink-700">{preliminary.risksAndLimitations}</p>
-          </>}
-          {(preliminary.costEstimates?.length ?? 0) > 0 && <>
-            <p className="mt-2 text-[0.8125rem] font-semibold text-ink-500">{t.lines}</p>
-            <ul className="mt-0.5 space-y-1 text-[0.875rem]">
-              {preliminary.costEstimates!.map((line, index) => (
-                <li key={index} className="flex items-baseline justify-between gap-3">
-                  <span dir="auto" className="min-w-0 text-ink-700">{line.serviceDescription}</span>
-                  <span className="flex-none whitespace-nowrap font-semibold tabular-nums text-ink-800"><bdi dir="ltr">{formatMoney(line.estimatedCost, line.currency, locale)}</bdi></span>
-                </li>
-              ))}
-            </ul>
-          </>}
-          {preliminary.proposalCurrency && <p className="mt-2 text-[0.8125rem] text-ink-500">{fillTemplate(t.proposalCurrency, { currency: currencyName(preliminary.proposalCurrency, locale) })}</p>}
-        </div>
-      )}
     </section>
   );
 }

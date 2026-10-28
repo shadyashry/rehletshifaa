@@ -22,12 +22,13 @@ const work = (id: string, caseId: ConsultantCaseId, type: string, title: string,
   id, caseId, caseNumber: cases[caseId].caseNumber, patientName: cases[caseId].patientName, caseStatus: cases[caseId].status, waitingOn: "CONSULTANT",
   careCategory: "cardiology", ...coordinator, documentCount: 3, type, title, context, priority: "NORMAL", status: "OPEN", blocking: false,
   dueAt: at(-20), overdue: false, createdAt: at(10), version: 0, copy: null, ...extra });
+// In the backend's order (StaffWorkQueryService.QUEUE_ORDER): most urgent, then soonest due.
 const workItems = [
+  work("cw4", "follow", "REVIEW_COMPLICATION", "Review a reported complication", "The patient's representative reported a fever at the day-30 check.", { priority: "URGENT", overdue: true, dueAt: at(2) }),
   work("cw1", "review", "CLINICAL_REVIEW", "Review the case and record your recommendation", "The coordinator prepared the case; three documents are ready.", { priority: "HIGH", dueAt: at(-6) }),
   work("cw2", "treat", "COUNTERSIGN_MILESTONE", "Countersign a treatment milestone", "Operations recorded \"Procedure started\" from the hospital's admission desk."),
   // The backend's own item (DischargeService.PACK_WORK) with its wording code, as My work receives it.
   work("cw3", "discharge", "DISCHARGE_PACK", "Complete the discharge pack", "The medication list and the follow-up plan are still missing.", { dueAt: at(-30), copy: { code: "DISCHARGE_PACK", params: { caseNumber: "RS-2026-000014" } } }),
-  work("cw4", "follow", "REVIEW_COMPLICATION", "Review a reported complication", "The patient's representative reported a fever at the day-30 check.", { priority: "URGENT", overdue: true, dueAt: at(2) }),
 ];
 
 const documents = [

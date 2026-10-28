@@ -4444,7 +4444,7 @@
         "review": "Review",
         "reviewForm": "Review the reported complication ({point})",
         "reviewNote": "What you did or advised",
-        "reviewHint": "Recorded in the clinical record. It releases the hold on closing the case.",
+        "reviewHint": "Recorded in the clinical record. Say what you found and what you advised or arranged for the patient.",
         "saveReview": "Record the review"
       },
       "closure": {

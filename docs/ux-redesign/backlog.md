@@ -609,3 +609,33 @@ Four reviewers (React/composition, web-design-guidelines, RTL/i18n, Pro Max) + d
 |---|---|---|---|---|
 | MEDIUM | The In review and Estimate ready stamps were not seen live at the gate (the owner stopped the walk at Received); they are covered by the specs against the live build and the backend D-1 tests. RS-2026-000006 (synthetic, `INTAKE_REVIEW`) can carry the live check once a coordinator sends it to a Consultant and an estimate is released. | area 1 gate | dev data | live run |
 | LOW | The dev frontend container was built from the area worktree (`-p rehletshifaa`); a later canonical rebuild from the main checkout serves whatever that checkout has (today `feat/review-p0`, which does not yet contain area 1). | area 1 gate | docker compose | owner: merge area 1 into `feat/review-p0` |
+
+## Area 3 — close (2026-10-28)
+
+Re-critique 28/40 (from 17; `.impeccable/critique/2026-10-28T08-44-42Z__frontend-src-components-portal-clinicalreview-tsx.md`).
+Fixed in the closing pass: the preliminary recommendation now leads the evidence at the final assessment; the Consultant
+fixture's My work is in the backend's order (the urgent complication first); the complication hint states clinical intent
+instead of "releases the hold on closing"; a due check-in shows its date alone beside the Due badge. Open:
+
+| Sev | Item | Source | Files | Command |
+|---|---|---|---|---|
+| HIGH (backend) | **B-3-1a** the backend gives the Consultant a `RECORD_FINAL_ASSESSMENT` (FOCUS) step at ARRIVAL_CONFIRMED until a final assessment is saved; today the strip says "Nothing needs you right now" beside "Waiting on: The Consultant" and My work does not list it. Copy and focus target exist since 3-1. | 3-1, critique P1 | `PortalExperienceService` current action | backend, then /impeccable clarify |
+| MEDIUM (backend) | **B-3-1b** move the start of treatment onto the admission (the hospital's admission number) and retire `/doctor/cases/{id}/treatment-episodes` and its episode fields. | 3-1 | `CaseWorkflowActions.tsx`, treatment-episode endpoint | backend |
+| MEDIUM (backend) | **G-2** a final-assessment draft endpoint (the final assessment has no Save draft; nothing is cleared on a failed save). | 3-0 plan, critique H3 | `FinalAssessment`, clinical decision API | backend |
+| MEDIUM | During treatment the Consultant's Discharge panel is fully open (~700px of blockers, pack rows, plan, letter, invoice, return); show one line ("Pack: 2 of 4 recorded · 3 things block discharge") with the detail behind the same `Summary`, open when the current code is `COMPLETE_DISCHARGE_PACK`. | critique P2 | `DischargePanel.tsx` | /impeccable distill |
+| MEDIUM | Arabic parity: My work context lines are backend English (work-copy codes as area 2 did for titles); specialty and service names are English in Arabic (bilingual catalogue names, or `lang="en"` on fallbacks). | critique P2 | backend work items, catalogue, `VirtualClinic.tsx` | backend + /impeccable harden |
+| MEDIUM | Case and clinic tablists clip at 390 ("مديرو العـ", "السجـ") with no cue that they scroll: an inline-end fade mask on the tab scrollers. | critique P2 | `VirtualClinic.tsx`, `StaffCaseView.tsx` tablist | /impeccable adapt |
+| MEDIUM | Server refusals of the decision (`FACILITY_PACKAGE_RANGE`, `CATALOG_SERVICE_INVALID`) said at the control via `refusalExplainedInPlace`. | 3-1, critique H9 | `Portal.tsx`, `ClinicalDecision.tsx` | /impeccable harden |
+| MEDIUM | The journey rail marks Treatment as current at Arrival confirmed without explanation. | critique H1 | `JourneyPulse` | /impeccable clarify |
+| LOW | The evidence region (`max-h-[55vh]`, focusable) gives no visual or spoken cue that it scrolls; an end fade or "More below" and a description. | critique P1 (rest) | `StaffCaseView.tsx` aside | /impeccable layout |
+| LOW | Affiliations: "No relationship" is an exclusive choice drawn as a checkbox; make it a radio ("I use it, with no relationship" / "I have a relationship") with the relationship checkboxes under the second. "Not declared yet" could add or focus the form row. | critique, 3-3 | `Affiliations.tsx` | /impeccable harden |
+| LOW | The Consultant's "changes need my approval" checkbox applies at once without a saved line. | critique | `VirtualClinic.tsx` | /impeccable polish |
+| LOW | Clinic header: no notification bell (a manager learns of a rejected change only by reloading), avatar and My work count differ from the case pages; check what `PortalFrame` receives on the clinic page. | critique, 3-3 | `PortalFrame.tsx`, `virtual-clinic/page.tsx` | /impeccable polish |
+| LOW | The clinic's section is not in the URL (no deep link to a pending price change). | 3-3 | `VirtualClinic.tsx` | /impeccable adapt |
+| LOW | Clinic overview: "Approve and publish", "Discard the draft" and "Edit the public profile" in one cluster; Specialty and Care area both "Cardiology". Consider opening the clinic on what needs the Consultant. | critique | `VirtualClinic.tsx` | /impeccable distill |
+| LOW | The DISCHARGED stamp's coral/alert colour on the page where alert red means a reported problem; an ink or brand variant for the line stamp (brand decision, propose first). | critique | `brand/CaseStamp.tsx` | owner |
+| LOW | The change order's "Withdraw" drawn as a chevron disclosure, like a section. | critique | `TreatmentPanel.tsx` | /impeccable polish |
+| LOW | Change-order number "RS-CO-RS-2026-000013-1" doubles the prefix. | critique | backend numbering | backend |
+| LOW | `CaseWorkflowActions` still has one en/ar table, 9 inline ternaries and ~15 English strings (Operations' travel form) — area 5. | detector scan | `CaseWorkflowActions.tsx` | area 5 |
+| LOW | `.error-text` is 0.86rem (off the ladder); ConsultantRouting's two bordered radio tiles. | detector scan | `globals.css`, `ConsultantRouting.tsx` | /impeccable polish |
+| LOW | Carried from 3-1/3-2: documents "Show all" past ~10 files; a note when a seeded catalogue line was deactivated; the evidence heading level in the rail; the unused `followUp.outcomes.reviewForm` key; a coordinator-side panel order by the current task; "Refer this case" alone below the review; the orphan "Keyboard shortcuts ?" footer. | 3-1, 3-2, critique | various | /impeccable polish |

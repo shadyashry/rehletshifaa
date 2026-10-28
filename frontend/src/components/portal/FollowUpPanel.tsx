@@ -165,7 +165,7 @@ export function FollowUpPanel({ locale, role, caseId, caseStatus, currentCode, b
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-semibold text-ink-900">{pick(t.checkIns.points, c.point)}</span>
                   <StatusBadge tone={c.status === "DONE" ? "success" : c.status === "DUE" ? "warning" : "neutral"}>{pick(t.checkIns.status, c.status)}</StatusBadge>
-                  <span className="text-[0.8125rem] text-ink-600">{c.outcome ? `${pick(t.checkIns.outcomes, c.outcome)} · ${when(c.recordedAt)}` : fillTemplate(t.checkIns.due, { when: when(c.dueAt) })}</span>
+                  <span className="text-[0.8125rem] text-ink-600">{c.outcome ? `${pick(t.checkIns.outcomes, c.outcome)} · ${when(c.recordedAt)}` : c.status === "DUE" ? when(c.dueAt) : fillTemplate(t.checkIns.due, { when: when(c.dueAt) })}</span>
                 </p>
                 {c.note && <p dir="auto" className="mt-0.5 whitespace-pre-wrap break-words ps-1 text-[0.8125rem] text-ink-700">{c.note}</p>}
               </li>

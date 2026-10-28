@@ -436,6 +436,8 @@ Update at the end of every phase.
 | Portal (re-critique, Phase 6) | `.impeccable/critique/2026-10-07T21-50-23Z__frontend-src-components-portal.md` | 25/40 |
 | Portal (finish-plan Close) | `.impeccable/critique/2026-10-09T14-11-06Z__frontend-src-components-portal.md` | 27/40 |
 | Public site (finish-plan Close) | `.impeccable/critique/2026-10-09T14-11-07Z__dev-rehletshifaa-com.md` | 24/36 (67%; heuristic 7 n/a) |
+| Area 2 coordinator workspace (close) | `.impeccable/critique/2026-10-16T05-53-19Z__frontend-src-components-portal-staffcaseview-tsx.md` | 28/40 (from 21) |
+| Area 3 Consultant portal + Virtual Clinic (close) | `.impeccable/critique/2026-10-28T08-44-42Z__frontend-src-components-portal-clinicalreview-tsx.md` | 28/40 (from 17) |
 
 ## Future (out of scope for this run)
 
@@ -1179,6 +1181,63 @@ B-3-1a/B-3-1b and G-2 stay open.
 
 **Next:** slice 3-4 — the closing pass (re-critique, target ≥ 28/40; after shots `AREA3_SHOTS=after`; the STATUS section closing
 area 3), started in a new session from this branch.
+
+## UX area 3 — slice 3-4: closing pass; area 3 closed (2026-10-28, worktree `ux-3-4-closing-a9f91f`, branch `claude/ux-3-4-closing-a9f91f` from 3-3 @ `48e89c0f`)
+
+**Re-critique: 28/40** (dual-agent, same rubric as 3-0; `.impeccable/critique/2026-10-28T08-44-42Z__frontend-src-components-portal-clinicalreview-tsx.md`;
+trend 17 → 28, target ≥ 28 met). P0 0 (was 1), P1 3 (was 5). Up:
+- real-world match, control, error prevention, recognition, aesthetics, error recovery and help, 1–2 → 3;
+- consistency, 1 → 3: one shell, one tab style, one `Summary`, one filled action.
+
+Still 2:
+- **Visibility.** At arrival the strip says "Nothing needs you right now" above the open final assessment (B-3-1a). The journey rail marks Treatment current at arrival.
+- **Flexibility.** The phone review is still about 3,800px. Clinic tabs are not in the URL.
+
+Mechanical scan against the 2026-10-16 baseline:
+
+| Category | Before | After |
+|---|---|---|
+| Off-ladder sizes | 103 | 0 |
+| Tinted notices | 17 | 0 |
+| Boxes in cards | about 11 | 2 (ConsultantRouting radio tiles) |
+| Filled-button pairs | in every view | 0 |
+| Uppercase + tracking | 4 | 0 |
+| Inline en/ar tables | 3 | 1 |
+| Glyph icons | 2 | 0 |
+| `window.confirm` | 1 | 0 |
+
+The remaining inline table, plus 9 ternaries and about 15 English strings, are all in `CaseWorkflowActions`: Operations' travel form, area 5. Both tablists are complete. Raw colours and physical-direction classes are 0. Detector 0 (regex-only). The browser overlay was skipped because the portal needs the mocked OIDC session.
+
+**HIGH findings, fixed here (small, in scope):**
+- **The preliminary recommendation now leads the evidence at the final assessment** (`CaseEvidence` in `ClinicalDecision.tsx`). It was last in the rail's 55vh scroller and cut off mid-heading, while the field's hint asked what had changed from it.
+- **My work's order.** The fixture listed the urgent complication last under "most urgent first". The backend already ranks it first (`StaffWorkQueryService.QUEUE_ORDER`: priority, then due, then created), so `consultant-fixture.ts` now lists My work in that order.
+- **Copy, from the minor findings.** The complication review hint states clinical intent ("Say what you found and what you advised or arranged for the patient.", en + ar) instead of "releases the hold on closing the case". A due check-in shows its date alone beside the Due badge, not "Due · due Oct 16".
+
+**The third HIGH finding is backend work:** B-3-1a, the final assessment step on the strip.
+
+**Verify.**
+- `pnpm typecheck` ok.
+- eslint 0 on the touched files.
+- vitest FollowUpPanel, FinalAssessment and ClinicalReview: 34/34.
+- Playwright on :3118 (production build), consultant-shots + a11y en+ar: 34/34.
+- Visual check of the after shots: the assess rail opens on the preliminary, and the urgent complication is first in My work, en + ar.
+
+**Screenshots:** `screenshots/area-3/after/`: my-work, case-review/assess/treat/discharge/follow and clinic-overview/services/affiliations, each in en and ar at 390 and 1440 (36 shots, taken with `AREA3_SHOTS=after` on the synthetic Consultant fixture, after the fixes).
+
+**Area 3 follow-ups:** in backlog.md under "Area 3 — close". Not blocking, except as noted:
+- **B-3-1a:** the Consultant's `RECORD_FINAL_ASSESSMENT` (FOCUS) step at ARRIVAL_CONFIRMED (backend; the critique's open HIGH).
+- **B-3-1b:** start treatment on the admission and retire `/treatment-episodes` (backend).
+- **G-2:** a final-assessment draft endpoint (backend).
+- **Smaller items:**
+  - the Consultant's Discharge panel folded during treatment;
+  - Arabic context lines and catalogue names;
+  - a scroll cue on the phone tabs and on the evidence region;
+  - decision refusals said in place;
+  - Affiliations' "No relationship" as a radio choice;
+  - the clinic's bell and deep links;
+  - the stamp colour (owner).
+
+**Area 3 is closed.** Areas 4 (Finance, needed P1-15 and P1-17) and 5 (Operations, needed P1-15) are now unblocked: both chains are merged into the UX line. **Next** (PLAN.md order 3 → 7 → X → 6 → 5 → 4): **area 7 — Keycloak theme parity** (login, setup, OTP, passkey; EN/AR), started in a new session from this branch under the owner's standing instruction.
 
 ## Control Center — Consultant public profiles (2026-10-17)
 
