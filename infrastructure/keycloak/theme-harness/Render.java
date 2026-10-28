@@ -48,6 +48,11 @@ import javax.imageio.ImageIO;
 public class Render {
 
     static final String USER = "staff.demo@example.test";
+    /** Keys our bundle defines for the language being rendered, and each "page key" resolved from Keycloak's own
+     *  bundles instead (written to stock-keys.txt, so the spec can hold stock wording to a reviewed list). */
+    static Set<String> ourKeys = Set.of();
+    static String current = "";
+    static final Set<String> stockKeys = new java.util.TreeSet<>();
 
     public static void main(String[] args) throws Exception {
         Path kc = Path.of(args[0]).resolve("theme");
@@ -84,7 +89,11 @@ public class Render {
             for (String l : lang.equals("en") ? List.of("en") : List.of("en", lang)) {
                 for (Path dir : chain) load(messages, dir.resolve("messages/messages_" + l + ".properties"));
             }
+            Properties own = new Properties();
+            load(own, ours.resolve("login/messages/messages_" + lang + ".properties"));
+            ourKeys = own.stringPropertyNames();
             for (Scenario s : scenarios(qr)) {
+                current = s.name + "-" + lang;
                 Map<String, Object> model = baseModel(lang, s.name, properties, messages);
                 s.setup.accept(model);
                 Path file = out.resolve(s.name + "-" + lang + ".html");
@@ -95,6 +104,7 @@ public class Render {
             }
         }
         Files.writeString(out.resolve("pages.txt"), String.join("\n", index) + "\n");
+        Files.writeString(out.resolve("stock-keys.txt"), String.join("\n", stockKeys) + "\n");
         System.out.println("Rendered " + index.size() + " pages into " + out);
     }
 
@@ -148,8 +158,10 @@ public class Render {
                 m.put("isUserIdentified", "true");
                 m.put("userVerification", "required");
                 m.put("shouldDisplayAuthenticators", true);
+                // The stored label is the default the registration page offered, in the language it was shown in.
+                String label = text((Properties) m.get("_messages"), (Locale) m.get("_locale"), "webauthn-registration-init-label");
                 m.put("authenticators", Map.of("authenticators", List.of(Map.of(
-                    "credentialId", "cred-1", "label", "RehletShifaa passkey", "createdAt", "28/10/2026",
+                    "credentialId", "cred-1", "label", label, "createdAt", "28/10/2026",
                     "transports", Map.of("iconClass", "kcWebAuthnInternal", "displayNameProperties", List.of("webauthn-transport-internal"))))));
             })
         );
@@ -172,10 +184,14 @@ public class Render {
             "internationalizationEnabled", true, "password", true, "rememberMe", true, "resetPasswordAllowed", true,
             "registrationAllowed", false, "loginWithEmailAllowed", true, "registrationEmailAsUsername", false,
             "duplicateEmailsAllowed", false, "displayNameHtml", "", "displayName", "RehletShifaa"));
+        // Keycloak's LocaleBean labels each language by a locale_<tag> message if the theme sets one, else by the
+        // language's own name for itself.
+        String en = messages.getProperty("locale_en", Locale.ENGLISH.getDisplayName(Locale.ENGLISH));
+        String ar = messages.getProperty("locale_ar", Locale.forLanguageTag("ar").getDisplayName(Locale.forLanguageTag("ar")));
         m.put("locale", Map.of(
-            "current", rtl ? "عربي" : "English", "currentLanguageTag", lang, "rtl", rtl,
-            "supported", List.of(Map.of("label", "English", "languageTag", "en", "url", page + "-en.html"),
-                                 Map.of("label", "عربي", "languageTag", "ar", "url", page + "-ar.html"))));
+            "current", rtl ? ar : en, "currentLanguageTag", lang, "rtl", rtl,
+            "supported", List.of(Map.of("label", en, "languageTag", "en", "url", page + "-en.html"),
+                                 Map.of("label", ar, "languageTag", "ar", "url", page + "-ar.html"))));
         m.put("login", Map.of());
         m.put("auth", new Auth(false));
         m.put("messagesPerField", new Fields(m, Map.of()));
@@ -225,6 +241,7 @@ public class Render {
      *  MessageFormat unchanged (bundles already write a literal apostrophe as ''), and a missing key prints itself. */
     static String text(Properties messages, Locale locale, String key, Object... params) {
         String pattern = messages.getProperty(key);
+        if (pattern != null && !ourKeys.contains(key)) stockKeys.add(current + " " + key);
         return pattern == null ? key : new MessageFormat(pattern, locale).format(params);
     }
 

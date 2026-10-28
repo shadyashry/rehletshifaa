@@ -98,6 +98,55 @@ test.describe("Keycloak theme", () => {
     });
   }
 
+  // 7-1: every string comes from our bundles in the page's language. A raw message key means a missing message;
+  // Keycloak's own voice (« » arrows, "We are sorry…", Submit, barcode, OTP devices) must not reach either locale.
+  const RAW_KEY = /\b[a-z]+(?:[A-Z][A-Za-z]+)+\d*\b|\b[a-z]+(?:-[a-z]+){2,}\b|\b[a-z]\w*\.[A-Za-z_-]{3,}\b/;
+  const KEYCLOAK_VOICE = /[«»]|we are sorry|\bsubmit\b|barcode|device name|\botp\b|webauthn|click here to proceed|نعتذر/i;
+  // Text that is not copy: the account's email and the authenticator apps' own names.
+  const NOT_COPY = [/\S+@\S+/g, /FreeOTP|Google Authenticator|Microsoft Authenticator/g];
+  // Keys a page may still take from Keycloak's own bundles (Render.java lists them in stock-keys.txt): reviewed as
+  // plain enough, or app names. doClickHere ("Click here" on verify-email) is shared with other pages, so 7-2 replaces
+  // the link through login-verify-email.ftl instead of the message.
+  const STOCK_OK = new Set([
+    "showPassword", "hidePassword", "passwordConfirm", "logoutOtherSessions",
+    "totpAppFreeOTPName", "totpAppGoogleName", "totpAppMicrosoftAuthenticatorName", "doClickHere",
+  ]);
+
+  test("words: stock Keycloak keys are reviewed ones", () => {
+    const stock = readFileSync(path.join(harness ?? "", "stock-keys.txt"), "utf8").trim().split("\n").filter(Boolean);
+    expect(stock.filter(line => !STOCK_OK.has(line.split(" ")[1]))).toEqual([]);
+  });
+
+  for (const locale of LOCALES) {
+    test(`words: our bundles only (${locale})`, async ({ page }) => {
+      for (const name of PAGES) {
+        await open(page, `${name}-${locale}`);
+        const strings = await page.evaluate(() => {
+          const out: string[] = [document.title];
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+            const parent = n.parentElement;
+            // The locale menu names each language in that language ("English" on an Arabic page is the way out).
+            if (!parent || parent.closest("script, style, noscript, [role=menuitem]")) continue;
+            if (n.textContent?.trim()) out.push(n.textContent.trim());
+          }
+          for (const el of document.querySelectorAll("[aria-label], [alt], [placeholder], [title], input[type=submit], input[type=button]")) {
+            // The QR image's alt is hard-coded in Keycloak's login-config-totp.ftl; 7-3 overrides that template.
+            if (el.id === "kc-totp-secret-qr-code") continue;
+            for (const attr of ["aria-label", "alt", "placeholder", "title"]) { const v = el.getAttribute(attr); if (v?.trim()) out.push(v.trim()); }
+            if (el instanceof HTMLInputElement && el.value.trim()) out.push(el.value.trim());
+          }
+          return out;
+        });
+        const copy = strings.map(s => NOT_COPY.reduce((t, re) => t.replace(re, ""), s));
+        const where = `${name}-${locale}`;
+        expect.soft(copy.filter(s => RAW_KEY.test(s)), `${where}: raw message keys`).toEqual([]);
+        expect.soft(copy.filter(s => KEYCLOAK_VOICE.test(s)), `${where}: Keycloak's voice`).toEqual([]);
+        if (locale === "ar") expect.soft(copy.filter(s => /[A-Za-z]{2,}/.test(s)), `${where}: English on the Arabic page`).toEqual([]);
+      }
+    });
+  }
+
   for (const locale of LOCALES) for (const width of [390, 1440]) {
     test(`shots (${locale}, ${width})`, async ({ page }) => {
       test.skip(!folder, "set AREA7_SHOTS to write shots");

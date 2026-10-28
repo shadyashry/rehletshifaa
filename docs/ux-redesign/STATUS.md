@@ -2008,6 +2008,48 @@ re-run. Not verified live: Keycloak was down; `login-error.spec.ts` / `mfa-live.
 
 **Next:** slice 7-1 — words, started in a new session from this branch.
 
+### Slice 7-1 — words (2026-10-29, worktree `mystifying-hodgkin-8e6ee6`, branch `claude/mystifying-hodgkin-8e6ee6` from 7-0 @ `e0ee33cb`)
+
+Copy only, in `messages_en.properties` and `messages_ar.properties` (CRLF UTF-8, keys inserted textually; no template change):
+- `en` now overrides every key `ar` does (key parity, scripted): English stops speaking in Keycloak's voice ("Forgot Password?",
+  "« Back to Login", "Username or email", Submit);
+- sign-in label "Email" / «البريد الإلكتروني» (patients and staff sign in with their email; usernames still work);
+  "Keep me signed in on this device"; the reset intro names the link it sends;
+- « » glyphs gone (`proceedWithAction` "Continue", `backToApplication` "Continue to the case" / «المتابعة إلى الحالة»);
+  setup copy says "the case", never "my case" / «حالتي», so a relative holding the account reads it right;
+- the expired link says what to do in either case and who sends a new link (the coordinator, «منسقك»); the generic error
+  title is "We could not continue this step" / «تعذّر إكمال هذه الخطوة» instead of "We are sorry…" / «نعتذر...»;
+- verify-email in our words in both languages (the Arabic page showed Keycloak's English sentence); `doSubmit` "Continue";
+- authenticator setup without jargon: no Device Name, OTP devices, barcode, "Unable to scan?" or "click Submit"; one name
+  for the code ("Code from your authenticator app" / «الرمز من تطبيق المصادقة»), and a wrong code says what to enter;
+- passkeys: where a key lives ("On this device", USB/NFC/Bluetooth, `webauthn-transport-*`, raw keys before), "Added",
+  the unsupported-browser line; the restart link's name "Sign in with another account" / «تسجيل الدخول بحساب آخر»;
+- `languages` = "Language: English" / «اللغة: العربية» and `locale_ar` = «العربية» (the portal's name for the language): the
+  locale button's accessible name now contains its visible label (WCAG 2.5.3) in both languages.
+
+**Harness.** `render.sh` used an absolute `/c/...` cache path that `docker cp` mangles, so a fresh worktree could not render;
+it is relative now. `Render.java` labels languages as Keycloak 26 does (`locale_*` or the language's own name), stores the
+passkey under the label its registration page offered, and writes `stock-keys.txt`: every key a page still takes from
+Keycloak's own bundles. `keycloak-theme.spec.ts` adds "words": stock keys only from a reviewed list, and on every page
+(text, title, aria-label, alt, placeholder, button values) no raw message key, none of Keycloak's voice, and on `ar` no
+English beyond the email and the authenticator apps' names. Proved by rendering the 7-0 bundles: the check fails.
+
+**Reviews.** RB: HIGH ×1 fixed (stock wording passed silently because the harness merges Keycloak's bundles: now recorded
+and held to a list) + LOWs (title collected, QR alt exempted by element only, `NOT_COPY` stripped before every check, wider
+raw-key pattern, label through the formatter). WG: HIGH ×1 deferred to 7-2 with reason: the verify-email link reads "Click
+here", but `doClickHere` is shared with the page-expired and link-account pages, so the fix is `login-verify-email.ftl`;
+its MEDIUMs fixed (error title, expired message now matches its one link, spam line no longer assumes a sent email,
+`loginTotpTitle` aligned) and "Use passkey". RTL: no HIGH; `locale_ar` «العربية», NFC wording fixed. Pro Max: no HIGH,
+no overflow at 375/768/1024/1440, contrast and targets hold; two orphan words at 390 shortened. The rest in backlog.md
+"Area 7".
+
+**Verify.** `keycloak-theme.spec.ts` 11/11 on the harness (26 pages × 390/1440, words en/ar, stock keys); `tsc` and eslint on
+the spec clean. Keycloak on :8180 answered, but it serves the main checkout's theme, so nothing here was checked live.
+Native Arabic review still pending. Shots: `screenshots/area-7/7-1/` (13 pages × en/ar × 390/1440).
+
+**Next:** slice 7-2 — the setup moments (`info.ftl`, `error.ftl`, `login-update-password.ftl`, plus `login-verify-email.ftl`
+for the "Click here" link), in a new session from this branch.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

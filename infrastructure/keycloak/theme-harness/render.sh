@@ -14,7 +14,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 KC_VERSION="${KC_VERSION:-26.7.3}"
 FREEMARKER_VERSION="${FREEMARKER_VERSION:-2.3.32}"
 IMAGE="quay.io/keycloak/keycloak:$KC_VERSION"
-CACHE="$HERE/.cache"
+# Relative paths throughout: a Windows JDK and docker cp both mangle the /c/... form Git Bash uses.
+cd "$HERE"
+CACHE=.cache
 LIB=/opt/keycloak/lib/lib/main
 
 # The stamp is written only after both jars unpacked, so a failed extraction is retried, never rendered from.
@@ -31,7 +33,5 @@ if [ ! -f "$CACHE/.ok-$KC_VERSION" ]; then
   touch "$CACHE/.ok-$KC_VERSION"
 fi
 
-# Relative paths: a Windows JDK cannot read the /c/... form Git Bash uses.
-cd "$HERE"
 rm -rf out
 java -cp .cache/freemarker.jar Render.java .cache/themes .cache/vendor ../themes/rehletshifaa out
