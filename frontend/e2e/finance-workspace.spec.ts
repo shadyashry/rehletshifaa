@@ -28,7 +28,7 @@ test("Finance confirms a transfer only after a question that names the amount an
   await expect(page.getByLabel("Amount received (EGP)")).toHaveValue("43200");
   await page.getByRole("button", { name: "Confirm payment received" }).click();
   const dialog = page.getByRole("alertdialog");
-  await expect(dialog).toContainText(/Record EGP\s?43,200 received against .*QNB-2026-10-27-558211/);
+  await expect(dialog).toContainText(/Record .?EGP\s?43,200.? received against .*QNB-2026-10-27-558211/);
   expect(writes.filter(w => w.path.endsWith("/payments"))).toHaveLength(0);
   await dialog.getByRole("button", { name: "Confirm payment received" }).click();
   await expect.poll(() => writes.filter(w => w.path === "/finance/cases/deposit/deposits/dep1/payments").length).toBe(1);
@@ -51,7 +51,51 @@ test("commercial terms are approved after a question with the patient's total", 
   await page.locator("#case-heading").waitFor();
   await page.getByRole("button", { name: "Approve commercial terms" }).click();
   const dialog = page.getByRole("alertdialog");
-  await expect(dialog).toContainText(/Approve these terms at EGP\s?288,000\?/);
+  await expect(dialog).toContainText(/Approve these terms at .?EGP\s?288,000.?\?/);
   await dialog.getByRole("button", { name: "Approve commercial terms" }).click();
   await expect.poll(() => writes.filter(w => w.path === "/finance/cases/approve/proposals/v-approve/approve").length).toBe(1);
+});
+
+// UX 4-1: the admission money.
+test("the letter states its gap and is accepted only after a question with the price", async ({ page }) => {
+  const { writes } = await setupFinanceDay(page);
+  await page.goto("/en/portal?case=letter");
+  const panel = page.locator("#admission-panel");
+  await expect(panel).toContainText(/EGP\s?22,500.* above the estimate's maximum \(.*9\.4%.*\)/);
+  await panel.getByLabel("Reason", { exact: true }).fill("The hospital added an ICU night");
+  await panel.getByRole("button", { name: "Accept the letter" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText(/Accept the letter at .*EGP\s?262,500/);
+  expect(writes.filter(w => w.path.endsWith("/letter/decision"))).toHaveLength(0);
+  await dialog.getByRole("button", { name: "Accept the letter" }).click();
+  await expect.poll(() => writes.filter(w => w.path === "/finance/cases/letter/admission/letter/decision").length).toBe(1);
+  expect(writes.find(w => w.path.endsWith("/letter/decision"))?.body).toMatchObject({ decision: "ACCEPT", note: "The hospital added an ICU night" });
+});
+
+test("in Arabic the letter's gap is said in words and refusing is the second verb", async ({ page }) => {
+  await setupFinanceDay(page);
+  await page.goto("/ar/portal?case=letter");
+  const panel = page.locator("#admission-panel");
+  await expect(panel).toContainText("أعلى من الحد الأقصى للتقدير المقبول");
+  await expect(panel.getByRole("button", { name: "ارفض الخطاب" })).toBeHidden();
+  await panel.locator("summary", { hasText: "لا يمكنك قبول هذا الخطاب؟" }).click();
+  await expect(panel.getByRole("button", { name: "ارفض الخطاب" })).toBeVisible();
+  // The backend's blocker codes read as words, never as lower-cased codes.
+  await expect(panel).not.toContainText(/[a-z]+ [a-z]+ [a-z]+ open|not issued/);
+});
+
+test("the receipt reads against the voucher, and the fee balance is derived and asked about", async ({ page }) => {
+  const { writes } = await setupFinanceDay(page);
+  await page.goto("/en/portal?case=receipt");
+  await expect(page.locator("#admission-panel")).toContainText("Matches what is owed at the cashier");
+  await page.goto("/en/portal?case=fee");
+  const panel = page.locator("#admission-panel");
+  await expect(panel).toContainText(/Platform fee .*EGP\s?55,700.* − deposit applied to the fee .*EGP\s?43,200.* = .*EGP\s?12,500/);
+  await panel.getByLabel("Payment reference").fill("CIB-TRF-88120");
+  await panel.getByLabel("Received at").fill("2026-10-27T11:00");
+  await panel.getByRole("button", { name: "Record the fee balance" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText(/Record .*EGP\s?12,500.* received against .*CIB-TRF-88120/);
+  await dialog.getByRole("button", { name: "Record the fee balance" }).click();
+  await expect.poll(() => writes.filter(w => w.path === "/finance/cases/fee/admission/fee-balance").length).toBe(1);
 });

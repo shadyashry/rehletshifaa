@@ -100,23 +100,26 @@ const caseView = (id: FinanceCaseId) => {
 };
 
 // P1-15's admission view as Finance reads it.
-const voucher = (caseId: string, feeBalanceEgp = 0) => ({ id: "v1", voucherNumber: `RS-V-${caseId}-1`, revision: 1, status: "ISSUED", packageTotalEgp: 200000, platformFeeEgp: 30000, depositPaidEgp: 43200,
-  depositCreditEgp: 13200, feeBalanceEgp, patientPaysAtFacilityEgp: 186800, displayCurrency: "USD", fxRate: 0.0204, fxRateDate: "2026-10-20", patientPaysAtFacilityDisplay: 3810.72,
+// The split keeps the voucher's identities (V99): credit + fee − fee balance = deposit; the patient pays the package less the credit.
+// With a fee balance, the fee is above the deposit, so nothing is credited to the hospital.
+const voucher = (caseId: string, feeBalanceEgp = 0) => ({ id: "v1", voucherNumber: `RS-V-${caseId}-1`, revision: 1, status: "ISSUED", packageTotalEgp: 200000,
+  platformFeeEgp: feeBalanceEgp > 0 ? 43200 + feeBalanceEgp : 30000, depositPaidEgp: 43200, depositCreditEgp: feeBalanceEgp > 0 ? 0 : 13200, feeBalanceEgp,
+  patientPaysAtFacilityEgp: feeBalanceEgp > 0 ? 200000 : 186800, displayCurrency: "USD", fxRate: 0.0204, fxRateDate: "2026-10-20", patientPaysAtFacilityDisplay: 3810.72,
   feeBalanceDisplay: feeBalanceEgp * 0.0204, issuedAt: at(96) });
 const letterRow = (amountEgp: number, countersigned: boolean) => ({ id: "e1", kind: "FACILITY_ADMISSION_LETTER", documentId: "d1", reference: "NHH-77", amountEgp, recordedRole: "OPERATIONS",
   recordedBy: "Tarek Example", recordedAt: at(20), superseded: false, ...(countersigned ? { countersignedRole: "FINANCE", countersignedAt: at(118) } : {}) });
-const receiptRow = (countersigned: boolean) => ({ id: "e2", kind: "BALANCE_EVIDENCED", documentId: "d2", reference: "NHH-CASH-5521", amountEgp: 186800, recordedRole: "OPERATIONS",
+const receiptRow = (countersigned: boolean, amountEgp = 186800) => ({ id: "e2", kind: "BALANCE_EVIDENCED", documentId: "d2", reference: "NHH-CASH-5521", amountEgp, recordedRole: "OPERATIONS",
   recordedBy: "Tarek Example", recordedAt: at(5), effectiveAt: at(5.5), superseded: false, ...(countersigned ? { countersignedRole: "FINANCE", countersignedAt: at(4) } : {}) });
 const admission = (id: FinanceCaseId) => {
   const reserved = { caseId: id, emergencyOverride: false, admissionId: "a1", facilityId: "f1", facilityName: "Nile Heart Hospital", facilityCity: "Cairo", plannedAdmissionAt: at(-40),
     letterReferenceMaxEgp: 240000, balanceOwedEgp: 0, feeBalanceOwedEgp: 0 };
   switch (id) {
     case "letter": return { ...reserved, caseStatus: "TRAVEL_COORDINATION", admissionStatus: "RESERVED", letterCheck: "VARIANCE_OPEN", pointOfNoReturnApproved: false,
-      admissionBlockers: ["PRICE_VARIANCE_OPEN", "VOUCHER_NOT_ISSUED", "BALANCE_NOT_EVIDENCED"], evidence: [letterRow(262500, false)] };
+      admissionBlockers: ["VOUCHER_NOT_ISSUED"], evidence: [letterRow(262500, false)] };
     case "receipt": return { ...reserved, caseStatus: "ARRIVAL_CONFIRMED", admissionStatus: "CONFIRMED", letterCheck: "WITHIN_ESTIMATE", pointOfNoReturnApproved: true, pointOfNoReturnAt: at(30),
       voucher: voucher(id), balanceOwedEgp: 186800, admissionBlockers: ["BALANCE_NOT_EVIDENCED"], evidence: [letterRow(230000, true), receiptRow(false)] };
     case "fee": return { ...reserved, caseStatus: "ARRIVAL_CONFIRMED", admissionStatus: "CONFIRMED", letterCheck: "WITHIN_ESTIMATE", pointOfNoReturnApproved: true, pointOfNoReturnAt: at(30),
-      voucher: voucher(id, 12500), feeBalanceOwedEgp: 12500, admissionBlockers: ["FEE_BALANCE_NOT_PAID"], evidence: [letterRow(230000, true), receiptRow(true)] };
+      voucher: voucher(id, 12500), feeBalanceOwedEgp: 12500, admissionBlockers: ["FEE_BALANCE_DUE"], evidence: [letterRow(230000, true), receiptRow(true, 200000)] };
     case "change": return { ...reserved, caseStatus: "TREATMENT_IN_PROGRESS", admissionStatus: "ADMITTED", letterCheck: "WITHIN_ESTIMATE", pointOfNoReturnApproved: true, pointOfNoReturnAt: at(130),
       admissionNumber: "NHH-ADM-30117", voucher: voucher(id), admissionBlockers: [], evidence: [letterRow(230000, true), receiptRow(true)] };
     default: return null;

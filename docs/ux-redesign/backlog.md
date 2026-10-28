@@ -715,14 +715,17 @@ MEDIUM/LOW findings, the critique's minor observations, and the items that later
 | P1 | The strip says "Nothing needs you" on the fee and statement cases while the page holds the act; My work says "another party" for Finance's own items | critique | `CurrentAction.tsx`, `MyWork.tsx`; backend B-4-1 | 4-3 + B-4-1 |
 | P1 | Finance's work contexts stay English on the Arabic page (`copy: null`; `LOCALIZED_FORM_HINT` only knows PROPOSAL_TERMS_CALL); `currentAction.work.APPROVE_COMMERCIAL_TERMS` missing | detector scan | `CurrentAction.tsx`, messages | 4-3 |
 | P1 | The proposal card and the release checklist (with the backend's English `financeReasons`) show for Finance on every case | critique | `StaffCaseView.tsx` (`proposalPanel`, `RoleActions`) | 4-3 |
-| P2 | The letter shows the quote and the cap but not the gap; the fee balance is not derived; EGP is the sub-line in the voucher facts | critique | `AdmissionPanel.tsx` | 4-1 |
+| Done (4-1) | The letter shows the quote and the cap but not the gap; the fee balance is not derived; EGP is the sub-line in the voucher facts | critique | `AdmissionPanel.tsx` | — |
 | P2 | Variance: the verdict ("EGP 7,660 above the band") sits below six figures; Approve is filled and Return a link | critique | `ReconciliationPanel.tsx` | 4-2 |
 | MEDIUM | 13 × `text-[0.85rem]` (ReconciliationPanel), 1 × `text-[0.9rem]` (FxReapproval), off the ladder | detector scan | `ReconciliationPanel.tsx`, `FxReapproval.tsx` | 4-2 |
 | LOW | The deposit form's amount has `max={balanceEgp}` with no visible "Balance due" hint, so an over-amount gets the browser's own range message | WG | `StaffCaseView.tsx` (`TransferPanel`) | 4-1 polish |
-| LOW | `RefundForm`: labels are `text-[0.8125rem] font-bold` while the new forms use `text-sm font-semibold`; the amount lacks `inputMode`/`autoComplete`, the detail lacks `dir="auto"`; it is a raw form with its own dialog, not `ActForm` (no refusal at the form) | Pro Max, WG | `RefundForm.tsx` | 4-1 |
-| LOW | `Money` is a bare `<bdi>`: "EGP" can wrap away from its number at 375, and a long figure can split under `overflow-wrap:anywhere` | Pro Max | `panel-parts.tsx` (`Money`) | shared polish |
+| Done (4-1) | `RefundForm`: label sizes, `inputMode`/`autoComplete`/`dir`, a raw form with its own dialog (now `ActForm`, `AmountInput`, money-only idempotency key) | Pro Max, WG | `RefundForm.tsx` | — |
+| Done (4-1) | `Money` is a bare `<bdi>` (now `whitespace-nowrap`; `Fact` wraps a long reference inside its column) | Pro Max | `panel-parts.tsx` | — |
 | LOW | `DepositCard`/`TransferPanel` branch on `isFinance` in four places; split them into Finance and coordinator variants sharing the figures | RB (composition) | `StaffCaseView.tsx` | 4-3 |
 | LOW | My work lists the overdue item after two "High" items (the backend's order); every row repeats the care-area icon and the document count | critique | `MyWork.tsx`, backend order | 4-3 |
 | LOW | The reconcile header leaves out the city; the variance "Approve" has no object | critique | `ReconciliationPanel.tsx` | 4-2 |
-| LOW | `pick()` falls back to lower-cased codes for blockers Finance sees ("fee balance not paid", "price variance open") | critique | `AdmissionPanel.tsx`, messages | 4-1 |
+| Done (4-1) | `pick()` fell back to lower-cased codes for blockers Finance sees: the fixture used codes the backend never sends (`PRICE_VARIANCE_OPEN`, `FEE_BALANCE_NOT_PAID`); now the backend's `AdmissionReadiness` codes, all worded | critique | `e2e/finance-fixture.ts` | — |
 | LOW | The deposit component's raw beneficiary ("Rehlet Shifaa") and the purpose come from the backend in English | critique | `StaffCaseView.tsx` (`DepositCard`), backend | 4-3 / backend copy |
+| MEDIUM | `FinanceApproval`'s rate (4-0) is one forced left-to-right run; in Arabic Intl's RLM marks reverse only the EGP side ("1 US$ = ج.م. 49.0196"). 4-1 fixed it in the voucher (each side isolated in Arabic) | 4-1 RTL | `FinanceApproval.tsx` | 4-2 |
+| LOW | `ActForm`'s `confirm.body` is `string \| (data) => string`; `title` is function-only. Make `body` function-only too | 4-1 RB | `panel-parts.tsx` | shared polish |
+| LOW | The fee derivation is an equation ("رسوم المنصة … − … = …"); RTL review offers a prose form if native review prefers it | 4-1 RTL | messages `admission.finance.feeDerivation` | native Arabic review |

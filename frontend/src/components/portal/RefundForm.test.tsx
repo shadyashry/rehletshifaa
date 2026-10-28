@@ -39,5 +39,17 @@ describe("Finance refund policy reason", () => {
     fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: work.confirm.refund }));
     await waitFor(() => expect(onRecord).toHaveBeenCalled());
     expect((screen.getByLabelText("Amount (EGP)") as HTMLInputElement).value).toBe("500");
+    // UX 4-1: the refusal is said at the form, and a retry of the same refund keeps its key, so it can never be recorded twice.
+    expect((await screen.findByRole("alert")).textContent).toMatch(/^Not saved\./);
+    fireEvent.click(screen.getByRole("button", { name: "Record a refund" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: work.confirm.refund }));
+    await waitFor(() => expect(onRecord).toHaveBeenCalledTimes(2));
+    expect(onRecord.mock.calls[1][0].idempotencyKey).toBe(onRecord.mock.calls[0][0].idempotencyKey);
+    // A changed refund is a new one.
+    fireEvent.change(screen.getByLabelText("Amount (EGP)"), { target: { value: "450" } });
+    fireEvent.click(screen.getByRole("button", { name: "Record a refund" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: work.confirm.refund }));
+    await waitFor(() => expect(onRecord).toHaveBeenCalledTimes(3));
+    expect(onRecord.mock.calls[2][0].idempotencyKey).not.toBe(onRecord.mock.calls[0][0].idempotencyKey);
   });
 });

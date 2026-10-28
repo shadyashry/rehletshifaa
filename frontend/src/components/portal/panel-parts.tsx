@@ -79,11 +79,13 @@ export function Summary({ children }: { children: ReactNode }) {
 }
 
 export function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return <div><dt className="text-ink-500">{label}</dt><dd className="font-semibold text-ink-900">{children}</dd></div>;
+  // UX 4-1: a long reference wraps inside its own column rather than widening the grid past a phone's width.
+  return <div className="min-w-0 [overflow-wrap:anywhere]"><dt className="text-ink-500">{label}</dt><dd className="font-semibold text-ink-900">{children}</dd></div>;
 }
 
+/** An amount, left-to-right and never split between its currency and its figure. */
 export function Money({ children }: { children: ReactNode }) {
-  return <bdi dir="ltr" className="tabular-nums">{children}</bdi>;
+  return <bdi dir="ltr" className="whitespace-nowrap tabular-nums">{children}</bdi>;
 }
 
 export function DocumentPicker({ name, label, empty, documents, required = false }: { name: string; label: string; empty: string; documents: PanelDocument[]; required?: boolean }) {
@@ -127,6 +129,42 @@ export function localInput(iso?: string | null) {
 }
 export function text(value: FormDataEntryValue | null) { const v = String(value ?? "").trim(); return v || null; }
 
+/** An EGP amount copied from paper: plain digits, or thousands grouped by commas throughout, with up to two decimals. */
+const AMOUNT = /^(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]{1,2})?$/;
+const WHOLE = new Intl.NumberFormat("en-US");
+const CENTS = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Grouped with Latin digits, as `formatMoney` writes amounts in both languages; cents kept when there are any. */
+const groupAmount = (value: number) => (Number.isInteger(value) ? WHOLE : CENTS).format(value);
+/**
+ * The amount typed, or NaN when it is not one. Arabic-Indic digits and separators read as Latin (an Arabic keypad types them)
+ * and a currency word around the figure is dropped ("EGP 195,500"); anything else ambiguous — "195,50", "1,2" — is refused,
+ * never re-read as another amount.
+ */
+export function readAmount(value: FormDataEntryValue | string | null) {
+  const latin = String(value ?? "").trim()
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/٫/g, ".").replace(/٬/g, ",").replace(/^[\p{L}\p{Sc}\s]+|[\p{L}\p{Sc}\s.]+$/gu, "");
+  return AMOUNT.test(latin) ? Number(latin.replaceAll(",", "")) : Number.NaN;
+}
+
+/**
+ * UX 5-4: an EGP amount the officer copies from paper (the letter's price, the cashier's receipt; UX 4-1: Finance's fee and refund). It reads as
+ * printed ("195,500.00"), is grouped again when left, and says in the page's language when it is not an amount above zero.
+ */
+export function AmountInput({ id, name, invalid, defaultValue, describedBy }: { id: string; name: string; invalid: string; defaultValue?: number; describedBy?: string }) {
+  const check = (field: HTMLInputElement) => {
+    const value = readAmount(field.value);
+    field.setCustomValidity(field.value.trim() && !(value > 0) ? invalid : "");
+    return value;
+  };
+  return (
+    <input id={id} className="field tabular-nums" name={name} type="text" inputMode="decimal" required dir="ltr" autoComplete="off" spellCheck={false}
+           defaultValue={defaultValue != null ? groupAmount(defaultValue) : undefined} aria-describedby={describedBy}
+           onChange={event => { check(event.currentTarget); }}
+           onBlur={event => { const value = check(event.currentTarget); if (value > 0) event.currentTarget.value = groupAmount(value); }}/>
+  );
+}
+
 /** UX 5-2: a `datetime-local` field with its clock hint (the field has no zone, so it says whose clock it reads). */
 export function TimeField({ label, name, hint, defaultValue, required = true }: { label: string; name: string; hint: string; defaultValue?: string; required?: boolean }) {
   const id = useId();
@@ -147,7 +185,7 @@ export function TimeField({ label, name, hint, defaultValue, required = true }: 
  */
 export function ActForm({ action, refused, retry, confirm, className, onFocusCapture, children }: {
   action: (data: FormData) => Promise<boolean>; /** "Not saved." */ refused: string; /** Said when the portal gave no reason. */ retry: string;
-  confirm?: { title: (data: FormData) => string; body: string; confirm: string; cancel: string };
+  confirm?: { title: (data: FormData) => string; body: string | ((data: FormData) => string); confirm: string; cancel: string };
   className?: string; onFocusCapture?: FocusEventHandler<HTMLFormElement>; children: ReactNode;
 }) {
   const { error } = use(FeedbackContext);
@@ -172,7 +210,7 @@ export function ActForm({ action, refused, retry, confirm, className, onFocusCap
           <CircleAlert size={16} aria-hidden className="mt-0.5 flex-none"/><span>{refused} {error || retry}</span></p>}
         {children}
       </form>
-      {asking && confirm && <ConfirmDialog title={confirm.title(asking)} body={confirm.body} confirm={confirm.confirm} cancel={confirm.cancel}
+      {asking && confirm && <ConfirmDialog title={confirm.title(asking)} body={typeof confirm.body === "function" ? confirm.body(asking) : confirm.body} confirm={confirm.confirm} cancel={confirm.cancel}
                                            onConfirm={() => { setAsking(null); run(asking); }} onCancel={() => setAsking(null)}/>}
     </>
   );

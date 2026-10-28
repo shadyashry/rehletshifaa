@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
-import { ActForm, DocumentPicker, DoneAct, Fact, LaterAct, Money, Summary, Task as PanelTask, TimeField, instant, localInput, pick, text, type PanelDocument } from "@/components/portal/panel-parts";
+import { ActForm, AmountInput, DocumentPicker, DoneAct, Fact, LaterAct, Money, Summary, Task as PanelTask, TimeField, instant, localInput, pick, readAmount, text, type PanelDocument } from "@/components/portal/panel-parts";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { CURRENCY_LABELS, type AdmissionEvidence, type AdmissionView, type DirectoryFacility, type Mutate } from "@/components/portal/portal-model";
 
@@ -28,6 +28,8 @@ const LETTER_DECIDABLE = new Set(["CHECK_PENDING", "VARIANCE_OPEN"]);
 const OPERATIONS_CLEARS = new Set(["VOUCHER_NOT_ISSUED", "BALANCE_NOT_EVIDENCED", "ADMISSION_NUMBER_MISSING"]);
 /** A letter Finance has checked: the voucher can be issued by hand from here. */
 const LETTER_CHECKED = new Set(["WITHIN_ESTIMATE", "VARIANCE_ACCEPTED"]);
+/** A letter Finance has decided either way: one line among what is checked. */
+const LETTER_DONE = new Set([...LETTER_CHECKED, "REFUSED"]);
 
 /**
  * P1-15, staff case page: the "Admission & money" panel (design §5 stages 1–3). It shows the reservation, the frozen voucher
@@ -119,7 +121,6 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
     // In treatment, Finance's current work may be the Treatment panel's (P1-16): this panel then leads only for its own work.
     : role === "finance" && (caseStatus !== "TREATMENT_IN_PROGRESS" || ADMISSION_WORK.has(currentCode ?? "")) ? (pendingLetter ? "decide" : toCountersign.length > 0 ? `countersign:${toCountersign[0].id}` : feeOwed ? "fee" : null)
     : null;
-  const btn = (key: string) => next === key ? "btn-primary" : "btn-secondary";
   const voucherFacts = voucher && <VoucherFacts t={t} locale={locale} voucher={voucher} view={view} egp={egp}/>;
 
   // UX 3-2: the Consultant reads the admission as one line — where, and whether the hospital's letter is within the estimate —
@@ -198,7 +199,10 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
             <Trail t={t} evidence={view.evidence} when={when} egp={egp}/>
           </details>
         )}
-      </> : !reserved ? <p className="mt-2 text-[0.875rem] text-ink-600">{t.notReserved}</p> : (
+      </> : role === "finance" ? (
+        <FinanceFile t={t} locale={locale} view={view} caseId={caseId} next={next} busy={busy} act={act} when={when} egp={egp} money={voucherFacts}
+          pendingLetter={pendingLetter} toCountersign={toCountersign} cleared={cleared}/>
+      ) : !reserved ? <p className="mt-2 text-[0.875rem] text-ink-600">{t.notReserved}</p> : (
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-3">
           <Fact label={t.facility}><bdi>{view.facilityName ?? "—"}</bdi>{view.facilityCity && <span className="font-normal text-ink-600"> · <bdi>{view.facilityCity}</bdi></span>}</Fact>
           <Fact label={t.plannedAt}>{when(view.plannedAdmissionAt)}</Fact>
@@ -209,8 +213,8 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         </dl>
       )}
 
-      {role !== "operations" && <>
-        {voucherFacts ? <div className="mt-4 border-t border-line pt-3">{voucherFacts}</div>
+      {role === "coordinator" && <>
+        {voucherFacts ?<div className="mt-4 border-t border-line pt-3">{voucherFacts}</div>
           : reserved && <p className="mt-4 border-t border-line pt-3 text-[0.875rem] text-ink-600">{t.noVoucher}</p>}
 
         <div className="mt-4 border-t border-line pt-3">
@@ -222,36 +226,9 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         </div>
       </>}
 
-      {role === "finance" && (
-        <div className="mt-2">
-          {pendingLetter && <LetterDecision key={pendingLetter.id} t={t} letter={pendingLetter} variance={view.letterCheck === "VARIANCE_OPEN"} referenceMax={view.letterReferenceMaxEgp}
-            egp={egp} busy={busy} primary={next === "decide"} onDecide={(decision, note) => act(`/finance/cases/${caseId}/admission/letter/decision`, { evidenceId: pendingLetter.id, decision, note })}/>}
-          {toCountersign.length > 0 && (
-            <div className="mt-3 border-t border-line pt-3">
-              <h4 className="text-[0.875rem] font-bold text-ink-800">{t.finance.toCountersign}</h4>
-              <ul className="mt-1.5 divide-y divide-line">
-                {toCountersign.map(row => <Countersign key={row.id} t={t} row={row} when={when} egp={egp} busy={busy} primary={next === `countersign:${row.id}`}
-                                                       onConfirm={() => act(`/finance/cases/${caseId}/evidence/${row.id}/countersign`)}/>)}
-              </ul>
-            </div>
-          )}
-          {feeOwed && (
-            <Task title={t.finance.feeTitle} next={next === "fee"}>
-              <ActForm className="grid gap-3 sm:grid-cols-3" refused={t.forms.refused} retry={t.forms.refusedRetry} action={data => act(`/finance/cases/${caseId}/admission/fee-balance`, { reference: String(data.get("reference") ?? "").trim(), amountEgp: Number(data.get("amountEgp")), receivedAt: instant(data.get("receivedAt")) })}>
-                <label className="block text-sm font-semibold">{t.finance.reference}<input className="field" name="reference" maxLength={160} required autoComplete="off" spellCheck={false} dir="ltr"/></label>
-                <label className="block text-sm font-semibold">{t.forms.amountEgp}<input className="field" name="amountEgp" type="number" inputMode="decimal" min="0.01" step="0.01" required dir="ltr" defaultValue={view.feeBalanceOwedEgp ?? undefined}/></label>
-                <TimeField label={t.finance.receivedAt} name="receivedAt" hint={t.forms.timeHint}/>
-                <p className="text-[0.8125rem] text-ink-500 sm:col-span-3">{t.finance.freshSignIn}</p>
-                <div className="sm:col-span-3"><button className={btn("fee")} disabled={busy}>{t.finance.recordFee}</button></div>
-              </ActForm>
-            </Task>
-          )}
-        </div>
-      )}
-
       {role === "coordinator" && <FirstAppointment t={t} caseId={caseId} set={appointmentSet} busy={busy} act={act}/>}
 
-      {role !== "operations" && (
+      {role === "coordinator" && (
         <details className="group mt-3 border-t border-line pt-1">
           <Summary>{t.trail.title} ({view.evidence.length})</Summary>
           <Trail t={t} evidence={view.evidence} when={when} egp={egp}/>
@@ -439,42 +416,6 @@ function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, 
   </>);
 }
 
-/** An EGP amount copied from paper: plain digits, or thousands grouped by commas throughout, with up to two decimals. */
-const AMOUNT = /^(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]{1,2})?$/;
-const WHOLE = new Intl.NumberFormat("en-US");
-const CENTS = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-/** Grouped with Latin digits, as `formatMoney` writes amounts in both languages; cents kept when there are any. */
-const groupAmount = (value: number) => (Number.isInteger(value) ? WHOLE : CENTS).format(value);
-/**
- * The amount typed, or NaN when it is not one. Arabic-Indic digits and separators read as Latin (an Arabic keypad types them)
- * and a currency word around the figure is dropped ("EGP 195,500"); anything else ambiguous — "195,50", "1,2" — is refused,
- * never re-read as another amount.
- */
-function readAmount(value: FormDataEntryValue | string | null) {
-  const latin = String(value ?? "").trim()
-    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
-    .replace(/٫/g, ".").replace(/٬/g, ",").replace(/^[\p{L}\p{Sc}\s]+|[\p{L}\p{Sc}\s.]+$/gu, "");
-  return AMOUNT.test(latin) ? Number(latin.replaceAll(",", "")) : Number.NaN;
-}
-
-/**
- * UX 5-4: an EGP amount the officer copies from the hospital's paper (the letter's price, the cashier's receipt). It reads as
- * printed ("195,500.00"), is grouped again when left, and says in the page's language when it is not an amount above zero.
- */
-function AmountInput({ id, name, invalid, defaultValue, describedBy }: { id: string; name: string; invalid: string; defaultValue?: number; describedBy?: string }) {
-  const check = (field: HTMLInputElement) => {
-    const value = readAmount(field.value);
-    field.setCustomValidity(field.value.trim() && !(value > 0) ? invalid : "");
-    return value;
-  };
-  return (
-    <input id={id} className="field tabular-nums" name={name} type="text" inputMode="decimal" required dir="ltr" autoComplete="off" spellCheck={false}
-           defaultValue={defaultValue != null ? groupAmount(defaultValue) : undefined} aria-describedby={describedBy}
-           onChange={event => { check(event.currentTarget); }}
-           onBlur={event => { const value = check(event.currentTarget); if (value > 0) event.currentTarget.value = groupAmount(value); }}/>
-  );
-}
-
 /** A name or date set inside a sentence of the other script, isolated so it never reorders its neighbours. */
 const isolate = (value: string) => `⁨${value}⁩`;
 
@@ -484,8 +425,134 @@ const numberConfirm = (t: Copy) => ({
   body: t.forms.numberConfirmBody, confirm: t.forms.number, cancel: t.cancel,
 });
 
+/**
+ * UX 4-1: Finance's side of the admission, in the order Finance works it. The money act of this moment comes first — the
+ * letter's decision, a receipt to countersign, the fee balance — carrying the view's one filled button when it is the next
+ * thing to do; each states what it is checked against and the gap, and asks before it commits. What is already checked follows
+ * as one line per act (the voucher's money behind its own line), then what still stands before admission and is someone
+ * else's, then the trail behind one disclosure. Presentation only: the backend decides every rule.
+ */
+function FinanceFile({ t, locale, view, caseId, next, busy, act, when, egp, money, pendingLetter, toCountersign, cleared }: {
+  t: Copy; locale: Locale; view: AdmissionView; caseId: string; next: string | null; busy: boolean;
+  act: (path: string, body?: unknown) => Promise<boolean>; when: (iso?: string | null) => string; egp: (n?: number | null) => string;
+  /** The voucher's money, behind the voucher's own line. */ money: ReactNode;
+  pendingLetter: AdmissionEvidence | null; toCountersign: AdmissionEvidence[]; cleared: boolean;
+}) {
+  const id = useId();
+  const reserved = !!view.admissionId;
+  const voucher = view.voucher ?? null;
+  const openRows = view.evidence.filter(row => !row.superseded);
+  const feeOwed = view.feeBalanceOwedEgp ?? 0;
+  const letter = LETTER_DONE.has(view.letterCheck ?? "") ? openRows.find(row => row.kind === "FACILITY_ADMISSION_LETTER") ?? null : null;
+  const signed = openRows.filter(row => COUNTERSIGNED_HERE.has(row.kind) && row.countersignedAt);
+  const fees = openRows.filter(row => row.kind === "FEE_BALANCE_RECEIVED");
+  // Before admission, what is not this page's act now: a receipt waiting here and a fee balance owed here are the acts above.
+  const waiting = cleared ? [] : view.admissionBlockers.filter(code =>
+    !(code === "BALANCE_NOT_EVIDENCED" && toCountersign.some(row => row.kind === "BALANCE_EVIDENCED")) && !(code === "FEE_BALANCE_DUE" && feeOwed > 0));
+  const hospital = !view.facilityName ? null : view.facilityCity ? fillTemplate(t.forms.hospitalOption, { name: isolate(view.facilityName), city: isolate(view.facilityCity) }) : isolate(view.facilityName);
+  const done = !!voucher || !!letter || signed.length > 0 || fees.length > 0 || !!view.admissionNumber;
+
+  return (<>
+    <p className="mt-1 text-[0.875rem] text-ink-700">{!reserved ? t.notReserved
+      : <><span className="font-semibold text-ink-900">{hospital ?? "—"}</span>{view.plannedAdmissionAt && <> · {t.plannedAt} {isolate(when(view.plannedAdmissionAt))}</>}</>}</p>
+
+    {pendingLetter && <LetterDecision key={pendingLetter.id} t={t} locale={locale} letter={pendingLetter} variance={view.letterCheck === "VARIANCE_OPEN"} referenceMax={view.letterReferenceMaxEgp}
+      egp={egp} busy={busy} primary={next === "decide"} onDecide={(decision, note) => act(`/finance/cases/${caseId}/admission/letter/decision`, { evidenceId: pendingLetter.id, decision, note })}/>}
+    {toCountersign.length > 0 && (
+      <div className="mt-3 border-t border-line pt-3">
+        <h4 id={`${id}-countersign`} className="text-[0.875rem] font-bold text-ink-800">{t.finance.toCountersign}</h4>
+        <ul aria-labelledby={`${id}-countersign`} className="divide-y divide-line">
+          {/* The difference is said against what is owed only for a single receipt: two part-receipts are each "short". */}
+          {toCountersign.map(row => <Countersign key={row.id} t={t} row={row} owed={view.balanceOwedEgp}
+                                                 compare={toCountersign.filter(other => other.kind === "BALANCE_EVIDENCED").length === 1} when={when} egp={egp} busy={busy} primary={next === `countersign:${row.id}`}
+                                                 onConfirm={() => act(`/finance/cases/${caseId}/evidence/${row.id}/countersign`)}/>)}
+        </ul>
+      </div>
+    )}
+    {feeOwed > 0 && (
+      <div className="mt-3">
+        <Task title={t.finance.feeTitle} next={next === "fee"}>
+          <FeeBalance t={t} voucher={voucher} owed={feeOwed} egp={egp} busy={busy} primary={next === "fee"}
+            onRecord={body => act(`/finance/cases/${caseId}/admission/fee-balance`, body)}/>
+        </Task>
+      </div>
+    )}
+
+    {done && (<div className="mt-3 border-t border-line pt-3">
+      <h4 id={`${id}-done`} className="text-[0.875rem] font-bold text-ink-800">{t.finance.done}</h4>
+      <ol aria-labelledby={`${id}-done`} className="divide-y divide-line border-b border-line">
+        {letter && <li><DoneAct tone={view.letterCheck === "REFUSED" ? "warning" : "done"}
+          fact={<>{t.letter} · <Money>{egp(letter.amountEgp)}</Money> · <span className={letterTone(view.letterCheck) === "warning" ? "text-alert-800" : undefined}>{pick(t.letterCheck, view.letterCheck ?? "NONE")}</span></>}/></li>}
+        {/* A voucher not issued yet is said once, among what stands before admission. */}
+        {voucher && <li><DoneAct fact={<>{t.voucher} <bdi dir="ltr" translate="no">{voucher.voucherNumber}</bdi> · {fillTemplate(t.voucherRevision, { revision: String(voucher.revision) })}</>} change={t.summary.money}>{money}</DoneAct></li>}
+        {signed.map(row => <li key={row.id}><DoneAct fact={row.kind === "POINT_OF_NO_RETURN"
+          ? <>{t.forms.pnrAt} {isolate(when(row.effectiveAt ?? view.pointOfNoReturnAt))} · {t.pnrApproved}</>
+          : <>{pick(t.trail.kinds, row.kind)}{row.reference && <> <bdi dir="ltr" translate="no">{row.reference}</bdi></>} · <Money>{egp(row.amountEgp)}</Money> · {t.acts.checked}</>}/></li>)}
+        {fees.map(row => <li key={row.id}><DoneAct fact={<>{pick(t.trail.kinds, row.kind)} · <Money>{egp(row.amountEgp)}</Money>{row.reference && <> · <bdi dir="ltr" translate="no">{row.reference}</bdi></>}</>}/></li>)}
+        {view.admissionNumber && <li><DoneAct fact={<>{t.admissionNumber} <bdi dir="ltr" translate="no">{view.admissionNumber}</bdi></>}/></li>}
+      </ol>
+    </div>)}
+
+    {waiting.length > 0 && (
+      <div className="mt-3">
+        <h4 id={`${id}-waiting`} className="flex items-start gap-2 text-[0.875rem] font-bold text-ink-800"><Clock size={16} aria-hidden className="mt-0.5 flex-none text-ink-500"/>{t.acts.waitingOn}</h4>
+        <ul aria-labelledby={`${id}-waiting`} className="mt-1 list-disc space-y-1 ps-6 text-[0.875rem] text-ink-700">{waiting.map(code => <li key={code}>{pick(t.checklist.blockers, code)}</li>)}</ul>
+      </div>
+    )}
+    {view.emergencyOverride && <p className="mt-2 text-[0.875rem] font-semibold text-alert-800">{t.emergencyRecorded}</p>}
+
+    {view.evidence.length > 0 && (
+      <details className="group mt-1">
+        <Summary>{t.trail.title} ({view.evidence.length})</Summary>
+        <Trail t={t} evidence={view.evidence} when={when} egp={egp}/>
+      </details>
+    )}
+  </>);
+}
+
+/**
+ * UX 4-1: the platform fee balance, derived where it is recorded (the fee less what the deposit covered of it, as the voucher
+ * froze it), and recorded after a question that repeats the amount and the reference.
+ */
+function FeeBalance({ t, voucher, owed, egp, busy, primary, onRecord }: {
+  t: Copy; voucher: AdmissionView["voucher"] | null; owed: number; egp: (n?: number | null) => string; busy: boolean; primary: boolean;
+  onRecord: (body: { reference: string; amountEgp: number; receivedAt: string | null }) => Promise<boolean>;
+}) {
+  const id = useId();
+  const received = voucher ? Math.max(0, voucher.feeBalanceEgp - owed) : 0;
+  return (
+    <ActForm className="grid gap-3 sm:grid-cols-3" refused={t.forms.refused} retry={t.forms.refusedRetry}
+      confirm={{ title: data => fillTemplate(t.finance.feeConfirmTitle, { amount: isolate(egp(readAmount(data.get("amountEgp")))), reference: isolate(String(data.get("reference") ?? "").trim()) }),
+        body: t.finance.feeConfirmBody, confirm: t.finance.recordFee, cancel: t.cancel }}
+      action={data => onRecord({ reference: String(data.get("reference") ?? "").trim(), amountEgp: readAmount(data.get("amountEgp")), receivedAt: instant(data.get("receivedAt")) })}>
+      {voucher && (
+        <div id={`${id}-derivation`} className="text-[0.875rem] tabular-nums text-ink-700 sm:col-span-3">
+          <p>{fillTemplate(t.finance.feeDerivation, { fee: isolate(egp(voucher.platformFeeEgp)), applied: isolate(egp(voucher.depositPaidEgp - voucher.depositCreditEgp)), balance: isolate(egp(voucher.feeBalanceEgp)) })}</p>
+          {received > 0 && <p className="mt-1">{fillTemplate(t.finance.feeReceived, { received: isolate(egp(received)), owed: isolate(egp(owed)) })}</p>}
+        </div>
+      )}
+      <label className="block text-sm font-semibold">{t.finance.reference}<input className="field" name="reference" maxLength={160} required autoComplete="off" spellCheck={false} dir="auto"/></label>
+      <div>
+        <label htmlFor={`${id}-amount`} className="block text-sm font-semibold">{t.forms.amountEgp}</label>
+        <AmountInput id={`${id}-amount`} name="amountEgp" invalid={t.forms.amountInvalid} defaultValue={owed} describedBy={voucher ? `${id}-derivation` : undefined}/>
+      </div>
+      <TimeField label={t.finance.receivedAt} name="receivedAt" hint={t.forms.timeHint}/>
+      <div className="sm:col-span-3"><button className={primary ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.finance.recordFee}</button></div>
+    </ActForm>
+  );
+}
+
 /** The frozen voucher: its number, what each side pays, what is still owed, and the rate it was frozen at. */
 function VoucherFacts({ t, locale, voucher, view, egp }: { t: Copy; locale: Locale; voucher: NonNullable<AdmissionView["voucher"]>; view: AdmissionView; egp: (n?: number | null) => string }) {
+  // UX 4-1: EGP is the ledger's figure and leads; the patient's currency is its sub-line. The stored rate is EGP → the patient's
+  // currency, and is printed the way Egyptian finance quotes it (1 US$ = EGP 49.0196). In Arabic each side is isolated and the
+  // equation reads right to left ("1 US$ = 49.0196 ج.م."); a forced left-to-right run would reverse only Intl's Arabic side.
+  const foreign = voucher.displayCurrency && voucher.displayCurrency !== "EGP" ? voucher.displayCurrency : null;
+  const sub = (amount?: number | null) => foreign && amount != null
+    ? <span className="block text-[0.8125rem] font-normal text-ink-600"><Money>{formatMoney(amount, foreign, locale)}</Money></span> : null;
+  const one = foreign ? formatMoney(1, foreign, locale) : "";
+  const egpPer = foreign && voucher.fxRate ? new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "EGP", maximumSignificantDigits: 6 }).format(1 / voucher.fxRate) : null;
+  const rate = egpPer == null ? null : locale === "ar" ? `${isolate(one)} = ${isolate(egpPer)}` : `⁦${one} = ${egpPer}⁩`;
   return (
     <>
       <p className="text-[0.875rem] text-ink-500">{t.voucher} <bdi dir="ltr" translate="no" className="font-bold text-ink-900">{voucher.voucherNumber}</bdi> · {fillTemplate(t.voucherRevision, { revision: String(voucher.revision) })}</p>
@@ -494,14 +561,13 @@ function VoucherFacts({ t, locale, voucher, view, egp }: { t: Copy; locale: Loca
         <Fact label={t.money.platformFee}><Money>{egp(voucher.platformFeeEgp)}</Money></Fact>
         <Fact label={t.money.depositPaid}><Money>{egp(voucher.depositPaidEgp)}</Money></Fact>
         <Fact label={t.money.depositCredit}><Money>{egp(voucher.depositCreditEgp)}</Money></Fact>
-        <Fact label={t.money.patientPays}><Money>{egp(voucher.patientPaysAtFacilityEgp)}</Money>
-          {voucher.displayCurrency && voucher.displayCurrency !== "EGP" && voucher.patientPaysAtFacilityDisplay != null && <span className="font-normal text-ink-600"> · <Money>{formatMoney(voucher.patientPaysAtFacilityDisplay, voucher.displayCurrency, locale)}</Money></span>}</Fact>
-        {voucher.feeBalanceEgp > 0 && <Fact label={t.money.feeBalance}><Money>{egp(voucher.feeBalanceEgp)}</Money></Fact>}
+        <Fact label={t.money.patientPays}><Money>{egp(voucher.patientPaysAtFacilityEgp)}</Money>{sub(voucher.patientPaysAtFacilityDisplay)}</Fact>
+        {voucher.feeBalanceEgp > 0 && <Fact label={t.money.feeBalance}><Money>{egp(voucher.feeBalanceEgp)}</Money>{sub(voucher.feeBalanceDisplay)}</Fact>}
         <Fact label={t.money.balanceOwed}><Money>{egp(view.balanceOwedEgp)}</Money></Fact>
         {(view.feeBalanceOwedEgp ?? 0) > 0 && <Fact label={t.money.feeBalanceOwed}><Money>{egp(view.feeBalanceOwedEgp)}</Money></Fact>}
       </dl>
-      {voucher.fxRate != null && voucher.fxRateDate && (
-        <p className="mt-2 text-[0.8125rem] text-ink-500">{fillTemplate(t.money.rate, { rate: `⁨${new Intl.NumberFormat(intlLocale(locale), { maximumSignificantDigits: 6 }).format(voucher.fxRate)}⁩`,
+      {rate && voucher.fxRateDate && (
+        <p className="mt-2 text-[0.8125rem] text-ink-600">{fillTemplate(t.money.rate, { rate,
           date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${voucher.fxRateDate}T00:00:00Z`)) })}</p>
       )}
     </>
@@ -549,56 +615,106 @@ function Task({ title, next, children }: { title: string; next: boolean; childre
   return <PanelTask title={title} next={next} anchor="admission-next">{children}</PanelTask>;
 }
 
-function LetterDecision({ t, letter, variance, referenceMax, egp, busy, primary, onDecide }: {
-  t: Copy; letter: AdmissionEvidence; variance: boolean; referenceMax?: number | null; egp: (n?: number | null) => string; busy: boolean; primary: boolean;
-  onDecide: (decision: "ACCEPT" | "REFUSE", note: string | null) => Promise<boolean>;
-}) {
+/**
+ * A reason typed for a decision. When one is owed, the page refuses an empty or blank reason in its own words, at the field
+ * and read out (the browser's own message would be in the browser's language, and a passing tooltip).
+ */
+function ReasonField({ label, owed, hint }: { label: string; /** The page's own words when a reason is owed. */ owed?: string; hint?: string }) {
   const id = useId();
-  const [note, setNote] = useState("");
-  const [missing, setMissing] = useState<string | null>(null);
-  async function decide(decision: "ACCEPT" | "REFUSE") {
-    const reason = note.trim();
-    // A reason is owed for a price above the accepted estimate and for every refusal; the backend says so too.
-    if (!reason && (decision === "REFUSE" || variance)) { setMissing(decision === "REFUSE" ? t.finance.refuseNoteRequired : t.finance.noteRequired); document.getElementById(`${id}-note`)?.focus(); return; }
-    setMissing(null);
-    if (await onDecide(decision, reason || null)) setNote("");
-  }
+  const [missing, setMissing] = useState(false);
+  const described = missing ? `${id}-missing` : hint ? `${id}-hint` : undefined;
   return (
-    <div id={primary ? "admission-next" : undefined} className="mt-3 border-t border-line pt-3">
-      <h4 className="text-[0.875rem] font-bold text-ink-800">{t.finance.letterTitle}</h4>
-      <dl className="mt-1.5 grid gap-x-6 gap-y-1 text-[0.875rem] tabular-nums sm:grid-cols-2">
-        <Fact label={t.finance.quoted}><Money>{egp(letter.amountEgp)}</Money>{letter.reference && <span className="font-normal text-ink-600"> · <bdi dir="ltr">{letter.reference}</bdi></span>}</Fact>
-        {referenceMax != null && <Fact label={t.referenceMax}><Money>{egp(referenceMax)}</Money></Fact>}
-      </dl>
-      {variance && <p className="mt-2 text-[0.875rem] font-semibold text-alert-800">{t.letterCheck.VARIANCE_OPEN}</p>}
-      <label htmlFor={`${id}-note`} className="mt-3 block text-sm font-semibold">{t.finance.note}</label>
-      <textarea id={`${id}-note`} className="field" rows={2} maxLength={2000} value={note} onChange={event => { setNote(event.target.value); if (missing) setMissing(null); }}
-                aria-invalid={missing ? true : undefined} aria-describedby={missing ? `${id}-missing` : undefined}/>
-      {missing && <p id={`${id}-missing`} role="alert" className="mt-1 text-[0.8125rem] font-semibold text-alert-800">{missing}</p>}
-      <p className="mt-1 text-[0.8125rem] text-ink-500">{t.finance.freshSignIn}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className={primary ? "btn-primary" : "btn-secondary"} disabled={busy} onClick={() => void decide("ACCEPT")}>{t.finance.accept}</button>
-        <button type="button" className="btn-secondary" disabled={busy} onClick={() => void decide("REFUSE")}>{t.finance.refuse}</button>
-      </div>
+    <div className="w-full">
+      <label htmlFor={id} className="block text-sm font-semibold">{label}</label>
+      <textarea id={id} className="field" name="note" rows={2} maxLength={2000} dir="auto" required={!!owed} aria-invalid={missing || undefined} aria-describedby={described}
+        onInvalid={owed ? event => { event.currentTarget.setCustomValidity(owed); setMissing(true); } : undefined}
+        onInput={owed ? event => {
+          // A reason of spaces only is no reason: the backend refuses it, so the form does first.
+          const blank = !event.currentTarget.value.trim();
+          event.currentTarget.setCustomValidity(blank && event.currentTarget.value ? owed : "");
+          if (!blank) setMissing(false);
+        } : undefined}/>
+      {missing ? <p id={`${id}-missing`} role="alert" className="mt-1 text-[0.8125rem] font-semibold text-alert-800">{owed}</p>
+        : hint && <p id={`${id}-hint`} className="mt-1 text-[0.8125rem] text-ink-600">{hint}</p>}
     </div>
   );
 }
 
-function Countersign({ t, row, when, egp, busy, primary, onConfirm }: {
-  t: Copy; row: AdmissionEvidence; when: (iso?: string | null) => string; egp: (n?: number | null) => string; busy: boolean; primary: boolean; onConfirm: () => Promise<boolean>;
+/**
+ * UX 4-1: the hospital's letter as Finance checks it — the price, the estimate's maximum, and the gap already worked out with
+ * its percentage. Accepting asks first, the amount in the question; a reason is owed for a price above the estimate. Refusing
+ * is the second verb, behind its own disclosure, with its reason and its own question.
+ */
+function LetterDecision({ t, locale, letter, variance, referenceMax, egp, busy, primary, onDecide }: {
+  t: Copy; locale: Locale; letter: AdmissionEvidence; variance: boolean; referenceMax?: number | null; egp: (n?: number | null) => string; busy: boolean; primary: boolean;
+  onDecide: (decision: "ACCEPT" | "REFUSE", note: string | null) => Promise<boolean>;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const quoted = letter.amountEgp;
+  const gap = quoted != null && referenceMax != null ? Math.round((quoted - referenceMax) * 100) / 100 : null;
+  const percent = new Intl.NumberFormat(intlLocale(locale), { style: "percent", maximumFractionDigits: 1 });
+  // A percentage of a zero maximum means nothing: the gap is then said as an amount only.
+  const gapText = gap == null || referenceMax == null ? null
+    : gap > 0 ? fillTemplate(t.finance.gapAbove, { amount: isolate(egp(gap)), percent: isolate(referenceMax > 0 ? percent.format(gap / referenceMax) : "—") })
+    : gap < 0 ? fillTemplate(t.finance.gapBelow, { amount: isolate(egp(-gap)) }) : t.finance.gapAt;
+  const amount = isolate(egp(quoted));
   return (
-    <li id={primary ? "admission-next" : undefined} className="flex flex-wrap items-center justify-between gap-3 py-2 text-[0.875rem]">
-      <span className="min-w-0">
-        <span className="font-semibold text-ink-900">{pick(t.trail.kinds, row.kind)}</span>
-        {row.amountEgp != null && <> · <Money>{egp(row.amountEgp)}</Money></>}
-        {row.reference && <> · <bdi dir="ltr">{row.reference}</bdi></>}
-        <span className="block text-[0.8125rem] text-ink-600">{fillTemplate(t.trail.recorded, { role: pick(t.trail.roles, row.recordedRole ?? "SYSTEM") })} · {when(row.effectiveAt ?? row.recordedAt)}</span>
-      </span>
-      <button type="button" className={primary ? "btn-primary" : "btn-secondary"} disabled={busy} onClick={() => setConfirming(true)}>{t.finance.countersign}<span className="sr-only">: {pick(t.trail.kinds, row.kind)}</span></button>
-      {confirming && <ConfirmDialog title={t.finance.countersignTitle} body={t.finance.countersignBody} confirm={t.finance.countersign} cancel={t.cancel}
-                                    onConfirm={() => { setConfirming(false); void onConfirm(); }} onCancel={() => setConfirming(false)}/>}
+    <div id={primary ? "admission-next" : undefined} className="mt-3 border-t border-line pt-3">
+      <h4 className="text-[0.875rem] font-bold text-ink-800">{t.finance.letterTitle}</h4>
+      <dl className="mt-1.5 grid gap-x-6 gap-y-2 text-[0.875rem] tabular-nums sm:grid-cols-3">
+        <Fact label={t.finance.quoted}><Money>{egp(quoted)}</Money>{letter.reference && <span className="block text-[0.8125rem] font-normal text-ink-600"><bdi dir="ltr" translate="no">{letter.reference}</bdi></span>}</Fact>
+        {referenceMax != null && <Fact label={t.referenceMax}><Money>{egp(referenceMax)}</Money></Fact>}
+        {gapText && <Fact label={t.finance.gap}><span className={gap != null && gap > 0 ? "text-alert-800" : undefined}>{gapText}</span></Fact>}
+      </dl>
+      <ActForm className="mt-3 flex flex-col items-start gap-3" refused={t.forms.refused} retry={t.forms.refusedRetry}
+        confirm={{ title: () => fillTemplate(t.finance.acceptTitle, { amount }), body: variance && gapText ? fillTemplate(t.finance.acceptBodyVariance, { gap: gapText }) : t.finance.acceptBody,
+          confirm: t.finance.accept, cancel: t.cancel }}
+        action={data => onDecide("ACCEPT", text(data.get("note")))}>
+        <ReasonField label={variance ? t.finance.note : t.finance.noteOptional} owed={variance ? t.finance.noteRequired : undefined} hint={variance ? t.finance.noteRequired : undefined}/>
+        <button className={primary ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.finance.accept}</button>
+      </ActForm>
+      <details className="group mt-3 border-t border-line">
+        <Summary>{t.finance.refuseOpen}</Summary>
+        <ActForm className="flex flex-col items-start gap-3 pb-3" refused={t.forms.refused} retry={t.forms.refusedRetry}
+          confirm={{ title: () => fillTemplate(t.finance.refuseTitle, { amount }), body: t.finance.refuseBody, confirm: t.finance.refuse, cancel: t.cancel }}
+          action={data => onDecide("REFUSE", text(data.get("note")))}>
+          <ReasonField label={t.finance.refuseNote} owed={t.finance.refuseNoteRequired}/>
+          <button className="btn-secondary" disabled={busy}>{t.finance.refuse}</button>
+        </ActForm>
+      </details>
+    </div>
+  );
+}
+
+/**
+ * A record Finance countersigns. UX 4-1: a cashier receipt reads as a checked fact — its amount against what the voucher says
+ * is owed at the cashier, and the difference said in words — and the question repeats the amount; a refusal is said in place.
+ */
+function Countersign({ t, row, owed, compare, when, egp, busy, primary, onConfirm }: {
+  t: Copy; row: AdmissionEvidence; owed?: number | null; /** Whether the difference against `owed` is said (one receipt waiting). */ compare: boolean;
+  when: (iso?: string | null) => string; egp: (n?: number | null) => string; busy: boolean; primary: boolean; onConfirm: () => Promise<boolean>;
+}) {
+  const kind = pick(t.trail.kinds, row.kind);
+  const receipt = row.kind === "BALANCE_EVIDENCED";
+  const diff = receipt && compare && row.amountEgp != null && owed != null ? Math.round((row.amountEgp - owed) * 100) / 100 : null;
+  const verdict = diff == null ? null : diff === 0 ? t.finance.receiptMatches
+    : fillTemplate(diff < 0 ? t.finance.receiptShort : t.finance.receiptOver, { amount: isolate(egp(Math.abs(diff))) });
+  return (
+    <li id={primary ? "admission-next" : undefined} className="py-3 text-[0.875rem]">
+      <p className="font-semibold text-ink-900 [overflow-wrap:anywhere]">{kind}{row.reference && <> <bdi dir="ltr" translate="no">{row.reference}</bdi></>}
+        {!receipt && row.amountEgp != null && <> · <Money>{egp(row.amountEgp)}</Money></>}{row.kind === "POINT_OF_NO_RETURN" && <> · {isolate(when(row.effectiveAt ?? row.recordedAt))}</>}</p>
+      <p className="text-[0.8125rem] text-ink-600">{fillTemplate(t.trail.recorded, { role: pick(t.trail.roles, row.recordedRole ?? "SYSTEM") })} · {when(row.effectiveAt ?? row.recordedAt)}</p>
+      {receipt && (
+        <dl className="mt-2 grid gap-x-6 gap-y-2 tabular-nums sm:grid-cols-3">
+          <Fact label={kind}><Money>{egp(row.amountEgp)}</Money></Fact>
+          <Fact label={t.finance.owedAtCashier}><Money>{egp(owed)}</Money></Fact>
+          {verdict && <Fact label={t.finance.check}><span className={diff === 0 ? undefined : "text-alert-800"}>{verdict}</span></Fact>}
+        </dl>
+      )}
+      <ActForm className="mt-3" refused={t.forms.refused} retry={t.forms.refusedRetry} action={() => onConfirm()}
+        confirm={{ title: () => receipt && row.amountEgp != null ? fillTemplate(t.finance.countersignReceiptTitle, { amount: isolate(egp(row.amountEgp)) }) : t.finance.countersignTitle,
+          body: t.finance.countersignBody, confirm: t.finance.countersign, cancel: t.cancel }}>
+        <button className={primary ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.finance.countersign}<span className="sr-only">: {row.reference ? `${kind} ${row.reference}` : kind}</span></button>
+      </ActForm>
     </li>
   );
 }

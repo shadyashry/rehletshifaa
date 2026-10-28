@@ -1655,6 +1655,76 @@ rejectBody}`; `caseView.deposit.refundOpen`.
 
 **Next:** slice 4-1, the admission money, started in a new session from this branch.
 
+## UX area 4 — Finance: slice 4-1 the admission money (2026-10-28, worktree `zen-lalande-72e692`, branch `claude/zen-lalande-72e692` from 4-0 @ `61d898fd`)
+
+Scope: Finance's side of `AdmissionPanel.tsx` (+ test), `RefundForm.tsx` (+ test), the shared `panel-parts.tsx`, messages, the
+Finance fixture and behaviour spec.
+
+**Finance's admission, in the order Finance works it** (a new `FinanceFile` variant; the coordinator's branch is unchanged).
+- One line under the heading: the hospital and the planned admission.
+- **The act of this moment first**, carrying the view's one filled button when it is `next`:
+  - **Letter decision.** The quote, the estimate's maximum and the **gap** worked out: "EGP 22,500 above the estimate's
+    maximum (9.4%)", or below/at it. Accept is an `ActForm` with a confirmation naming the price ("Accept the letter at EGP
+    262,500?"; the body repeats the gap when a reason is owed). The reason is required above the estimate, optional within
+    it. **Refuse is the second verb**, behind "Can't accept this letter?", with its own required reason ("Reason for
+    refusing") and its own question. A blank or spaces-only reason is refused at the field in the page's words (inline,
+    `role="alert"`, `aria-invalid`), not by the browser's tooltip.
+  - **Receipt countersign as a checked fact.** The receipt against "Owed at the cashier, per the voucher", and the check in
+    words: "Matches…", "EGP 5,432.10 less than…", "…more than…" (said only when one receipt waits; two part-receipts are not
+    each "short"). Countersigning is an `ActForm` (refusal said in place) whose question names the amount; the button's
+    accessible name carries the reference.
+  - **Fee balance derived.** "Platform fee EGP 55,700 − deposit applied to the fee EGP 43,200 = EGP 12,500" (the voucher's
+    identity, V99), plus what was received so far. The amount uses the panel's `AmountInput`; the confirmation repeats the
+    amount and the reference.
+- **"Checked so far"** (visible heading): the decided letter, the voucher (its money behind its own line), countersigned
+  receipts and the point of no return, fee payments and the admission number, each one `DoneAct` line.
+- **Before admission, waiting on others**: the blockers that are not the act above (a receipt waiting here and a fee owed
+  here are the page's own acts). Then the **evidence trail behind one disclosure**.
+- **EGP first in the voucher facts**: the patient's currency is each figure's sub-line (the fee balance gains its own), and
+  the rate reads "1 US$ = EGP 49.0196" (in Arabic each side isolated, so it reads right to left). This also reaches Operations'
+  voucher money line.
+- **Codes.** The lower-cased "price variance open" / "fee balance not paid" came from the fixture, which used codes the backend
+  never sends. The fixture now uses `AdmissionReadiness`'s codes, all worded in en and ar. The fee voucher now keeps the V99
+  identity.
+
+**`RefundForm` on `ActForm`.** A refusal is said at the form. Labels at `text-sm font-semibold`, the amount on `AmountInput`
+(Arabic digits, the page's own message), the detail `dir="auto"`, the reason isolated in the question. The idempotency key is
+per refund (amount + reason), kept through a refused or timed-out attempt, so correcting the free-text detail never records a
+refund twice.
+
+**Shared.** `AmountInput`/`readAmount` moved from `AdmissionPanel` to `panel-parts` (Finance's fee and refund use them). `ActForm`'s
+confirmation body may be worded from the form. `Fact` wraps a long reference inside its column; `Money` never splits.
+
+Copy in en + ar, inserted textually: `admission.finance.{gap,gapAbove,gapBelow,gapAt,noteOptional,acceptTitle,acceptBody,
+acceptBodyVariance,refuseOpen,refuseNote,refuseTitle,refuseBody,owedAtCashier,check,receiptMatches,receiptShort,receiptOver,
+countersignReceiptTitle,feeDerivation,feeReceived,feeConfirmTitle,feeConfirmBody,done}`; `admission.finance.freshSignIn`
+removed (the confirmations carry it).
+
+**Reviews** (four read-only reviewers; no CRITICAL):
+- Pro Max: HIGH ×1 fixed (a long reference could scroll a phone sideways). MEDIUM (refund grid) and three LOWs fixed. Contrast,
+  focus, targets, ladder sizes pass.
+- Web design guidelines: HIGH ×1 fixed (Finance's amounts bypassed `AmountInput`). MEDIUMs fixed: the reason's message inline,
+  the visible "Checked so far" heading, reference wrapping. LOWs fixed: reference `dir="auto"`, isolated refund amount.
+- RB + composition: MEDIUMs fixed (the refund key over money fields only; countersign refusal in place). LOWs fixed: blank
+  reasons, zero maximum, several receipts, dead copy, formatting.
+- RTL/i18n: MEDIUMs fixed (the Arabic rate order; gap wording that reads inside the confirmation). Arabic wording taken.
+- Deferred to backlog "Area 4 — Finance": `FinanceApproval`'s rate in Arabic (4-2), `ActForm` body function-only, the fee
+  derivation as prose if native review prefers.
+
+**Verify.**
+- `pnpm typecheck` ok; eslint on the touched files clean.
+- vitest 97 files / 803 tests: 802 pass, the known `StaffOperationalUi` W-44 fails (a second failure, ProposalSign, was load
+  flakiness: 34/34 twice alone). `AdmissionPanel.test.tsx` 38/38 (Finance rewritten: gap and reason, refuse as the second verb,
+  receipt check and short receipt, fee derivation and confirmation, the checked lines); `RefundForm.test.tsx` 3/3 (refusal in
+  place, the same key on retry, a new key for a changed refund).
+- Playwright on a production build on :3207: finance-shots (`AREA4_SHOTS=4-1`), finance-workspace (new: the letter's gap and
+  confirmed accept; Arabic gap and refuse behind its disclosure, no lower-cased codes; the receipt check, the fee derivation and
+  its confirmed record), operations-shots, consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar: 105/105. Two
+  4-0 assertions were loosened to allow the isolate marks 4-0 put around its amounts.
+- Overwritten shots restored. Shots: `screenshots/area-4/4-1/`.
+
+**Next:** slice 4-2, the treatment and the settlement, started in a new session from this branch.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

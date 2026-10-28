@@ -200,51 +200,98 @@ describe("AdmissionPanel — Operations' hospital file", () => {
 
 describe("AdmissionPanel — Finance", () => {
   afterEach(cleanup);
-  const variance: AdmissionView = { ...reserved, letterCheck: "VARIANCE_OPEN", voucher: null, balanceOwedEgp: null, evidence: [letterRow] };
+  const variance: AdmissionView = { ...reserved, letterCheck: "VARIANCE_OPEN", voucher: null, balanceOwedEgp: null, evidence: [{ ...letterRow, amountEgp: 262500 }] };
+  const receipt = { id: "e7", kind: "BALANCE_EVIDENCED", reference: "CASH-991", amountEgp: 195432.1, recordedRole: "OPERATIONS", recordedAt: "2026-10-19T10:00:00Z", effectiveAt: "2026-10-19T09:30:00Z", superseded: false };
 
-  it("needs a reason to accept a price above the estimate, then sends the decision", async () => {
+  it("states the letter's gap, owes a reason above the estimate, and accepts only after a question with the amount", async () => {
     const { mutate, load } = setup("finance", variance, { caseStatus: "TRAVEL_COORDINATION" });
     const accept = await screen.findByRole("button", { name: "Accept the letter" });
     expect(load).toHaveBeenCalledWith("/finance/cases/c1/admission");
+    // UX 4-1: the gap is worked out, with its percentage of the estimate's maximum.
+    expect(screen.getByText(/EGP\s?22,500.* above the estimate's maximum \(.*9\.4%.*\)/)).toBeTruthy();
+    const reason = screen.getByLabelText("Reason") as HTMLTextAreaElement;
+    expect(reason.required).toBe(true);
+    expect(reason).toHaveAccessibleDescription("Give a reason: the price is above the accepted estimate.");
+    fireEvent.invalid(reason);
+    expect(reason.validationMessage).toBe("Give a reason: the price is above the accepted estimate.");
+    fireEvent.input(reason, { target: { value: "Hospital added an ICU night" } });
+    expect(accept.className).toContain("btn-primary");
     fireEvent.click(accept);
-    expect(screen.getByRole("alert").textContent).toBe("Give a reason: the price is above the accepted estimate.");
     expect(mutate).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Hospital added an ICU night" } });
-    fireEvent.click(accept);
+    const dialog = screen.getByRole("alertdialog", { name: /Accept the letter at .*EGP\s?262,500.*\?/ });
+    expect(dialog.textContent).toMatch(/You accept a price .*EGP\s?22,500.* above the estimate's maximum/);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Accept the letter" }));
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/admission/letter/decision", { evidenceId: "e1", decision: "ACCEPT", note: "Hospital added an ICU night" }));
   });
 
-  it("refuses a letter only with a reason", async () => {
-    const { mutate } = setup("finance", { ...variance, letterCheck: "CHECK_PENDING" });
-    fireEvent.click(await screen.findByRole("button", { name: "Refuse the letter" }));
-    expect(screen.getByRole("alert").textContent).toBe("Give the reason for refusing the letter.");
-    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Wrong patient name" } });
-    fireEvent.click(screen.getByRole("button", { name: "Refuse the letter" }));
+  it("refuses a letter as the second verb, with its reason and its own question", async () => {
+    const { mutate } = setup("finance", { ...variance, letterCheck: "CHECK_PENDING", evidence: [letterRow] });
+    expect(await screen.findByText(/EGP\s?10,000.* below the estimate's maximum/)).toBeTruthy();
+    // Within the estimate the reason to accept is optional.
+    expect((screen.getByLabelText("Reason (optional)") as HTMLTextAreaElement).required).toBe(false);
+    const refuseGroup = screen.getByText("Can't accept this letter?").closest("details")!;
+    expect(refuseGroup.open).toBe(false);
+    const reason = within(refuseGroup).getByLabelText("Reason for refusing") as HTMLTextAreaElement;
+    fireEvent.invalid(reason);
+    expect(reason.validationMessage).toBe("Give the reason for refusing the letter.");
+    fireEvent.input(reason, { target: { value: "Wrong patient name" } });
+    const refuse = within(refuseGroup).getByRole("button", { name: "Refuse the letter" });
+    expect(refuse.className).toContain("btn-secondary");
+    fireEvent.click(refuse);
+    const dialog = screen.getByRole("alertdialog", { name: /Refuse the letter at .*EGP\s?230,000/ });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Refuse the letter" }));
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/admission/letter/decision", { evidenceId: "e1", decision: "REFUSE", note: "Wrong patient name" }));
   });
 
-  it("countersigns a recorded receipt after a confirmation", async () => {
-    const receipt = { id: "e7", kind: "BALANCE_EVIDENCED", reference: "CASH-991", amountEgp: 195432.1, recordedRole: "OPERATIONS", recordedAt: "2026-10-19T10:00:00Z", effectiveAt: "2026-10-19T09:30:00Z", superseded: false };
+  it("reads a receipt against what the voucher says is owed at the cashier, and countersigns after a question with the amount", async () => {
     const { mutate } = setup("finance", { ...reserved, evidence: [...reserved.evidence, receipt] });
-    const countersign = await screen.findByRole("button", { name: /^Countersign\W+Hospital receipt$/ });
+    const countersign = await screen.findByRole("button", { name: /^Countersign\W+Hospital receipt CASH-991$/ });
+    expect(screen.getByText("Owed at the cashier, per the voucher")).toBeTruthy();
+    expect(screen.getByText("Matches what is owed at the cashier")).toBeTruthy();
+    // The receipt waiting here is this page's act, not something to wait for.
+    expect(screen.queryByText("Before admission, waiting on others")).toBeNull();
     expect(countersign.className).toContain("btn-primary");
     fireEvent.click(countersign);
     expect(mutate).not.toHaveBeenCalled();
-    const dialog = screen.getByRole("alertdialog", { name: "Countersign this record?" });
+    const dialog = screen.getByRole("alertdialog", { name: /Countersign the receipt for .*EGP\s?195,432\.10/ });
     fireEvent.click(dialog.querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/evidence/e7/countersign", undefined));
   });
 
-  it("records the platform fee balance the capped deposit did not cover", async () => {
-    const { mutate } = setup("finance", { ...reserved, voucher: { ...voucher, feeBalanceEgp: 1250 }, feeBalanceOwedEgp: 1250, admissionBlockers: ["FEE_BALANCE_DUE"] });
-    expect(await screen.findByText("The platform fee balance is not received")).toBeTruthy();
-    const fee = screen.getByText("Record the platform fee balance").closest("details")!;
+  it("says a receipt short of what is owed in words", async () => {
+    setup("finance", { ...reserved, evidence: [...reserved.evidence, { ...receipt, amountEgp: 190000 }] });
+    expect(await screen.findByText(/EGP\s?5,432\.10.* less than what is owed at the cashier/)).toBeTruthy();
+  });
+
+  it("derives the fee balance and records it after a question with the amount and the reference", async () => {
+    const feeVoucher = { ...voucher, depositPaidEgp: 28750, depositCreditEgp: 0, feeBalanceEgp: 1250, feeBalanceDisplay: 25.5 };
+    const { mutate } = setup("finance", { ...reserved, balanceOwedEgp: 0, voucher: feeVoucher, feeBalanceOwedEgp: 1250, admissionBlockers: ["FEE_BALANCE_DUE"] });
+    const fee = (await screen.findByText("Record the platform fee balance")).closest("details")!;
     expect(fee.open).toBe(true);
     const form = within(fee);
+    expect(form.getByText(/Platform fee .*EGP\s?30,000.* − deposit applied to the fee .*EGP\s?28,750.* = .*EGP\s?1,250/)).toBeTruthy();
+    expect(screen.queryByText("The platform fee balance is not received")).toBeNull();
     fireEvent.change(form.getByLabelText("Payment reference"), { target: { value: "TRF-12" } });
     fireEvent.change(form.getByLabelText("Received at"), { target: { value: "2026-10-18T12:00" } });
     fireEvent.click(form.getByRole("button", { name: "Record the fee balance" }));
+    expect(mutate).not.toHaveBeenCalled();
+    const dialog = screen.getByRole("alertdialog", { name: /Record .*EGP\s?1,250.* received against .*TRF-12/ });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Record the fee balance" }));
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/admission/fee-balance", { reference: "TRF-12", amountEgp: 1250, receivedAt: new Date("2026-10-18T12:00").toISOString() }));
+  });
+
+  it("says what is already checked as one line per act, the voucher's money EGP first behind its own line", async () => {
+    setup("finance", { ...reserved, caseStatus: "TREATMENT_IN_PROGRESS", admissionNumber: "NHH-ADM-1", balanceOwedEgp: 0, admissionBlockers: [],
+      evidence: [...reserved.evidence, { ...receipt, countersignedRole: "FINANCE", countersignedAt: "2026-10-19T12:00:00Z" }] });
+    const done = await screen.findByRole("list", { name: "Checked so far" });
+    const lines = within(done).getAllByRole("listitem").map(li => li.textContent);
+    expect(lines[0]).toMatch(/^Admission letter · EGP\s?230,000 · Checked, within the estimate$/);
+    expect(lines.some(l => /^Hospital receipt CASH-991 · EGP\s?195,432\.10 · countersigned by Finance$/.test(l ?? ""))).toBe(true);
+    expect(lines.at(-1)).toBe("Admission number NHH-ADM-1");
+    expect(screen.queryByRole("button", { name: /countersign/i })).toBeNull();
+    // The rate as Finance quotes it, inside the voucher's money.
+    expect(screen.getByText(/= EGP\s?49\.0196/).closest("details")?.open).toBe(false);
+    expect(screen.getByText(/^Evidence trail/).closest("details")?.open).toBe(false);
   });
 
   it("offers no Operations recording to Finance or a coordinator", async () => {
