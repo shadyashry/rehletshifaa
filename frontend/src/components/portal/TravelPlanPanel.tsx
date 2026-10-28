@@ -6,7 +6,7 @@ import { intlLocale } from "@/lib/i18n";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
-import { Summary, Task, instant, localInput, pick, text } from "@/components/portal/panel-parts";
+import { DoneAct, Summary, Task, instant, localInput, pick, text } from "@/components/portal/panel-parts";
 import { StatusBadge } from "@/components/portal/StatusBadge";
 import type { Mutate, TravelPlanView } from "@/components/portal/portal-model";
 
@@ -130,37 +130,47 @@ function TravelPlan({ caseId, plan, busy, mutate, current, heading: Heading, cla
     </form>
   );
 
+  const planLine = !plan ? t.nothingYet : plan.plannedArrival ? fillTemplate(t.arriving, { at: `⁨${dateTime.format(new Date(plan.plannedArrival))}⁩` }) : t.noArrivalYet;
+  const changeLabel = plan?.plannedArrival || booked ? t.change : t.start;
+
+  // UX 5-4: inside the hospital file, while travel is not the act now, it is one line like the file's other acts (booked: done;
+  // otherwise still waiting), its form behind the line's change.
+  if (Heading === "h4" && !current) return (
+    <div id="travel-panel">
+      <DoneAct tone={booked ? "done" : "waiting"} fact={<>{t.title} · {plan && <>{pick(t.status, plan.status)} · </>}{planLine}</>} change={changeLabel}>{planForm}</DoneAct>
+    </div>
+  );
+
   return (
-    <Root id="travel-panel" aria-labelledby={Heading === "h3" ? `${id}-title` : undefined} className={className}>
+    <Root id="travel-panel" aria-labelledby={Heading === "h3" ? `${id}-title` : undefined} className={Heading === "h4" ? "py-2" : className}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <Heading id={`${id}-title`} className={Heading === "h3" ? "title text-base" : "text-[0.875rem] font-bold text-ink-800"}>{t.title}</Heading>
-        {plan && <StatusBadge tone={booked ? "success" : "neutral"}>{pick(t.status, plan.status)}</StatusBadge>}
+        {/* Inside the hospital file the status is said in the act's line, not as a card's chip (UX 5-4). */}
+        {plan && Heading === "h3" && <StatusBadge tone={booked ? "success" : "neutral"}>{pick(t.status, plan.status)}</StatusBadge>}
       </div>
 
       {next === "plan" ? <div className="mt-3">{planForm}</div> : <>
         {/* Not the act now: what the plan holds, in one line, with the form behind its disclosure. */}
-        <p className="mt-1 text-[0.875rem] text-ink-700">{!plan ? t.nothingYet : plan.plannedArrival
-          ? fillTemplate(t.arriving, { at: `⁨${dateTime.format(new Date(plan.plannedArrival))}⁩` }) : t.noArrivalYet}</p>
+        <p className="mt-1 text-[0.875rem] text-ink-700">{plan && Heading === "h4" && <>{pick(t.status, plan.status)} · </>}{planLine}</p>
         <details className="group mt-1 border-t border-line">
-          <Summary>{plan ? t.change : t.start}</Summary>
+          <Summary>{changeLabel}</Summary>
           <div className="pb-3">{planForm}</div>
         </details>
       </>}
 
-      <Task title={t.arrival.title} next={next === "arrival"} anchor="travel-arrival-next">
-        {plan ? (
-          <form className="flex flex-wrap items-end gap-3" onSubmit={askArrival} noValidate>
-            <p id={`${id}-arrived-hint`} className="w-full max-w-[65ch] text-[0.8125rem] text-ink-600">{t.arrival.hint}</p>
-            <label className="block text-sm font-semibold">{t.arrival.at}
-              <input ref={arrivedField} className="field" name="arrivedAt" type="datetime-local" dir="ltr" max={localInput(new Date().toISOString())}
-                     aria-invalid={arrivedError ? true : undefined} aria-describedby={`${id}-arrived-hint${arrivedError ? ` ${id}-arrived-error` : ""}`}
-                     onChange={() => arrivedError && setArrivedError(null)}/>
-            </label>
-            <button className={next === "arrival" ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.arrival.record}</button>
-            {arrivedError && <p id={`${id}-arrived-error`} role="alert" className="w-full text-[0.8125rem] font-semibold text-alert-800">{arrivedError}</p>}
-          </form>
-        ) : <p className="text-[0.8125rem] text-ink-600">{t.arrival.needsPlan}</p>}
-      </Task>
+      {/* UX 5-4: the arrival is an act once the travel is booked and travel is the act now (never beside an open letter). */}
+      {booked && current && <Task title={t.arrival.title} next={next === "arrival"} anchor="travel-arrival-next">
+        <form className="flex flex-wrap items-end gap-3" onSubmit={askArrival} noValidate>
+          <p id={`${id}-arrived-hint`} className="w-full max-w-[65ch] text-[0.8125rem] text-ink-600">{t.arrival.hint}</p>
+          <label className="block text-sm font-semibold">{t.arrival.at}
+            <input ref={arrivedField} className="field" name="arrivedAt" type="datetime-local" dir="ltr" max={localInput(new Date().toISOString())}
+                   aria-invalid={arrivedError ? true : undefined} aria-describedby={`${id}-arrived-hint${arrivedError ? ` ${id}-arrived-error` : ""}`}
+                   onChange={() => arrivedError && setArrivedError(null)}/>
+          </label>
+          <button className={next === "arrival" ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.arrival.record}</button>
+          {arrivedError && <p id={`${id}-arrived-error`} role="alert" className="w-full text-[0.8125rem] font-semibold text-alert-800">{arrivedError}</p>}
+        </form>
+      </Task>}
       {arrivedAt && <ConfirmDialog title={t.arrival.confirmTitle} body={fillTemplate(t.arrival.confirmBody, { at: `⁨${dateTime.format(new Date(arrivedAt))}⁩` })} confirm={t.arrival.record} cancel={t.arrival.cancel}
         onConfirm={() => recordArrival(arrivedAt)} onCancel={() => setArrivedAt(null)}/>}
     </Root>

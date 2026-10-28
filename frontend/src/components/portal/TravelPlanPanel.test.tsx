@@ -108,8 +108,10 @@ describe("TravelPlanPanel", () => {
 
   it("as a later act of the hospital file: one line, the forms behind disclosures, no filled button", () => {
     const { container } = renderWithWork(<TravelAct caseId="c1" plan={stored} current={false} busy={false} mutate={vi.fn()}/>);
-    expect(screen.getByRole("heading", { level: 4, name: "Travel and arrival" })).toBeInTheDocument();
-    expect(screen.getByText(/^Planned arrival: .*2026/)).toBeInTheDocument();
+    // UX 5-4: not the act now, it is one line of the file, like its other acts.
+    expect(screen.queryByRole("heading")).toBeNull();
+    expect(screen.getByText(/^Travel and arrival · Planning · Planned arrival: .*2026/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Planning/)).toHaveLength(1);
     expect(container.querySelectorAll(".btn-primary")).toHaveLength(0);
     expect(screen.getByText("Change the travel plan").closest("details")).not.toHaveAttribute("open");
   });

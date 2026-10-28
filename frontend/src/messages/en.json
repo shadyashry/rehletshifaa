@@ -3653,7 +3653,6 @@
         "confirmTitle": "Record the patient's arrival?",
         "confirmBody": "The patient arrived at {at}. This moves the case to admission and cannot be undone from here.",
         "cancel": "Cancel",
-        "needsPlan": "Save the travel plan first.",
         "missing": "Enter when the patient arrived.",
         "future": "The arrival cannot be in the future.",
         "failed": "The arrival was not recorded. Read the message above, check the time, then try again."
@@ -3666,7 +3665,10 @@
         "reserved": "Reserved · {hospital} · admission {date}",
         "receipt": "Cashier receipt recorded",
         "checked": "countersigned by Finance",
-        "awaitingCheck": "waiting for Finance's countersignature"
+        "awaitingCheck": "waiting for Finance's countersignature",
+        "waitingOn": "Before admission, waiting on others",
+        "alsoNow": "Also possible now",
+        "history": "File history"
       },
       "summary": {
         "title": "Admission",
@@ -3776,6 +3778,9 @@
         "pnr": "Set the point of no return",
         "pnrAt": "No refund for travel after",
         "pnrHint": "Travel costs are not refunded after this time. Finance then approves it.",
+        "changePnr": "Change the point of no return",
+        "quotedHint": "The accepted estimate allows up to {amount}.",
+        "amountInvalid": "Enter the amount in figures, above zero, for example 195,500.",
         "pnrConfirm": "Set the point of no return to {time}?",
         "number": "Record the admission number",
         "numberField": "Hospital admission number",

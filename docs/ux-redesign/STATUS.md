@@ -1510,6 +1510,58 @@ clean; vitest 788/791 → after the test update all green but the known `StaffOp
 Playwright on a production build on :3131: operations-shots + a11y en/ar 34/34; the plan shot's strip reads "Reserve the
 hospital" with the reservation's Save as the one filled button. Overwritten shots restored.
 
+## UX area 5 — slice 5-4: the side cards folded into the hospital file (2026-10-28, worktree `sharp-antonelli-b6a40e`, branch `claude/sharp-antonelli-b6a40e` reset to 5-3 @ `6fbce9be`)
+
+Follow-up to the area-5 re-critique (29/40) P1 #2 and P2 #3; presentation only, Operations only. No owner gate (standing instruction).
+B-5-1 (the strip's step codes, AdmissionPanel's `next`, the `currentAction`/`workTitles`/`workCopy` copy) runs in another session and was
+left alone so the branches merge cleanly.
+
+**One file, one sequence.** For Operations "Destination & treatment" is not drawn while the file, the travel card or the going-home acts are on
+the page (`StaffCaseView` `fileShowsIt`). "Before admission" became "Before admission, waiting on others" (an `h4` with its list): only what
+Operations cannot clear — consent, the final quote, the fee balance, a receipt not yet countersigned by Finance; the voucher, an unrecorded
+receipt and the number are the file's own acts. The file's list is the sequence: reserve → letter → point of no return (once set, a done fact,
+changeable until Finance approves) → travel → voucher → receipt → number. The voucher is a done line once issued (its money breakdown behind
+it); before that it is issued by hand only when possible now (letter checked, no final quote waiting; the backend's two refusals), else a later
+act. Travel inside the file is one ✓ (booked) or waiting line while it is not the act now ("Plan the travel" until there is a date); it opens
+with its forms only when it is the act, and its arrival act only then and once booked. Later acts show "Later:" with a dashed marker
+(`LaterAct`, shared with Discharge), so they no longer read as radios.
+
+**Only acts possible now; the record behind one disclosure.** "Also possible now: Point of no return · First confirmed appointment" — one
+closed group under the list, named by its contents — holds the acts that are possible now but no step of the sequence (the point of no return
+before it is set; the first appointment while owed, once a hospital is reserved). "File history (n)" holds the record — the evidence trail and
+the recorded appointment's correction — and is hidden while empty. The accepted estimate maximum is the letter price's hint. The cashier line
+asks for money only while it is owed and no receipt waits on Finance. `FirstAppointment` and `Trail` are components; the coordinator keeps
+both as before.
+
+**Harden.** The Arabic case tabs fit at 390 (`px-2 gap-0` below `sm`; `operations-shots` now asserts the tab strip does not overflow). The
+receipt and letter amounts are `AmountInput`: a grouped text field ("195,432.10", Latin digits like `formatMoney`), regrouped on leaving; it
+reads Arabic-Indic digits and separators and a currency word around the figure, and refuses an ambiguous amount ("195,50", "1,2", "0", "-5")
+with a localized `setCustomValidity` message instead of re-reading it. Focus after an act now finds the travel form (`travel-plan-next` /
+`travel-arrival-next`; the old `travel-next` id did not exist). Disclosure labels wrap beside their marker (`Summary` no longer wraps).
+
+Copy en + ar, inserted textually: `admission.acts.waitingOn`, `.alsoNow`, `.history`, `admission.forms.changePnr`, `.quotedHint`,
+`.amountInvalid`; removed `travelPlan.arrival.needsPlan`.
+
+**Reviews** (four read-only reviewers). RB + composition: HIGH ×1 fixed (blur re-read "195,50" as 19,550 — amounts now parse strictly);
+MEDIUMs fixed (the receipt awaiting countersignature, zero refused, the first appointment hidden in history). Web design guidelines: HIGH ×1
+fixed (the browser's own pattern message, Arabic digits refused); MEDIUMs fixed (the waiting heading, the appointment as an act). RTL/i18n:
+HIGH ×2 fixed (Arabic-Indic digits, the pattern); MEDIUMs fixed (the double full stop in «…ج.م..», the letter price on the same field,
+«بانتظار أطراف أخرى»). Pro Max: no CRITICAL/HIGH; contrast, focus, motion, icons pass. The rest is in backlog.md "Area 5 — Operations".
+
+**Re-critique: 30/40** (from 29; target ≥ 32 not reached), dual-agent,
+`.impeccable/critique/2026-10-28T13-12-53Z__frontend-src-components-portal-admissionpanel-tsx.md`. A ran four times (30, 30, 31, 30), the
+in-scope P2s of each pass fixed before the next (the depart card, the arrival gate, the cashier line after payment, the side acts' group and
+its label, the travel line, the voucher's line, the dashed later rows). What holds it at 30 is outside this slice: the strip naming the stage
+above a ✓ travel line (B-5-1) and the act names differing between My work and the case (with English queue summaries in Arabic). Heuristic 8
+rose to 3. Detector 0; one filled button per Operations view; 390 pages 2,250–2,870px (were 2,500–3,320; letter 3,125 → 2,463).
+
+**Verify.** `pnpm typecheck` ok; eslint on the touched files clean; vitest 97 files / 799 tests, 798 pass (the known `StaffOperationalUi`
+W-44; one `CaseStatusAccess` timeout under parallel load passed 39/39 alone). New tests: blockers only others clear, File history and the
+side group, the voucher by hand vs later, the point of no return as a fact, the cashier line after payment, grouped amounts, Arabic-Indic
+digits and refused ambiguous amounts, travel as one line in the file. Playwright on a production build on :3187: operations-shots
+(`AREA5_SHOTS=5-4`), consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58. Overwritten shots restored. After shots:
+`screenshots/area-5/5-4/`.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The
