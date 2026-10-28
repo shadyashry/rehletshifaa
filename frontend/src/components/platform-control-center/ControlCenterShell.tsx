@@ -25,8 +25,10 @@ const FOCUSABLE = 'a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"]
  * passes only what sits below its section (for example a person's name). Pages own their loading/empty/error state;
  * the title passed in must not change to "Loading…".
  */
-export function ControlCenterShell({ locale, active, crumbs = [], title, intro, actions, children }: {
-  locale: Locale; active: NavKey; crumbs?: Crumb[]; title: string; intro?: string; actions?: ReactNode; children: ReactNode;
+export function ControlCenterShell({ locale, active, crumbs = [], title, intro, actions, className, children }: {
+  locale: Locale; active: NavKey; crumbs?: Crumb[]; title: string; intro?: string; actions?: ReactNode;
+  /** A page's own scope on the shell (UX 4-3: `cc-petrol`, a page converged to Petrol & Paper). */
+  className?: string; children: ReactNode;
 }) {
   const access = useControlCenterAccess();
   const ar = locale === "ar";
@@ -67,7 +69,7 @@ export function ControlCenterShell({ locale, active, crumbs = [], title, intro, 
   const where = active === "overview" ? pick(item.label, locale) : `${pick(group.label, locale)} · ${pick(item.label, locale)}`;
 
   return (
-    <div className={"cc" + (drawer ? " cc-drawer-open" : "")} dir={ar ? "rtl" : "ltr"}>
+    <div className={"cc" + (className ? ` ${className}` : "") + (drawer ? " cc-drawer-open" : "")} dir={ar ? "rtl" : "ltr"}>
       <a className="cc-skip" href="#cc-main">{ar ? "تخطَّ إلى المحتوى" : "Skip to content"}</a>
       <header className="cc-topbar">
         <button ref={toggle} type="button" className="cc-menu-button" aria-expanded={drawer} aria-controls="cc-sidebar" onClick={() => (drawer ? closeDrawer() : setDrawer(true))}>

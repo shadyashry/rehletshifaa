@@ -53,7 +53,24 @@ export function workItemText(item: { copy?: WorkItemCopy | null; type: string; t
   const steps: Record<string, { title: string }> = work.currentAction.states;
   const step = Object.hasOwn(steps, item.type) && !/^(WAIT_|VIEW_ONLY|default$)/.test(item.type) ? steps[item.type].title : undefined;
   const localized = Object.hasOwn(titles, item.type) ? titles[item.type] : step;
-  return { title: (locale === "ar" ? localized : undefined) ?? (item.title || localized || ""), context: item.context };
+  return { title: (locale === "ar" ? localized : undefined) ?? (item.title || localized || ""),
+    context: (locale === "ar" ? workTypeContext(item.type, work.workCopy) : null) ?? item.context };
+}
+
+/** Work types worded by another code's entry (the deposit transfer's item is worded as its verification). */
+const TYPE_WORDING: Record<string, string> = { DEPOSIT_RECORD: "DEPOSIT_VERIFY_TRANSFER" };
+
+/**
+ * UX 4-3: the context of a work item that came without a wording code, from its work type's own entry, so the Arabic page never
+ * shows the backend's English sentence where the type is worded. `null` when the type has no entry (the English stays).
+ */
+export function workTypeContext(type: string | null | undefined, messages: WorkCopy["workCopy"]): string | null {
+  if (!type) return null;
+  const code = Object.hasOwn(TYPE_WORDING, type) ? TYPE_WORDING[type] : type;
+  const items: Record<string, WordedEntry> = messages.items;
+  const entry = Object.hasOwn(items, code) ? items[code] : undefined;
+  // An entry that needs the item's own parameters cannot be worded from the type alone: the backend's sentence stays.
+  return entry?.context && !entry.context.includes("{") ? entry.context : null;
 }
 
 /**

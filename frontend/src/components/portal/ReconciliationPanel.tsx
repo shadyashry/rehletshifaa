@@ -9,7 +9,7 @@ import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { StatementSheet } from "@/components/portal/GoingHomeStory";
-import { ActForm, AmountInput, ConfirmAction, Fact, Money, ReasonField, Task as PanelTask, pick, readAmount, text } from "@/components/portal/panel-parts";
+import { ActForm, AmountInput, ConfirmAction, Fact, LeadSignal, Money, ReasonField, Summary, Task as PanelTask, pick, readAmount, text } from "@/components/portal/panel-parts";
 import type { InvoiceLine, Mutate, QuoteLine, ReconciliationView, StaffStatement } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["reconciliation"];
@@ -17,7 +17,7 @@ type Copy = LocalizedWorkCopy["reconciliation"];
 export type SettlementRole = "finance" | "coordinator";
 
 /** Work types whose work is done in this panel, so "do it" lands on its next form (P1-17). */
-export const SETTLEMENT_WORK: ReadonlySet<string> = new Set(["RECONCILE_INVOICE", "COUNTERSIGN_RECONCILIATION", "FACILITY_DISPUTE", "REFUND_CREDIT"]);
+export const SETTLEMENT_WORK: ReadonlySet<string> = new Set(["RECONCILE_INVOICE", "COUNTERSIGN_RECONCILIATION", "FACILITY_DISPUTE", "REFUND_CREDIT", "RECORD_E_INVOICE"]);
 /** Finance works the invoice from treatment (it can be recorded before discharge); everyone reads the result once discharged. */
 export const SETTLEMENT_STAGES: ReadonlySet<string> = new Set(["DISCHARGED", "FOLLOW_UP"]);
 const ANCHOR = "reconciliation-next";
@@ -35,10 +35,12 @@ const isolate = (value: string) => `⁨${value}⁩`;
  * verdict against the band ("EGP 7,660 above the band") before the Manager's decision, which comes before the evidence; Approve
  * and Return are two equal acts. On a phone the invoice lines are stacked rows.
  */
-export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentCode, busy, mutate, load }: {
+export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentCode, busy, mutate, load, onLead }: {
   locale: Locale; role: SettlementRole; caseId: string; caseStatus: string;
   /** The viewer's current action code or work type, which picks what opens first (and which Finance Manager work is theirs). */
   currentCode?: string | null; busy: boolean; mutate: Mutate; load: <T>(path: string) => Promise<T>;
+  /** UX 4-3: told the act this panel leads with when no step names it (the e-invoice), so the strip can say it. */
+  onLead?: (code: string | null) => void;
 }) {
   const work = useWorkCopy();
   const t = work.reconciliation;
@@ -60,8 +62,14 @@ export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentC
     const result: unknown = await mutate(path, body);
     if (!result) return false;
     if (typeof result === "object" && result !== null && "quote" in result && "statements" in result) setView(result as ReconciliationView); else await read();
+    // UX 4-3: a recorded act's form goes (the e-invoice, once recorded): focus moves on to the act now open, or the panel's heading.
+    requestAnimationFrame(() => {
+      const lost = document.activeElement;
+      if (lost && lost !== document.body && lost.isConnected) return;
+      (document.getElementById(ANCHOR)?.querySelector<HTMLElement>("select,input,textarea,button") ?? document.getElementById(`${id}-title`))?.focus();
+    });
     return true;
-  }, [mutate, read]);
+  }, [mutate, read, id]);
 
   if (view === undefined) return null;
   if (view === null) return <section id="reconciliation-panel" className="card p-5"><h3 className="title text-base">{t.title}</h3><p role="alert" className="mt-2 text-[0.875rem] text-alert-800">{t.loadFailed}</p></section>;
@@ -74,19 +82,23 @@ export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentC
   const disputeOpen = (view.disputedEgp ?? 0) > 0 && !view.disputeOutcome && (view.status === "DISPUTED" || view.status === "CLOSED");
   const managerCountersign = finance && awaiting && currentCode === "COUNTERSIGN_RECONCILIATION";
   const managerDispute = finance && disputeOpen && currentCode === "FACILITY_DISPUTE";
-  // The next thing this viewer does here: it opens first and carries the panel's one primary button.
+  const current = view.statements.find(s => s.current) ?? null;
+  // The next thing this viewer does here: it opens first and carries the panel's one primary button. UX 4-3: the current
+  // statement's e-invoice reference has no step of its own yet (B-4-1), so it leads while no other step is named.
+  const eInvoiceOwed = finance && !!current && !current.eInvoiceRef;
   const next = !finance ? null
     : currentCode === "RECONCILE_INVOICE" ? (canOpen ? "open" : canSubmit ? "submit" : null)
-    : managerCountersign ? "countersign" : managerDispute ? "dispute" : null;
-  const current = view.statements.find(s => s.current) ?? null;
+    : managerCountersign ? "countersign" : managerDispute ? "dispute"
+    : eInvoiceOwed && (!currentCode || currentCode === "NONE" || currentCode === "RECORD_E_INVOICE") ? "einvoice" : null;
   const hospital = !view.facilityName ? null
     : view.facilityCity ? fillTemplate(t.hospital, { name: isolate(view.facilityName), city: isolate(view.facilityCity) }) : isolate(view.facilityName);
   const verdict = view.reconciliationId ? varianceVerdict(t, view.varianceEgp, view.bandLimitEgp, egp) : null;
 
   return (
     <section id="reconciliation-panel" aria-labelledby={`${id}-title`} className="card p-5">
+      <LeadSignal code={next === "einvoice" && currentCode !== "RECORD_E_INVOICE" ? "RECORD_E_INVOICE" : null} onLead={onLead}/>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 id={`${id}-title`} className="title text-base">{t.title}</h3>
+        <h3 id={`${id}-title`} tabIndex={-1} className="title text-base outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600">{t.title}</h3>
         <StatusBadge tone={statusTone(view.status)}>{view.status ? pick(t.status, view.status) : t.notOpened}</StatusBadge>
       </div>
 
@@ -185,7 +197,7 @@ export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentC
           {view.statements.length === 0 ? <p className="mt-1 text-[0.875rem] text-ink-600">{t.statements.empty}</p> : (
             <ul className="mt-2 space-y-5">
               {view.statements.map(s => <StatementItem key={s.id} t={t} locale={locale} statement={s} when={when} busy={busy}
-                canRecord={finance && s.current && !s.eInvoiceRef} onRecord={reference => act(`/finance/cases/${caseId}/statements/${s.id}/e-invoice`, { reference })}/>)}
+                canRecord={finance && s.current && !s.eInvoiceRef} lead={next === "einvoice" && s.current} onRecord={reference => act(`/finance/cases/${caseId}/statements/${s.id}/e-invoice`, { reference })}/>)}
             </ul>
           )}
         </div>
@@ -472,14 +484,30 @@ function DisputeForm({ t, amount, busy, primary, onResolve }: {
   );
 }
 
-function StatementItem({ t, locale, statement: s, when, busy, canRecord, onRecord }: {
-  t: Copy; locale: Locale; statement: StaffStatement; when: (iso?: string | null) => string; busy: boolean; canRecord: boolean; onRecord: (reference: string) => Promise<boolean>;
+function StatementItem({ t, locale, statement: s, when, busy, canRecord, lead, onRecord }: {
+  t: Copy; locale: Locale; statement: StaffStatement; when: (iso?: string | null) => string; busy: boolean; canRecord: boolean;
+  /** UX 4-3: the e-invoice is Finance's act now: its form is open and carries the view's one filled button. */
+  lead: boolean; onRecord: (reference: string) => Promise<boolean>;
 }) {
   const id = useId();
   const patientCopy = useWorkCopy().statement;
   // UX 4-2: Finance reads the totals as a ledger does: the total charged is gross (before payments), the balance or credit net.
   const statementCopy = { ...patientCopy, totalCharged: t.statements.totalGross, balanceDue: t.statements.balanceNet, creditDue: t.statements.creditNet };
   const reference = (data: FormData) => String(data.get("reference") ?? "").trim();
+  const eInvoiceForm = canRecord && (
+    <ActForm className="mt-2 grid gap-2 pb-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end" refused={t.refused} retry={t.refusedRetry}
+             action={data => onRecord(reference(data))}
+             confirm={{ title: data => fillTemplate(t.statements.confirmTitle, { reference: isolate(reference(data)), number: isolate(s.statementNumber) }),
+                        body: `${t.statements.eInvoiceHint} ${t.freshSignIn}`, confirm: t.statements.save, cancel: t.cancel }}>
+      <div>
+        <label htmlFor={`${id}-reference`} className="block text-sm font-semibold">{t.statements.eInvoice}</label>
+        <input id={`${id}-reference`} className="field" name="reference" required maxLength={80} autoComplete="off" spellCheck={false} dir="ltr"
+               aria-describedby={`${id}-reference-hint`}/>
+      </div>
+      <button className={lead ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.statements.save}</button>
+      <p id={`${id}-reference-hint`} className="text-[0.8125rem] text-ink-500 sm:col-span-2">{t.statements.eInvoiceHint}</p>
+    </ActForm>
+  );
   return (
     <li>
       <p className="mb-1 flex flex-wrap items-center gap-2 text-[0.8125rem] text-ink-600">
@@ -491,23 +519,15 @@ function StatementItem({ t, locale, statement: s, when, busy, canRecord, onRecor
         <span className="font-semibold">{t.statements.eInvoice}: </span>
         {s.eInvoiceRef ? <><bdi dir="ltr" translate="no">{s.eInvoiceRef}</bdi> · {fillTemplate(t.statements.eInvoiceRecorded, { when: when(s.eInvoiceRecordedAt) })}</> : "—"}
       </p>
-      {canRecord && (
-        <details className="mt-1">
-          <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-bold text-brand-700">{t.statements.eInvoiceForm}</summary>
-          <ActForm className="grid gap-2 pb-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end" refused={t.refused} retry={t.refusedRetry}
-                   action={data => onRecord(reference(data))}
-                   confirm={{ title: data => fillTemplate(t.statements.confirmTitle, { reference: isolate(reference(data)), number: isolate(s.statementNumber) }),
-                              body: `${t.statements.eInvoiceHint} ${t.freshSignIn}`, confirm: t.statements.save, cancel: t.cancel }}>
-            <div>
-              <label htmlFor={`${id}-reference`} className="block text-sm font-semibold">{t.statements.eInvoice}</label>
-              <input id={`${id}-reference`} className="field" name="reference" required maxLength={80} autoComplete="off" spellCheck={false} dir="ltr"
-                     aria-describedby={`${id}-reference-hint`}/>
-            </div>
-            <button className="btn-secondary" disabled={busy}>{t.statements.save}</button>
-            <p id={`${id}-reference-hint`} className="text-[0.8125rem] text-ink-500 sm:col-span-2">{t.statements.eInvoiceHint}</p>
-          </ActForm>
-        </details>
-      )}
+      {canRecord && (lead
+        ? <div id={ANCHOR} className="mt-3 border-t border-line pt-3">
+            <h5 className="text-[0.875rem] font-bold text-ink-800">{t.statements.eInvoiceForm}</h5>
+            {eInvoiceForm}
+          </div>
+        : <details className="mt-1">
+            <Summary>{t.statements.eInvoiceForm}</Summary>
+            {eInvoiceForm}
+          </details>)}
     </li>
   );
 }

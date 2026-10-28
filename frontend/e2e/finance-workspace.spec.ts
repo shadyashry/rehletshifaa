@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { setupFinanceDay } from "./finance-fixture";
 
@@ -162,11 +162,83 @@ test("a statement's totals read gross and net, and its e-invoice is recorded aft
   const panel = page.locator("#reconciliation-panel");
   await expect(panel).toContainText("Total charged (gross, before payments)");
   await expect(panel).toContainText("Balance due (net of payments)");
-  await panel.locator("summary", { hasText: "Record the e-invoice reference" }).click();
+  // UX 4-3: the e-invoice is the sheet's act on this case, its form open (no disclosure to find it behind).
   await panel.getByLabel("E-invoice reference").fill("ETA-2026-55190");
   await panel.getByRole("button", { name: "Record the reference" }).click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toContainText(/Record e-invoice .*ETA-2026-55190.* on statement .*RS-ST-statement-1.*\?/);
   await dialog.getByRole("button", { name: "Record the reference" }).click();
   await expect.poll(() => writes.filter(w => w.path === "/finance/cases/statement/statements/s1/e-invoice").length).toBe(1);
+});
+
+// UX 4-3: the Finance sheet — the act first, the strip agreeing with the page, the proposal folded, Arabic work contexts.
+const filled = (page: Page) => page.locator("main .btn-primary:visible");
+
+test("the fee balance is the strip's step, and the page holds one filled button", async ({ page }) => {
+  await setupFinanceDay(page);
+  await page.goto("/en/portal?case=fee");
+  const strip = page.locator("#current-action");
+  await expect(strip).toContainText("Your step");
+  await expect(page.locator("#current-action-title")).toHaveText("Record the platform fee balance");
+  await expect(strip).not.toContainText("Nothing needs you");
+  await expect(page.locator("#admission-panel")).toBeVisible();
+  await expect(filled(page)).toHaveCount(1);
+  await expect(filled(page)).toHaveText("Record the fee balance");
+  // "Go to the form" lands in the fee form.
+  await strip.getByRole("button", { name: /Record the fee balance/ }).click();
+  await expect(page.locator("#admission-panel").getByLabel("Payment reference")).toBeFocused();
+  // The proposal folds to one line with the deposit as its line; its items and the release checklist are not on the sheet.
+  await expect(page.locator("#proposal-summary-title")).toBeVisible();
+  await expect(page.getByText("Bespoke lead extraction")).toHaveCount(0);
+  await expect(page.getByText("Release requirements")).toHaveCount(0);
+  await expect(page.getByText("Destination & treatment")).toHaveCount(0);
+});
+
+test("the e-invoice is the strip's step on a closed reconciliation, in Arabic too", async ({ page }) => {
+  await setupFinanceDay(page);
+  await page.goto("/ar/portal?case=statement");
+  await expect(page.locator("#current-action-title")).toHaveText("سجّل مرجع الفاتورة الإلكترونية");
+  await expect(filled(page)).toHaveCount(1);
+  await page.locator("#current-action").getByRole("button", { name: /سجّل مرجع الفاتورة الإلكترونية/ }).click();
+  await expect(page.locator("#reconciliation-panel").getByLabel("مرجع الفاتورة الإلكترونية")).toBeFocused();
+});
+
+test("the deposit's moment opens the sheet with its one act, before the folded proposal", async ({ page }) => {
+  await setupFinanceDay(page);
+  await page.goto("/en/portal?case=deposit");
+  const confirm = page.getByRole("button", { name: "Confirm payment received" });
+  await expect(confirm).toBeVisible();
+  await expect(filled(page)).toHaveCount(1);
+  const [act, line] = await Promise.all([confirm.boundingBox(), page.locator("#proposal-summary-title").boundingBox()]);
+  expect(act!.y).toBeLessThan(line!.y);
+});
+
+test("the approval keeps its checklist and lines in one place, never a second proposal card", async ({ page }) => {
+  await setupFinanceDay(page);
+  await page.goto("/en/portal?case=approve");
+  await expect(page.getByText("Release requirements")).toBeVisible();
+  // The lines are the approval's own (in the strip); the proposal card below would repeat them.
+  await expect(page.getByText("Bespoke lead extraction")).toHaveCount(await page.locator("#current-action").getByText("Bespoke lead extraction").count());
+});
+
+test("in Arabic, My work and the strip word Finance's contexts from the work type", async ({ page }) => {
+  await setupFinanceDay(page);
+  await page.goto("/ar/portal?view=work");
+  const list = page.locator("main");
+  await expect(list).toContainText("أدخل المريض الرقم المرجعي لتحويله البنكي");
+  await expect(list).not.toContainText("The patient sent a bank transfer reference");
+  await expect(list).not.toContainText(/Waiting on|another party|جهة أخرى/);
+  await page.goto("/ar/portal?case=receipt");
+  await expect(page.locator("#current-action")).toContainText("سجّلت العمليات إيصال الخزينة");
+  await expect(page.locator("#current-action")).not.toContainText("Operations recorded");
+});
+
+test("Control Center › Margin & Deposit reads in Petrol & Paper", async ({ page }) => {
+  await setupFinanceDay(page);
+  await page.goto("/en/portal/control-center/commercial/margin-deposit");
+  await expect(page.getByRole("note")).toContainText("Internal only.");
+  const root = page.locator(".cc-petrol");
+  await expect(root).toHaveCount(1);
+  expect(await root.evaluate(el => getComputedStyle(el).getPropertyValue("--cc-brand").trim())).toBe("#0e5f66");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
 });

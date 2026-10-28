@@ -1811,6 +1811,114 @@ returnNoteRequired}`, `reconciliation.form.{amountInvalid,paidInvalid,confirmTit
 
 **Next:** slice 4-3, the Finance sheet and the area's close, started in a new session from this branch.
 
+## UX area 4 — Finance: slice 4-3 the Finance sheet + close; area 4 closed (2026-10-28, worktree `quirky-gagarin-80690e`, branch `claude/quirky-gagarin-80690e` fast-forwarded to 4-2 @ `c4fd32fd`)
+
+Scope: `StaffCaseView.tsx`, `CurrentAction.tsx`, `lib/portal-labels.ts`, the shared `panel-parts.tsx`, `AdmissionPanel.tsx` and
+`ReconciliationPanel.tsx` (lead signal, the e-invoice act), Control Center `ControlCenterShell.tsx`/`MarginDeposit.tsx`/
+`control-center.css`, messages, the Finance fixture and specs.
+
+**The Finance sheet.**
+- **The act first.** Finance's overview is ranked by the money act of the moment:
+  - a transfer to confirm (the deposit's own card);
+  - an FX re-approval while no other step is named;
+  - otherwise the panel that holds the step: admission, treatment, reconciliation.
+
+  The other panels follow in the order the money happens. Each act carries its panel's one filled button.
+- **The strip agrees with the page.** Two acts have no step codes yet: the fee balance and the current statement's e-invoice. While the
+  step names nothing, the panel's own act becomes the strip's step:
+  - "Your step · Record the platform fee balance" and "Record the e-invoice reference", with "Waiting on: You";
+  - "Go to the form" lands in the act's first field.
+
+  The panels report it through `LeadSignal` (`panel-parts`), keyed by case. The codes are B-4-1's (`RECORD_FEE_BALANCE`,
+  `RECORD_E_INVOICE`), so the backend slice only has to send them. While a transfer waits, the transfer leads instead.
+- **The e-invoice as an act.** When it leads, its form is open, carries the filled button and sits at `reconciliation-next`.
+  Once recorded, focus moves to the panel's next act or its heading. While another step is named it stays behind its
+  disclosure.
+- **The proposal folded.** Outside the approval, the proposal is one `ProposalSummary` line ("Latest proposal · Preliminary estimate
+  · v1 · … · $5,772 · 3 services") with "View proposal". The deposit is that line's `DoneAct` line, with the refund behind its
+  disclosure. Only the approval keeps the release checklist (and its proposal card when the approval is not in the strip).
+- **No destination card for Finance** where the admission's or the reconciliation's header already names the hospital.
+- **The deposit, split** (backlog LOW):
+  - `FinanceDepositCard` is used while a transfer waits: EGP first, `TransferStatus` with Finance's `TransferActs`.
+  - `FinanceDepositLine` is used otherwise. The focus comes to it once, and only when Finance's confirmation settled the balance.
+  - The coordinator's and Operations' `DepositCard` share `DepositFigures` (`ledger: "EGP" | "patient"`) and `TransferStatus`
+    (heading level follows the card).
+  - The component's backend purpose and beneficiary are isolated.
+
+**Arabic work contexts.**
+- An item without a wording code reads its context from its work type's `workCopy.items` entry in Arabic (`workTypeContext`; the
+  deposit's `DEPOSIT_RECORD` is worded as `DEPOSIT_VERIFY_TRANSFER`). This applies on My work and in the strip. Entries with
+  parameters keep the backend's sentence.
+- `currentAction.work.APPROVE_COMMERCIAL_TERMS` was added.
+- The fixture sent `waitingOn: "FINANCE"`, which the backend never sends (`CaseActionService.reconcileWaitingOn`). It now sends
+  `STAFF`, which reads "you" on Finance's own items.
+- **Overdue before priority** is not the backend's order (`StaffWorkQueryService.QUEUE_ORDER`: priority, due, age). It goes to the
+  backlog as **B-4-2**.
+
+**Control Center › Commercial › Margin & Deposit** in Petrol & Paper. The shell gains a `className` scope, and `.cc-petrol`
+re-points the `--cc-*` palette to Petrol & Paper's values (no new colour):
+- petrol ink, actions and focus;
+- paper surface and warm hairlines;
+- the Field Edge `#7a898c` (3.6:1) on fields and quiet buttons;
+- 8px radii and Alexandria headings.
+
+The rest of the Control Center is area 6.
+
+Copy is in en and ar, inserted textually:
+- `currentAction.work.APPROVE_COMMERCIAL_TERMS`;
+- `currentAction.actions.{RECORD_FEE_BALANCE,RECORD_E_INVOICE}`;
+- `currentAction.states.{RECORD_FEE_BALANCE,RECORD_E_INVOICE}`.
+
+**Reviews** (four read-only reviewers; no CRITICAL):
+- **Pro Max:** two HIGHs fixed:
+  - the deposit card showed with no transfer to confirm (now it is the line);
+  - focus could jump to the deposit line later (now once, on a settled confirmation).
+
+  The `.cc-petrol` token check passed: all values are in `theme-petrol.css`/`globals.css`.
+- **Web design guidelines:**
+  - HIGH ×1 fixed: focus was lost after the e-invoice was recorded.
+  - MEDIUMs fixed: the one-shot focus, a visible ring on the focused line, the h3→h4 transfer heading, the strip leading with the
+    transfer when one waits.
+  - LOW fixed: `aria-labelledby` on the transfer section.
+- **RB + composition:** no HIGH.
+  - MEDIUM fixed: the focus flag.
+  - LOWs fixed: a stale lead for one paint on a case switch (now kept with its case id), the FX rank only while no step is named, the
+    admission lead only on `NONE`, no empty proposal line.
+- **RTL/i18n:** no HIGH.
+  - MEDIUMs fixed: «سجّل المتبقي من الرسوم»; contexts with placeholders keep the backend's sentence.
+  - LOWs fixed: «لا يمكن تسجيله إلا مرة واحدة», «والرقم المرجعي للدفعة», isolated purpose/beneficiary.
+- **Deferred** to backlog "Area 4 — Finance": two filled buttons when two acts coincide (MEDIUM), the three Arabic deposit terms
+  (MEDIUM), `LeadSignal` until B-4-1, `StatementItem`'s two booleans, the Control Center notices/badges and run-on policy facts
+  (area 6), the deposit amount field, the generic Arabic contexts.
+
+**Verify.**
+- `pnpm typecheck` ok; eslint on the touched files clean.
+- vitest 97 files / 807 tests: 806 pass, plus the known `StaffOperationalUi` W-44. New tests:
+  - `ReconciliationPanel.test.tsx`: the e-invoice leads and is heard with no step, and stays behind its disclosure under another step.
+  - `portal-labels.test.ts`: Arabic contexts from the work type, the `DEPOSIT_RECORD` alias, English unchanged, an unknown type kept.
+  - The touched suites were re-run after the review fixes: 26 files / 232 tests green.
+- Playwright on a production build on :3218: 119/119 across finance-shots (`AREA4_SHOTS=4-3`, with the new margin & deposit shot),
+  finance-workspace, operations-shots, consultant-shots, staff-chrome, hospital-agreement-audit and a11y en+ar. The new
+  finance-workspace checks:
+  - the fee balance as the strip's step, with one filled button and the form focused;
+  - the folded proposal, with no checklist and no destination card;
+  - the Arabic e-invoice step;
+  - the deposit act before the proposal line;
+  - the approval's checklist with no second card;
+  - Arabic contexts on My work and the strip;
+  - Margin & Deposit in Petrol & Paper.
+
+  The 4-2 e-invoice test no longer opens a disclosure.
+- After shots: `screenshots/area-4/after/` (`AREA4_SHOTS=after`) and `screenshots/area-4/4-3/`. Overwritten shots restored.
+
+**Re-critique: 29/40** (from 20; target ≥ 28):
+`.impeccable/critique/2026-10-28T21-00-00Z__frontend-src-components-portal-staffcaseview-tsx.md`. No P0 or P1 remains. Error
+recovery stays at 2: a panel that fails to load has no retry.
+
+**Area 4 closed.** `PLAN.md` row 4 is marked closed. Backend follow-ups:
+- **B-4-1:** step codes `RECORD_FEE_BALANCE`/`RECORD_E_INVOICE` from `CaseActionService`; this retires `LeadSignal`.
+- **B-4-2:** overdue first in `QUEUE_ORDER`, if the owner wants it.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

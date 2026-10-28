@@ -153,4 +153,14 @@ describe("the case's other open work", () => {
     // Never a waiting state's words.
     expect(workItemText(item("w7", "WAIT_OPERATIONS"), "ar", ar.portalWork).title).toBe("Record the receipt");
   });
+
+  // UX 4-3: an item that came without a wording code reads its context from its work type in Arabic; English keeps the backend's.
+  it("words an uncoded item's context from its work type in Arabic", () => {
+    const finance = (type: string) => ({ id: "f", type, title: "Countersign the hospital receipt", context: "Operations recorded the cashier's receipt.", copy: null });
+    expect(workItemText(finance("COUNTERSIGN_BALANCE"), "ar", ar.portalWork).context).toBe(ar.portalWork.workCopy.items.COUNTERSIGN_BALANCE.context);
+    expect(workItemText(finance("DEPOSIT_RECORD"), "ar", ar.portalWork).context).toBe(ar.portalWork.workCopy.items.DEPOSIT_VERIFY_TRANSFER.context);
+    expect(workItemText(finance("COUNTERSIGN_BALANCE"), "en", en.portalWork).context).toBe("Operations recorded the cashier's receipt.");
+    // A type with no entry keeps the backend's sentence.
+    expect(workItemText(finance("NOT_A_TYPE"), "ar", ar.portalWork).context).toBe("Operations recorded the cashier's receipt.");
+  });
 });

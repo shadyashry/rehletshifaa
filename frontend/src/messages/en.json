@@ -1896,6 +1896,7 @@
         "PROPOSAL_DECLINED_REVIEW": "Acknowledge outcome",
         "CLINICAL_OUTCOME_REVIEW": "Acknowledge outcome",
         "DEPOSIT_RECORD": "Verify the transfer",
+        "APPROVE_COMMERCIAL_TERMS": "Approve commercial terms",
         "TRAVEL": "Assign Operations",
         "REASSIGN_CONSULTANT": "Reassign Consultant",
         "CONFIRM_TRANSFER": "Confirm the transfer",
@@ -1946,6 +1947,8 @@
         "UPDATE_TRAVEL_PLAN": "Complete arrangements",
         "APPROVE_COMMERCIAL_TERMS": "Approve commercial terms",
         "RECORD_HOSPITAL_BALANCE": "Record the receipt",
+        "RECORD_FEE_BALANCE": "Record the fee balance",
+        "RECORD_E_INVOICE": "Record the e-invoice reference",
         "RECORD_ADMISSION_NUMBER": "Record the admission number",
         "RECORD_MILESTONE": "Record a milestone",
         "COMPLETE_DISCHARGE_PACK": "Complete the discharge pack",
@@ -2053,6 +2056,14 @@
         "default": {
           "title": "Nothing needs you right now",
           "body": "The next step appears here as soon as it is due."
+        },
+        "RECORD_FEE_BALANCE": {
+          "title": "Record the platform fee balance",
+          "body": "The deposit did not cover the platform fee. Record the balance the patient paid, with its reference."
+        },
+        "RECORD_E_INVOICE": {
+          "title": "Record the e-invoice reference",
+          "body": "The statement is issued. Record the tax authority's document id for it; it can be recorded once."
         },
         "RECORD_HOSPITAL_BALANCE": {
           "title": "Record the hospital receipt",

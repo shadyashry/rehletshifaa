@@ -83,7 +83,8 @@ export function MarginDeposit({ locale }: { locale: Locale }) {
   const area = (a?: string) => (a ? named(a) : ar ? "الافتراضي (كل مجالات الرعاية)" : "Default (all care areas)");
   const since = (d?: string) => d ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(d)) : null;
   const title = ar ? "الهامش والدفعة المقدمة" : "Margin & Deposit";
-  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="marginDeposit" title={title}
+  // UX 4-3: where Finance reads its margin and deposit policies, the page is in Petrol & Paper (the rest of the Control Center is area 6).
+  const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="marginDeposit" title={title} className="cc-petrol"
     intro={ar ? "إعداد تجاري داخلي: هامش رحلة شفاء ودفعة التنسيق المقدمة." : "Internal commercial configuration: RehletShifaa's margin and the coordination deposit."}>{body}</ControlCenterShell>;
   if (authLoading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);

@@ -492,3 +492,12 @@
 @media(max-width:1050px){.cc-readiness-strip{grid-template-columns:repeat(3,minmax(110px,1fr))}.cc-consultant-readiness-list>li{grid-template-columns:1fr}.cc-order-actions{justify-content:flex-start}}
 @media(max-width:800px){.cc-profile-languages,.cc-profile-previews{grid-template-columns:1fr}.cc-directory-overview{flex-direction:column}.cc-profile-actions{position:static}}
 @media(max-width:520px){.cc-readiness-strip{grid-template-columns:1fr 1fr}.cc-profile-language{padding:14px}.cc-profile-short-grid,.cc-profile-link-row{grid-template-columns:1fr}.cc-profile-link-row .cc-icon-button{justify-self:start}.cc-directory-overview{padding:16px}}
+/* UX 4-3: Commercial › Margin & Deposit, where Finance works, in Petrol & Paper. The Control Center's own palette above is legacy
+   (owner, 2026-10-07); these are Petrol & Paper's values (app/theme-petrol.css, globals.css), not new colours: petrol ink and actions,
+   paper surface, warm hairlines, the Field Edge (ink-350, 3.6:1) on fields and quiet buttons, 8px radii, Alexandria headings. */
+.cc-petrol{--cc-ink:#14262b;--cc-muted:#41555a;--cc-line:#e3ded4;--cc-line-soft:#efeae0;--cc-surface:#f7f4ee;--cc-brand:#0e5f66;--cc-brand-dark:#0e4f55;--cc-brand-soft:#eef4f3;--cc-focus:#0e5f66}
+.cc-petrol :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border-color:#7a898c;border-radius:8px}
+.cc-petrol :is(.cc-secondary,a.cc-secondary){border-color:#7a898c}
+.cc-petrol :is(.cc-list,.cc-internal){border-radius:8px}
+.cc-petrol :is(.cc-header h1,.cc-section-head h2){color:#13292e;font-family:var(--font-brand-latin),var(--font-latin),"Segoe UI",sans-serif}
+.cc-petrol[dir=rtl] :is(.cc-header h1,.cc-section-head h2){font-family:var(--font-brand-arabic),var(--font-brand-latin),var(--font-arabic),Tahoma,sans-serif}

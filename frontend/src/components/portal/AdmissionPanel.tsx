@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
-import { ActForm, AmountInput, DocumentPicker, DoneAct, Fact, LaterAct, Money, ReasonField, Summary, Task as PanelTask, TimeField, instant, localInput, pick, quotedRate, readAmount, text, type PanelDocument } from "@/components/portal/panel-parts";
+import { ActForm, AmountInput, DocumentPicker, DoneAct, Fact, LaterAct, LeadSignal, Money, ReasonField, Summary, Task as PanelTask, TimeField, instant, localInput, pick, quotedRate, readAmount, text, type PanelDocument } from "@/components/portal/panel-parts";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { CURRENCY_LABELS, type AdmissionEvidence, type AdmissionView, type DirectoryFacility, type Mutate } from "@/components/portal/portal-model";
 
@@ -20,7 +20,8 @@ export type AdmissionRole = "operations" | "finance" | "coordinator" | "doctor";
 export const ADMISSION_STAGES: ReadonlySet<string> = new Set(["TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "ADMISSION_READY", "TREATMENT_IN_PROGRESS"]);
 /** Current actions and work types whose work is done in this panel, so "do it" lands on its next form. */
 export const ADMISSION_WORK: ReadonlySet<string> = new Set(["RECORD_HOSPITAL_BALANCE", "RECORD_ADMISSION_NUMBER", "CHECK_PROFORMA", "PRICE_VARIANCE",
-  "REVISE_ADMISSION_LETTER", "COUNTERSIGN_BALANCE", "APPROVE_POINT_OF_NO_RETURN", "EMERGENCY_ADMISSION_REVIEW", "ADMISSION_VOUCHER_BLOCKED"]);
+  "REVISE_ADMISSION_LETTER", "COUNTERSIGN_BALANCE", "APPROVE_POINT_OF_NO_RETURN", "EMERGENCY_ADMISSION_REVIEW", "ADMISSION_VOUCHER_BLOCKED",
+  "RECORD_FEE_BALANCE"]);
 /** Ledger rows Finance countersigns from here (a letter is countersigned by its own decision). */
 const COUNTERSIGNED_HERE = new Set(["BALANCE_EVIDENCED", "POINT_OF_NO_RETURN"]);
 const LETTER_DECIDABLE = new Set(["CHECK_PENDING", "VARIANCE_OPEN"]);
@@ -42,7 +43,7 @@ const LETTER_DONE = new Set([...LETTER_CHECKED, "REFUSED"]);
  * decides every rule; the panel offers one primary action — the next one — and keeps the rest one click away. For Operations
  * (UX 5-1) the recordings are one hospital file in the order they happen, with the travel plan in its place among them.
  */
-export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, documents = [], facilities = [], busy, mutate, load, travel, onView }: {
+export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, documents = [], facilities = [], busy, mutate, load, travel, onView, onLead }: {
   locale: Locale; role: AdmissionRole; caseId: string; caseStatus: string;
   /** The viewer's current action code or work type, which picks the form that opens first. */
   currentCode?: string | null;
@@ -51,6 +52,8 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
   travel?: (current: boolean) => ReactNode;
   /** Told each view the panel shows, so the page can read the reservation back (the logistics card). */
   onView?: (view: AdmissionView | null) => void;
+  /** UX 4-3: told the act Finance's file leads with when no step names it (the fee balance), so the strip can say it. */
+  onLead?: (code: string | null) => void;
 }) {
   const t = useWorkCopy().admission;
   const id = useId();
@@ -199,10 +202,11 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
             <Trail t={t} evidence={view.evidence} when={when} egp={egp}/>
           </details>
         )}
-      </> : role === "finance" ? (
+      </> : role === "finance" ? (<>
+        <LeadSignal code={next === "fee" && (!currentCode || currentCode === "NONE") ? "RECORD_FEE_BALANCE" : null} onLead={onLead}/>
         <FinanceFile t={t} locale={locale} view={view} caseId={caseId} next={next} busy={busy} act={act} when={when} egp={egp} money={voucherFacts}
           pendingLetter={pendingLetter} toCountersign={toCountersign} cleared={cleared}/>
-      ) : !reserved ? <p className="mt-2 text-[0.875rem] text-ink-600">{t.notReserved}</p> : (
+      </>) : !reserved ? <p className="mt-2 text-[0.875rem] text-ink-600">{t.notReserved}</p> : (
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-3">
           <Fact label={t.facility}><bdi>{view.facilityName ?? "—"}</bdi>{view.facilityCity && <span className="font-normal text-ink-600"> · <bdi>{view.facilityCity}</bdi></span>}</Fact>
           <Fact label={t.plannedAt}>{when(view.plannedAdmissionAt)}</Fact>

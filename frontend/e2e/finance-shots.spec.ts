@@ -28,6 +28,14 @@ for (const locale of ["en", "ar"] as const) for (const width of [390, 1440]) {
       await page.screenshot({ path: shot(`my-work-${locale}-${width}`), fullPage: true });
     });
 
+    // UX 4-3: Control Center › Commercial, where Finance reads its margin and deposit policies.
+    test("margin and deposit", async ({ page }) => {
+      await page.goto(`/${locale}/portal/control-center/commercial/margin-deposit`);
+      await expect(page.getByRole("note")).toBeVisible();
+      await settle(page);
+      await page.screenshot({ path: shot(`commercial-margin-deposit-${locale}-${width}`), fullPage: true });
+    });
+
     for (const id of FINANCE_CASES) test(`case ${id}`, async ({ page }) => {
       test.setTimeout(120000);
       await page.goto(`/${locale}/portal?case=${id}`);

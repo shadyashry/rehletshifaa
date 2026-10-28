@@ -2,7 +2,7 @@
 
 import { RefundForm } from "./RefundForm";
 import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
-import { createContext, use, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createContext, use, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
 import { TravelAct, TravelDone, TravelPlanPanel, TRAVEL_STAGES } from "@/components/portal/TravelPlanPanel";
@@ -107,6 +107,15 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   const actions:CaseActions=value.actions??{journeyStage:c.status,waitingOn:c.waitingOn,currentAction:{code:"NONE",kind:"NONE"},blockers:[],availableActions:[]};
   const current=actions.currentAction;
   const available=actions.availableActions;
+ // UX 4-3: until the fee balance and the e-invoice have step codes (B-4-1), the act a Finance panel leads with while no step is
+ // named is the strip's step, so the strip says what the page shows. The panels decide it; the page only hears it.
+ // Kept with the case it was heard on, so a case just opened never reads the last case's lead for a paint.
+ const [leads,setLeads]=useState<{caseId:string|null;admission:string|null;reconciliation:string|null}>({caseId:null,admission:null,reconciliation:null});
+ const leadOf=(panel:"admission"|"reconciliation")=>(code:string|null)=>setLeads(prev=>prev.caseId===c.id&&prev[panel]===code?prev
+  :{...(prev.caseId===c.id?prev:{admission:null,reconciliation:null}),caseId:c.id,[panel]:code});
+ const transferWaits=value.deposit?.transfer?.status==="SUBMITTED"&&(value.deposit.status==="REQUESTED"||value.deposit.status==="PARTIALLY_PAID");
+ const panelLead=role==="finance"&&current.kind==="NONE"&&!transferWaits&&leads.caseId===c.id?leads.admission??leads.reconciliation:null;
+ const step:CurrentActionView=panelLead?{code:panelLead,kind:"FOCUS"}:current;
  // Evidence panels are reused so the consultant reads them before deciding, while the coordinator keeps
  // them below the action panels. Rendered once (the guards below are mutually exclusive by role).
  const intakePanel=value.intakeSummary?.trim()?<Panel title={cv.intakeSummary}><p className="whitespace-pre-wrap break-words text-ink-700">{value.intakeSummary}</p></Panel>:null;
@@ -127,7 +136,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   :value.travelPlan?.confirmedArrival?()=><DoneAct fact={<TravelDone plan={value.travelPlan??null}/>}/>:undefined;
  // The reservation the admission panel last showed, read back by the logistics card (the reservation owns the hospital).
  const [reservation,setReservation]=useState<AdmissionView|null>(null);
- const admissionPanel=admissionShown?<PanelBoundary key={`admission-${c.id}`} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load} travel={travelAct} onView={setReservation}/></PanelBoundary>:null;
+ const admissionPanel=admissionShown?<PanelBoundary key={`admission-${c.id}`} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load} travel={travelAct} onView={setReservation} onLead={role==="finance"?leadOf("admission"):undefined}/></PanelBoundary>:null;
  // P1-16: milestones, change orders, the running money and the evidence checklist while the patient is in treatment (and for an
  // open Treatment work item afterwards, such as Finance's emergency change-order review, which survives the case's exit).
  const treatmentPanel=admissionRole&&!value.preview&&(c.status==="TREATMENT_IN_PROGRESS"||TREATMENT_WORK.has(current.workType??""))?<PanelBoundary key={`treatment-${c.id}`} title={work.treatment.title} message={fillTemplate(cv.panelFailed,{panel:work.treatment.title})}><TreatmentPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
@@ -135,14 +144,14 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  // invoice in the reconciliation instead); and the reconciliation and statements once discharged, or for an open Finance item.
  const dischargePanel=admissionRole&&admissionRole!=="finance"&&!value.preview&&(DISCHARGE_STAGES.has(c.status)||DISCHARGE_WORK.has(current.workType??""))?<PanelBoundary key={`discharge-${c.id}`} title={work.discharge.title} message={fillTemplate(cv.panelFailed,{panel:work.discharge.title})}><DischargePanel key={c.id} locale={locale} role={admissionRole as DischargeRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} dischargedAt={value.timeline.find(entry=>entry.status==="DISCHARGED")?.occurredAt??null} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // UX 5-3: Operations reads the reconciliation as the Discharge panel's state line; the workbench is Finance's and the coordinator's.
- const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&admissionRole!=="operations"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<PanelBoundary key={`reconciliation-${c.id}`} title={work.reconciliation.title} message={fillTemplate(cv.panelFailed,{panel:work.reconciliation.title})}><ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
+ const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&admissionRole!=="operations"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<PanelBoundary key={`reconciliation-${c.id}`} title={work.reconciliation.title} message={fillTemplate(cv.panelFailed,{panel:work.reconciliation.title})}><ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load} onLead={role==="finance"?leadOf("reconciliation"):undefined}/></PanelBoundary>:null;
  // P1-18: the follow-up window, contacts, check-ins, outcomes and what holds the case open, for the case's Consultant and coordinator
  // (never Finance or Operations), from discharge to a closed case, or for an open follow-up item (a review outlives the exit).
  const followUpPanel=(isDoctor||isCoordinator)&&!value.preview&&(FOLLOW_UP_STAGES.has(c.status)||FOLLOW_UP_WORK.has(current.workType??""))?<PanelBoundary key={`followUp-${c.id}`} title={work.followUp.title} message={fillTemplate(cv.panelFailed,{panel:work.followUp.title})}><FollowUpPanel key={c.id} locale={locale} role={isDoctor?"doctor":"coordinator"} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // UX 3-2: the Consultant's panels in the order of their work — the panel holding the current step first, then the stage's
  // own order (after discharge, Follow-up before Discharge; in treatment, Treatment before Discharge, the Admission summary last).
  // The Start treatment act stays with the admission it depends on. Presentation only: the panels still decide what they show.
- const stepCode=current.workType??current.code;
+ const stepCode=step.workType??step.code;
  const afterDischarge=["DISCHARGED","FOLLOW_UP","CLOSED"].includes(c.status);
  const stageOrder=afterDischarge?["followUp","discharge","treatment","admission"]:["treatment","discharge","admission","followUp"];
  const consultantPanels=isDoctor?[
@@ -159,8 +168,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  const stageLine=cv.logistics.stage as Record<string,string>;
  const travelLine=Object.hasOwn(stageLine,c.status)?stageLine[c.status]:plan?label(cv.logistics.travel,plan.status):cv.logistics.notPlanned;
  // UX 5-4: Operations reads the destination in its own file (the reservation, the travel act, the arrival) and, at the end, in its
- // going-home acts, so the card is left out while any of them is on the page.
- const fileShowsIt=role==="operations"&&(admissionShown||travelLive||!!dischargePanel);
+ // going-home acts, so the card is left out while any of them is on the page. UX 4-3: Finance reads the hospital in the admission's or
+ // the reconciliation's header.
+ const fileShowsIt=role==="operations"&&(admissionShown||travelLive||!!dischargePanel)||role==="finance"&&(admissionShown||!!reconciliationPanel);
  const logistics=(plan||reserved)&&!fileShowsIt?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{cv.logistics.title}</h3>
   <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-4">
    {/* "Not chosen yet" only while one can still be chosen; later, a hospital not read here is left unsaid rather than denied. */}
@@ -181,6 +191,30 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  const formAction=isCoordinator&&owned&&current.kind==="FOCUS"&&["ASSIGN_CONSULTANT","CONFIRM_REFERRAL","ASSIGN_OPERATIONS","ASSIGN_FINANCE"].includes(formCode)||(formCode==="RECORD_PROPOSAL_DECISION"&&isCoordinator&&owned&&!!value.proposal&&available.includes("RECORD_PROPOSAL_DECISION"));
  const proposalIsWork=isCoordinator&&owned&&(["PREPARE_PROPOSAL","RELEASE_PROPOSAL","WAIT_INTERNAL_APPROVAL","ASSIGN_FINANCE"].includes(current.code)||["PREPARE_PROPOSAL","PROPOSAL_REVISION"].includes(current.workType??"")||(!!approved&&!value.proposal)||c.status==="ARRIVAL_CONFIRMED");
  const proposalPanel=<Panel title={t.proposal} wide>{recommendationBlock}{value.proposal?<ProposalCard proposal={value.proposal}/>:null}{isCoordinator&&owned&&approved&&(!value.proposal||["REVISION_REQUESTED","EXPIRED"].includes(value.proposal.status))&&<ProposalSendForm estimate={approved} onSend={sendProposal}/>}{isCoordinator&&value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={available.includes("RESEND_PROPOSAL_LINK")}/>}{isCoordinator&&owned&&c.status==="ARRIVAL_CONFIRMED"&&<FinalQuoteActions reviewId={approved?.id} proposal={value.proposal} gates={value.gates}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}{showActions&&dim&&<p className="mt-4 text-[0.875rem] text-ink-600">{cv.handoffLocked}</p>}{showActions&&<LockedSection locked={dim}><RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} mutate={mutate} approvalInCard={financeApproval}/></LockedSection>}</Panel>;
+ // UX 4-3, Finance's sheet: the money act of this moment opens it — a transfer to confirm, a quote to re-price, or the panel that
+ // holds the step (or leads while none is named) — then the other panels in the order the money happens. The proposal folds to one
+ // line below them, with the deposit as its line once its own moment is over; only the approval keeps the release checklist.
+ const deposit=value.deposit??null;
+ const depositOpen=!!deposit&&(deposit.status==="REQUESTED"||deposit.status==="PARTIALLY_PAID");
+ // The deposit is a card of its own only while it is Finance's act (a transfer to confirm); otherwise it is the proposal's line.
+ const depositLeads=depositOpen&&(deposit?.transfer?.status==="SUBMITTED"||current.workType==="DEPOSIT_RECORD");
+ const fxPending=value.proposal?.fxReapprovalStatus==="PENDING";
+ // When Finance's own confirmation closes the deposit's moment, the focus follows it to the deposit's line.
+ const [depositClosedOn,setDepositClosedOn]=useState<string|null>(null);
+ const [overlay,setOverlay]=useState<CaseOverlay|null>(null);
+ const financeSheet=role==="finance"?[
+  {key:"deposit",act:depositLeads,node:depositLeads&&deposit?<FinanceDepositCard deposit={deposit} onClosed={()=>setDepositClosedOn(c.id)}/>:null},
+  {key:"fx",act:fxPending&&(step.kind==="NONE"||stepCode==="FX_REAPPROVAL"),node:fxPending&&value.proposal?<FxReapproval locale={locale} copy={proposalCopy.price.fxReapproval} caseId={c.id} versionId={value.proposal.versionId} currency={value.proposal.currency} commercial={value.commercial}
+    total={value.proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0)} busy={busy} mutate={mutate}/>:null},
+  {key:"admission",act:ADMISSION_WORK.has(stepCode),node:admissionPanel},
+  {key:"treatment",act:TREATMENT_WORK.has(stepCode),node:treatmentPanel},
+  {key:"reconciliation",act:SETTLEMENT_WORK.has(stepCode),node:reconciliationPanel},
+ ].filter(panel=>panel.node).toSorted((a,b)=>Number(b.act)-Number(a.act)):null;
+ const depositLine=deposit&&!depositLeads?<FinanceDepositLine deposit={deposit} focus={depositClosedOn===c.id} onFocused={()=>setDepositClosedOn(null)}/>:null;
+ const approving=financeApproval||(available.includes("APPROVE_COMMERCIAL_TERMS")&&!!value.proposal);
+ const financeProposal=!financeSheet||(!value.proposal&&!depositLine)?null
+  :approving?<Panel title={t.proposal} wide>{!financeApproval&&value.proposal&&<ProposalCard proposal={value.proposal}/>}{depositLine}{showActions&&<RoleActions role={role} t={t} c={c} proposal={value.proposal} gates={value.gates} availableActions={available} mutate={mutate} approvalInCard={financeApproval}/>}</Panel>
+  :<ProposalSummary proposal={value.proposal} available={[]} onView={()=>setOverlay("proposal")}>{depositLine}</ProposalSummary>;
  const clinicalPanel=(value.clinicalReviews.length>0||["CONSULTANT_REVIEW","ARRIVAL_CONFIRMED"].includes(c.status))?<Panel title={cv.reviewHistory}>{value.clinicalReviews.length?value.clinicalReviews.map(r=><div key={r.id} className="border-b border-line pb-4 last:border-0 last:pb-0"><strong>{fillTemplate(cv.reviewVersion,{version:new Intl.NumberFormat(intlLocale(locale)).format(r.versionNumber)})} · {statusLabel(r.status,locale)}</strong>{r.recommendedTreatment&&<p dir="auto" className="mt-1">{r.recommendedTreatment}</p>}{r.risksAndLimitations&&<p dir="auto" className="mt-1 text-sm text-ink-600">{r.risksAndLimitations}</p>}{r.costEstimates&&r.costEstimates.length>0&&<div className="mt-3 border-t border-line pt-3"><p className="mb-2 label-micro text-brand-700">{t.estimatedByConsultant}</p>{r.proposalCurrency&&<p className="mb-2 text-[0.8125rem] text-ink-600">{cv.proposalCurrency}: <strong>{CURRENCY_LABELS[r.proposalCurrency]?.[locale]??r.proposalCurrency}</strong></p>}<ul className="space-y-1 text-sm">{r.costEstimates.map((e,i)=><li key={i} className="flex items-baseline justify-between gap-3"><span dir="auto">{e.serviceDescription}</span><span className="text-end"><strong className="block whitespace-nowrap"><bdi dir="ltr">{e.quotedCost!=null&&e.quotedCurrency?money(e.quotedCost,e.quotedCurrency,locale):money(e.estimatedCost,e.currency,locale)}</bdi></strong>{e.quotedCost!=null&&e.quotedCurrency&&<span className="block whitespace-nowrap text-[0.8125rem] text-ink-500">{cv.base} <bdi dir="ltr">{money(e.estimatedCost,e.currency,locale)}</bdi></span>}</span></li>)}</ul></div>}</div>):<Empty/>}</Panel>:null;
  // The consultant's clinical review is the page's primary work, not an appendix to the review history.
  const reviewDraft=isDoctor&&c.status==="CONSULTANT_REVIEW"?(value.clinicalReviews.find(r=>r.status==="DRAFT")??null):null;
@@ -207,7 +241,6 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   const evidence=decisionSheet?<CaseEvidence locale={locale} intakeSummary={value.intakeSummary} documents={documents} preliminary={preliminary} viewDoc={viewDoc} downloadDoc={downloadDoc}/>:null;
   // Everything needed to act sits above the fold; the rest of the case is one tab away.
   const [tab,setTab]=useState<"overview"|"clinical"|"documents"|"activity">(()=>isDoctor&&decisionSheet?"clinical":"overview");
-  const [overlay,setOverlay]=useState<CaseOverlay|null>(null);
   // A close only clears the overlay that asked for it, as the separate open flags did: a late close event from a drawer
   // that was just replaced must not shut the one that replaced it.
   const closeOverlay=(which:CaseOverlay)=>setOverlay(open=>open===which?null:open);
@@ -220,9 +253,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   // The step's control: the Consultant's clinical step lands in the decision sheet (Clinical tab) — the recommendation
   // field — while a panel's step lands on that panel's next task. Instant scrolls, so the page's smooth scrolling never cuts
   // the move short before the control is on screen.
-  const panelStep=current.workType==="DEPOSIT_RECORD"||[ADMISSION_WORK,TREATMENT_WORK,DISCHARGE_WORK,SETTLEMENT_WORK,FOLLOW_UP_WORK].some(set=>set.has(current.workType??current.code));
+  const panelStep=step.workType==="DEPOSIT_RECORD"||[ADMISSION_WORK,TREATMENT_WORK,DISCHARGE_WORK,SETTLEMENT_WORK,FOLLOW_UP_WORK].some(set=>set.has(step.workType??step.code));
   const toDecision=isDoctor&&!panelStep&&(decisionSheet||secondOpinionOnly);
-  const focusAction=()=>{setTab(toDecision?"clinical":"overview");requestAnimationFrame(()=>{const target=(toDecision?(document.getElementById("clinical-decision")??document.getElementById("case-actions")):(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(role==="operations"&&TRAVEL_STAGES.has(c.status)?document.getElementById("admission-next")??document.getElementById("travel-plan-next")??document.getElementById("travel-arrival-next"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(current.workType??current.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel"))??document.getElementById("case-tab-panel");const control=target?.querySelector<HTMLElement>("textarea,select,input,button")??target;scrollIntoView(control,{behavior:"instant",block:"center"});control?.focus({preventScroll:true});});};
+  const focusAction=()=>{setTab(toDecision?"clinical":"overview");requestAnimationFrame(()=>{const target=(toDecision?(document.getElementById("clinical-decision")??document.getElementById("case-actions")):(step.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(role==="operations"&&TRAVEL_STAGES.has(c.status)?document.getElementById("admission-next")??document.getElementById("travel-plan-next")??document.getElementById("travel-arrival-next"):null)??(ADMISSION_WORK.has(step.workType??step.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(step.workType??step.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(step.workType??step.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(step.workType??step.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(step.workType??step.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel"))??document.getElementById("case-tab-panel");const control=target?.querySelector<HTMLElement>("textarea,select,input,button")??target;scrollIntoView(control,{behavior:"instant",block:"center"});control?.focus({preventScroll:true});});};
   const completeWork=(evidence:string)=>{if(current.workItemId!=null)void mutate(`/tasks/${current.workItemId}/cases/${c.id}/complete`,{evidence,expectedVersion:current.workItemVersion??0});};
   const openMessages=()=>setOverlay("messages");
   // When the step is the patient's reply (the backend's action, never the stage) and this viewer is the one who answers the
@@ -241,7 +274,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
 
   // The cover's strip (UX area 2): who the case waits on, said once on the page, and — for the coordinator — what the
   // patient's own page says now (the backend's patient step; never inferred here). No field, no line.
-  const waitingText=actions.waitingOn&&actions.waitingOn!=="NONE"?waitingLabel(actions.waitingOn,work.waiting,{role,ownsCase:owned,action:value.actions?current:null}):null;
+  const waitingText=actions.waitingOn&&actions.waitingOn!=="NONE"?waitingLabel(actions.waitingOn,work.waiting,{role,ownsCase:owned,action:value.actions?step:null}):null;
   const patientStep=!value.preview?actions.patientStep??null:null;
   const facts=waitingText||patientStep?<CoverFacts waiting={waitingText} actions={actions} step={patientStep} proposal={value.patientProposal}/>:undefined;
   // My work's order is the backend's; the next item is the first one after this case's items that belongs to another case,
@@ -296,7 +329,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
    </div>
 
    <div className="mt-5 border-t border-line pt-5">
-  <CurrentActionPanel locale={locale} role={role} action={current} facts={facts}
+  <CurrentActionPanel locale={locale} role={role} action={step} facts={facts}
    response={current.workType==="REVIEW_PATIENT_RESPONSE"?{message:latestPatientMessage?.body,documentName:newestDocument?.fileName}:null}
    busy={busy} secondary={replyFromStrip} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
    respondBy={myPending?.offerExpiresAt??null}
@@ -309,7 +342,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
    {alsoOpen.length>0&&<AlsoOpen items={alsoOpen}/>}
   </section>
   {/* Once the cover has scrolled away, the case and its step stay in one slim line under the site header. */}
-  {line.gone&&<CaseLine top={line.top} action={current} title={actionTitle(current,role,work)} next={nextItem&&openNext?{item:nextItem,onOpen:openNext}:null}/>}
+  {line.gone&&<CaseLine top={line.top} action={step} title={actionTitle(step,role,work)} next={nextItem&&openNext?{item:nextItem,onOpen:openNext}:null}/>}
 
   {/* P1-13: a closed case is reopened into follow-up by a manager or the case's own Consultant; one quiet line, never on another stage. */}
   {c.status==="CLOSED"&&!value.preview&&(isDoctor||(isCoordinator&&canReopen))&&<ReopenCase locale={locale} caseId={c.id} side={isDoctor?"doctor":"coordinator"} busy={busy} mutate={mutate} load={load}/>}
@@ -348,8 +381,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
         </div>
        </section>}
        {banners}
-       {logistics}
-       {consultantPanels?consultantPanels.map(panel=><div key={panel.key} className="space-y-4">{panel.node}</div>):<>
+       {!financeSheet&&logistics}
+       {consultantPanels?consultantPanels.map(panel=><div key={panel.key} className="space-y-4">{panel.node}</div>)
+        :financeSheet?<>{financeSheet.map(panel=><div key={panel.key} className="space-y-4">{panel.node}</div>)}{logistics}{financeProposal}</>:<>
         {workflowBlock}
         {admissionPanel}
         {treatmentPanel}
@@ -360,9 +394,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
        {/* The proposal is the work while it is being prepared or released; afterwards it is reference. */}
        {isCoordinator&&(proposalIsWork?<div id={current.kind==="FOCUS"&&!formAction?"case-actions":undefined}>{proposalPanel}</div>
          :(value.proposal||value.deposit)?<ProposalSummary proposal={value.proposal} deposit={value.deposit} delivery={value.delivery} available={available} onView={()=>setOverlay("proposal")}/>:null)}
-       {role==="finance"&&value.proposal?.fxReapprovalStatus==="PENDING"&&<FxReapproval locale={locale} copy={proposalCopy.price.fxReapproval} caseId={c.id} versionId={value.proposal.versionId} currency={value.proposal.currency} commercial={value.commercial}
-         total={value.proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0)} busy={busy} mutate={mutate}/>}
-       {!isCoordinator&&!isDoctor&&(value.proposal||value.deposit)&&proposalPanel}
+       {!isCoordinator&&!isDoctor&&!financeSheet&&(value.proposal||value.deposit)&&proposalPanel}
        {/* The case brief: the facts a coordinator decides ownership on, and the operational context once they own it. */}
        {/* P1-13 (A-05): the age band (the owner corrects it) and, for a minor, the guardian and the evidence decision. */}
        {isCoordinator&&!value.preview&&<GuardianReview key={c.id} locale={locale} caseId={c.id} ageBand={c.ageBand} canEdit={owned} busy={busy} mutate={mutate} load={load} viewDoc={viewDoc}/>}
@@ -419,7 +451,8 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
    <RecordProposalDecision key={value.proposal.versionId} locale={locale} caseId={c.id} proposal={value.proposal} representatives={value.representatives} busy={busy} mutate={async(path,body,method)=>{const result=await mutate(path,body,method);if(result)closeOverlay("recordDecision");return result;}}/>
   </CaseDrawer>}
   {overlay==="proposal"&&<CaseDrawer locale={locale} title={t.proposal} onClose={()=>closeOverlay("proposal")}>
-   <div className="space-y-4">{recommendationBlock}{value.proposal&&<ProposalCard proposal={value.proposal}/>}{value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={false}/>}{value.deposit&&<DepositCard deposit={value.deposit}/>}</div>
+   {/* Finance reads the deposit on the sheet itself (its act, or its one line), so the drawer is the proposal alone. */}
+   <div className="space-y-4">{recommendationBlock}{value.proposal&&<ProposalCard proposal={value.proposal}/>}{value.delivery&&value.proposal&&<DeliveryCard delivery={value.delivery} versionId={value.proposal.versionId} canResend={false}/>}{value.deposit&&!financeSheet&&<DepositCard deposit={value.deposit}/>}</div>
   </CaseDrawer>}
   {overlay==="transfer"&&<CaseDrawer locale={locale} title={cv.transferTitle} onClose={()=>closeOverlay("transfer")}><TransferOwnership locale={locale} caseId={c.id} caseNumber={c.caseNumber} currentOwner={c.coordinatorSubject} currentOwnerName={c.coordinatorName} mySubject={mySubject} staff={staff??[]} busy={busy} mutate={mutate} onClose={()=>closeOverlay("transfer")}/></CaseDrawer>}
   {overlay==="requestInfo"&&<RequestInformationDialog locale={locale} caseIds={[c.id]} busy={busy} mutate={mutate} onClose={()=>closeOverlay("requestInfo")}/>}
@@ -554,7 +587,7 @@ function useCoverGone(cover:RefObject<HTMLElement|null>){
  * in one line, with the full breakdown, delivery and deposit one click away. The secure link the patient
  * currently holds is shown compactly with its one utility — resend — only while resending is valid.
  */
-function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?:Proposal;deposit?:DepositView|null;delivery?:DeliveryStatus|null;available:string[];onView:()=>void}){const work=useWorkCopy();const cv=work.caseView;const s=cv.summary;const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
+function ProposalSummary({proposal,deposit,delivery,available,onView,children}:{proposal?:Proposal;deposit?:DepositView|null;delivery?:DeliveryStatus|null;available:string[];onView:()=>void;/** What reads under the line (Finance's deposit line, UX 4-3). */children?:ReactNode}){const work=useWorkCopy();const cv=work.caseView;const s=cv.summary;const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
  // A resend revokes the link the patient holds, so it is confirmed first.
  const [resendPath,setResendPath]=useState<string|null>(null);
  const total=proposal?proposal.items.filter(i=>!i.optional).reduce((sum,i)=>sum+i.quantity*i.unitPrice,0):null;
@@ -576,7 +609,7 @@ function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?
    </div>
    <button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={onView}>{s.view}</button>
   </div>
-  <dl className="mt-3 grid gap-x-6 gap-y-2 border-t border-line pt-3 text-[0.875rem] sm:grid-cols-2">
+  {(deposit||delivery||resendProfile)&&<dl className="mt-3 grid gap-x-6 gap-y-2 border-t border-line pt-3 text-[0.875rem] sm:grid-cols-2">
    {deposit&&<div className="flex flex-wrap items-baseline justify-between gap-x-3"><dt className="text-ink-500">{s.deposit}</dt><dd className="font-semibold text-ink-800">{depositLabel}{deposit.totalDisplay!=null&&<> · <bdi dir="ltr">{fmt(deposit.totalDisplay,deposit.currency||"EGP")}</bdi></>}{deposit.paidDisplay?<span className="text-ink-500"> · {s.paid} <bdi dir="ltr">{fmt(deposit.paidDisplay,deposit.currency||"EGP")}</bdi></span>:null}</dd></div>}
    {(delivery||resendProfile)&&<div className="flex flex-wrap items-baseline justify-between gap-x-3"><dt className="text-ink-500">{s.secureLink}</dt><dd className="flex flex-wrap items-center gap-x-2 font-semibold text-ink-800">
     {delivery&&!resendProfile&&<span>{deliveryLabel} · {channel} · <bdi dir="ltr">{delivery.destinationMasked}</bdi></span>}
@@ -584,7 +617,8 @@ function ProposalSummary({proposal,deposit,delivery,available,onView}:{proposal?
     {resendProposal&&<button type="button" className="link-cta text-[0.875rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>setResendPath(`/coordinator/cases/${caseId}/proposals/${proposal.versionId}/resend`)}>{s.resend}</button>}
     {resendProfile&&<button type="button" className="link-cta text-[0.875rem]" disabled={busy} aria-haspopup="dialog" onClick={()=>setResendPath(`/coordinator/cases/${caseId}/onboarding-link/resend`)}>{s.resend}</button>}
    </dd></div>}
-  </dl>
+  </dl>}
+  {children}
   {resendPath&&<ConfirmDialog title={work.confirm.resendTitle} body={delivery?fillTemplate(work.confirm.resendBodyTo,{destination:`\u2068${delivery.destinationMasked}\u2069`}):work.confirm.resendBody} confirm={work.confirm.resend} cancel={work.confirm.cancel}
    onCancel={()=>setResendPath(null)} onConfirm={()=>{const path=resendPath;setResendPath(null);void mutate(path);}}/>}
  </section>;
@@ -731,81 +765,125 @@ export function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;pr
 }
 
 /**
- * The patient's bank transfer (DEP-3): the reference they entered and where it stands. Finance confirms the amount received
- * against it, or returns it to the patient with a reason; there is nothing to confirm until the patient has sent one.
- * UX 4-0: confirming asks first, with the amount and the reference in the question, and a refusal is said at the form;
- * returning the reference is the second verb, behind its own disclosure, and asks too. The reference never breaks inside itself.
+ * The patient's bank transfer (DEP-3): the reference they entered and where it stands, read the same by everyone on the case;
+ * `children` is what the viewer can do about it (Finance's acts). The reference never breaks inside itself.
  */
-function TransferPanel({locale,deposit,caseId,isFinance,busy,mutate}:{locale:Locale;deposit:DepositView;caseId:string;isFinance:boolean;busy:boolean;mutate:Mutate}){
- const work=useWorkCopy();const tx=work.depositTransfer;const forms=work.admission.forms;
+function TransferStatus({deposit,level:Heading="h5",children}:{deposit:DepositView;/** Under the card's own heading level. */level?:"h4"|"h5";children?:ReactNode}){
+ const {locale}=useCaseWorkspace();const tx=useWorkCopy().depositTransfer;
  const transfer=deposit.transfer;const pending=transfer?.status==="SUBMITTED";
- const reference=transfer?`⁨${transfer.reference}⁩`:"";
- // One idempotency key per transfer, kept through a refused or timed-out attempt so a retry can never record the money twice.
- const key=useRef<{id:string;key:string}|null>(null);
- const paymentKey=(id:string)=>{if(key.current?.id!==id)key.current={id,key:crypto.randomUUID()};return key.current.key;};
- return <section aria-label={tx.title} className="mt-4 border-t border-line pt-3">
-  <h5 className="text-[0.875rem] font-bold text-ink-800">{tx.title}</h5>
+ const id=useId();
+ return <section aria-labelledby={`${id}-title`} className="mt-4 border-t border-line pt-3">
+  <Heading id={`${id}-title`} className="text-[0.875rem] font-bold text-ink-800">{tx.title}</Heading>
   {pending&&transfer?<p className="mt-1 text-sm text-ink-700">{transfer.method&&<span className="me-2 font-semibold text-ink-800">{tx.method[transfer.method as keyof typeof tx.method]??transfer.method} ·</span>}{transfer.agentName&&<>{tx.agent}: <bdi dir="auto" className="font-semibold text-ink-900">{transfer.agentName}</bdi> · </>}{tx.reference}: <bdi dir="auto" translate="no" className="select-all font-semibold text-ink-900 [overflow-wrap:anywhere]">{transfer.reference}</bdi> <span className="text-ink-500">· {tx.sent} <bdi dir="ltr">{new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(transfer.submittedAt))}</bdi></span></p>
    :<p className="mt-1 text-sm text-ink-600">{tx.waiting}</p>}
   {!pending&&transfer?.status==="REJECTED"&&<p className="mt-1 text-sm text-alert-700">{fillTemplate(tx.rejectedLast,{reason:`⁨${transfer.reason??""}⁩`})}</p>}
-  {isFinance&&pending&&transfer&&<>
-   <div id="deposit-payment">
-    <ActForm className="mt-3 flex flex-wrap items-end gap-3" refused={forms.refused} retry={forms.refusedRetry}
-     confirm={{title:data=>fillTemplate(tx.confirmTitle,{amount:`⁦${money(Number(data.get("amount")),"EGP",locale)}⁩`,reference}),body:tx.confirmBody,confirm:tx.confirm,cancel:work.confirm.cancel}}
-     action={data=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/payments`,{amountEgp:Number(data.get("amount"))||0,idempotencyKey:paymentKey(transfer.id)}).then(result=>{if(result)key.current=null;return !!result;})}>
-     <label className="block text-sm font-semibold">{tx.amount}<input className="field mt-1 block w-44" name="amount" type="number" min="0.01" step="0.01" max={deposit.balanceEgp??undefined} defaultValue={deposit.balanceEgp??undefined} required dir="ltr" inputMode="decimal" autoComplete="off"/></label>
-     <button className="btn-primary" disabled={busy}>{tx.confirm}</button>
-    </ActForm>
-   </div>
-   <details className="group mt-2">
-    <Summary>{tx.cantConfirm}</Summary>
-    <ActForm className="flex flex-wrap items-end gap-3 pb-3" refused={forms.refused} retry={forms.refusedRetry}
-     confirm={{title:()=>fillTemplate(tx.rejectTitle,{reference}),body:tx.rejectBody,confirm:tx.reject,cancel:work.confirm.cancel}}
-     action={data=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/transfers/${transfer.id}/reject`,{reason:String(data.get("reason")||"").trim()}).then(result=>!!result)}>
-     <label className="block min-w-0 flex-1 basis-64 text-sm font-semibold">{tx.rejectReason}<input className="field" name="reason" required maxLength={500} dir="auto" autoComplete="off"/></label>
-     <button className="btn-secondary" disabled={busy}>{tx.reject}</button>
-    </ActForm>
-   </details>
-  </>}
+  {children}
  </section>;
 }
 
-function DepositCard({deposit}:{deposit:DepositView}){
- const {locale,role,c:{id:caseId},busy,mutate}=useCaseWorkspace();
- const workCopy=useWorkCopy();const g=workCopy.caseView.deposit;
- const isFinance=role==="finance";
- const currency=deposit.currency||"EGP";
+/**
+ * Finance's acts on a transfer waiting to be confirmed. UX 4-0: confirming asks first, with the amount and the reference in the
+ * question, and a refusal is said at the form; returning the reference is the second verb, behind its own disclosure, and asks too.
+ */
+function TransferActs({deposit,transfer,onConfirmed}:{deposit:DepositView;transfer:NonNullable<DepositView["transfer"]>;onConfirmed:()=>void}){
+ const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
+ const work=useWorkCopy();const tx=work.depositTransfer;const forms=work.admission.forms;
+ const reference=`⁨${transfer.reference}⁩`;
+ // One idempotency key per transfer, kept through a refused or timed-out attempt so a retry can never record the money twice.
+ const key=useRef<{id:string;key:string}|null>(null);
+ const paymentKey=(id:string)=>{if(key.current?.id!==id)key.current={id,key:crypto.randomUUID()};return key.current.key;};
+ return <>
+  <div id="deposit-payment">
+   <ActForm className="mt-3 flex flex-wrap items-end gap-3" refused={forms.refused} retry={forms.refusedRetry}
+    confirm={{title:data=>fillTemplate(tx.confirmTitle,{amount:`⁦${money(Number(data.get("amount")),"EGP",locale)}⁩`,reference}),body:tx.confirmBody,confirm:tx.confirm,cancel:work.confirm.cancel}}
+    action={data=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/payments`,{amountEgp:Number(data.get("amount"))||0,idempotencyKey:paymentKey(transfer.id)}).then(result=>{if(result){key.current=null;if(Number(data.get("amount"))>=(deposit.balanceEgp??0))onConfirmed();}return !!result;})}>
+    <label className="block text-sm font-semibold">{tx.amount}<input className="field mt-1 block w-44" name="amount" type="number" min="0.01" step="0.01" max={deposit.balanceEgp??undefined} defaultValue={deposit.balanceEgp??undefined} required dir="ltr" inputMode="decimal" autoComplete="off"/></label>
+    <button className="btn-primary" disabled={busy}>{tx.confirm}</button>
+   </ActForm>
+  </div>
+  <details className="group mt-2">
+   <Summary>{tx.cantConfirm}</Summary>
+   <ActForm className="flex flex-wrap items-end gap-3 pb-3" refused={forms.refused} retry={forms.refusedRetry}
+    confirm={{title:()=>fillTemplate(tx.rejectTitle,{reference}),body:tx.rejectBody,confirm:tx.reject,cancel:work.confirm.cancel}}
+    action={data=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/transfers/${transfer.id}/reject`,{reason:String(data.get("reason")||"").trim()}).then(result=>!!result)}>
+    <label className="block min-w-0 flex-1 basis-64 text-sm font-semibold">{tx.rejectReason}<input className="field" name="reason" required maxLength={500} dir="auto" autoComplete="off"/></label>
+    <button className="btn-secondary" disabled={busy}>{tx.reject}</button>
+   </ActForm>
+  </details>
+ </>;
+}
+
+const depositTone=(status:string)=>status==="PAID"?"success":(status==="REFUNDED"||status==="CANCELLED"||status==="WAIVED")?"neutral":"warning";
+
+/**
+ * The deposit's three figures and what it is made of, in the currency the reader works in: Finance records in EGP, so EGP leads
+ * and the patient's currency follows (UX 4-0); the coordinator reads the patient's currency first, with its EGP beneath (QA W-26).
+ */
+function DepositFigures({deposit,ledger}:{deposit:DepositView;ledger:"EGP"|"patient"}){
+ const {locale}=useCaseWorkspace();const g=useWorkCopy().caseView.deposit;
+ const currency=deposit.currency||"EGP";const foreign=currency!=="EGP";
  const amount=(n?:number)=>n==null?"—":money(n,currency,locale);
- const foreign=currency!=="EGP";
- // QA W-26: Finance records in EGP, so each figure carries its EGP amount. UX 4-0: for Finance the EGP figure leads and the
- // patient's currency follows; the coordinator still reads the patient's currency first.
- const figure=(display?:number,egp?:number)=>isFinance
+ const figure=(display?:number,egp?:number)=>ledger==="EGP"
   ?<><Money>{egp!=null?money(egp,"EGP",locale):foreign?"—":amount(display)}</Money>{foreign&&display!=null&&<span className="block text-[0.8125rem] font-normal text-ink-500"><Money>{amount(display)}</Money></span>}</>
   :<><Money>{amount(display)}</Money>{foreign&&egp!=null&&<span className="block text-[0.8125rem] font-normal text-ink-500"><Money>{money(egp,"EGP",locale)}</Money></span>}</>;
+ return <>
+  <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><dt className="text-ink-500">{g.total}</dt><dd className="font-bold">{figure(deposit.totalDisplay,deposit.totalEgp)}</dd></div><div><dt className="text-ink-500">{g.paid}</dt><dd className="font-bold">{figure(deposit.paidDisplay,deposit.paidEgp)}</dd></div><div><dt className="text-ink-500">{g.balance}</dt><dd className="font-bold">{figure(deposit.balanceDisplay,deposit.balanceEgp)}</dd></div></dl>
+  {deposit.components.length>0&&<ul className="mt-3 space-y-1 text-sm">{deposit.components.map((cp,i)=><li key={i} className="flex justify-between gap-3"><span><bdi dir="auto">{cp.purpose}</bdi> <span className="text-[0.8125rem] text-ink-500">(<bdi dir="auto">{cp.beneficiary}</bdi>{cp.creditedToFinal?` · ${g.credited}`:""})</span></span><strong className="whitespace-nowrap"><Money>{ledger==="EGP"?money(cp.amountEgp,"EGP",locale):amount(cp.amountDisplay)}</Money></strong></li>)}</ul>}
+ </>;
+}
+
+/** The deposit for everyone but Finance (the coordinator, Operations): its figures and where the patient's transfer stands. */
+function DepositCard({deposit}:{deposit:DepositView}){
+ const workCopy=useWorkCopy();const g=workCopy.caseView.deposit;
  const open=deposit.status==="REQUESTED"||deposit.status==="PARTIALLY_PAID";
- const tone=deposit.status==="PAID"?"success":(deposit.status==="REFUNDED"||deposit.status==="CANCELLED"||deposit.status==="WAIVED")?"neutral":"warning";
- const status=label(workCopy.caseView.depositStatus,deposit.status);
- // A refund is Finance's second verb on a deposit: behind its own disclosure, and only once something was paid.
- const refund=isFinance&&(deposit.paidEgp??0)>0?<details className="group mt-2 border-t border-line">
+ return <div className="mt-4 border-t border-line pt-4">
+  <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-bold text-ink-800">{g.title}</h4><StatusBadge tone={depositTone(deposit.status)}>{label(workCopy.caseView.depositStatus,deposit.status)}</StatusBadge></div>
+  <DepositFigures deposit={deposit} ledger="patient"/>
+  {open&&<TransferStatus deposit={deposit}/>}
+ </div>;
+}
+
+/** A refund is Finance's second verb on a deposit: behind its own disclosure, and only once something was paid. */
+function DepositRefund({deposit}:{deposit:DepositView}){
+ const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();const g=useWorkCopy().caseView.deposit;
+ if((deposit.paidEgp??0)<=0)return null;
+ return <details className="group mt-2 border-t border-line">
   <Summary>{g.refundOpen}</Summary>
   <div className="pb-3"><RefundForm locale={locale} busy={busy} onRecord={request=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/refunds`,request)}/><p className="mt-2 text-[0.8125rem] text-ink-500">{g.note}</p></div>
- </details>:null;
- // UX 4-0: outside its own moment (nothing left to confirm) Finance reads the deposit as one line: what was paid, or what was
- // asked when nothing was. When Finance's own act just closed the moment, focus moves to that line, so it is read next.
+ </details>;
+}
+
+/**
+ * UX 4-3: Finance's deposit while its moment is open — its own card on the sheet, EGP first, with the transfer to confirm. It
+ * opens the sheet while a transfer waits (the step names it); `onClosed` tells the page when Finance's confirmation was recorded.
+ */
+function FinanceDepositCard({deposit,onClosed}:{deposit:DepositView;onClosed:()=>void}){
+ const workCopy=useWorkCopy();const g=workCopy.caseView.deposit;const id=useId();
+ const transfer=deposit.transfer;
+ return <section aria-labelledby={`${id}-title`} className="card p-5">
+  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"><h3 id={`${id}-title`} className="title text-base">{g.title}</h3><StatusBadge tone={depositTone(deposit.status)}>{label(workCopy.caseView.depositStatus,deposit.status)}</StatusBadge></div>
+  <DepositFigures deposit={deposit} ledger="EGP"/>
+  <TransferStatus deposit={deposit} level="h4">{transfer?.status==="SUBMITTED"&&<TransferActs deposit={deposit} transfer={transfer} onConfirmed={onClosed}/>}</TransferStatus>
+  <DepositRefund deposit={deposit}/>
+ </section>;
+}
+
+/**
+ * UX 4-0, 4-3: outside its own moment Finance reads the deposit as one line under the proposal: what was paid, or what was asked
+ * when nothing was. When Finance's own confirmation just closed the moment, the focus comes to this line, so it is read next.
+ */
+function FinanceDepositLine({deposit,focus,onFocused}:{deposit:DepositView;focus:boolean;onFocused:()=>void}){
+ const {locale}=useCaseWorkspace();const workCopy=useWorkCopy();const g=workCopy.caseView.deposit;
  const line=useRef<HTMLDivElement>(null);
- const wasOpen=useRef(open);
- useEffect(()=>{if(wasOpen.current&&!open&&isFinance)line.current?.focus();wasOpen.current=open;},[open,isFinance]);
+ const focused=useRef(onFocused);
+ useEffect(()=>{focused.current=onFocused;});
+ useEffect(()=>{if(!focus)return;line.current?.focus();focused.current();},[focus]);
+ const currency=deposit.currency||"EGP";const foreign=currency!=="EGP";
  const paidSome=(deposit.paidEgp??0)>0;
- if(isFinance&&!open)return <div ref={line} tabIndex={-1} className="mt-4 border-t border-line pt-2 outline-none">
-  <DoneAct tone={deposit.status==="PAID"?"done":"neutral"} fact={<><span className="font-semibold text-ink-900">{g.title}</span> · {status} · {deposit.status==="PAID"?null:<>{paidSome?g.paid:g.total} </>}<Money>{money(paidSome?deposit.paidEgp!:deposit.totalEgp,"EGP",locale)}</Money>{foreign&&<span className="text-ink-600"> · <Money>{amount(paidSome?deposit.paidDisplay:deposit.totalDisplay)}</Money></span>}</>}/>
-  {refund}
- </div>;
- return <div className="mt-4 border-t border-line pt-4">
-  <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-bold text-ink-800">{g.title}</h4><StatusBadge tone={tone}>{status}</StatusBadge></div>
-  <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><dt className="text-ink-500">{g.total}</dt><dd className="font-bold">{figure(deposit.totalDisplay,deposit.totalEgp)}</dd></div><div><dt className="text-ink-500">{g.paid}</dt><dd className="font-bold">{figure(deposit.paidDisplay,deposit.paidEgp)}</dd></div><div><dt className="text-ink-500">{g.balance}</dt><dd className="font-bold">{figure(deposit.balanceDisplay,deposit.balanceEgp)}</dd></div></dl>
-  {deposit.components.length>0&&<ul className="mt-3 space-y-1 text-sm">{deposit.components.map((cp,i)=><li key={i} className="flex justify-between gap-3"><span>{cp.purpose} <span className="text-[0.8125rem] text-ink-500">({cp.beneficiary}{cp.creditedToFinal?` · ${g.credited}`:""})</span></span><strong className="whitespace-nowrap"><Money>{isFinance?money(cp.amountEgp,"EGP",locale):amount(cp.amountDisplay)}</Money></strong></li>)}</ul>}
-  {open&&<TransferPanel locale={locale} deposit={deposit} caseId={caseId} isFinance={isFinance} busy={busy} mutate={mutate}/>}
-  {refund}
+ const display=paidSome?deposit.paidDisplay:deposit.totalDisplay;
+ return <div ref={line} tabIndex={-1} className="mt-4 border-t border-line pt-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+  <DoneAct tone={deposit.status==="PAID"?"done":"neutral"} fact={<><span className="font-semibold text-ink-900">{g.title}</span> · {label(workCopy.caseView.depositStatus,deposit.status)} · {deposit.status==="PAID"?null:<>{paidSome?g.paid:g.total} </>}<Money>{money(paidSome?deposit.paidEgp!:deposit.totalEgp,"EGP",locale)}</Money>{foreign&&<span className="text-ink-600"> · <Money>{display==null?"—":money(display,currency,locale)}</Money></span>}</>}/>
+  <DepositRefund deposit={deposit}/>
  </div>;
 }
 

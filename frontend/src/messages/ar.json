@@ -1955,6 +1955,7 @@
         "PROPOSAL_DECLINED_REVIEW": "تأكيد الاطلاع",
         "CLINICAL_OUTCOME_REVIEW": "تأكيد الاطلاع",
         "DEPOSIT_RECORD": "التحقق من التحويل",
+        "APPROVE_COMMERCIAL_TERMS": "اعتماد الشروط المالية",
         "TRAVEL": "تعيين فريق العمليات",
         "REASSIGN_CONSULTANT": "إعادة تعيين استشاري",
         "CONFIRM_TRANSFER": "تأكيد النقل",
@@ -2005,6 +2006,8 @@
         "UPDATE_TRAVEL_PLAN": "استكمال الترتيبات",
         "APPROVE_COMMERCIAL_TERMS": "اعتماد الشروط المالية",
         "RECORD_HOSPITAL_BALANCE": "سجّل الإيصال",
+        "RECORD_FEE_BALANCE": "سجّل المتبقي من الرسوم",
+        "RECORD_E_INVOICE": "سجّل مرجع الفاتورة الإلكترونية",
         "RECORD_ADMISSION_NUMBER": "سجّل رقم الدخول",
         "RECORD_MILESTONE": "سجّل مرحلة",
         "COMPLETE_DISCHARGE_PACK": "أكمل ملف الخروج",
@@ -2112,6 +2115,14 @@
         "default": {
           "title": "لا يوجد إجراء مطلوب الآن",
           "body": "ستظهر الخطوة التالية هنا فور توفرها."
+        },
+        "RECORD_FEE_BALANCE": {
+          "title": "سجّل المتبقي من رسوم المنصة",
+          "body": "لم تغطِّ الوديعة رسوم المنصة. سجّل المبلغ المتبقي الذي دفعه المريض والرقم المرجعي للدفعة."
+        },
+        "RECORD_E_INVOICE": {
+          "title": "سجّل مرجع الفاتورة الإلكترونية",
+          "body": "صدر كشف الحساب. سجّل رقم المستند لدى مصلحة الضرائب؛ لا يمكن تسجيله إلا مرة واحدة."
         },
         "RECORD_HOSPITAL_BALANCE": {
           "title": "سجّل إيصال المستشفى",

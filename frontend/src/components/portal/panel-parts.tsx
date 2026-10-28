@@ -69,6 +69,17 @@ export function LaterAct({ notYet, children }: { notYet: string; children: React
   return <p className="flex items-start gap-2 py-2 text-[0.875rem] text-ink-500"><CircleDashed size={16} aria-hidden className="mt-0.5 flex-none"/><span className="min-w-0 [overflow-wrap:anywhere]"><span className="font-semibold">{notYet}</span> {children}</span></p>;
 }
 
+/**
+ * UX 4-3: tells the page which act a panel leads with when the backend's step names none (the fee balance, the e-invoice), so the
+ * strip says what the page shows; forgotten when the act or the panel goes. Until B-4-1's step codes, the codes are the strip's own.
+ */
+export function LeadSignal({ code, onLead }: { code: string | null; onLead?: (code: string | null) => void }) {
+  const tell = useRef(onLead);
+  useEffect(() => { tell.current = onLead; });
+  useEffect(() => { tell.current?.(code); return () => tell.current?.(null); }, [code]);
+  return null;
+}
+
 /** A disclosure's summary with a drawn marker that turns as its own `<details>` opens (the native marker is gone once it is a
  * flex box). It reads its parent, not a `group`, so a closed disclosure inside an open one keeps its closed marker (UX 5-2). It does
  * not wrap, so a long label wraps beside its marker, never under it (UX 5-4). */

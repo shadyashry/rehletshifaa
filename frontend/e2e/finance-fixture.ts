@@ -25,7 +25,7 @@ const cases: Record<FinanceCaseId, Record<string, unknown>> = {
 };
 
 const work = (id: string, caseId: FinanceCaseId, type: string, title: string, context: string, extra: Record<string, unknown> = {}) => ({
-  id, caseId, caseNumber: cases[caseId].caseNumber, patientName: cases[caseId].patientName, caseStatus: cases[caseId].status, waitingOn: "FINANCE",
+  id, caseId, caseNumber: cases[caseId].caseNumber, patientName: cases[caseId].patientName, caseStatus: cases[caseId].status, waitingOn: "STAFF",
   careCategory: "cardiology", ...coordinator, documentCount: 4, type, title, context, priority: "NORMAL", status: "OPEN", blocking: false,
   dueAt: at(-20), overdue: false, createdAt: at(10), version: 0, copy: null, ...extra });
 // In the backend's order (StaffWorkQueryService.QUEUE_ORDER): most urgent, then soonest due. The titles are FinanceWork's own.
@@ -46,7 +46,7 @@ const documents = [
 ];
 
 const actions = (stage: string, currentAction: Record<string, unknown>, available: string[] = []) =>
-  ({ journeyStage: stage, waitingOn: "FINANCE", blockers: [], currentAction, availableActions: available });
+  ({ journeyStage: stage, waitingOn: "STAFF", blockers: [], currentAction, availableActions: available });
 // Finance's step is the open work item on the case (CaseActionService: WORK_ITEM with its type), or the approval step.
 const item = (id: string) => {
   const w = workItems.find(row => row.id === id)!;
@@ -171,6 +171,16 @@ const reconciliation = (id: FinanceCaseId) => {
   }
 };
 
+// The policies Finance reads in Control Center › Commercial › Margin & Deposit.
+const policies = {
+  margins: [{ id: "m1", marginRate: 0.12, minimumCoordinationFeeEgp: 30000, manualBandEgp: 5000, finalQuoteValidityDays: 14, fxToleranceRate: 0.03, changeOrderBandRate: 0.1,
+    changeOrderBandEgp: 15000, fitToFlyHours: 72, followUpFreeDays: 30, active: true, version: 3, validFrom: at(2000) },
+    { id: "m2", careCategory: "cardiology", marginRate: 0.15, minimumCoordinationFeeEgp: 30000, manualBandEgp: null, finalQuoteValidityDays: 14, fxToleranceRate: 0.03,
+      changeOrderBandRate: 0.1, changeOrderBandEgp: 15000, fitToFlyHours: 72, followUpFreeDays: 30, active: true, version: 1, validFrom: at(900) }],
+  deposits: [{ id: "d1", depositRate: 0.15, refundCutoffDays: 10, minimumUsd: 200, maximumUsd: 1500, active: true, version: 2, validFrom: at(2000) }],
+  careAreas: [{ slug: "cardiology", nameEn: "Cardiology", nameAr: "أمراض القلب" }],
+};
+
 export async function setupFinanceDay(page: Page) {
   const portal = await setupPortal(page, "FINANCE", { pendingWork: false });
   await page.route("**/api/v1/**", async route => {
@@ -190,6 +200,10 @@ export async function setupFinanceDay(page: Page) {
       return reply([]);
     }
     if (/^\/cases\/[a-z]+\/documents$/.test(api)) return reply(documents);
+    // Control Center › Commercial, where Finance reads its margin and deposit policies (UX 4-3).
+    if (api === "/finance/commercial-policies") return reply(policies.margins);
+    if (api === "/finance/deposit-policies") return reply(policies.deposits);
+    if (api === "/finance/care-areas") return reply(policies.careAreas);
     return route.fallback();
   });
   return portal;

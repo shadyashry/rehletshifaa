@@ -6,7 +6,7 @@ import { ArrowDown, ArrowRight, CalendarClock, CircleAlert, FileText, MessageSqu
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { scrollIntoView } from "@/lib/scroll";
 import { intlLocale, type Locale } from "@/lib/i18n";
-import { fillTemplate, plural, workCopyText, type WorkCopy, type WorkItemCopy } from "@/lib/portal-labels";
+import { fillTemplate, plural, workCopyText, workTypeContext, type WorkCopy, type WorkItemCopy } from "@/lib/portal-labels";
 
 /** The backend's resolution of what this person should do now — rendered, never re-derived here. */
 export type CurrentActionView = {
@@ -197,9 +197,10 @@ function describe(action: CurrentActionView, role: string, t: ActionCopy, locali
     const known = workCopyText(action.copy, wording);
     if (known) return { title: known.title, body: known.context };
   }
-  // Work without a known code keeps the backend's English; Arabic shows the work type in Arabic and keeps the context.
+  // Work without a known code keeps the backend's English; Arabic words it from its work type (UX 4-3: the context too, where the
+  // type has an entry).
   if (action.code === "WORK_ITEM") return { title: pick(localizedWork ?? {}, action.workType) ?? action.title ?? "",
-    body: localizedWork && LOCALIZED_FORM_HINT.has(action.workType ?? "") ? null : action.context };
+    body: !localizedWork ? action.context : LOCALIZED_FORM_HINT.has(action.workType ?? "") ? null : workTypeContext(action.workType, wording) ?? action.context };
   if (action.code === "VIEW_ONLY") return role === "coordinator" ? t.states.VIEW_ONLY : t.states.VIEW_ONLY_STAFF;
   if (action.code === "ACCEPT_ASSIGNMENT") return role === "doctor" ? t.states.ACCEPT_ASSIGNMENT_DOCTOR : t.states.ACCEPT_ASSIGNMENT;
   if (action.code === "WAIT_PATIENT_READINESS") return state(t.readiness, action.blockerCode ?? "") ?? t.readiness.default;
