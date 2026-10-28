@@ -1940,6 +1940,8 @@
         "ASSIGN_FINANCE": "Assign Finance",
         "RECORD_CLINICAL_DECISION": "Record clinical decision",
         "RECORD_FINAL_ASSESSMENT": "Record final assessment",
+        "RESERVE_HOSPITAL": "Reserve the hospital",
+        "RECORD_ADMISSION_LETTER": "Record the letter",
         "UPDATE_TRAVEL_PLAN": "Complete arrangements",
         "APPROVE_COMMERCIAL_TERMS": "Approve commercial terms",
         "RECORD_HOSPITAL_BALANCE": "Record the receipt",
@@ -2030,6 +2032,14 @@
         "RECORD_CLINICAL_DECISION": {
           "title": "Record your clinical decision",
           "body": "Review the intake summary and documents, then record your recommendation."
+        },
+        "RESERVE_HOSPITAL": {
+          "title": "Reserve the hospital",
+          "body": "Reserve the hospital and the planned admission date with the facility."
+        },
+        "RECORD_ADMISSION_LETTER": {
+          "title": "Record the admission letter",
+          "body": "Record the hospital's admission letter with its quoted package price, so Finance can check it."
         },
         "UPDATE_TRAVEL_PLAN": {
           "title": "Arrange travel and arrival",
@@ -2940,6 +2950,8 @@
       "RELEASE_PROPOSAL": "Release the proposal to the patient",
       "APPROVE_COMMERCIAL_TERMS": "Approve the commercial terms",
       "PREPARE_TRAVEL_PACKAGE": "Plan the travel package",
+      "RESERVE_HOSPITAL": "Reserve the hospital",
+      "RECORD_ADMISSION_LETTER": "Record the admission letter",
       "UPDATE_TRAVEL_PLAN": "Arrange travel and arrival",
       "TRAVEL": "Coordinate treatment and travel",
       "REASSIGN_CONSULTANT": "Reassign the case to a Consultant",
@@ -3377,6 +3389,14 @@
         "PREPARE_TRAVEL_PACKAGE": {
           "title": "Plan the travel package",
           "context": "Describe the travel package for the proposal before it is released. Bookings and arrival are arranged only after the patient's deposit."
+        },
+        "RESERVE_HOSPITAL": {
+          "title": "Reserve the hospital",
+          "context": "Reserve the hospital and the planned admission date with the facility."
+        },
+        "RECORD_ADMISSION_LETTER": {
+          "title": "Record the admission letter",
+          "context": "Record the hospital's admission letter with its quoted package price, so Finance can check it."
         },
         "UPDATE_TRAVEL_PLAN": {
           "title": "Arrange travel and arrival",

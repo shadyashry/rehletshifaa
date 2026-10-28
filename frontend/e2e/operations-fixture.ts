@@ -27,8 +27,8 @@ const work = (id: string, caseId: OperationsCaseId, type: string, title: string,
 const workItems = [
   work("ow3", "balance", "RECORD_HOSPITAL_BALANCE", "Record the receipt", "The patient is at the hospital's cashier; the voucher is issued.", { priority: "HIGH", dueAt: at(-2) }),
   work("ow4", "admit", "RECORD_ADMISSION_NUMBER", "Record the admission number", "Cleared for admission. The hospital's admission desk gives the number.", { dueAt: at(-4) }),
-  work("ow1", "plan", "TRAVEL", "Arrange travel and arrival", "Deposit settled. Flights, visa and the hospital reservation are still open."),
-  work("ow2", "letter", "TRAVEL", "Arrange travel and arrival", "Reserved at Nile Heart Hospital. The hospital's admission letter is not recorded yet.", { dueAt: at(-30) }),
+  work("ow1", "plan", "RESERVE_HOSPITAL", "Reserve the hospital", "Deposit settled. Flights, visa and the hospital reservation are still open."),
+  work("ow2", "letter", "RECORD_ADMISSION_LETTER", "Record the admission letter", "Reserved at Nile Heart Hospital. The hospital's admission letter is not recorded yet.", { dueAt: at(-30) }),
   work("ow5", "depart", "CONFIRM_DEPARTURE", "Confirm the patient has left", "Return flight confirmed for this morning."),
 ];
 
@@ -54,9 +54,9 @@ const caseView = (id: OperationsCaseId) => {
     assignments: [{ id: "a1", assigneeSubject: "qa-coordinator", assigneeName: "Layla Hassan", assigneeRole: "OPERATIONS", assignmentType: "PRIMARY", status: "ACTIVE", assignedAt: at(120), version: 1 }] };
   switch (id) {
     case "plan": return { ...common, travelPlan: { facilityId: null, facilityName: null, status: "PLANNING", plannedArrival: null, confirmedArrival: null },
-      actions: actions("TRAVEL_COORDINATION", { code: "UPDATE_TRAVEL_PLAN", kind: "FOCUS", workType: "TRAVEL", workItemId: "ow1", workItemVersion: 0 }, ["UPDATE_TRAVEL_PLAN"]) };
+      actions: actions("TRAVEL_COORDINATION", { code: "RESERVE_HOSPITAL", kind: "FOCUS" }, ["RESERVE_HOSPITAL", "UPDATE_TRAVEL_PLAN"]) };
     case "letter": return { ...common, travelPlan: travelPlan("CONFIRMED", -72, null),
-      actions: actions("TRAVEL_COORDINATION", { code: "UPDATE_TRAVEL_PLAN", kind: "FOCUS", workType: "TRAVEL", workItemId: "ow2", workItemVersion: 0 }, ["UPDATE_TRAVEL_PLAN"]) };
+      actions: actions("TRAVEL_COORDINATION", { code: "RECORD_ADMISSION_LETTER", kind: "FOCUS" }, ["RECORD_ADMISSION_LETTER", "UPDATE_TRAVEL_PLAN"]) };
     case "balance": return { ...common, travelPlan: travelPlan("ARRIVED", 30, 28), timeline: [...timeline, { type: "STATUS", label: "Arrived", status: "ARRIVAL_CONFIRMED", occurredAt: at(28) }],
       actions: actions("ARRIVAL_CONFIRMED", { code: "RECORD_HOSPITAL_BALANCE", kind: "FOCUS" }) };
     case "admit": return { ...common, travelPlan: travelPlan("ARRIVED", 50, 48), timeline: [...timeline, { type: "STATUS", label: "Cleared", status: "ADMISSION_READY", occurredAt: at(3) }],

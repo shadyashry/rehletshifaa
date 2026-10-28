@@ -97,13 +97,15 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
   const feeOwed = (view.feeBalanceOwedEgp ?? 0) > 0;
   const appointmentSet = openRows.some(row => row.kind === "FIRST_CONFIRMED_APPOINTMENT");
   // The next thing this viewer does here: its form opens and carries the panel's one primary button.
-  // Operations' acts in the order they happen: the reservation and the letter, then (still in travel coordination) the travel plan
-  // and the arrival, then what the backend's step names. B-5-1 would name the reservation and the letter as steps too.
-  // One stage for both: the view's own when a command has just moved it.
+  // Operations' acts in the order they happen. In travel coordination the backend's step names them (B-5-1): the reservation,
+  // the letter (or the refused letter's own item), then the travel plan. After arrival a reservation or letter still missing
+  // comes first, then what the step names. One stage for both: the view's own when a command has just moved it.
   const stage = view.caseStatus ?? caseStatus;
   const cleared = ["ADMISSION_READY", "TREATMENT_IN_PROGRESS"].includes(stage);
   const next = role === "operations"
-    ? (!reserved && !cleared ? "reserve" : ["NONE", "REFUSED"].includes(view.letterCheck ?? "NONE") && !cleared ? "letter" : stage === "TRAVEL_COORDINATION" && travel ? "travel"
+    ? (stage === "TRAVEL_COORDINATION"
+      ? (currentCode === "RESERVE_HOSPITAL" ? "reserve" : ["RECORD_ADMISSION_LETTER", "REVISE_ADMISSION_LETTER"].includes(currentCode ?? "") ? "letter" : travel ? "travel" : null)
+      : !reserved && !cleared ? "reserve" : ["NONE", "REFUSED"].includes(view.letterCheck ?? "NONE") && !cleared ? "letter"
       : currentCode === "RECORD_HOSPITAL_BALANCE" ? "receipt" : currentCode === "RECORD_ADMISSION_NUMBER" ? "number" : null)
     // In treatment, Finance's current work may be the Treatment panel's (P1-16): this panel then leads only for its own work.
     : role === "finance" && (caseStatus !== "TREATMENT_IN_PROGRESS" || ADMISSION_WORK.has(currentCode ?? "")) ? (pendingLetter ? "decide" : toCountersign.length > 0 ? `countersign:${toCountersign[0].id}` : feeOwed ? "fee" : null)

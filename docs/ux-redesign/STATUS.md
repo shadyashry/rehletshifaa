@@ -1486,6 +1486,30 @@ shots restored. After shots: `screenshots/area-5/after/`.
 **Area 5 closed.** 5-0 travel plan (`da2f014c`), 5-1 hospital file (`7f6798c6`), 5-2 cashier (`78f86a4c`), 5-3 going home + close (this
 commit). Follow-ups: B-5-1 (backend step codes), the reservation summary on the workspace, folding the side cards into the file.
 
+### B-5-1 — Operations' step names the hospital file's open act (2026-10-28)
+
+The strip and My work said "Arrange travel and arrival" for all of treatment coordination while the hospital file's open act
+was the reservation or the letter. `AdmissionReadiness.hospitalStep` now names Operations' act from the reservation and the
+ledger: `RESERVE_HOSPITAL` while nothing is reserved, `RECORD_ADMISSION_LETTER` while no letter is recorded or Finance refused
+the latest (the refusal's own `REVISE_ADMISSION_LETTER` item still leads, and the stage step stays out of the queue beside it),
+then `UPDATE_TRAVEL_PLAN`. `CaseActionService.stageFallback` reads it in `TRAVEL_COORDINATION` only (ACCEPTED is unchanged). Both
+codes are stage work (one work item each, with English text and `WorkCopy`), have SLA rows (2 working days, the travel plan's
+window) and en/ar copy (`currentAction.states`, `actions`, `workTitles`, `workCopy`). While either leads, `availableActions` keeps
+`UPDATE_TRAVEL_PLAN`, so the travel plan stays live in the file. `AdmissionService.letterCheck` and the step share one refusal
+rule. Not added to `JourneyStageRegistry` or the V45 authorization mapping: that registry is the journey engine's catalog of
+handler-backed actions, whose graphs end at the proposal. An entry without a handler would offer an act no graph can run.
+`RECORD_FINAL_ASSESSMENT` and `PREPARE_TRAVEL_PACKAGE` are not in it either. So the journey parity tests are unchanged and green.
+
+Frontend: `AdmissionPanel`'s Operations `next` reads the step code in travel coordination (reserve, letter or the refused
+letter's item, else the travel act). After arrival it keeps the derived order, since the backend names no reservation step
+there. The operations fixture's plan and letter cases carry the real step codes and work types.
+
+**Verify.** Backend `mvn -o test` 998 tests, 0 failures, 3 environment skips (new `HospitalFileStepTest`: reserve → letter →
+travel plan, the refusal, ACCEPTED unchanged; `CoordinatorCaseActionsTest` now expects `RESERVE_HOSPITAL`). `pnpm typecheck`
+clean; vitest 788/791 → after the test update all green but the known `StaffOperationalUi` W-44; `AdmissionPanel.test.tsx` 28/28.
+Playwright on a production build on :3131: operations-shots + a11y en/ar 34/34; the plan shot's strip reads "Reserve the
+hospital" with the reservation's Save as the one filled button. Overwritten shots restored.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

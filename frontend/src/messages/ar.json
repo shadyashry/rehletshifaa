@@ -1999,6 +1999,8 @@
         "ASSIGN_FINANCE": "تعيين المالية",
         "RECORD_CLINICAL_DECISION": "تسجيل القرار السريري",
         "RECORD_FINAL_ASSESSMENT": "تسجيل التقييم النهائي",
+        "RESERVE_HOSPITAL": "احجز المستشفى",
+        "RECORD_ADMISSION_LETTER": "سجّل الخطاب",
         "UPDATE_TRAVEL_PLAN": "استكمال الترتيبات",
         "APPROVE_COMMERCIAL_TERMS": "اعتماد الشروط المالية",
         "RECORD_HOSPITAL_BALANCE": "سجّل الإيصال",
@@ -2089,6 +2091,14 @@
         "RECORD_CLINICAL_DECISION": {
           "title": "سجّل قرارك السريري",
           "body": "راجع ملخص الاستقبال والمستندات ثم سجّل التوصية."
+        },
+        "RESERVE_HOSPITAL": {
+          "title": "احجز المستشفى",
+          "body": "احجز المستشفى وموعد الدخول المخطط مع المنشأة."
+        },
+        "RECORD_ADMISSION_LETTER": {
+          "title": "سجّل خطاب الدخول",
+          "body": "سجّل خطاب الدخول الصادر من المستشفى بسعر الباقة المعروض، لتراجعه المالية."
         },
         "UPDATE_TRAVEL_PLAN": {
           "title": "رتّب السفر والوصول",
@@ -2999,6 +3009,8 @@
       "RELEASE_PROPOSAL": "أصدر العرض للمريض",
       "APPROVE_COMMERCIAL_TERMS": "اعتمد الشروط المالية",
       "PREPARE_TRAVEL_PACKAGE": "خطّط لباقة السفر",
+      "RESERVE_HOSPITAL": "احجز المستشفى",
+      "RECORD_ADMISSION_LETTER": "سجّل خطاب الدخول",
       "UPDATE_TRAVEL_PLAN": "رتّب السفر والوصول",
       "TRAVEL": "تنسيق العلاج والسفر",
       "REASSIGN_CONSULTANT": "إعادة تعيين الحالة لاستشاري",
@@ -3436,6 +3448,14 @@
         "PREPARE_TRAVEL_PACKAGE": {
           "title": "خطّط لباقة السفر",
           "context": "صِف باقة السفر للعرض قبل إرساله. تُرتَّب الحجوزات والوصول بعد استلام وديعة المريض فقط."
+        },
+        "RESERVE_HOSPITAL": {
+          "title": "احجز المستشفى",
+          "context": "احجز المستشفى وموعد الدخول المخطط مع المنشأة."
+        },
+        "RECORD_ADMISSION_LETTER": {
+          "title": "سجّل خطاب الدخول",
+          "context": "سجّل خطاب الدخول الصادر من المستشفى بسعر الباقة المعروض، لتراجعه المالية."
         },
         "UPDATE_TRAVEL_PLAN": {
           "title": "رتّب السفر والوصول",

@@ -35,6 +35,8 @@ public class SlaPolicy {
      *   <li>Finance verification of a reported transfer ({@code DEPOSIT_RECORD}): 1;</li>
      *   <li>patient identity review ({@code PATIENT_IDENTITY_REVIEW}; no work item yet, read for the patient copy): 2;</li>
      *   <li>Operations' travel package and travel plan ({@code PREPARE_TRAVEL_PACKAGE}, {@code UPDATE_TRAVEL_PLAN}): 2;</li>
+     *   <li>Operations' hospital reservation and admission letter ({@code RESERVE_HOSPITAL}, {@code RECORD_ADMISSION_LETTER}, B-5-1): 2,
+     *       the travel plan's own window, since they are its first acts;</li>
      *   <li>the Consultant's clinical review ({@code CLINICAL_REVIEW}): 2;</li>
      *   <li>the coordinator's intake review ({@code ASSIGN_CONSULTANT}, {@code REVIEW_PATIENT_RESPONSE}): 1;</li>
      *   <li>the coordinator's proposal ({@code PREPARE_PROPOSAL}): 2 (session 2, so the patient's "preparing your
@@ -47,6 +49,8 @@ public class SlaPolicy {
             Map.entry("PATIENT_IDENTITY_REVIEW", 2),
             Map.entry("PREPARE_TRAVEL_PACKAGE", 2),
             Map.entry("UPDATE_TRAVEL_PLAN", 2),
+            Map.entry("RESERVE_HOSPITAL", 2),
+            Map.entry("RECORD_ADMISSION_LETTER", 2),
             Map.entry("CLINICAL_REVIEW", 2),
             Map.entry("ASSIGN_CONSULTANT", 1),
             Map.entry("REVIEW_PATIENT_RESPONSE", 1),

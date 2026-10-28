@@ -49,7 +49,7 @@ describe("AdmissionPanel — Operations", () => {
   });
 
   it("reads its own role's view and opens the reservation as the one primary action", async () => {
-    const { mutate, load } = setup("operations", empty);
+    const { mutate, load } = setup("operations", empty, { currentCode: "RESERVE_HOSPITAL" });
     expect(await screen.findByText("Reserve the hospital")).toBeTruthy();
     expect(load).toHaveBeenCalledWith("/operations/cases/c1/admission");
     expect(screen.getByText("The final quote is not accepted")).toBeTruthy();
@@ -136,7 +136,7 @@ describe("AdmissionPanel — Operations' hospital file", () => {
   const travelling: AdmissionView = { ...reserved, caseStatus: "TRAVEL_COORDINATION", letterCheck: "NONE", voucher: null, balanceOwedEgp: null, evidence: [] };
 
   it("orders the acts and opens only the letter while the reservation stands as one line", async () => {
-    const { travel, container, onView } = file(travelling);
+    const { travel, container, onView } = file(travelling, "RECORD_ADMISSION_LETTER");
     const acts = await screen.findByRole("list", { name: "Hospital file" });
     const items = within(acts).getAllByRole("listitem").map(li => li.textContent ?? "");
     expect(items[0]).toMatch(/^Reserved · ⁨Nile Heart Hospital⁩ · ⁨Cairo⁩ · admission .*2026/);
@@ -151,7 +151,7 @@ describe("AdmissionPanel — Operations' hospital file", () => {
   });
 
   it("hands the filled button to the travel act once the letter is recorded", async () => {
-    const { travel, container } = file({ ...travelling, letterCheck: "CHECK_PENDING" });
+    const { travel, container } = file({ ...travelling, letterCheck: "CHECK_PENDING" }, "UPDATE_TRAVEL_PLAN");
     const acts = await screen.findByRole("list", { name: "Hospital file" });
     expect(within(acts).getAllByRole("listitem")[1].textContent).toMatch(/^Admission letter · Waiting for Finance's check/);
     expect(travel).toHaveBeenLastCalledWith(true);
