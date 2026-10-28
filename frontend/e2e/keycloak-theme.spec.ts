@@ -17,8 +17,9 @@ const shot = (name: string) => path.join(repo, "docs/ux-redesign/screenshots/are
 // Keep in step with Render.java's scenarios.
 const PAGES = [
   "login", "login-error", "reset-password", "setup-start", "setup-start-two", "setup-password", "setup-password-error",
-  "setup-done", "setup-expired",
-  "verify-email", "verify-email-sent", "otp-setup", "otp", "otp-error", "passkey-setup", "passkey",
+  "setup-done", "setup-expired", "setup-expired-no-client",
+  "verify-email", "verify-email-sent", "otp-setup", "otp-setup-manual", "otp", "otp-choose", "otp-error", "passkey-setup",
+  "passkey", "passkey-several",
 ] as const;
 const LOCALES = ["en", "ar"] as const;
 
@@ -68,6 +69,7 @@ test.describe("Keycloak theme", () => {
               overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
               body: style("body")?.fontFamily ?? "",
               heading: style("#kc-page-title")?.fontFamily ?? "",
+              headings: [...document.querySelectorAll("h1")].filter(visible).map(h => h.textContent?.trim() ?? ""),
               tracked: text.filter(el => !["otp", "totp"].includes(el.id) && parseFloat(getComputedStyle(el).letterSpacing) > 0).map(el => el.id || el.tagName),
               uppercase: text.filter(el => getComputedStyle(el).textTransform === "uppercase").map(el => el.id || el.tagName),
               small: [...document.querySelectorAll(".card-pf a[href], .card-pf button, .card-pf input:not([type=hidden]), .card-pf select")]
@@ -81,10 +83,10 @@ test.describe("Keycloak theme", () => {
           expect.soft(facts.failedFonts, `${where}: fonts that failed to load`).toEqual([]);
           expect.soft(facts.loadedFonts, `${where}: body face loaded`).toContain(locale === "ar" ? "Cairo" : "Plus Jakarta Sans");
           expect.soft(facts.body, `${where}: body face`).toMatch(locale === "ar" ? /^Cairo/ : /^"?Plus Jakarta Sans/);
-          // Second-factor pages show the account in the title slot instead of a heading until 7-3 gives them one.
-          if (!/^(otp|passkey)/.test(name)) {
-            expect.soft(facts.heading, `${where}: heading face`).toMatch(/^Alexandria/);
-          }
+          // 7-3: every page, the second step included, has one h1 that says something.
+          expect.soft(facts.heading, `${where}: heading face`).toMatch(/^Alexandria/);
+          expect.soft(facts.headings.length, `${where}: one h1`).toBe(1);
+          expect.soft(facts.headings[0] ?? "", `${where}: h1 text`).not.toBe("");
           expect.soft(facts.overflow, `${where}: horizontal scroll`).toBeLessThanOrEqual(0);
           if (locale === "ar") expect.soft(facts.tracked, `${where}: tracked Arabic`).toEqual([]);
           expect.soft(facts.uppercase, `${where}: uppercase`).toEqual([]);
@@ -127,25 +129,49 @@ test.describe("Keycloak theme", () => {
           for (let n = walker.nextNode(); n; n = walker.nextNode()) {
             const parent = n.parentElement;
             // The locale menu names each language in that language ("English" on an Arabic page is the way out).
-            if (!parent || parent.closest("script, style, noscript, [role=menuitem]")) continue;
+            // translate="no" marks what is not copy: the brand's two-script lockup, the authenticator key and algorithm,
+            // the apps' own names.
+            if (!parent || parent.closest("script, style, noscript, [role=menuitem], [translate=no]")) continue;
             if (n.textContent?.trim()) out.push(n.textContent.trim());
           }
           for (const el of document.querySelectorAll("[aria-label], [alt], [placeholder], [title], input[type=submit], input[type=button]")) {
-            // The QR image's alt is hard-coded in Keycloak's login-config-totp.ftl; 7-3 overrides that template.
-            if (el.id === "kc-totp-secret-qr-code") continue;
             for (const attr of ["aria-label", "alt", "placeholder", "title"]) { const v = el.getAttribute(attr); if (v?.trim()) out.push(v.trim()); }
             if (el instanceof HTMLInputElement && el.value.trim()) out.push(el.value.trim());
           }
-          return out;
+          // The passkey pages hand their prompt, default label and unsupported-browser text to Keycloak's scripts.
+          const scripted: string[] = [];
+          for (const script of document.querySelectorAll("script:not([src])")) {
+            for (const m of script.textContent?.matchAll(/\b(?:initLabel|initLabelPrompt|errmsg)\s*:\s*("(?:[^"\\]|\\.)*")/g) ?? []) {
+              scripted.push(JSON.parse(m[1]) as string);
+            }
+          }
+          return { out: [...out, ...scripted], scripted: scripted.length };
         });
-        const copy = strings.map(s => NOT_COPY.reduce((t, re) => t.replace(re, ""), s));
         const where = `${name}-${locale}`;
+        // A template change that moved these strings would otherwise skip them silently.
+        if (name === "passkey-setup") expect.soft(strings.scripted, `${where}: script texts found`).toBe(3);
+        const copy = strings.out.map(s => NOT_COPY.reduce((t, re) => t.replace(re, ""), s));
         expect.soft(copy.filter(s => RAW_KEY.test(s)), `${where}: raw message keys`).toEqual([]);
         expect.soft(copy.filter(s => KEYCLOAK_VOICE.test(s)), `${where}: Keycloak's voice`).toEqual([]);
         if (locale === "ar") expect.soft(copy.filter(s => /[A-Za-z]{2,}/.test(s)), `${where}: English on the Arabic page`).toEqual([]);
       }
     });
   }
+
+  // 7-3: the code fields ask a phone for digits and let the browser offer a one-time code; the restart link has words.
+  test("second step: code fields and the account line", async ({ page }) => {
+    for (const locale of LOCALES) {
+      for (const name of ["otp", "otp-choose", "otp-error", "otp-setup", "otp-setup-manual"]) {
+        await open(page, `${name}-${locale}`);
+        const code = page.locator("#otp, #totp");
+        await expect.soft(code, `${name}-${locale}: inputmode`).toHaveAttribute("inputmode", "numeric");
+        await expect.soft(code, `${name}-${locale}: autocomplete`).toHaveAttribute("autocomplete", "one-time-code");
+        await expect.soft(page.locator("#reset-login"), `${name}-${locale}: restart link`).toHaveText(/\S/);
+      }
+      await open(page, `otp-error-${locale}`);
+      await expect.soft(page.locator("#otp")).toHaveAttribute("aria-describedby", "input-error-otp-code");
+    }
+  });
 
   for (const locale of LOCALES) for (const width of [390, 1440]) {
     test(`shots (${locale}, ${width})`, async ({ page }) => {

@@ -1,6 +1,6 @@
 # Shape plan — Area 7: the Keycloak theme, the file's front door
 
-Status: **plan, 2026-10-28** — written without an owner gate under the owner's standing instruction (2026-10-15: "always
+Status: **closed 2026-10-29** (7-0..7-3 delivered on the harness; re-critique 30/40; see STATUS). Was: **plan, 2026-10-28** — written without an owner gate under the owner's standing instruction (2026-10-15: "always
 continue each next implementation on new session without asking me till the end"); assumptions are marked **[A]**.
 Scope: `PLAN.md` row 7 — the Keycloak login theme `infrastructure/keycloak/themes/rehletshifaa`: sign-in, the patient's
 account setup (emailed link → password → ready / expired), password reset, email verification, and the staff second

@@ -2091,6 +2091,60 @@ eslint and `tsc` clean. Not live-checked (Keycloak :8180 serves the main checkou
 **Next:** slice 7-3 — the second factor + close (`login-otp.ftl`, `login-config-totp.ftl` incl. the manual-key view,
 `webauthn-register.ftl`, `webauthn-authenticate.ftl`; re-critique ≥ 28/40, after shots, live walk), in a new session.
 
+### Slice 7-3 — the second factor, and area 7 closed (2026-10-29, worktree `happy-elbakyan-3f197e`, branch `claude/happy-elbakyan-3f197e` fast-forwarded to 7-2 @ `ce4cbee8`)
+
+**What Keycloak really sends** (26.7.3 `keycloak-services` bytecode, `docker create`/`cp` only): `UpdateTotp` puts `mode`
+(from the query) and `totp` (`TotpBean`: secret, encoded key, QR, manual/QR urls, policy, apps, existing credentials);
+`OTPFormAuthenticator` sends `otpLogin` (`userOtpCredentials` id + userLabel, `selectedCredentialId`) and the `totp` field
+error; `WebAuthnAuthenticator` sends `authenticators` (label, `createdAt` as a formatted string, transports), `isUserIdentified`,
+`shouldDisplayAuthenticators`, plus `mediation`/`authenticatorAttachment` that the base template ignores; `WebAuthnRegister`
+the creation options and `isSetRetry`. Harness scenarios added to match: `otp-setup-manual`, `otp-choose` (two
+authenticators), `passkey-several` (two keys, joined transports), `setup-expired-no-client` (20 scenarios × en/ar).
+
+Overrides (each from Keycloak's `base/login` template):
+- `template.ftl`: every page has one real h1; on a second step the account is a quiet line beneath it with the restart link
+  in words ("Sign in with another account"; Keycloak's icon link had an undismissable tooltip); the card is the `<main>`
+  landmark; body + heading faces preloaded per language; the lockup is the portal's `Logo.tsx` as live text (mark
+  `img/brand-mark.png` + Alexandria name in both scripts, coral dot), so it centres, scales and survives forced colours;
+  no positive tabindex on the locale button, `lang` on each language.
+- `login-otp.ftl`: h1 "Enter your authenticator code"; several authenticators as one labelled choice of native radios (no
+  positive tabindex); the code field `inputmode=numeric`, `autocomplete=one-time-code`, error tied by `aria-describedby`.
+- `login-config-totp.ftl`: h1 "Set up your authenticator app" and `loginTotpIntro` rendered; the QR view also shows the key,
+  and on a phone the key comes first ("On the phone that has the app"); QR alt in the page language; the manual view's
+  settings as a definition list in our words ("Time-based", "30 seconds"); "Phone name (optional)" when Keycloak does not
+  require it; focus on the field at fault after a refused save; the save is "Finish setup" (no longer `doSubmit`).
+- `webauthn-register.ftl` / `webauthn-authenticate.ftl`: words-only h1s, one sentence on what a passkey is, the person's
+  keys as one list (titled when several) with where each lives and when it was added, the date isolated (`<bdi>`).
+- Icons: the theme's own line SVGs through `theme.properties` (`rs-icon …`, masks in `currentColor`, forced-colours safe):
+  alerts, show/hide password, passkey transports, authenticator phone, locale caret; the onward chevron and list mirror.
+- Copy: 24 keys in both bundles (CRLF, inserted textually); the expired-link message now holds with or without the button
+  ("sign in to see the case"); Arabic emails wrapped in bidi isolates in the verify-email and different-user sentences.
+- Retired: `brand-lockup.png/.svg` and the unused 835 KB `logo.png`. PatternFly 3 is **kept**: Keycloak's templates still lay
+  out with its grid columns, form groups and checkbox rows (dropping it moved the locale switch and the reset buttons), and
+  pficon is still used by two pages outside the harness. `themes/README.md` updated.
+
+**Reviews.** RB: no HIGH; templates faithful to base (field names, hidden inputs, JS ids); narrower `translate="no"`, icon via
+property, `dir=auto` on the account; harness gaps to backlog. WG: no HIGH; focus after a refused TOTP save, alert icons
+hidden, register button `type=button`, list title an h2, forced-colours dot; link-buttons and the locale menu to backlog.
+RTL: no HIGH; key parity scripted, `<bdi>` date, Arabic emails isolated, list separator spacing in the template, «المثبّت
+عليه» wording, list icon mirrored. Pro Max: no HIGH; axe 0 on 20 pages, no overflow at 375/768/1024/1440; primary button
+keeps an edge in forced colours, radio focus ring. Critique B: our CSS and templates scan clean; missing `<main>` fixed;
+positive tabindex in stock `login.ftl` to backlog.
+
+**Re-critique: 30/40** (from 17; dual-agent; `.impeccable/critique/2026-10-28T21-42-20Z__ifaa-login-resources-css-rehletshifaa-css-0ac0c72f.md`).
+Open P1s, both in backlog: the expired link has no route to the coordinator (needs a backend contact/fresh-link route, plan
+O-3) and verify-email's one action is a footer link.
+
+**Verify.** `keycloak-theme.spec.ts` 12/12 on the harness (40 pages × 390/1440: one h1 per page, fonts, overflow, axe
+serious/critical, 44px, words en/ar incl. the passkey scripts' texts, code fields and account line); eslint and `tsc` clean.
+**Live walk not done:** Keycloak on :8180 is up but mounts the main checkout's `infrastructure/keycloak/themes`, not this
+branch; per the rules nothing was rebuilt. Native Arabic review still pending. Shots: `screenshots/area-7/7-3/` and
+`screenshots/area-7/after/` (20 pages × en/ar × 390/1440).
+
+**Area 7 closed** on the harness (17 → 30/40). Follow-ups in backlog "Area 7": the expired-link route, verify-email's
+button, a live password checklist, `login.ftl` tabindex, the locale menu, harness gaps, the Oracle theme copy, and the live
+walk once this branch is the mounted theme.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

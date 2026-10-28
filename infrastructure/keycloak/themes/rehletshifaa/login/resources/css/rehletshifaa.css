@@ -113,31 +113,102 @@ html[dir="rtl"] body {
   padding-inline: 1rem;
 }
 
-/* ---- Header: the lockup, centred above the card ---- */
-#kc-header,
-#kc-header-wrapper {
-  color: transparent;
-  font-size: 0;
-  line-height: 0;
-  letter-spacing: 0;
-  text-transform: none;
-  white-space: normal;
-  text-shadow: none;
-  padding: 0;
-  float: none;
-}
-
+/* ---- Header: the lockup, centred above the card ----
+   The portal's lockup (frontend/src/components/Logo.tsx), as live text: the mark, then the name in Alexandria in both
+   scripts, the lead in medium and the accent in bold and colour, the first "i" of "Shifaa" dotted in coral. Its three
+   colours are Logo.tsx's own values (not @theme tokens), hence theme-local names. */
 .login-pf-page .login-pf-page-header {
   margin-block-end: 1.5rem;
 }
 
+#kc-header,
 #kc-header-wrapper {
-  display: block;
-  block-size: 4.5rem;
-  background-image: url("../img/brand-lockup.png");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
+  float: none;
+  padding: 0;
+  letter-spacing: 0;
+  text-transform: none;
+  text-shadow: none;
+  white-space: normal;
+}
+
+#kc-header-wrapper {
+  display: flex;
+  justify-content: center;
+  --rs-logo-ink: #29454d;
+  --rs-logo-accent: #247c86;
+  --rs-logo-dot: #e98d78;
+  --rs-logo-size: 3rem;
+}
+
+.rs-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rs-lockup-mark {
+  flex: none;
+  inline-size: var(--rs-logo-size);
+  block-size: var(--rs-logo-size);
+}
+
+.rs-lockup-words {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+
+.rs-wordmark,
+.rs-wordmark-ar {
+  color: var(--rs-logo-ink);
+  font-family: var(--rs-font-heading);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.rs-wordmark {
+  font-size: calc(var(--rs-logo-size) * 0.62);
+  letter-spacing: -0.02em;
+}
+
+.rs-wordmark-ar {
+  margin-block-start: 0.25rem;
+  font-size: calc(var(--rs-logo-size) * 0.44);
+}
+
+.rs-wordmark-accent {
+  color: var(--rs-logo-accent);
+  font-weight: 700;
+}
+
+.rs-wordmark-i {
+  position: relative;
+}
+
+.rs-wordmark-i::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 0.035em;
+  inset-inline-start: 50%;
+  inline-size: 0.225em;
+  block-size: 0.225em;
+  border-radius: 50%;
+  background: var(--rs-logo-dot);
+  transform: translateX(-50%);
+}
+
+/* Read once, in the page's language; the drawn lockup is aria-hidden. */
+.rs-sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ---- The card: white, a hairline, the petrol tab of a file ---- */
@@ -177,43 +248,33 @@ html[dir="rtl"] #kc-page-title {
   margin-block-start: 1.25rem;
 }
 
-/* The account a second step belongs to: a quiet line, not a heading. */
-#kc-username {
+/* The account a second step belongs to (UX 7-3): a quiet line beneath the h1, and the way out of it in words. */
+#kc-username.rs-account {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem;
-  margin: 0;
+  column-gap: 1rem;
+  margin-block: 0.375rem 0;
+  color: var(--color-ink-600);
+  font-size: 0.9375rem;
 }
 
+/* Keycloak's login.css sets this to 20px with an end padding: it is the quiet line, not a second title. */
 #kc-attempted-username {
+  min-inline-size: 0;
   padding: 0;
   overflow-wrap: anywhere;
-  color: var(--color-ink-800);
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0;
-  direction: ltr;
+  color: var(--color-ink-700);
+  font-size: inherit;
+  font-weight: 500;
   unicode-bidi: isolate;
 }
 
-/* The restart link: a 44px target whose tooltip stays inside the card. */
 #reset-login {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-inline-size: 2.75rem;
   min-block-size: 2.75rem;
-}
-
-/* The restart arrow points toward the start of the flow, so it mirrors in Arabic. */
-#reset-login .pficon-arrow:dir(rtl) {
-  transform: scaleX(-1);
-}
-
-/* Keycloak's hover tooltip cannot be dismissed (WCAG 1.4.13) and pushed the page sideways; the link keeps its
-   aria-label, and 7-3 gives it a visible one. */
-.kc-login-tooltip .kc-tooltip-text {
-  display: none;
+  font-size: 0.9375rem;
 }
 
 /* ---- Text ---- */
@@ -424,7 +485,7 @@ input.btn-primary {
   --pf-c-button--m-primary--active--BackgroundColor: var(--color-brand-700);
   min-block-size: var(--rs-control-height);
   padding-inline: 1.25rem;
-  border: 0;
+  border: 1px solid transparent; /* forced colours draw it, so the button keeps an edge there */
   border-radius: var(--radius-card);
   background-color: var(--color-brand-600);
   color: #ffffff;
@@ -668,8 +729,15 @@ a:focus-visible {
   inset-inline: auto 0;
 }
 
+/* Keycloak draws the caret as the character ˅; it is the theme's chevron instead (Icons, below). */
 button#kc-current-locale-link::after {
+  content: "";
+  inline-size: 1rem;
+  block-size: 1rem;
   margin-inline-start: 0;
+  background-color: currentColor;
+  -webkit-mask: var(--rs-icon-caret) center / contain no-repeat;
+  mask: var(--rs-icon-caret) center / contain no-repeat;
 }
 
 #kc-locale-dropdown a {
@@ -688,12 +756,12 @@ span.required:not(.pf-c-form__helper-text) {
   color: var(--color-alert-700);
 }
 
+/* Keycloak's own select-authenticator page (not overridden). */
 .select-auth-box-parent {
   text-align: start;
 }
 
-.select-auth-box-icon,
-#kc-form-webauthn .select-auth-box-icon {
+.select-auth-box-icon {
   margin-inline: 0 1rem;
 }
 
@@ -701,10 +769,10 @@ span.required:not(.pf-c-form__helper-text) {
   margin-inline: 0 2rem;
 }
 
-#kc-form-webauthn .select-auth-box-headline {
-  color: var(--color-ink-800);
-  font-family: var(--rs-font-heading);
-  font-weight: 600;
+/* ---- The second step (UX 7-3) ---- */
+#kc-totp-intro,
+#kc-webauthn-intro {
+  margin-block: 0 1.25rem;
 }
 
 #kc-totp-settings,
@@ -715,26 +783,235 @@ span.required:not(.pf-c-form__helper-text) {
 }
 
 ol#kc-totp-settings {
+  margin-block: 0 1.25rem;
   padding-inline: 1.25rem 0;
 }
 
-/* Keycloak forces dir="ltr" on the authenticator's name; an Arabic name should still read right to left. */
-#userLabel {
-  unicode-bidi: plaintext;
+#kc-totp-settings > li + li {
+  margin-block-start: 0.75rem;
+}
+
+#kc-totp-settings p {
+  margin-block: 0 0.25rem;
+}
+
+/* Two ways to add the account: scan from a computer, or type the key on the phone that holds the app. A phone cannot
+   scan its own screen, so there the key comes first (the only link sits in the key block, so focus order holds). */
+.rs-totp-add {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-block-start: 0.5rem;
+}
+
+#kc-content .rs-totp-way {
+  margin-block-end: 0.5rem;
+  color: var(--color-ink-700);
+  font-size: 0.9375rem;
+  font-weight: 600;
 }
 
 #kc-totp-secret-qr-code {
+  display: block;
+  inline-size: 12rem;
   max-inline-size: 100%;
   block-size: auto;
   border: 1px solid var(--color-line);
-  border-radius: 6px;
+  border-radius: var(--radius-card);
 }
 
+/* The key is not words: grouped by fours as Keycloak sends it, read left to right in both languages. */
 #kc-totp-secret-key {
-  direction: ltr;
-  unicode-bidi: isolate;
+  display: inline-block;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--paper);
+  color: var(--color-ink-900);
+  font-family: var(--rs-font-latin);
+  font-size: 1.0625rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  word-spacing: 0.35em;
   overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+  user-select: all;
+}
+
+.rs-totp-policy {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+}
+
+.rs-totp-policy > div {
+  display: contents;
+}
+
+.rs-totp-policy dt {
+  color: var(--color-ink-700);
+  font-weight: 600;
+}
+
+.rs-totp-policy dd {
+  margin: 0;
+  color: var(--color-ink-800);
+}
+
+.rs-totp-policy dd[dir="ltr"] {
+  justify-self: start;
+}
+
+/* Which authenticator: native radios in bordered rows, the chosen one in petrol. */
+.rs-choice {
+  min-inline-size: 0;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  border: 0;
+}
+
+#kc-content .rs-choice legend {
+  margin-block-end: 0.5rem;
+  padding: 0;
+  border: 0;
+  color: var(--color-ink-700);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+#kc-content .rs-choice-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-block-size: var(--rs-control-height);
+  margin-block-end: 0.5rem;
+  padding-inline: 0.875rem;
+  border: 1px solid var(--color-ink-350);
+  border-radius: var(--radius-card);
+  color: var(--color-ink-800);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+#kc-content .rs-choice-item:hover {
+  border-color: var(--color-brand-600);
+}
+
+#kc-content .rs-choice-item:has(input:checked) {
+  border-color: var(--color-brand-600);
+  background: var(--color-brand-50);
+}
+
+.rs-choice-item input[type="radio"] {
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0;
+  accent-color: var(--color-brand-600);
+}
+
+.rs-choice-item .rs-icon {
+  color: var(--color-ink-500);
+}
+
+/* The person's passkeys: one list, each key with where it lives and when it was added. */
+#kc-content .rs-list-title {
+  margin-block: 0 0.5rem;
+  color: var(--color-ink-700);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.rs-passkeys {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rs-passkey {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+
+.rs-passkey > .rs-icon {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  color: var(--color-brand-600);
+}
+
+.rs-passkey-body {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.rs-passkey-label {
+  color: var(--color-ink-800);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.rs-passkey-meta {
+  color: var(--color-ink-600);
+  font-size: 0.875rem;
+}
+
+/* A primary action with its Cancel: stacked, full width, the action first. */
+#kc-form-buttons.rs-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+#kc-form-buttons.rs-actions form {
+  margin: 0;
+}
+
+/* ---- Icons: the theme's own line icons (24px grid, 2px stroke), drawn in the text colour through a mask ---- */
+:where(html) {
+  --rs-icon-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.rs-icon {
+  display: inline-block;
+  flex: none;
+  inline-size: 1.25em;
+  block-size: 1.25em;
+  vertical-align: -0.25em;
+  background-color: currentColor;
+  -webkit-mask: var(--rs-icon-src) center / contain no-repeat;
+  mask: var(--rs-icon-src) center / contain no-repeat;
+}
+
+.rs-icon-error { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7.5v5.5M12 16.5h.01'/%3E%3C/svg%3E"); }
+.rs-icon-warning { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.5 2.5 20h19z'/%3E%3Cpath d='M12 10v4.5M12 17.5h.01'/%3E%3C/svg%3E"); }
+.rs-icon-success { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='m8 12.5 2.75 2.75L16 10'/%3E%3C/svg%3E"); }
+.rs-icon-info { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5.5M12 7.5h.01'/%3E%3C/svg%3E"); }
+.rs-icon-eye { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E"); }
+.rs-icon-eye-off { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='m4 4 16 16'/%3E%3C/svg%3E"); }
+.rs-icon-key { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='15.5' r='4.5'/%3E%3Cpath d='m11.2 12.3 8.8-8.8M16.5 7l2.5 2.5M14 9.5l2 2'/%3E%3C/svg%3E"); }
+.rs-icon-usb { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='7' y='9' width='10' height='12.5' rx='2'/%3E%3Cpath d='M9 9V2.5h6V9M11 5h.01M13 5h.01'/%3E%3C/svg%3E"); }
+.rs-icon-nfc { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8.5a5 5 0 0 1 0 7M10 6a8.5 8.5 0 0 1 0 12M14 3.5a12 12 0 0 1 0 17'/%3E%3C/svg%3E"); }
+.rs-icon-bluetooth { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 7 10 10-5 4.5v-19L17 7 7 17'/%3E%3C/svg%3E"); }
+.rs-icon-device { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='4.5' width='17' height='11.5' rx='1.5'/%3E%3Cpath d='M2 20h20'/%3E%3C/svg%3E"); }
+.rs-icon-phone { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='6.5' y='2.5' width='11' height='19' rx='2'/%3E%3Cpath d='M11 18h2'/%3E%3C/svg%3E"); }
+.rs-icon-list { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01'/%3E%3C/svg%3E"); }
+.rs-icon-lock { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7.5a4 4 0 0 1 8 0V11'/%3E%3C/svg%3E"); }
+.rs-icon-chevron { --rs-icon-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E"); }
+
+/* The chevron points onward and the list's bullets lead the line, so both mirror in Arabic. */
+.rs-icon-chevron:dir(rtl),
+.rs-icon-list:dir(rtl) {
+  transform: scaleX(-1);
 }
 
 /* ---- Focus: the portal's 3px petrol ring, on everything (PatternFly 3's a:focus and checkbox rules are more specific
@@ -742,6 +1019,7 @@ ol#kc-totp-settings {
 :focus-visible,
 a:focus-visible,
 input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible,
 .pf-c-button:focus-visible,
 .btn-default:focus-visible {
   outline: 3px solid var(--color-brand-600);
@@ -749,18 +1027,18 @@ input[type="checkbox"]:focus-visible,
 }
 
 a:focus:not(:focus-visible),
-input[type="checkbox"]:focus:not(:focus-visible) {
+input[type="checkbox"]:focus:not(:focus-visible),
+input[type="radio"]:focus:not(:focus-visible) {
   outline: none;
 }
 
-/* ---- Forced colours: the lockup is a background image, so the realm name it hides is shown instead ---- */
+/* ---- Forced colours: masked icons and the wordmark's dot paint with their background, which the system would erase ---- */
 @media (forced-colors: active) {
-  #kc-header-wrapper {
-    background-image: none;
-    color: CanvasText;
-    font-size: 1.25rem;
-    line-height: 1.4;
-    text-align: center;
+  .rs-icon,
+  .rs-wordmark-i::after,
+  button#kc-current-locale-link::after {
+    background-color: CanvasText;
+    forced-color-adjust: none;
   }
 }
 
@@ -781,9 +1059,13 @@ input[type="checkbox"]:focus:not(:focus-visible) {
     padding-inline: 0;
   }
 
+  /* Not below 2.75rem: the Arabic accent must stay large text (18.7px bold) to need only 3:1. */
   #kc-header-wrapper {
-    block-size: 3.75rem;
-    padding: 0;
+    --rs-logo-size: 2.75rem;
+  }
+
+  .rs-totp-key {
+    order: -1;
   }
 
   .login-pf-page .card-pf {

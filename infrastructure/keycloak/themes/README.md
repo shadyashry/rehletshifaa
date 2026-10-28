@@ -2,14 +2,19 @@
 
 Branded login/registration/reset/verify/OTP/error pages for the `rehletshifaa` realm.
 
-- **Palette:** warm cream background, healing teal primary, soft-ink headings, pale-aqua surfaces.
-- **Parent:** `keycloak` (classic) — we only override CSS, the logo, and message bundles, so
-  Keycloak's forms and validation keep working across upgrades.
+- **Palette:** Petrol & Paper (DESIGN.md), mirrored in `login/resources/css/rehletshifaa.css` under the portal's token
+  names; `frontend/e2e/keycloak-theme.spec.ts` fails when a mirrored value drifts.
+- **Parent:** `keycloak` (classic). We override CSS, message bundles and, where words alone could not do it (UX area 7),
+  a few templates (`template.ftl`, `info.ftl`, `error.ftl`, the password, reset, verify-email, authenticator and passkey
+  pages), each starting from Keycloak 26.7.3's own `base/login` template, so its forms and validation keep working.
+  Re-check them against `base/login` when Keycloak is upgraded.
 - **Bilingual:** English + Arabic with RTL handled via logical CSS properties and Keycloak's
   built-in `dir="rtl"` for `ar`.
-- **Logo:** `login/resources/img/brand-lockup.png`, generated from
-  `brand-lockup.svg` and the canonical `frontend/public/brand/icon.png` with the same bilingual
-  wordmark treatment as the website header.
+- **Logo:** the portal's lockup (`frontend/src/components/Logo.tsx`) drawn in `template.ftl`: the mark
+  `login/resources/img/brand-mark.png` (a copy of the canonical `frontend/public/brand/icon.png`) and the name as live
+  text in Alexandria, in both scripts.
+- **Check without a server:** `bash infrastructure/keycloak/theme-harness/render.sh` renders every page with synthetic
+  data; `keycloak-theme.spec.ts` checks and shoots them (see the spec's header).
 
 ## How it is delivered per environment
 

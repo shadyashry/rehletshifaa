@@ -150,11 +150,26 @@ public class Render {
                 m.put("message", message(m, "error", "expiredActionMessage"));
                 m.put("client", Map.of("baseUrl", "#"));
             }),
+            // ErrorPage without an authentication session has no client: no button, so the message must hold alone.
+            new Scenario("setup-expired-no-client", "error.ftl", m -> m.put("message", message(m, "error", "expiredActionMessage"))),
             new Scenario("verify-email", "login-verify-email.ftl", m -> m.put("user", Map.of("email", USER))),
             // After Keycloak has sent the email: the resend link says "again".
             new Scenario("verify-email-sent", "login-verify-email.ftl", m -> { m.put("user", Map.of("email", USER)); m.put("verifyEmail", USER); }),
             new Scenario("otp-setup", "login-config-totp.ftl", m -> {
                 m.put("totp", totp(qr));
+                m.put("auth", new Auth(true));
+            }),
+            // UpdateTotp sets "mode" from the query when the person asks for the key instead of the QR code.
+            new Scenario("otp-setup-manual", "login-config-totp.ftl", m -> {
+                m.put("totp", totp(qr));
+                m.put("mode", "manual");
+                m.put("auth", new Auth(true));
+            }),
+            new Scenario("otp-choose", "login-otp.ftl", m -> {
+                boolean ar = "ar".equals(m.get("lang"));
+                m.put("otpLogin", Map.of("userOtpCredentials", List.of(
+                    Map.of("id", "c1", "userLabel", ar ? "هاتف العمل" : "Work phone"),
+                    Map.of("id", "c2", "userLabel", ar ? "الهاتف الشخصي" : "Personal phone")), "selectedCredentialId", "c1"));
                 m.put("auth", new Auth(true));
             }),
             new Scenario("otp", "login-otp.ftl", m -> {
@@ -178,11 +193,27 @@ public class Render {
                 m.put("shouldDisplayAuthenticators", true);
                 // The stored label is the default the registration page offered, in the language it was shown in.
                 String label = text((Properties) m.get("_messages"), (Locale) m.get("_locale"), "webauthn-registration-init-label");
-                m.put("authenticators", Map.of("authenticators", List.of(Map.of(
-                    "credentialId", "cred-1", "label", label, "createdAt", "28/10/2026",
-                    "transports", Map.of("iconClass", "kcWebAuthnInternal", "displayNameProperties", List.of("webauthn-transport-internal"))))));
+                m.put("authenticators", Map.of("authenticators", List.of(passkey("cred-1", label, "kcWebAuthnInternal", "webauthn-transport-internal"))));
+            }),
+            // Several keys: Keycloak titles the list (webauthn-available-authenticators) and joins a key's transports.
+            new Scenario("passkey-several", "webauthn-authenticate.ftl", m -> {
+                m.putAll(webauthn());
+                m.put("auth", new Auth(true));
+                m.put("isUserIdentified", "true");
+                m.put("userVerification", "required");
+                m.put("shouldDisplayAuthenticators", true);
+                String label = text((Properties) m.get("_messages"), (Locale) m.get("_locale"), "webauthn-registration-init-label");
+                String key = "ar".equals(m.get("lang")) ? "مفتاح أمان المكتب" : "Office security key";
+                m.put("authenticators", Map.of("authenticators", List.of(
+                    passkey("cred-1", label, "kcWebAuthnInternal", "webauthn-transport-internal"),
+                    passkey("cred-2", key, "kcWebAuthnUSB", "webauthn-transport-usb", "webauthn-transport-nfc"))));
             })
         );
+    }
+
+    static Map<String, Object> passkey(String id, String label, String iconClass, String... transports) {
+        return Map.of("credentialId", id, "label", label, "createdAt", "28/10/2026",
+            "transports", Map.of("iconClass", iconClass, "displayNameProperties", List.of(transports)));
     }
 
     static Map<String, Object> baseModel(String lang, String page, Properties properties, Properties messages) {
