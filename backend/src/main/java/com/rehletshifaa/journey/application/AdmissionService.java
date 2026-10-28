@@ -447,6 +447,7 @@ public class AdmissionService {
             throw new ApiException(409, "ARRIVAL_NOT_EXPECTED", "Your arrival is confirmed once your travel is confirmed");
         ledger.record(caseId, new Fact(Kind.PATIENT_ARRIVED, null, null, null, clock.instant(), null), actor.subject(), "PATIENT", null);
         move(caseId, "TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", actor.subject(), "PATIENT", "The patient confirmed their arrival");
+        work.changed(caseId); // B-3-1a: the Consultant's final assessment is now owed
     }
 
     /** Operations recorded the confirmed arrival on the travel plan (JourneyService.upsertTravel, already authorised). */
@@ -454,6 +455,7 @@ public class AdmissionService {
     public void arrivalAttested(UUID caseId, Instant arrivedAt, String subject) {
         if (ledger.latest(caseId, Kind.ARRIVAL_ATTESTED).isPresent()) return;
         ledger.record(caseId, new Fact(Kind.ARRIVAL_ATTESTED, null, null, null, arrivedAt, null), subject, "OPERATIONS", null);
+        work.changed(caseId); // B-3-1a: the Consultant's final assessment is now owed
     }
 
     // ---- views ----

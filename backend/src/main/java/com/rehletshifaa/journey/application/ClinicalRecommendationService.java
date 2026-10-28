@@ -123,7 +123,9 @@ public class ClinicalRecommendationService {
         String carriedCurrency=clinicalReviews.findLatestProposalCurrency(caseId,Limit.of(1)).stream().findFirst().orElse(null);
         clinicalReviews.saveAndFlush(ClinicalReviewVersion.approvedSuitable(reviewId,caseId,practitionerId,version,request.recommendedTreatment(),request.risksAndLimitations(),carriedCurrency,actor.subject(),now));
         saveCostEstimates(reviewId,practitionerId,request.costEstimates());
-        audit("FINAL_ASSESSMENT_SAVED",actor,caseId,"ClinicalReview",reviewId.toString(),"CREATE","SUCCESS",null);return new IdResponse(reviewId,"APPROVED");
+        audit("FINAL_ASSESSMENT_SAVED",actor,caseId,"ClinicalReview",reviewId.toString(),"CREATE","SUCCESS",null);
+        work.changed(caseId); // B-3-1a: the final assessment step is done
+        return new IdResponse(reviewId,"APPROVED");
     }
 
     private String requireIssuableCurrency(String requested){

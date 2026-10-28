@@ -17,8 +17,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 
 /**
- * B-3-1a: once the patient has arrived the Consultant's step is the final assessment, until one is saved; nobody else's
- * step changes. The fixture's patient never went through onboarding, so their readiness is read as complete here.
+ * B-3-1a: once the patient has arrived the Consultant's step is the final assessment, on the strip and in My work, until one
+ * is saved; nobody else's step changes. The fixture's patient never went through onboarding, so their readiness is read as complete here.
  */
 class FinalAssessmentStepTest extends AdmissionFixture {
     @MockitoSpyBean CustomerReadinessService patientReadiness;
@@ -36,12 +36,13 @@ class FinalAssessmentStepTest extends AdmissionFixture {
         jdbc.update("UPDATE medical_cases SET status='TRAVEL_COORDINATION' WHERE id=?", c.caseId);
         jdbc.update("INSERT INTO travel_plans(id,case_id,planned_arrival,status,updated_at,version) VALUES(?,?,?,?,?,0)",
                 UUID.randomUUID(), c.caseId, Instant.now().plusSeconds(3600), "CONFIRMED", Instant.now());
+        // The fixture approves the review directly; the decision itself closes the clinical review item.
+        jdbc.update("UPDATE case_tasks SET status='COMPLETED' WHERE case_id=? AND task_type='CLINICAL_REVIEW'", c.caseId);
         em.clear();
         asPatient();
         admissions.patientArrived(c.caseId);
-        // The fixture approves the review directly; the decision itself closes the clinical review item.
-        jdbc.update("UPDATE case_tasks SET status='COMPLETED' WHERE case_id=? AND task_type='CLINICAL_REVIEW'", c.caseId);
         em.flush(); em.clear();
+        assertThat(openStep(c.caseId)).as("in the Consultant's My work").isEqualTo(1);
 
         asDoctor();
         var step = journey.workspace(c.caseId).actions().currentAction();
@@ -60,5 +61,10 @@ class FinalAssessmentStepTest extends AdmissionFixture {
                 List.of(new CostEstimateItem("Angioplasty package", new BigDecimal("100000.00"), "EGP", service))));
         em.flush(); em.clear();
         assertThat(journey.workspace(c.caseId).actions().currentAction().code()).as("saved: the step is done").isNotEqualTo("RECORD_FINAL_ASSESSMENT");
+        assertThat(openStep(c.caseId)).as("and gone from My work").isZero();
+    }
+
+    private int openStep(UUID caseId) {
+        return count("SELECT COUNT(*) FROM case_tasks WHERE case_id=? AND task_type='RECORD_FINAL_ASSESSMENT' AND owner_subject=? AND status='OPEN'", caseId, DOCTOR);
     }
 }

@@ -499,13 +499,14 @@ public class CaseActionService {
 
     /**
      * Steps a stage owes one named person that no event raises work for: the coordinator's intake review and internal
-     * sign-off steps up to the release (#3, #3b), Finance's approval and Operations' plans once they have accepted. Each is
+     * sign-off steps up to the release (#3, #3b), Finance's approval and Operations' plans once they have accepted, and the
+     * Consultant's final assessment at arrival (B-3-1a). Each is
      * carried by one work item named after the step, so My work, "At a glance" and the current action read one source. The
      * step is still decided by {@link #stageFallback}; the item is its queue entry, and the current action keeps the step's
      * own code and form.
      */
     static final Set<String> STAGE_WORK = Set.of("ASSIGN_CONSULTANT", "ASSIGN_OPERATIONS_PLAN", "ASSIGN_FINANCE", "RELEASE_PROPOSAL",
-            "APPROVE_COMMERCIAL_TERMS", "PREPARE_TRAVEL_PACKAGE", "UPDATE_TRAVEL_PLAN");
+            "APPROVE_COMMERCIAL_TERMS", "PREPARE_TRAVEL_PACKAGE", "UPDATE_TRAVEL_PLAN", "RECORD_FINAL_ASSESSMENT");
     /** English title and context of each stage step's item; the portal words it from the step's code (EN/AR). */
     private static final Map<String, List<String>> STAGE_WORK_TEXT = Map.of(
             "ASSIGN_CONSULTANT", List.of("Prepare the case for a Consultant", "Complete anything missing, then assign a Consultant for this care area."),
@@ -514,7 +515,8 @@ public class CaseActionService {
             "RELEASE_PROPOSAL", List.of("Release the proposal to the patient", "Every internal sign-off is in. Check the release requirements, then release the secure link."),
             "APPROVE_COMMERCIAL_TERMS", List.of("Approve the commercial terms", "Review the manually priced services before the proposal can be released."),
             "PREPARE_TRAVEL_PACKAGE", List.of("Plan the travel package", "Describe the travel package for the proposal before it is released. Bookings and arrival are arranged only after the patient's deposit."),
-            "UPDATE_TRAVEL_PLAN", List.of("Arrange travel and arrival", "Keep the travel plan current; confirm it once every requirement is met."));
+            "UPDATE_TRAVEL_PLAN", List.of("Arrange travel and arrival", "Keep the travel plan current; confirm it once every requirement is met."),
+            "RECORD_FINAL_ASSESSMENT", List.of("Record the final assessment", "The patient has arrived. Examine them, then confirm or change your recommendation and its estimate lines."));
     /** Cases this thread is syncing: a change the sync makes announces itself again, and the outer pass already covers it. */
     private final ThreadLocal<Set<UUID>> syncing = ThreadLocal.withInitial(HashSet::new);
 
@@ -565,10 +567,11 @@ public class CaseActionService {
         if (blockers.stream().anyMatch(CaseActionService::patientGate)) return new HashMap<>();
         Proposal proposal = queries.latestProposal(caseId);
         Map<String, StageStep> owed = new HashMap<>();
-        for (Role role : List.of(Role.COORDINATOR, Role.FINANCE, Role.OPERATIONS)) {
+        for (Role role : List.of(Role.COORDINATOR, Role.FINANCE, Role.OPERATIONS, Role.CONSULTANT)) {
             String subject = role == Role.COORDINATOR ? f.coordinatorSubject() : f.activeAssignee(role.caseAssignmentRole());
-            // Never work for someone who has left the role (the coordinator is re-routed on departure; assignees are not).
-            if (subject == null || role != Role.COORDINATOR && !workforce.holds(subject, role.caseAssignmentRole())) continue;
+            // Never work for someone who has left the role (the coordinator is re-routed on departure; assignees are not). A
+            // Consultant is a credentialed practitioner, not a workforce role: their active assignment is the test, as for milestones.
+            if (subject == null || !Set.of(Role.COORDINATOR, Role.CONSULTANT).contains(role) && !workforce.holds(subject, role.caseAssignmentRole())) continue;
             String code = stageFallback(caseId, f, proposal, role, blockers).code();
             // In ACCEPTED the case waits on the deposit, whatever Operations' page offers; their plan is owed once coordination starts.
             if (STAGE_WORK.contains(code) && !("UPDATE_TRAVEL_PLAN".equals(code) && !"TRAVEL_COORDINATION".equals(f.status())))
@@ -596,6 +599,8 @@ public class CaseActionService {
             work.closeWorkItems(caseId, "TRAVEL", "Superseded — treatment coordination is already under way", false);
         if (!"ACCEPTED".equals(status))
             work.closeWorkItems(caseId, CaseHandoffService.DEPOSIT_RECORD_WORK, "Superseded — the case is past the deposit stage", false);
+        if (!"ARRIVAL_CONFIRMED".equals(status))
+            work.closeWorkItems(caseId, "RECORD_FINAL_ASSESSMENT", "Superseded — the patient is past the final assessment", false);
         // P1-16: the milestone clock runs only while the patient is in treatment.
         if (!"TREATMENT_IN_PROGRESS".equals(status)) {
             work.closeWorkItems(caseId, TreatmentMilestoneService.RECORD_MILESTONE, "Superseded — the patient is no longer in treatment", false);

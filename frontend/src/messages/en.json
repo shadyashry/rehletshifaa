@@ -3369,6 +3369,10 @@
           "title": "Finance must approve the commercial terms",
           "context": "A manually priced service needs Finance sign-off before release. Assign who should approve it."
         },
+        "RECORD_FINAL_ASSESSMENT": {
+          "title": "Record the final assessment",
+          "context": "The patient has arrived. Examine them, then confirm or change your recommendation and its estimate lines."
+        },
         "RELEASE_PROPOSAL": {
           "title": "Release the proposal to the patient",
           "context": "Check the release requirements, then release the secure link."
