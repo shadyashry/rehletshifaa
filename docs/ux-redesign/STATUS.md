@@ -1225,7 +1225,7 @@ The remaining inline table, plus 9 ternaries and about 15 English strings, are a
 **Screenshots:** `screenshots/area-3/after/`: my-work, case-review/assess/treat/discharge/follow and clinic-overview/services/affiliations, each in en and ar at 390 and 1440 (36 shots, taken with `AREA3_SHOTS=after` on the synthetic Consultant fixture, after the fixes).
 
 **Area 3 follow-ups:** in backlog.md under "Area 3 — close". Not blocking, except as noted:
-- **B-3-1a:** the Consultant's `RECORD_FINAL_ASSESSMENT` (FOCUS) step at ARRIVAL_CONFIRMED (backend; the critique's open HIGH).
+- ~~**B-3-1a:** the Consultant's `RECORD_FINAL_ASSESSMENT` (FOCUS) step at ARRIVAL_CONFIRMED (backend; the critique's open HIGH).~~ **Done** (see below).
 - **B-3-1b:** start treatment on the admission and retire `/treatment-episodes` (backend).
 - **G-2:** a final-assessment draft endpoint (backend).
 - **Smaller items:**
@@ -1238,6 +1238,15 @@ The remaining inline table, plus 9 ternaries and about 15 English strings, are a
   - the stamp colour (owner).
 
 **Area 3 is closed.** Areas 4 (Finance, needed P1-15 and P1-17) and 5 (Operations, needed P1-15) are now unblocked: both chains are merged into the UX line. **Next** (PLAN.md order 3 → 7 → X → 6 → 5 → 4): **area 7 — Keycloak theme parity** (login, setup, OTP, passkey; EN/AR), started in a new session from this branch under the owner's standing instruction.
+
+## Backend follow-up B-3-1a: the final assessment on the strip (2026-10-28, worktree `b-3-1a-final-assessment-25ffca`, branch `claude/b-3-1a-final-assessment-25ffca` from 3-4 @ `d8a150c7`)
+
+Closes the area 3 re-critique's open HIGH: at arrival the strip said "Nothing needs you right now" beside "Waiting on: The Consultant".
+- **Backend.** `CaseActionService.stageFallback` gives the case's Consultant `RECORD_FINAL_ASSESSMENT` (FOCUS) at ARRIVAL_CONFIRMED until a final assessment is saved: an APPROVED review written after the move into the current stage (`ClinicalReviewVersionRepository.existsByCaseIdAndStatusAndCreatedAtAfter`). Other roles' steps are unchanged.
+- **Frontend.** The `stagedAction` rename shim in `CurrentAction.tsx` (RECORD_CLINICAL_DECISION → RECORD_FINAL_ASSESSMENT by stage) and the panel's `stage` prop are gone: the strip words the backend's code. The step's states/actions copy existed since 3-1; work-type copy added (`currentAction.work`, `workTitles`, en + ar). The focus target is unchanged: the Consultant's FOCUS lands on the FinalAssessment form (`#clinical-decision`). `consultant-fixture.ts` returns the step at arrival.
+- **Not done:** My work still does not list the step (it is a stage step, not a work item; stage-step sync covers Coordinator, Finance and Operations only). Kept in backlog.
+
+**Verify.** `FinalAssessmentStepTest` (present at arrival, gone after the save, not shown to Operations, Coordinator or patient); backend `mvn -o -q test`: 992 tests, 0 failures, 3 skipped; `pnpm typecheck` ok; vitest 97 files / 766 tests, 765 pass (the known `StaffOperationalUi` W-44; a `NoPortalWorkspace` flake under load passes alone); Playwright on :3119 (production build): consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar — 54/54; overwritten shots restored.
 
 ## Control Center — Consultant public profiles (2026-10-17)
 

@@ -43,10 +43,8 @@ export type SecondaryAction = { label: string; onClick: () => void; opensDialog?
  * <p>Everything here comes from the backend's action contract. Future workflow steps are absent until
  * they become the current action, and nothing is offered that the backend would refuse.
  */
-export function CurrentActionPanel({ locale, role, action, stage, response, busy, secondary = [], form, facts, respondBy, onComplete, onFocusAction, onClaim, onAcceptAssignment, onDeclineAssignment }: {
+export function CurrentActionPanel({ locale, role, action, response, busy, secondary = [], form, facts, respondBy, onComplete, onFocusAction, onClaim, onAcceptAssignment, onDeclineAssignment }: {
   locale: Locale; role: string; action: CurrentActionView; response?: ResponseContext | null; busy?: boolean;
-  /** The case's stage, for wording only: the same step reads differently by stage (the backend still decides the step). */
-  stage?: string;
   secondary?: SecondaryAction[];
   /** The form that does a FOCUS step, shown here instead of a button that scrolls to it: one entry point per action. */
   form?: ReactNode;
@@ -63,9 +61,8 @@ export function CurrentActionPanel({ locale, role, action, stage, response, busy
   const [note, setNote] = useState("");
   if (role === "patient") return null;
 
-  const worded = stagedAction(action, stage);
-  const copy = describe(worded, role, t, locale === "ar" ? work.workTitles : null, work.workCopy);
-  const found = primaryFor(worded, t);
+  const copy = describe(action, role, t, locale === "ar" ? work.workTitles : null, work.workCopy);
+  const found = primaryFor(action, t);
   // With the step's form inline, its submit is the primary; a second button for the same job would only repeat it. With the
   // form elsewhere on the page (UX 3-1, every role), the strip only points to it: the form's own submit is the view's one
   // filled action.
@@ -170,12 +167,6 @@ export function CurrentActionPanel({ locale, role, action, stage, response, busy
 
 type Primary = { label: string; kind: "complete" | "focus" | "claim" | "accept" | "none" };
 
-/**
- * The step as it is worded at this stage. "Record clinical decision" on an arrived patient is the final in-person
- * assessment, so it reads as that; the code the backend sent still decides what the step is.
- */
-const stagedAction = (action: CurrentActionView, stage?: string): CurrentActionView =>
-  action.code === "RECORD_CLINICAL_DECISION" && stage === "ARRIVAL_CONFIRMED" ? { ...action, code: "RECORD_FINAL_ASSESSMENT" } : action;
 type ActionCopy = WorkCopy["currentAction"];
 const pick = (table: Record<string, string>, key?: string | null) => (key && Object.hasOwn(table, key) ? table[key] : undefined);
 
@@ -220,8 +211,8 @@ export const isOwnStep = (action: CurrentActionView) => action.kind !== "WAIT" &
 export const stepLabel = (action: CurrentActionView, work: LocalizedWorkCopy) => isOwnStep(action) ? work.caseCover.yourStep : work.caseCover.now;
 
 /** The step's title as the panel words it, for the case's sticky line (the same words, never a second rule). */
-export function actionTitle(action: CurrentActionView, role: string, work: LocalizedWorkCopy, stage?: string) {
-  return describe(stagedAction(action, stage), role, work.currentAction, work.locale === "ar" ? work.workTitles : null, work.workCopy).title;
+export function actionTitle(action: CurrentActionView, role: string, work: LocalizedWorkCopy) {
+  return describe(action, role, work.currentAction, work.locale === "ar" ? work.workTitles : null, work.workCopy).title;
 }
 
 /**

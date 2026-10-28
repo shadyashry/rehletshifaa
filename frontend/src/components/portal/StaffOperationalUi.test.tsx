@@ -129,12 +129,12 @@ describe("CurrentActionPanel", () => {
     expect(onFocusAction).toHaveBeenCalled();
   });
 
-  it("words the clinical step as the final assessment once the patient has arrived (copy only)", () => {
-    renderWithWork(<CurrentActionPanel locale="en" role="doctor" stage="ARRIVAL_CONFIRMED" action={{ code: "RECORD_CLINICAL_DECISION", kind: "FOCUS" }} onFocusAction={vi.fn()}/>);
+  it("words the Consultant's step at arrival as the final assessment", () => {
+    renderWithWork(<CurrentActionPanel locale="en" role="doctor" action={{ code: "RECORD_FINAL_ASSESSMENT", kind: "FOCUS" }} onFocusAction={vi.fn()}/>);
     expect(screen.getByRole("heading", { name: "Record your final assessment" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Go to the form: Record final assessment" })).toBeTruthy();
     cleanup();
-    renderWithWork(<CurrentActionPanel locale="ar" role="doctor" stage="ARRIVAL_CONFIRMED" action={{ code: "RECORD_CLINICAL_DECISION", kind: "FOCUS" }} onFocusAction={vi.fn()}/>, "ar");
+    renderWithWork(<CurrentActionPanel locale="ar" role="doctor" action={{ code: "RECORD_FINAL_ASSESSMENT", kind: "FOCUS" }} onFocusAction={vi.fn()}/>, "ar");
     expect(screen.getByRole("heading", { name: "سجّل تقييمك النهائي" })).toBeTruthy();
   });
 

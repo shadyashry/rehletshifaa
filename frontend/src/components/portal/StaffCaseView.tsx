@@ -275,7 +275,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
    </div>
 
    <div className="mt-5 border-t border-line pt-5">
-  <CurrentActionPanel locale={locale} role={role} action={current} stage={c.status} facts={facts}
+  <CurrentActionPanel locale={locale} role={role} action={current} facts={facts}
    response={current.workType==="REVIEW_PATIENT_RESPONSE"?{message:latestPatientMessage?.body,documentName:newestDocument?.fileName}:null}
    busy={busy} secondary={replyFromStrip} onComplete={completeWork} onFocusAction={focusAction} onClaim={()=>void mutate(`/coordinator/cases/${c.id}/claim`)}
    respondBy={myPending?.offerExpiresAt??null}
@@ -288,7 +288,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
    {alsoOpen.length>0&&<AlsoOpen items={alsoOpen}/>}
   </section>
   {/* Once the cover has scrolled away, the case and its step stay in one slim line under the site header. */}
-  {line.gone&&<CaseLine top={line.top} action={current} title={actionTitle(current,role,work,c.status)} next={nextItem&&openNext?{item:nextItem,onOpen:openNext}:null}/>}
+  {line.gone&&<CaseLine top={line.top} action={current} title={actionTitle(current,role,work)} next={nextItem&&openNext?{item:nextItem,onOpen:openNext}:null}/>}
 
   {/* P1-13: a closed case is reopened into follow-up by a manager or the case's own Consultant; one quiet line, never on another stage. */}
   {c.status==="CLOSED"&&!value.preview&&(isDoctor||(isCoordinator&&canReopen))&&<ReopenCase locale={locale} caseId={c.id} side={isDoctor?"doctor":"coordinator"} busy={busy} mutate={mutate} load={load}/>}

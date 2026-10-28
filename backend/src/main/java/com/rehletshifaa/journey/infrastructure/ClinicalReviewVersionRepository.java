@@ -28,6 +28,9 @@ public interface ClinicalReviewVersionRepository extends BaseRepository<Clinical
 
     boolean existsByIdAndCaseIdAndStatus(UUID id, UUID caseId, String status);
 
+    /** B-3-1a: an approved review written after the given moment (at arrival: the saved final assessment). */
+    boolean existsByCaseIdAndStatusAndCreatedAtAfter(UUID caseId, String status, Instant after);
+
     @Query("select r.proposalCurrency from ClinicalReviewVersion r where r.id = :id")
     java.util.Optional<String> findProposalCurrency(@Param("id") UUID id);
 

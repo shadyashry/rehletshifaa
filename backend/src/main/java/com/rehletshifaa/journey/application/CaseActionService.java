@@ -92,14 +92,16 @@ public class CaseActionService {
     private final DischargeReadiness discharge;
     private final EvidenceLedger ledger;
     private final com.rehletshifaa.journey.infrastructure.CaseOutcomeRepository outcomes;
+    private final com.rehletshifaa.journey.infrastructure.ClinicalReviewVersionRepository clinicalReviews;
 
     public CaseActionService(CaseActionQueryService queries, CustomerReadinessService readiness, PaymentService payment,
                              StaffWorkService work, PatientActionQueryService patientActions, ProposalAccessService proposals, Authority authority, Clock clock,
                              com.rehletshifaa.workforce.application.WorkforceDirectory workforce, CaseExitReasonRepository exitReasons,
                              TravelPlanRepository travelPlans, CaseStatusChangeRepository statusChanges, SlaPolicy sla, AdmissionReadiness admission,
                              com.rehletshifaa.journey.infrastructure.ChangeOrderRepository changeOrders, DischargeReadiness discharge, EvidenceLedger ledger,
-                             com.rehletshifaa.journey.infrastructure.CaseOutcomeRepository outcomes) {
-        this.outcomes = outcomes;
+                             com.rehletshifaa.journey.infrastructure.CaseOutcomeRepository outcomes,
+                             com.rehletshifaa.journey.infrastructure.ClinicalReviewVersionRepository clinicalReviews) {
+        this.outcomes = outcomes; this.clinicalReviews = clinicalReviews;
         this.admission = admission; this.changeOrders = changeOrders; this.discharge = discharge; this.ledger = ledger;
         this.exitReasons = exitReasons; this.travelPlans = travelPlans; this.statusChanges = statusChanges; this.sla = sla;
         this.workforce = workforce;
@@ -272,6 +274,8 @@ public class CaseActionService {
             return none();
         }
         if (role == Role.CONSULTANT && "CONSULTANT_REVIEW".equals(s)) return simple("RECORD_CLINICAL_DECISION", "FOCUS");
+        // B-3-1a: once the patient has arrived the Consultant examines them in person and records the final assessment.
+        if (role == Role.CONSULTANT && "ARRIVAL_CONFIRMED".equals(s) && !finalAssessmentSaved(caseId)) return simple("RECORD_FINAL_ASSESSMENT", "FOCUS");
         // P1-16: in treatment the Consultant records the milestones (their RECORD_MILESTONE item carries the due date).
         // P1-17: once the discharge is planned, the Consultant completes the discharge pack instead.
         if (role == Role.CONSULTANT && "TREATMENT_IN_PROGRESS".equals(s))
@@ -299,6 +303,12 @@ public class CaseActionService {
                 && Set.of("CLINICALLY_APPROVED", "OPERATIONS_COMPLETED").contains(proposal.status()))
             return simple("APPROVE_COMMERCIAL_TERMS", "FOCUS");
         return none();
+    }
+
+    /** An approved review written since the case entered its current stage (arrival): the final assessment is on file. */
+    private boolean finalAssessmentSaved(UUID caseId) {
+        return statusChanges.findFirstByCaseIdOrderByCreatedAtDesc(caseId)
+                .map(change -> clinicalReviews.existsByCaseIdAndStatusAndCreatedAtAfter(caseId, "APPROVED", change.getCreatedAt())).orElse(false);
     }
 
     /**

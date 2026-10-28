@@ -58,8 +58,8 @@ const caseView = (id: ConsultantCaseId) => {
     timeline, tasks: [], messages: [], assignments: [{ id: "a1", assigneeSubject: "qa-coordinator", assigneeName: "Dr Samir Example", assigneeRole: "DOCTOR", assignmentType: "PRIMARY", status: "ACTIVE", assignedAt: at(30), version: 1 }] };
   switch (id) {
     case "review": return { ...common, clinicalReviews: [], actions: actions("CONSULTANT_REVIEW", { code: "RECORD_CLINICAL_DECISION", kind: "FOCUS", workItemId: "cw1", workItemVersion: 0 }, ["RECORD_CLINICAL_DECISION"]) };
-    // The backend gives the Consultant no step at arrival yet (CaseActionService: none()); the final assessment is on the page by stage.
-    case "assess": return { ...common, clinicalReviews: [review], actions: actions("ARRIVAL_CONFIRMED", { code: "NONE", kind: "NONE" }) };
+    // B-3-1a: at arrival the Consultant's step is the final assessment until one is saved (CaseActionService.stageFallback).
+    case "assess": return { ...common, clinicalReviews: [review], actions: actions("ARRIVAL_CONFIRMED", { code: "RECORD_FINAL_ASSESSMENT", kind: "FOCUS" }) };
     case "treat": return { ...common, clinicalReviews: [review], actions: actions("TREATMENT_IN_PROGRESS", { code: "WORK_ITEM", kind: "FOCUS", workType: "COUNTERSIGN_MILESTONE", workItemId: "cw2", workItemVersion: 0, title: "Countersign a treatment milestone" }) };
     case "discharge": return { ...common, clinicalReviews: [review], actions: actions("TREATMENT_IN_PROGRESS", { code: "WORK_ITEM", kind: "FOCUS", workType: "DISCHARGE_PACK", workItemId: "cw3", workItemVersion: 0, title: "Complete the discharge pack",
       copy: { code: "DISCHARGE_PACK", params: { caseNumber: "RS-2026-000014" } } }) };
