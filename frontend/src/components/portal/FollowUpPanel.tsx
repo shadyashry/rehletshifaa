@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { CircleAlert } from "lucide-react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { fillTemplate } from "@/lib/portal-labels";
@@ -26,7 +27,8 @@ const ANCHOR = "follow-up-next";
  * it. The free window, the plan, the contacts, the coordinator's check-ins, the patient's outcome answers and what still holds the
  * case open — closing is automatic, so there is no close button. The Consultant books, records and cancels contacts and reviews a
  * reported complication; the coordinator records the check-ins and reads the rest without its clinical text (the API leaves it
- * out). One primary action — the viewer's current work — and the rest one click away.
+ * out). One primary action — the viewer's current work — and the rest one click away. A complication the patient reported opens
+ * the panel (UX 3-2): their words first, then what to do, then the review — never below the schedule.
  */
 export function FollowUpPanel({ locale, role, caseId, caseStatus, currentCode, busy, mutate, load }: {
   locale: Locale; role: FollowUpRole; caseId: string; caseStatus: string;
@@ -80,14 +82,36 @@ export function FollowUpPanel({ locale, role, caseId, caseStatus, currentCode, b
         {(status === "FOLLOW_UP" || closed) && <StatusBadge tone={closed ? "neutral" : "info"}>{closed ? t.state.closed : t.state.open}</StatusBadge>}
       </div>
 
+      {/* A REPORTED COMPLICATION — first, in the patient's words, with the review beside it. */}
+      {doctor && toReview.map(o => (
+        <div key={o.point} id={next === `review:${o.point}` ? ANCHOR : undefined} className="mt-3 border-t border-line pt-3" aria-labelledby={`${id}-report-${o.point}`} role="group">
+          <h4 id={`${id}-report-${o.point}`} className="flex items-center gap-2 text-[0.9375rem] font-bold text-alert-800"><CircleAlert size={18} aria-hidden className="flex-none"/>{t.complicationFirst.title}</h4>
+          <p className="mt-1 text-[0.8125rem] text-ink-600">
+            {pick(t.outcomes.points, o.point)} · {fillTemplate(t.outcomes.answered, { when: when(o.reportedAt) })}{o.channel ? ` ${pick(t.outcomes.channels, o.channel)}` : ""}
+            {o.reportedRole === "PATIENT_REPRESENTATIVE" && <> · {t.outcomes.byRepresentative}</>}
+          </p>
+          {o.complicationNote && <blockquote dir="auto" className="mt-2 max-w-[65ch] whitespace-pre-wrap break-words text-[0.9375rem] leading-6 text-ink-900">{o.complicationNote}</blockquote>}
+          <p className="mt-2 max-w-[65ch] text-[0.875rem] text-ink-700">{t.complicationFirst.safety}</p>
+          <div className="mt-3">
+            <NoteForm label={t.outcomes.reviewNote} hint={t.outcomes.reviewHint} name="note" required save={t.outcomes.saveReview} primary={next === `review:${o.point}`} busy={busy}
+                      onSubmit={data => act(`/doctor/cases/${caseId}/follow-up/outcomes/${o.point}/review`, { note: text(data.get("note")) })}/>
+          </div>
+        </div>
+      ))}
+      {!doctor && toReview.length > 0 && (
+        <p className="mt-3 flex max-w-[65ch] items-start gap-2 border-t border-line pt-3 text-[0.875rem] font-semibold text-alert-800">
+          <CircleAlert size={16} aria-hidden className="mt-0.5 flex-none"/>{fillTemplate(t.complicationFirst.coordinator, { point: pick(t.outcomes.points, toReview[0].point) })}
+        </p>
+      )}
+
       {/* THE FREE WINDOW (D-G) */}
       {view.window ? (
-        <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-3">
+        <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-3">
           <Fact label={t.window.discharged}>{day.format(new Date(view.window.dischargedAt))}</Fact>
           <Fact label={t.window.freeDays}>{fillTemplate(t.window.days, { days: String(view.window.freeDays) })}</Fact>
           <Fact label={view.window.closedAt ? t.window.ended : t.window.ends}>{day.format(new Date(view.window.closedAt ?? view.window.endsAt))}</Fact>
         </dl>
-      ) : <p className="mt-1 text-[0.85rem] text-ink-600">{t.window.none}</p>}
+      ) : <p className="mt-1 text-[0.875rem] text-ink-600">{t.window.none}</p>}
 
       {/* A complication after closure: the existing reopen (P1-13) is the way back into follow-up. */}
       {view.reopenAvailable && (
@@ -101,11 +125,11 @@ export function FollowUpPanel({ locale, role, caseId, caseStatus, currentCode, b
         <div className="mt-4 border-t border-line pt-3">
           <h4 className="text-[0.875rem] font-bold text-ink-800">{t.closure.title}</h4>
           {view.closureBlockers.length > 0 ? <>
-            <ul className="mt-1 space-y-1 text-[0.85rem] text-ink-700">
+            <ul className="mt-1 space-y-1 text-[0.875rem] text-ink-700">
               {view.closureBlockers.map(b => <li key={b.code} className="flex items-start gap-2"><span aria-hidden className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-ink-400"/>{pick(t.closure.blockers, b.code)}</li>)}
             </ul>
             <p className="mt-1.5 max-w-[65ch] text-[0.8125rem] text-ink-600">{t.closure.automatic}</p>
-          </> : <p className="mt-1 text-[0.85rem] text-ink-700">{t.closure.ready}</p>}
+          </> : <p className="mt-1 text-[0.875rem] text-ink-700">{t.closure.ready}</p>}
         </div>
       )}
 
@@ -113,7 +137,7 @@ export function FollowUpPanel({ locale, role, caseId, caseStatus, currentCode, b
       {view.plan && (
         <div className="mt-4 border-t border-line pt-3">
           <h4 className="text-[0.875rem] font-bold text-ink-800">{t.plan.title}</h4>
-          <p className="mt-1 text-[0.85rem] text-ink-800">{pick(t.modes, view.plan.mode)} · {when(view.plan.dueAt)}</p>
+          <p className="mt-1 text-[0.875rem] text-ink-800">{pick(t.modes, view.plan.mode)} · {when(view.plan.dueAt)}</p>
           {(view.plan.requiredTests || view.plan.instructions) && (
             <dl className="mt-1 grid gap-x-4 text-[0.8125rem] sm:grid-cols-[auto_1fr]">
               {view.plan.requiredTests && <Detail label={t.plan.tests}>{view.plan.requiredTests}</Detail>}
@@ -126,9 +150,9 @@ export function FollowUpPanel({ locale, role, caseId, caseStatus, currentCode, b
       {/* THE CONTACTS */}
       <div className="mt-4 border-t border-line pt-3">
         <h4 className="text-[0.875rem] font-bold text-ink-800">{t.contacts.title}</h4>
-        {view.contacts.length === 0 ? <p className="mt-1 text-[0.85rem] text-ink-600">{t.contacts.none}</p>
+        {view.contacts.length === 0 ? <p className="mt-1 text-[0.875rem] text-ink-600">{t.contacts.none}</p>
           : <ul className="mt-1 divide-y divide-line">{view.contacts.map(c => <ContactRow key={c.id} t={t} contact={c} when={when}/>)}</ul>}
-        {!doctor && currentCode === "REBOOK_FOLLOW_UP" && <p className="mt-2 max-w-[65ch] text-[0.85rem] font-semibold text-ink-800">{t.rebook}</p>}
+        {!doctor && currentCode === "REBOOK_FOLLOW_UP" && <p id={ANCHOR} tabIndex={-1} className="mt-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 max-w-[65ch] text-[0.875rem] font-semibold text-ink-800">{t.rebook}</p>}
       </div>
 
       {/* THE CHECK-INS */}
@@ -137,7 +161,7 @@ export function FollowUpPanel({ locale, role, caseId, caseStatus, currentCode, b
           <h4 className="text-[0.875rem] font-bold text-ink-800">{t.checkIns.title}</h4>
           <ul className="mt-1 divide-y divide-line">
             {view.checkIns.map(c => (
-              <li key={c.point} className="py-2 text-[0.85rem]">
+              <li key={c.point} className="py-2 text-[0.875rem]">
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-semibold text-ink-900">{pick(t.checkIns.points, c.point)}</span>
                   <StatusBadge tone={c.status === "DONE" ? "success" : c.status === "DUE" ? "warning" : "neutral"}>{pick(t.checkIns.status, c.status)}</StatusBadge>
@@ -153,19 +177,13 @@ export function FollowUpPanel({ locale, role, caseId, caseStatus, currentCode, b
       {/* THE OUTCOMES */}
       <div className="mt-4 border-t border-line pt-3">
         <h4 className="text-[0.875rem] font-bold text-ink-800">{t.outcomes.title}</h4>
-        {view.outcomes.length === 0 ? <p className="mt-1 max-w-[65ch] text-[0.85rem] text-ink-600">{t.outcomes.none}</p>
+        {view.outcomes.length === 0 ? <p className="mt-1 max-w-[65ch] text-[0.875rem] text-ink-600">{t.outcomes.none}</p>
           : <ul className="mt-1 divide-y divide-line">{view.outcomes.map(o => <OutcomeRow key={o.point} t={t} outcome={o} doctor={doctor} when={when}/>)}</ul>}
       </div>
 
       {/* RECORDING — the Consultant */}
       {doctor && (
         <div className="mt-3">
-          {toReview.map(o => (
-            <Task key={o.point} title={fillTemplate(t.outcomes.reviewForm, { point: pick(t.outcomes.points, o.point) })} next={next === `review:${o.point}`}>
-              <NoteForm label={t.outcomes.reviewNote} hint={t.outcomes.reviewHint} name="note" required save={t.outcomes.saveReview} primary={next === `review:${o.point}`} busy={busy}
-                        onSubmit={data => act(`/doctor/cases/${caseId}/follow-up/outcomes/${o.point}/review`, { note: text(data.get("note")) })}/>
-            </Task>
-          ))}
           {recordable && scheduled.map(c => (
             <Task key={c.id} title={fillTemplate(t.record.title, { when: when(c.dueAt) })} next={next === `record:${c.id}`}>
               <RecordForm t={t} primary={next === `record:${c.id}`} busy={busy}
@@ -230,7 +248,7 @@ function contactTone(status: string): StatusTone {
 /** One contact: how and when, its state, where it came from, and the Consultant's note (absent for the coordinator). */
 function ContactRow({ t, contact: c, when }: { t: Copy; contact: FollowUpContact; when: (iso?: string | null) => string }) {
   return (
-    <li className="py-2 text-[0.85rem]">
+    <li className="py-2 text-[0.875rem]">
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="font-semibold text-ink-900">{pick(t.modes, c.mode)} · {when(c.dueAt)}</span>
         <StatusBadge tone={contactTone(c.status)}>{pick(t.contacts.status, c.status)}</StatusBadge>
@@ -251,7 +269,7 @@ function OutcomeRow({ t, outcome: o, doctor, when }: { t: Copy; outcome: FollowU
   const w = t.outcomes;
   const score = (n?: number | null) => n == null ? "—" : fillTemplate(w.score, { score: String(n) });
   return (
-    <li className="py-2 text-[0.85rem]">
+    <li className="py-2 text-[0.875rem]">
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="font-semibold text-ink-900">{pick(w.points, o.point)}</span>
         {o.complication && <StatusBadge tone={o.reviewedAt ? "neutral" : "danger"}>{w.complication}</StatusBadge>}
@@ -271,8 +289,9 @@ function OutcomeRow({ t, outcome: o, doctor, when }: { t: Copy; outcome: FollowU
       </>}
       {o.complication && (
         <div className="mt-1 text-[0.8125rem]">
-          {o.complicationNote ? <p dir="auto" className="whitespace-pre-wrap break-words text-ink-900">{o.complicationNote}</p>
-            : !doctor && <p className="text-ink-600">{w.detailsWithConsultant}</p>}
+          {/* An unreviewed report is read in full at the top of the panel; the row keeps its state. */}
+          {o.complicationNote && (!doctor || o.reviewedAt) ? <p dir="auto" className="whitespace-pre-wrap break-words text-ink-900">{o.complicationNote}</p>
+            : !doctor && !o.complicationNote && <p className="text-ink-600">{w.detailsWithConsultant}</p>}
           <p className="mt-0.5 font-semibold text-ink-700">{o.reviewedAt ? fillTemplate(w.reviewed, { when: when(o.reviewedAt) }) : w.awaitingReview}</p>
           {o.reviewNote && <dl className="mt-0.5 grid gap-x-4 sm:grid-cols-[auto_1fr]"><Detail label={w.review}>{o.reviewNote}</Detail></dl>}
         </div>

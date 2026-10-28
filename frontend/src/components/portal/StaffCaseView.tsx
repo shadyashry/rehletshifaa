@@ -11,6 +11,7 @@ import { TreatmentPanel, TREATMENT_WORK } from "@/components/portal/TreatmentPan
 import { DischargePanel, DISCHARGE_STAGES, DISCHARGE_WORK, type DischargeRole } from "@/components/portal/DischargePanel";
 import { ReconciliationPanel, SETTLEMENT_STAGES, SETTLEMENT_WORK, type SettlementRole } from "@/components/portal/ReconciliationPanel";
 import { FollowUpPanel, FOLLOW_UP_STAGES, FOLLOW_UP_WORK } from "@/components/portal/FollowUpPanel";
+import { PanelBoundary } from "@/components/portal/panel-parts";
 import { BASE, CaseEvidence, DecisionSummary, EstimateLines, RecommendationFields, currencyName, useClinicalDecision } from "@/components/portal/ClinicalDecision";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
@@ -117,17 +118,29 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
  const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired} travelPlan={value.travelPlan??null} busy={busy} load={load}/></div>:null;
  // P1-15: the reservation, the voucher, the balance and its evidence, for every staff role on the case from travel coordination to treatment.
  const admissionRole=(["operations","finance","coordinator","doctor"] as string[]).includes(role)?role as AdmissionRole:null;
- const admissionPanel=admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview?<AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load}/>:null;
+ const admissionPanel=admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview?<PanelBoundary key={c.id} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // P1-16: milestones, change orders, the running money and the evidence checklist while the patient is in treatment (and for an
  // open Treatment work item afterwards, such as Finance's emergency change-order review, which survives the case's exit).
- const treatmentPanel=admissionRole&&!value.preview&&(c.status==="TREATMENT_IN_PROGRESS"||TREATMENT_WORK.has(current.workType??""))?<TreatmentPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/>:null;
+ const treatmentPanel=admissionRole&&!value.preview&&(c.status==="TREATMENT_IN_PROGRESS"||TREATMENT_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.treatment.title} message={fillTemplate(cv.panelFailed,{panel:work.treatment.title})}><TreatmentPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // P1-17: the discharge pack, the final invoice and the journey home, from treatment until the patient has left (Finance reads the
  // invoice in the reconciliation instead); and the reconciliation and statements once discharged, or for an open Finance item.
- const dischargePanel=admissionRole&&admissionRole!=="finance"&&!value.preview&&(DISCHARGE_STAGES.has(c.status)||DISCHARGE_WORK.has(current.workType??""))?<DischargePanel key={c.id} locale={locale} role={admissionRole as DischargeRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/>:null;
- const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/>:null;
+ const dischargePanel=admissionRole&&admissionRole!=="finance"&&!value.preview&&(DISCHARGE_STAGES.has(c.status)||DISCHARGE_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.discharge.title} message={fillTemplate(cv.panelFailed,{panel:work.discharge.title})}><DischargePanel key={c.id} locale={locale} role={admissionRole as DischargeRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} dischargedAt={value.timeline.find(entry=>entry.status==="DISCHARGED")?.occurredAt??null} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
+ const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.reconciliation.title} message={fillTemplate(cv.panelFailed,{panel:work.reconciliation.title})}><ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // P1-18: the follow-up window, contacts, check-ins, outcomes and what holds the case open, for the case's Consultant and coordinator
  // (never Finance or Operations), from discharge to a closed case, or for an open follow-up item (a review outlives the exit).
- const followUpPanel=(isDoctor||isCoordinator)&&!value.preview&&(FOLLOW_UP_STAGES.has(c.status)||FOLLOW_UP_WORK.has(current.workType??""))?<FollowUpPanel key={c.id} locale={locale} role={isDoctor?"doctor":"coordinator"} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/>:null;
+ const followUpPanel=(isDoctor||isCoordinator)&&!value.preview&&(FOLLOW_UP_STAGES.has(c.status)||FOLLOW_UP_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.followUp.title} message={fillTemplate(cv.panelFailed,{panel:work.followUp.title})}><FollowUpPanel key={c.id} locale={locale} role={isDoctor?"doctor":"coordinator"} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
+ // UX 3-2: the Consultant's panels in the order of their work — the panel holding the current step first, then the stage's
+ // own order (after discharge, Follow-up before Discharge; in treatment, Treatment before Discharge, the Admission summary last).
+ // The Start treatment act stays with the admission it depends on. Presentation only: the panels still decide what they show.
+ const stepCode=current.workType??current.code;
+ const afterDischarge=["DISCHARGED","FOLLOW_UP","CLOSED"].includes(c.status);
+ const stageOrder=afterDischarge?["followUp","discharge","treatment","admission"]:["treatment","discharge","admission","followUp"];
+ const consultantPanels=isDoctor?[
+  {key:"followUp",work:FOLLOW_UP_WORK,node:followUpPanel},
+  {key:"discharge",work:DISCHARGE_WORK,node:dischargePanel},
+  {key:"treatment",work:TREATMENT_WORK,node:treatmentPanel},
+  {key:"admission",work:ADMISSION_WORK,node:admissionPanel||workflowBlock?<>{admissionPanel}{workflowBlock}</>:null},
+ ].filter(panel=>panel.node).map(panel=>({...panel,rank:panel.work.has(stepCode)?0:1+stageOrder.indexOf(panel.key)})).toSorted((a,b)=>a.rank-b.rank):null;
  // P0-5: the destination and the treatment episodes read back with their facility named, for every staff role on the case.
  const when=(v?:string|null)=>v?new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
  const episodes=value.treatmentEpisodes??[];
@@ -315,13 +328,14 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
        </section>}
        {banners}
        {logistics}
-       {!isDoctor&&workflowBlock}
-       {admissionPanel}
-       {isDoctor&&workflowBlock}
-       {treatmentPanel}
-       {dischargePanel}
-       {reconciliationPanel}
-       {followUpPanel}
+       {consultantPanels?consultantPanels.map(panel=><div key={panel.key} className="space-y-4">{panel.node}</div>):<>
+        {workflowBlock}
+        {admissionPanel}
+        {treatmentPanel}
+        {dischargePanel}
+        {reconciliationPanel}
+        {followUpPanel}
+       </>}
        {/* The proposal is the work while it is being prepared or released; afterwards it is reference. */}
        {isCoordinator&&(proposalIsWork?<div id={current.kind==="FOCUS"&&!formAction?"case-actions":undefined}>{proposalPanel}</div>
          :(value.proposal||value.deposit)?<ProposalSummary proposal={value.proposal} deposit={value.deposit} delivery={value.delivery} available={available} onView={()=>setOverlay("proposal")}/>:null)}

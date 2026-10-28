@@ -36,11 +36,11 @@ const discharged: DischargeView = {
   handoverLetter: { evidenceId: "h1", generatedAt: "2026-10-25T11:00:00Z", english: "Dear colleague,\nYour patient was treated for coronary artery disease.", arabic: "الزميل العزيز،\nعولج مريضكم." },
 };
 
-function setup(role: DischargeRole, props: { currentCode?: string; data?: DischargeView; locale?: "en" | "ar" } = {}) {
+function setup(role: DischargeRole, props: { currentCode?: string; data?: DischargeView; locale?: "en" | "ar"; dischargedAt?: string } = {}) {
   const data = props.data ?? inTreatment;
   const mutate = vi.fn().mockResolvedValue(data);
   const load = vi.fn().mockResolvedValue(data) as unknown as <T>(path: string) => Promise<T>;
-  renderWithWork(<DischargePanel locale={props.locale ?? "en"} role={role} caseId="c1" caseStatus={data.caseStatus ?? "TREATMENT_IN_PROGRESS"} currentCode={props.currentCode}
+  renderWithWork(<DischargePanel locale={props.locale ?? "en"} role={role} caseId="c1" caseStatus={data.caseStatus ?? "TREATMENT_IN_PROGRESS"} currentCode={props.currentCode} dischargedAt={props.dischargedAt}
                                  documents={documents} busy={false} mutate={mutate} load={load}/>, props.locale ?? "en");
   return { mutate, load };
 }
@@ -169,3 +169,23 @@ describe("DischargePanel — Operations", () => {
     expect(document.querySelectorAll("#discharge-panel form")).toHaveLength(0);
   });
 });
+
+describe("DischargePanel — after discharge (UX 3-2)", () => {
+  afterEach(cleanup);
+
+  it("stamps the file on the day the case recorded the discharge, and folds the rest for the Consultant", async () => {
+    setup("doctor", { data: discharged, dischargedAt: "2026-10-25T12:00:00Z" });
+    const stamp = await screen.findByText(/^Discharged, /);
+    expect(stamp.closest(".case-stamp")).toBeTruthy();
+    const rest = screen.getByText("The discharge pack, the letter and the journey home", { selector: "summary" }).closest("details")!;
+    expect(rest.open).toBe(false);
+    expect(within(rest).getByText("Discharge pack")).toBeTruthy();
+  });
+
+  it("keeps the panel open for Operations, whose step after discharge is in it", async () => {
+    setup("operations", { data: discharged, currentCode: "CONFIRM_RETURN", dischargedAt: "2026-10-25T12:00:00Z" });
+    await screen.findByText(/^Discharged, /);
+    expect(screen.queryByText("The discharge pack, the letter and the journey home", { selector: "summary" })).toBeNull();
+  });
+});
+

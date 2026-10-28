@@ -9,7 +9,7 @@ import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
-import { ConfirmAction, DocumentPicker, Fact, Money, Task as PanelTask, instant, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
+import { ConfirmAction, DocumentPicker, Fact, Money, Summary, Task as PanelTask, instant, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
 import type { AdmissionEvidence, ChangeOrder, Mutate, TreatmentMilestone, TreatmentView } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["treatment"];
@@ -85,19 +85,80 @@ export function TreatmentPanel({ locale, role, caseId, caseStatus, currentCode, 
     : null;
   const dischargePlanned = live.some(m => m.kind === "DISCHARGE_PLANNED");
 
+  const doctor = role === "doctor";
+  // RUNNING MONEY — exactly as returned
+  const money = (
+    <div className="mt-4 border-t border-line pt-3">
+      <h4 className="text-[0.875rem] font-bold text-ink-800">{t.money.title}</h4>
+      <dl className="mt-2 grid gap-x-6 gap-y-2 text-[0.875rem] tabular-nums sm:grid-cols-2 lg:grid-cols-4">
+        <Fact label={t.money.package}><Money>{egp(view.money.packageEgp)}</Money></Fact>
+        <Fact label={t.money.changeOrders}><Money>{egp(view.money.changeOrdersEgp)}</Money></Fact>
+        <Fact label={t.money.authorised}><Money>{egp(view.money.authorisedEgp)}</Money></Fact>
+        <Fact label={t.money.billed}><Money>{egp(view.money.interimBilledEgp)}</Money></Fact>
+        {view.money.interimPendingEgp != null && <Fact label={t.money.pending}><Money>{egp(view.money.interimPendingEgp)}</Money></Fact>}
+        <Fact label={t.money.variance}>
+          <span className={view.money.varianceEgp > 0 ? "text-alert-800" : undefined}><Money>{egp(view.money.varianceEgp)}</Money>{view.money.varianceEgp > 0 && <> {t.money.over}</>}</span>
+        </Fact>
+        <Fact label={t.money.band}><Money>{egp(view.money.bandLimitEgp)}</Money></Fact>
+        <Fact label={t.money.bandUsed}><Money>{egp(view.money.bandUsedEgp)}</Money></Fact>
+      </dl>
+    </div>
+  );
+  // INTERIM BILLS
+  const bills = (
+    <div className="mt-4 border-t border-line pt-3">
+      <h4 className="text-[0.875rem] font-bold text-ink-800">{t.bills.title}</h4>
+      {view.interimBills.length === 0 ? <p className="mt-1 text-[0.875rem] text-ink-600">{t.bills.empty}</p> : (
+        <ul className="mt-1 divide-y divide-line">
+          {view.interimBills.map(b => <BillRow key={b.id} t={t} bill={b} roleName={pick(roles, b.recordedRole ?? "SYSTEM")} when={when} egp={egp}
+            action={billsToSign.some(s => s.id === b.id)
+              ? <ConfirmAction label={t.bills.countersign} context={b.reference ?? undefined} title={t.bills.countersignTitle} body={`${t.bills.countersignBody} ${t.freshSignIn}`}
+                               confirm={t.bills.countersign} cancel={t.cancel} primary={next === `bill:${b.id}`} busy={busy}
+                               onConfirm={() => act(`/finance/cases/${caseId}/treatment/interim-bills/${b.id}/countersign`)}/>
+              : null} primary={next === `bill:${b.id}`}/>)}
+        </ul>
+      )}
+    </div>
+  );
+  // EVIDENCE CHECKLIST PER STAGE
+  const checklist = (
+    <div className="mt-4 border-t border-line pt-3">
+      <h4 className="text-[0.875rem] font-bold text-ink-800">{t.checklist.title}</h4>
+      <div className="mt-2 grid gap-x-6 gap-y-4 sm:grid-cols-2">
+        {view.checklist.map(stage => (
+          <div key={stage.stage}>
+            <p className="flex flex-wrap items-center gap-2 text-[0.875rem] font-semibold text-ink-800">
+              {pick(t.checklist.stages, stage.stage)}
+              <StatusBadge tone={stage.complete ? "success" : "neutral"}>{stage.complete ? t.checklist.complete : t.checklist.incomplete}</StatusBadge>
+            </p>
+            <ul className="mt-1.5 space-y-1 text-[0.875rem]">
+              {stage.items.map(item => (
+                <li key={item.code} className={`flex items-start gap-2 ${item.done ? "text-ink-800" : "text-ink-600"}`}>
+                  <span aria-hidden className={`mt-0.5 grid h-4 w-4 flex-none place-items-center rounded-full ${item.done ? "bg-brand-600 text-white" : "border border-ink-350 bg-white"}`}>{item.done && <Check size={10} strokeWidth={3}/>}</span>
+                  <span>{pick(t.checklist.items, item.code)}{!item.required && <span className="text-ink-500"> ({t.checklist.optional})</span>}
+                    <span className="sr-only">: {item.done ? t.checklist.done : t.checklist.missing}</span></span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <section id="treatment-panel" aria-labelledby={`${id}-title`} className="card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3 id={`${id}-title`} className="title text-base">{t.title}</h3>
         {inTreatment && (view.nextMilestoneDueAt
-          ? <p className="text-[0.85rem] font-semibold text-ink-700">{fillTemplate(t.nextDue, { when: when(view.nextMilestoneDueAt) })}</p>
-          : dischargePlanned ? <p className="text-[0.85rem] text-ink-600">{t.clockStopped}</p> : null)}
+          ? <p className="text-[0.875rem] font-semibold text-ink-700">{fillTemplate(t.nextDue, { when: when(view.nextMilestoneDueAt) })}</p>
+          : dischargePlanned ? <p className="text-[0.875rem] text-ink-600">{t.clockStopped}</p> : null)}
       </div>
 
       {/* MILESTONES */}
       <h4 className="mt-4 text-[0.875rem] font-bold text-ink-800">{t.milestones.title}</h4>
-      {view.milestones.length === 0 ? <p className="mt-1 text-[0.85rem] text-ink-600">{t.milestones.empty}</p> : (
-        <ol className="mt-1 divide-y divide-line text-[0.85rem]">
+      {view.milestones.length === 0 ? <p className="mt-1 text-[0.875rem] text-ink-600">{t.milestones.empty}</p> : (
+        <ol className="mt-1 divide-y divide-line text-[0.875rem]">
           {view.milestones.map(m => <MilestoneRow key={m.id} t={t} m={m} roleName={pick(roles, m.recordedRole ?? "SYSTEM")} when={when} day={day}
             action={role === "doctor" && m.needsCountersign && !m.countersigned && !m.superseded
               ? <ConfirmAction label={t.milestones.countersign} context={pick(t.milestones.kinds, m.kind)} title={t.milestones.countersignTitle}
@@ -110,10 +171,10 @@ export function TreatmentPanel({ locale, role, caseId, caseStatus, currentCode, 
       {/* CHANGE ORDERS */}
       <div className="mt-4 border-t border-line pt-3">
         <h4 className="text-[0.875rem] font-bold text-ink-800">{t.orders.title}</h4>
-        {view.changeOrders.length === 0 ? <p className="mt-1 text-[0.85rem] text-ink-600">{t.orders.empty}</p> : (
+        {view.changeOrders.length === 0 ? <p className="mt-1 text-[0.875rem] text-ink-600">{t.orders.empty}</p> : (
           <ul className="mt-1 divide-y divide-line">
             {view.changeOrders.map(o => (
-              <li key={o.id} id={next === `price:${o.id}` ? ANCHOR : undefined} className="py-3 text-[0.85rem]">
+              <li key={o.id} id={next === `price:${o.id}` ? ANCHOR : undefined} className="py-3 text-[0.875rem]">
                 <OrderSummary t={t} order={o} locale={locale} when={when} egp={egp}/>
                 {priceable.some(p => p.id === o.id) && <PriceForm t={t} order={o} busy={busy} primary={next === `price:${o.id}`}
                   onPrice={lines => act(`/finance/cases/${caseId}/change-orders/${o.id}/price`, { lines })}/>}
@@ -125,61 +186,20 @@ export function TreatmentPanel({ locale, role, caseId, caseStatus, currentCode, 
         )}
       </div>
 
+      {/* For the Consultant the clinic comes first: the checklist here, the money and the hospital's bills behind one disclosure. */}
+      {doctor && checklist}
+
       {/* RUNNING MONEY — exactly as returned */}
-      <div className="mt-4 border-t border-line pt-3">
-        <h4 className="text-[0.875rem] font-bold text-ink-800">{t.money.title}</h4>
-        <dl className="mt-2 grid gap-x-6 gap-y-2 text-[0.85rem] tabular-nums sm:grid-cols-2 lg:grid-cols-4">
-          <Fact label={t.money.package}><Money>{egp(view.money.packageEgp)}</Money></Fact>
-          <Fact label={t.money.changeOrders}><Money>{egp(view.money.changeOrdersEgp)}</Money></Fact>
-          <Fact label={t.money.authorised}><Money>{egp(view.money.authorisedEgp)}</Money></Fact>
-          <Fact label={t.money.billed}><Money>{egp(view.money.interimBilledEgp)}</Money></Fact>
-          {view.money.interimPendingEgp != null && <Fact label={t.money.pending}><Money>{egp(view.money.interimPendingEgp)}</Money></Fact>}
-          <Fact label={t.money.variance}>
-            <span className={view.money.varianceEgp > 0 ? "text-alert-800" : undefined}><Money>{egp(view.money.varianceEgp)}</Money>{view.money.varianceEgp > 0 && <> {t.money.over}</>}</span>
-          </Fact>
-          <Fact label={t.money.band}><Money>{egp(view.money.bandLimitEgp)}</Money></Fact>
-          <Fact label={t.money.bandUsed}><Money>{egp(view.money.bandUsedEgp)}</Money></Fact>
-        </dl>
-      </div>
+      {doctor ? (
+        <details className="group mt-4 border-t border-line">
+          <Summary>
+            {t.money.title}<span className="font-normal text-ink-600">· {t.money.authorised} <Money>{egp(view.money.authorisedEgp)}</Money></span>
+            {view.money.varianceEgp > 0 && <span className="font-semibold text-alert-800">· <Money>{egp(view.money.varianceEgp)}</Money> {t.money.over}</span>}
+          </Summary>
+          <div className="pb-2">{money}{bills}</div>
+        </details>
+      ) : <>{money}{bills}{checklist}</>}
 
-      {/* INTERIM BILLS */}
-      <div className="mt-4 border-t border-line pt-3">
-        <h4 className="text-[0.875rem] font-bold text-ink-800">{t.bills.title}</h4>
-        {view.interimBills.length === 0 ? <p className="mt-1 text-[0.85rem] text-ink-600">{t.bills.empty}</p> : (
-          <ul className="mt-1 divide-y divide-line">
-            {view.interimBills.map(b => <BillRow key={b.id} t={t} bill={b} roleName={pick(roles, b.recordedRole ?? "SYSTEM")} when={when} egp={egp}
-              action={billsToSign.some(s => s.id === b.id)
-                ? <ConfirmAction label={t.bills.countersign} context={b.reference ?? undefined} title={t.bills.countersignTitle} body={`${t.bills.countersignBody} ${t.freshSignIn}`}
-                                 confirm={t.bills.countersign} cancel={t.cancel} primary={next === `bill:${b.id}`} busy={busy}
-                                 onConfirm={() => act(`/finance/cases/${caseId}/treatment/interim-bills/${b.id}/countersign`)}/>
-                : null} primary={next === `bill:${b.id}`}/>)}
-          </ul>
-        )}
-      </div>
-
-      {/* EVIDENCE CHECKLIST PER STAGE */}
-      <div className="mt-4 border-t border-line pt-3">
-        <h4 className="text-[0.875rem] font-bold text-ink-800">{t.checklist.title}</h4>
-        <div className="mt-2 grid gap-x-6 gap-y-4 sm:grid-cols-2">
-          {view.checklist.map(stage => (
-            <div key={stage.stage}>
-              <p className="flex flex-wrap items-center gap-2 text-[0.85rem] font-semibold text-ink-800">
-                {pick(t.checklist.stages, stage.stage)}
-                <StatusBadge tone={stage.complete ? "success" : "neutral"}>{stage.complete ? t.checklist.complete : t.checklist.incomplete}</StatusBadge>
-              </p>
-              <ul className="mt-1.5 space-y-1 text-[0.85rem]">
-                {stage.items.map(item => (
-                  <li key={item.code} className={`flex items-start gap-2 ${item.done ? "text-ink-800" : "text-ink-600"}`}>
-                    <span aria-hidden className={`mt-0.5 grid h-4 w-4 flex-none place-items-center rounded-full ${item.done ? "bg-brand-600 text-white" : "border border-ink-350 bg-white"}`}>{item.done && <Check size={10} strokeWidth={3}/>}</span>
-                    <span>{pick(t.checklist.items, item.code)}{!item.required && <span className="text-ink-500"> ({t.checklist.optional})</span>}
-                      <span className="sr-only">: {item.done ? t.checklist.done : t.checklist.missing}</span></span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* RECORDING */}
       {inTreatment && role === "doctor" && (
@@ -314,7 +334,7 @@ function BillRow({ t, bill, roleName, when, egp, action, primary }: {
   t: Copy; bill: AdmissionEvidence; roleName: string; when: (iso?: string | null) => string; egp: (n?: number | null) => string; action: ReactNode; primary: boolean;
 }) {
   return (
-    <li id={primary ? ANCHOR : undefined} className={`flex flex-wrap items-center justify-between gap-3 py-2 text-[0.85rem] ${bill.superseded ? "text-ink-500" : "text-ink-800"}`}>
+    <li id={primary ? ANCHOR : undefined} className={`flex flex-wrap items-center justify-between gap-3 py-2 text-[0.875rem] ${bill.superseded ? "text-ink-500" : "text-ink-800"}`}>
       <span className="min-w-0">
         <span className="font-semibold text-ink-900">{bill.reference && <bdi dir="ltr" translate="no">{bill.reference}</bdi>}{bill.amountEgp != null && <> · <Money>{egp(bill.amountEgp)}</Money></>}</span>
         <span className="block text-[0.8125rem] text-ink-600">
@@ -441,7 +461,7 @@ function ChangeOrderForm({ t, hint, submitLabel, confirm, busy, onSubmit }: {
 /** Finance prices every line of the order in EGP (step-up); totals and the band are the backend's. */
 function PriceForm({ t, order, busy, primary, onPrice }: { t: Copy; order: ChangeOrder; busy: boolean; primary: boolean; onPrice: (lines: { lineId: string; unitEgp: number }[]) => Promise<boolean> }) {
   return (
-    <form className="mt-3 rounded-lg border border-line bg-mist p-3" onSubmit={submit(data => onPrice(order.lines.map(line => ({ lineId: line.id, unitEgp: Number(data.get(`unit-${line.id}`)) }))))}>
+    <form className="mt-3 border-t border-line pt-3" onSubmit={submit(data => onPrice(order.lines.map(line => ({ lineId: line.id, unitEgp: Number(data.get(`unit-${line.id}`)) }))))}>
       <p className="text-[0.875rem] font-bold text-ink-800">{fillTemplate(t.pricing.title, { orderNumber: `⁨${order.orderNumber}⁩` })}</p>
       <p className="mt-0.5 max-w-[65ch] text-[0.8125rem] text-ink-600">{t.pricing.hint}</p>
       <div className="mt-2 grid gap-3 sm:grid-cols-2">
@@ -464,8 +484,8 @@ function Withdraw({ t, order, busy, onWithdraw }: { t: Copy; order: ChangeOrder;
   const [reason, setReason] = useState("");
   const [confirming, setConfirming] = useState(false);
   return (
-    <details className="mt-2">
-      <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-bold text-brand-700">{t.orders.withdraw}<span className="sr-only">: {order.orderNumber}</span></summary>
+    <details className="group mt-2">
+      <Summary>{t.orders.withdraw}<span className="sr-only">: {order.orderNumber}</span></Summary>
       <form className="pb-1" onSubmit={event => { event.preventDefault(); if (reason.trim()) setConfirming(true); }}>
         <label htmlFor={`${id}-reason`} className="block text-sm font-semibold">{t.orders.withdrawReason}</label>
         <textarea id={`${id}-reason`} className="field" rows={2} maxLength={2000} required value={reason} onChange={event => setReason(event.target.value)}/>

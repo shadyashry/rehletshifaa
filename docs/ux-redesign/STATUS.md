@@ -1066,6 +1066,60 @@ seeded catalogue line was deactivated; the evidence heading level in the rail (h
 first after discharge with the complication first, the discharge stamp, work-type copy, a per-panel error boundary), started
 in a new session from this branch.
 
+## UX area 3 — slice 3-2: after arrival (2026-10-28, worktree `ux-3-2-after-arrival-8a0824`, branch `claude/ux-3-2-after-arrival-8a0824` from `feat/review-p0` @ `db493ab9`)
+
+**Built (enhances the accepted layouts; Petrol & Paper unchanged, no new token).**
+- **Panels in the order of the Consultant's work** (`StaffCaseView`): the panel holding the current step comes first (by its
+  work set: admission, treatment, discharge, follow-up), then the stage's own order: in treatment Treatment → Discharge →
+  Admission; after discharge (DISCHARGED/FOLLOW_UP/CLOSED) Follow-up → Discharge → the rest. Start treatment stays with the
+  admission it depends on. Other roles keep the area-2 order unchanged.
+- **Money as summaries for the Consultant** (O-1, presentation only): Admission reads as one line ("Nile Heart Hospital · Cairo ·
+  Checked, within the estimate", the admission number when there is one, what still blocks treatment before clearance), the
+  voucher behind "The voucher and what is owed"; no ledger trail. The emergency admission at arrival stays. Treatment puts the
+  clinic first (milestones, change orders, evidence checklist) and the running money and the hospital's interim bills behind one
+  "Running money · Authorised total" disclosure, which also says a variance over the authorised total in its summary.
+- **Follow-up first, the complication first** (`FollowUpPanel`): an unreviewed complication opens the panel — "The patient
+  reported a problem" (drawn alert icon, alert-800 words, no tint), when and how it was answered and by whom, the patient's own
+  words (`dir="auto"`), the safety line (contact the patient or the person answering for them, record what you did or advised; an
+  incident is open), then the review form as the one primary action. The outcome row no longer repeats the words. The
+  coordinator sees one line that a problem was reported and the Consultant reviews it (no clinical text). The coordinator's
+  REBOOK_FOLLOW_UP line is a focus target.
+- **The discharge stamp** (`DischargePanel`): once discharged, the file's `CaseStamp` ("Discharged", line variant) on the date the
+  case timeline recorded DISCHARGED — a real event, never decoration; no date, a plain badge. For the Consultant the pack, letter,
+  invoice and journey home fold into "The discharge pack, the letter and the journey home"; Operations (return/departure) keeps
+  the panel open.
+- **Work-type copy and focus targets**: `COMPLETE_DISCHARGE_PACK`, `CONFIRM_RETURN`, `CONFIRM_DEPARTURE` added to
+  `currentAction.work` and `workTitles` (en+ar), so the Arabic strip and My work never fall back to English for these steps;
+  their targets are the panels' `*-next` anchors (unchanged mechanism, now the first panel).
+- **Per-panel error boundary** (`PanelBoundary` in `panel-parts`): each panel renders inside one, keyed per case; a view the page
+  cannot draw says "{panel} could not be shown…" in its own place while the cover, the step and the other panels work.
+- **Convergence**: off-ladder `0.85rem` → `0.875rem` in the four panels; `0.8rem`/`0.9rem` → `0.8125rem`/`0.9375rem` in
+  ReopenCase; Finance's tinted price box → hairline; ReopenCase card → hairline line; one shared `Summary` with a drawn
+  chevron (the flex summaries had lost their marker) and a hover state for every panel disclosure.
+- **Fixture**: the discharge work item now carries the backend's real type (`DISCHARGE_PACK`, `DischargeService.PACK_WORK`) and
+  wording code; the follow-up case has DISCHARGED/FOLLOW_UP timeline entries and a discharged view (pack done, return confirmed).
+
+**Reviews** (Impeccable, react-best-practices, composition-patterns and web-design-guidelines loaded at batch start; in-thread
+review of the diff): role-based branches inside the existing panels rather than new boolean props; one finding fixed (disclosure
+summaries had no hover state). Impeccable detector: 0 findings; off-ladder sizes in the touched panels: 0.
+
+**Verify.** `pnpm typecheck` ok; eslint 0 on the touched files (baseline 0); vitest 97 files / 760 tests, 759 pass — the one
+failure, `StaffOperationalUi.test.tsx` "tells Finance its list also holds the cases with a deposit to record" (QA W-44), fails the
+same on the clean base (pre-existing). New tests: Consultant admission summary, discharge stamp + fold (and open for Operations),
+`PanelBoundary`; FollowUpPanel's complication test rewritten for the report-first layout. Playwright on :3117 (production build):
+consultant-shots (now asserts the panel order and the stamp), staff-chrome, case-cover, staff-keyboard, portal-reliability,
+a11y en+ar — 61/61. Overwritten area-2 shots restored.
+
+**Screenshots:** `screenshots/area-3/3-2/` — my-work, case-review/assess/treat/discharge/follow, clinic-overview/services × en/ar ×
+390/1440.
+
+**Follow-ups (backlog, not blocking):** a coordinator-side order by the current task (left as area 2 accepted it); the unused
+`followUp.outcomes.reviewForm` key can go once nothing reads it; B-3-1a/B-3-1b and G-2 from 3-1 stay open.
+
+**Next:** slice 3-3 — the Virtual Clinic (portal shell + h1, tabs with keys, hairline sections, services list, confirmations, one
+filled action, "Credentials reviewed", manager permission line, Affiliations on P1-19's contract), started in a new session from
+this branch.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

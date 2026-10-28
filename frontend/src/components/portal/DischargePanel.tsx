@@ -9,7 +9,8 @@ import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { LetterBlock } from "@/components/portal/GoingHomeStory";
-import { DocumentPicker, Fact, Money, Task as PanelTask, instant, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
+import { CaseStamp } from "@/components/brand/CaseStamp";
+import { DocumentPicker, Fact, Money, Summary, Task as PanelTask, instant, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
 import type { DischargePackItem, DischargeView, Mutate } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["discharge"];
@@ -29,10 +30,14 @@ const ANCHOR = "discharge-next";
  * the handover letter for the home doctor (English and Arabic, printable), the hospital's final invoice and the journey home,
  * all as `GET /{role}/cases/{id}/discharge` returns them. The Consultant records the pack documents, the follow-up plan and
  * generates the letter; Operations records the final invoice, confirms the return (a flight needs a valid fit to fly) and the
- * departure. One primary action — the viewer's next one — and the rest one click away.
+ * departure. One primary action — the viewer's next one — and the rest one click away. Once the patient is discharged the
+ * panel carries the file's stamp on the day the case recorded it (UX 3-2), and for the Consultant, whose work has moved to
+ * Follow-up, the rest folds into one line.
  */
-export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, documents = [], busy, mutate, load }: {
+export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, dischargedAt, documents = [], busy, mutate, load }: {
   locale: Locale; role: DischargeRole; caseId: string; caseStatus: string;
+  /** When the case's timeline recorded the discharge: the stamp's date. No date, no stamp. */
+  dischargedAt?: string | null;
   /** The viewer's current action code or work type, which picks what opens first. */
   currentCode?: string | null;
   documents?: PanelDocument[]; busy: boolean; mutate: Mutate; load: <T>(path: string) => Promise<T>;
@@ -81,15 +86,17 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
     <section id="discharge-panel" aria-labelledby={`${id}-title`} className="card p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3 id={`${id}-title`} className="title text-base">{t.title}</h3>
-        {discharged && <StatusBadge tone="success">{t.state.discharged}</StatusBadge>}
+        {discharged && (dischargedAt ? <CaseStamp label={t.state.discharged} date={dischargedAt} locale={locale} variant="line"/>
+          : <StatusBadge tone="success">{t.state.discharged}</StatusBadge>)}
       </div>
-      {stateLine && <p className="mt-1 text-[0.85rem] text-ink-700">{stateLine}</p>}
+      {stateLine && <p className="mt-1 text-[0.875rem] text-ink-700">{stateLine}</p>}
+      <Fold fold={discharged && role === "doctor"} label={t.details}>
 
       {/* WHAT BLOCKS DISCHARGE — instead of a button: discharge happens on its own once this list is empty. */}
       {!discharged && view.blockers.length > 0 && (
         <div className="mt-3">
           <p className="text-[0.875rem] font-bold text-ink-800">{t.state.blocked}</p>
-          <ul className="mt-1 space-y-1 text-[0.85rem] text-ink-700">
+          <ul className="mt-1 space-y-1 text-[0.875rem] text-ink-700">
             {view.blockers.map(b => <li key={b.code} className="flex items-start gap-2"><span aria-hidden className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-ink-400"/>{pick(t.blockers, b.code)}</li>)}
           </ul>
           <p className="mt-1.5 max-w-[65ch] text-[0.8125rem] text-ink-600">{t.automatic}</p>
@@ -105,14 +112,14 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
       {/* FOLLOW-UP PLAN AND THE LETTER */}
       <div className="mt-4 border-t border-line pt-3">
         <h4 className="text-[0.875rem] font-bold text-ink-800">{t.followUp.title}</h4>
-        <p className="mt-1 text-[0.85rem] text-ink-700">{view.followUpPlan
+        <p className="mt-1 text-[0.875rem] text-ink-700">{view.followUpPlan
           ? `${pick(t.followUp.modes, view.followUpPlan.mode)} · ${fillTemplate(t.followUp.due, { when: when(view.followUpPlan.dueAt) })}` : t.followUp.none}</p>
       </div>
       <div className="mt-4 border-t border-line pt-3">
         {view.handoverLetter && (view.handoverLetter.english || view.handoverLetter.arabic)
           ? <><LetterBlock headingLevel={4} copy={{ title: t.letter.title, hint: t.letter.hint, english: t.letter.english, arabic: t.letter.arabic, print: t.letter.print }} letter={view.handoverLetter}/>
               <p className="text-[0.8125rem] text-ink-600">{fillTemplate(t.letter.generated, { when: when(view.handoverLetter.generatedAt) })}</p></>
-          : <><h4 className="text-[0.875rem] font-bold text-ink-800">{t.letter.title}</h4><p className="mt-1 text-[0.85rem] text-ink-600">{view.handoverLetter ? fillTemplate(t.letter.generated, { when: when(view.handoverLetter.generatedAt) }) : t.letter.none}</p></>}
+          : <><h4 className="text-[0.875rem] font-bold text-ink-800">{t.letter.title}</h4><p className="mt-1 text-[0.875rem] text-ink-600">{view.handoverLetter ? fillTemplate(t.letter.generated, { when: when(view.handoverLetter.generatedAt) }) : t.letter.none}</p></>}
         {role === "doctor" && DISCHARGE_STAGES.has(status) && (
           <button type="button" className="btn-secondary mt-2" disabled={busy} onClick={() => void act(`/doctor/cases/${caseId}/discharge/handover-letter`)}>
             {view.handoverLetter ? t.letter.regenerate : t.letter.generate}
@@ -124,23 +131,23 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
       <div className="mt-4 border-t border-line pt-3">
         <h4 className="text-[0.875rem] font-bold text-ink-800">{t.invoice.title}</h4>
         {view.finalInvoice ? (
-          <dl className="mt-2 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-3">
+          <dl className="mt-2 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-3">
             <Fact label={t.invoice.number}><bdi dir="ltr" translate="no">{view.finalInvoice.reference ?? "—"}</bdi></Fact>
             <Fact label={t.invoice.amountEgp}><Money>{egp(view.finalInvoice.amountEgp)}</Money></Fact>
             <Fact label={t.invoice.issuedAt}>{when(view.finalInvoice.effectiveAt ?? view.finalInvoice.recordedAt)}</Fact>
           </dl>
-        ) : <p className="mt-1 text-[0.85rem] text-ink-600">{t.invoice.none}</p>}
+        ) : <p className="mt-1 text-[0.875rem] text-ink-600">{t.invoice.none}</p>}
         {view.finalInvoice && <p className="mt-1 text-[0.8125rem] text-ink-600">{view.finalInvoice.countersignedAt ? `${t.invoice.countersigned} · ${when(view.finalInvoice.countersignedAt)}` : t.invoice.awaiting}</p>}
       </div>
       <div className="mt-4 border-t border-line pt-3">
         <h4 className="text-[0.875rem] font-bold text-ink-800">{t.travel.title}</h4>
         {view.returnTravel ? (
-          <p className="mt-1 text-[0.85rem] text-ink-800">
+          <p className="mt-1 text-[0.875rem] text-ink-800">
             {fillTemplate(t.travel.returnLine, { mode: pick(t.travel.modes, view.returnTravel.mode), when: when(view.returnTravel.departureAt) })}
             {view.returnTravel.reference && <> · {t.travel.reference} <bdi dir="ltr" translate="no">{view.returnTravel.reference}</bdi></>}
           </p>
-        ) : <p className="mt-1 text-[0.85rem] text-ink-600">{t.travel.none}</p>}
-        {view.departedAt && <p className="mt-1 text-[0.85rem] font-semibold text-ink-800">{fillTemplate(t.travel.departed, { when: when(view.departedAt) })}</p>}
+        ) : <p className="mt-1 text-[0.875rem] text-ink-600">{t.travel.none}</p>}
+        {view.departedAt && <p className="mt-1 text-[0.875rem] font-semibold text-ink-800">{fillTemplate(t.travel.departed, { when: when(view.departedAt) })}</p>}
       </div>
 
       {/* RECORDING — the Consultant */}
@@ -200,8 +207,15 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
           )}
         </div>
       )}
+      </Fold>
     </section>
   );
+}
+
+/** After discharge the Consultant reads this panel as its summary line; the pack, the letter and the journey home stay one click away. */
+function Fold({ fold, label, children }: { fold: boolean; label: string; children: ReactNode }) {
+  if (!fold) return <>{children}</>;
+  return <details className="group mt-3 border-t border-line"><Summary>{label}</Summary><div className="pb-2">{children}</div></details>;
 }
 
 function Task({ title, next, children }: { title: string; next: boolean; children: ReactNode }) {
@@ -216,7 +230,7 @@ function packTone(status: string): StatusTone {
 function PackRow({ t, item, when }: { t: Copy; item: DischargePackItem; when: (iso?: string | null) => string }) {
   const done = item.status === "DONE";
   return (
-    <li className="py-2 text-[0.85rem]">
+    <li className="py-2 text-[0.875rem]">
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span aria-hidden className={`grid h-4 w-4 flex-none place-items-center rounded-full ${done ? "bg-brand-600 text-white" : "border border-ink-350 bg-white"}`}>{done && <Check size={10} strokeWidth={3}/>}</span>
         <span className="font-semibold text-ink-900">{pick(t.pack.kinds, item.kind)}</span>

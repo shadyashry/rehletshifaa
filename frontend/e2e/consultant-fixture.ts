@@ -25,7 +25,8 @@ const work = (id: string, caseId: ConsultantCaseId, type: string, title: string,
 const workItems = [
   work("cw1", "review", "CLINICAL_REVIEW", "Review the case and record your recommendation", "The coordinator prepared the case; three documents are ready.", { priority: "HIGH", dueAt: at(-6) }),
   work("cw2", "treat", "COUNTERSIGN_MILESTONE", "Countersign a treatment milestone", "Operations recorded \"Procedure started\" from the hospital's admission desk."),
-  work("cw3", "discharge", "COMPLETE_DISCHARGE_PACK", "Complete the discharge pack", "The medication list and the follow-up plan are still missing.", { dueAt: at(-30) }),
+  // The backend's own item (DischargeService.PACK_WORK) with its wording code, as My work receives it.
+  work("cw3", "discharge", "DISCHARGE_PACK", "Complete the discharge pack", "The medication list and the follow-up plan are still missing.", { dueAt: at(-30), copy: { code: "DISCHARGE_PACK", params: { caseNumber: "RS-2026-000014" } } }),
   work("cw4", "follow", "REVIEW_COMPLICATION", "Review a reported complication", "The patient's representative reported a fever at the day-30 check.", { priority: "URGENT", overdue: true, dueAt: at(2) }),
 ];
 
@@ -59,8 +60,11 @@ const caseView = (id: ConsultantCaseId) => {
     // The backend gives the Consultant no step at arrival yet (CaseActionService: none()); the final assessment is on the page by stage.
     case "assess": return { ...common, clinicalReviews: [review], actions: actions("ARRIVAL_CONFIRMED", { code: "NONE", kind: "NONE" }) };
     case "treat": return { ...common, clinicalReviews: [review], actions: actions("TREATMENT_IN_PROGRESS", { code: "WORK_ITEM", kind: "FOCUS", workType: "COUNTERSIGN_MILESTONE", workItemId: "cw2", workItemVersion: 0, title: "Countersign a treatment milestone" }) };
-    case "discharge": return { ...common, clinicalReviews: [review], actions: actions("TREATMENT_IN_PROGRESS", { code: "WORK_ITEM", kind: "FOCUS", workType: "COMPLETE_DISCHARGE_PACK", workItemId: "cw3", workItemVersion: 0, title: "Complete the discharge pack" }) };
-    case "follow": return { ...common, clinicalReviews: [review], actions: actions("FOLLOW_UP", { code: "WORK_ITEM", kind: "FOCUS", workType: "REVIEW_COMPLICATION", workItemId: "cw4", workItemVersion: 0, title: "Review a reported complication", overdue: true }) };
+    case "discharge": return { ...common, clinicalReviews: [review], actions: actions("TREATMENT_IN_PROGRESS", { code: "WORK_ITEM", kind: "FOCUS", workType: "DISCHARGE_PACK", workItemId: "cw3", workItemVersion: 0, title: "Complete the discharge pack",
+      copy: { code: "DISCHARGE_PACK", params: { caseNumber: "RS-2026-000014" } } }) };
+    // Discharged 30 days ago (the timeline's DISCHARGED entry is the stamp's date).
+    case "follow": return { ...common, timeline: [...timeline, { type: "STATUS", label: "Discharged", status: "DISCHARGED", occurredAt: at(720) }, { type: "STATUS", label: "Follow-up", status: "FOLLOW_UP", occurredAt: at(700) }],
+      clinicalReviews: [review], actions: actions("FOLLOW_UP", { code: "WORK_ITEM", kind: "FOCUS", workType: "REVIEW_COMPLICATION", workItemId: "cw4", workItemVersion: 0, title: "Review a reported complication", overdue: true }) };
   }
 };
 
@@ -82,7 +86,14 @@ const treatment = (caseId: string) => ({
     { stage: "TREATMENT", complete: false, items: [{ code: "MILESTONE_ADMITTED", required: true, done: true }, { code: "MILESTONE_PROCEDURE_COMPLETED", required: true, done: false }] },
   ],
 });
-const discharge = (caseId: string) => ({
+const discharged = (caseId: string) => ({
+  caseId, caseStatus: "FOLLOW_UP", fitToFlyHours: 72, readyForDischarge: true, reconciliationSettled: true, blockers: [],
+  pack: ["DISCHARGE_SUMMARY", "MEDICATION_LIST", "OPERATIVE_NOTE", "FIT_TO_FLY"].map((kind, i) => ({ kind, requiredForDischarge: kind !== "FIT_TO_FLY", status: "DONE", recordedAt: at(730 - i) }))
+    .concat([{ kind: "IMPLANT_RECORD", requiredForDischarge: false, status: "NOT_REQUIRED", recordedAt: at(0) }]),
+  followUpPlan: { id: "p1", dueAt: at(500), mode: "VIDEO" },
+  returnTravel: { evidenceId: "e9", mode: "FLIGHT", departureAt: at(700), reference: "MS-912", confirmedAt: at(710) }, departedAt: at(700),
+});
+const discharge = (caseId: string) => caseId === "follow" ? discharged(caseId) : ({
   caseId, caseStatus: "TREATMENT_IN_PROGRESS", fitToFlyHours: 72, readyForDischarge: false, reconciliationSettled: false,
   pack: [
     { kind: "DISCHARGE_SUMMARY", requiredForDischarge: true, status: "DONE", recordedAt: at(6), diagnosis: "Coronary artery disease", warningSigns: "Chest pain or breathlessness" },

@@ -187,3 +187,19 @@ describe("AdmissionPanel — Consultant and Arabic", () => {
     expect(screen.getByText(/سجل الإثباتات/)).toBeTruthy();
   });
 });
+
+describe("AdmissionPanel — the Consultant's summary (UX 3-2)", () => {
+  afterEach(cleanup);
+
+  it("reads the admission as one line, with the voucher's money behind a closed disclosure and no ledger", async () => {
+    setup("doctor", { ...reserved, caseStatus: "TREATMENT_IN_PROGRESS", admissionStatus: "ADMITTED", admissionNumber: "NHH-ADM-9", admissionBlockers: [] });
+    expect(await screen.findByRole("heading", { name: "Admission" })).toBeTruthy();
+    expect(screen.getByText("Checked, within the estimate")).toBeTruthy();
+    const money = screen.getByText("The voucher and what is owed", { selector: "summary" }).closest("details")!;
+    expect(money.open).toBe(false);
+    expect(within(money).getByText("Patient pays at the cashier")).toBeTruthy();
+    expect(screen.queryByText(/^Evidence trail/)).toBeNull();
+    expect(screen.queryByText("Record the emergency admission", { selector: "summary" })).toBeNull();
+  });
+});
+

@@ -22,7 +22,7 @@ export function ReopenCase({ locale, caseId, side, busy, mutate, load }: {
   const t = useWorkCopy().safety.reopen;
   const [open, setOpen] = useState(false);
   return (
-    <section id="reopen-case" className="card mt-4 flex scroll-mt-28 flex-wrap items-center justify-between gap-x-4 gap-y-2 p-4" aria-label={t.closed}>
+    <section id="reopen-case" className="mt-4 flex scroll-mt-28 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-y border-line py-3" aria-label={t.closed}>
       <p className="text-[0.9375rem] text-ink-700">{t.closed}</p>
       <button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={() => setOpen(true)}>{t.action}</button>
       {open && <ReopenDialog locale={locale} caseId={caseId} side={side} busy={busy} mutate={mutate} load={load} onClose={() => setOpen(false)}/>}
@@ -64,12 +64,12 @@ function ReopenDialog({ locale, caseId, side, busy, mutate, load, onClose }: {
     <dialog ref={dialog} className="account-dialog" aria-labelledby={`${id}-title`} aria-describedby={`${id}-body`} onClose={onClose}>
       <div className="flex items-start justify-between gap-4">
         <h2 id={`${id}-title`} className="title">{t.title}</h2>
-        <button type="button" className="icon-button" aria-label={t.cancel} onClick={() => dialog.current?.close()}><X size={20}/></button>
+        <button type="button" className="icon-button" aria-label={t.cancel} onClick={() => dialog.current?.close()}><X size={20} aria-hidden/></button>
       </div>
-      <p id={`${id}-body`} className="mt-2 text-[0.9rem] leading-6 text-ink-600">{t.body}</p>
+      <p id={`${id}-body`} className="mt-2 text-[0.9375rem] leading-6 text-ink-600">{t.body}</p>
       <form className="mt-5 space-y-5" onSubmit={event => void save(event)} noValidate>
         <fieldset aria-describedby={touched && !reason ? `${id}-reason-error` : undefined}>
-          <legend className="text-[0.8rem] font-bold text-ink-800">{t.reasonLegend}</legend>
+          <legend className="text-[0.8125rem] font-bold text-ink-800">{t.reasonLegend}</legend>
           <div className="mt-1.5">
             {REOPEN_REASONS.map(code => (
               <label key={code} className="flex min-h-11 cursor-pointer items-center gap-3">
@@ -82,7 +82,7 @@ function ReopenDialog({ locale, caseId, side, busy, mutate, load, onClose }: {
         </fieldset>
         {incidents.length > 0 && (
           <div>
-            <label htmlFor={`${id}-incident`} className="block text-[0.8rem] font-bold text-ink-800">{t.incidentLabel}</label>
+            <label htmlFor={`${id}-incident`} className="block text-[0.8125rem] font-bold text-ink-800">{t.incidentLabel}</label>
             <select id={`${id}-incident`} className="field mt-1.5" value={incidentId} onChange={event => setIncidentId(event.target.value)}>
               <option value="">{t.noIncident}</option>
               {incidents.map(incident => <option key={incident.id} value={incident.id}>
@@ -92,7 +92,7 @@ function ReopenDialog({ locale, caseId, side, busy, mutate, load, onClose }: {
           </div>
         )}
         <div>
-          <label htmlFor={`${id}-note`} className="block text-[0.8rem] font-bold text-ink-800">{t.noteLabel}</label>
+          <label htmlFor={`${id}-note`} className="block text-[0.8125rem] font-bold text-ink-800">{t.noteLabel}</label>
           <textarea id={`${id}-note`} className="field mt-1.5 min-h-24 resize-y" dir="auto" maxLength={1000} value={note} onChange={event => setNote(event.target.value)}/>
         </div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

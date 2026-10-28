@@ -7,7 +7,7 @@ import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
-import { DocumentPicker, Fact, Money, Task as PanelTask, instant, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
+import { DocumentPicker, Fact, Money, Summary, Task as PanelTask, instant, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import type { AdmissionEvidence, AdmissionView, DirectoryFacility, Mutate } from "@/components/portal/portal-model";
 
@@ -29,7 +29,8 @@ const LETTER_DECIDABLE = new Set(["CHECK_PENDING", "VARIANCE_OPEN"]);
  * and what is still owed exactly as the API returns them, the checklist to ADMISSION_READY (the backend's
  * `admissionBlockers`) and the evidence trail; and it carries each role's recording: Operations reserves, records the letter,
  * the cashier receipt, the point of no return and the admission number; Finance decides the letter, countersigns and records
- * the fee balance (step-up: the portal re-signs in and replays); the Consultant records an emergency admission. The backend
+ * the fee balance (step-up: the portal re-signs in and replays); the Consultant reads it as a summary (UX 3-2) and records an
+ * emergency admission. The backend
  * decides every rule; the panel offers one primary action — the next one — and keeps the rest one click away.
  */
 export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, documents = [], facilities = [], busy, mutate, load }: {
@@ -79,6 +80,38 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
     : null;
   const btn = (key: string) => next === key ? "btn-primary" : "btn-secondary";
   const cleared = ["ADMISSION_READY", "TREATMENT_IN_PROGRESS"].includes(view.caseStatus ?? caseStatus);
+  const voucherFacts = voucher && <VoucherFacts t={t} locale={locale} voucher={voucher} view={view} egp={egp}/>;
+
+  // UX 3-2: the Consultant reads the admission as one line — where, and whether the hospital's letter is within the estimate —
+  // with the money behind a disclosure (presentation only: what a Consultant may read is the backend's call). Their one act
+  // here, the emergency admission, stays.
+  if (role === "doctor") return (
+    <section id="admission-panel" aria-labelledby={`${id}-title`} className="card p-5">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h3 id={`${id}-title`} className="title text-base">{t.summary.title}</h3>
+        {view.admissionStatus && <StatusBadge tone={view.admissionStatus === "CANCELLED" ? "neutral" : view.admissionStatus === "RESERVED" ? "info" : "success"}>{pick(t.admissionStatus, view.admissionStatus)}</StatusBadge>}
+      </div>
+      {!reserved ? <p className="mt-1 text-[0.875rem] text-ink-600">{t.notReserved}</p> : (
+        <p className="mt-1 text-[0.875rem] text-ink-700">
+          <bdi className="font-semibold text-ink-900">{view.facilityName ?? "—"}</bdi>{view.facilityCity && <> · <bdi>{view.facilityCity}</bdi></>}
+          {" · "}<span className={letterTone(view.letterCheck) === "warning" ? "text-alert-800" : undefined}>{pick(t.letterCheck, view.letterCheck ?? "NONE")}</span>
+          {view.admissionNumber && <> · {t.admissionNumber} <bdi dir="ltr">{view.admissionNumber}</bdi></>}
+        </p>
+      )}
+      {!cleared && view.admissionBlockers.length > 0 && (
+        <p className="mt-1 text-[0.875rem] text-ink-600">{t.summary.waiting} {view.admissionBlockers.map(code => pick(t.checklist.blockers, code)).join(" · ")}</p>
+      )}
+      {view.emergencyOverride && <p className="mt-2 text-[0.875rem] font-semibold text-alert-800">{t.emergencyRecorded}</p>}
+      {voucherFacts && (
+        <details className="group mt-3 border-t border-line">
+          <Summary>{t.summary.money}</Summary>
+          <div className="pb-2">{voucherFacts}</div>
+        </details>
+      )}
+      {caseStatus === "ARRIVAL_CONFIRMED" && !view.emergencyOverride && <EmergencyAdmission t={t} busy={busy}
+        onRecord={reason => act(`/doctor/cases/${caseId}/emergency-admission`, { reason })}/>}
+    </section>
+  );
 
   return (
     <section id="admission-panel" aria-labelledby={`${id}-title`} className="card p-5">
@@ -88,7 +121,7 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
       </div>
 
       {!reserved ? <p className="mt-2 text-[0.875rem] text-ink-600">{t.notReserved}</p> : (
-        <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.85rem] sm:grid-cols-2 lg:grid-cols-3">
+        <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-3">
           <Fact label={t.facility}><bdi>{view.facilityName ?? "—"}</bdi>{view.facilityCity && <span className="font-normal text-ink-600"> · <bdi>{view.facilityCity}</bdi></span>}</Fact>
           <Fact label={t.plannedAt}>{when(view.plannedAdmissionAt)}</Fact>
           <Fact label={t.letter}><span className={letterTone(view.letterCheck) === "warning" ? "text-alert-800" : undefined}>{pick(t.letterCheck, view.letterCheck ?? "NONE")}</span></Fact>
@@ -98,33 +131,15 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         </dl>
       )}
 
-      {voucher ? (
-        <div className="mt-4 border-t border-line pt-3">
-          <p className="text-[0.85rem] text-ink-500">{t.voucher} <bdi dir="ltr" translate="no" className="font-bold text-ink-900">{voucher.voucherNumber}</bdi> · {fillTemplate(t.voucherRevision, { revision: String(voucher.revision) })}</p>
-          <dl className="mt-2 grid gap-x-6 gap-y-2 text-[0.85rem] tabular-nums sm:grid-cols-2 lg:grid-cols-3">
-            <Fact label={t.money.packageTotal}><Money>{egp(voucher.packageTotalEgp)}</Money></Fact>
-            <Fact label={t.money.platformFee}><Money>{egp(voucher.platformFeeEgp)}</Money></Fact>
-            <Fact label={t.money.depositPaid}><Money>{egp(voucher.depositPaidEgp)}</Money></Fact>
-            <Fact label={t.money.depositCredit}><Money>{egp(voucher.depositCreditEgp)}</Money></Fact>
-            <Fact label={t.money.patientPays}><Money>{egp(voucher.patientPaysAtFacilityEgp)}</Money>
-              {voucher.displayCurrency && voucher.displayCurrency !== "EGP" && voucher.patientPaysAtFacilityDisplay != null && <span className="font-normal text-ink-600"> · <Money>{formatMoney(voucher.patientPaysAtFacilityDisplay, voucher.displayCurrency, locale)}</Money></span>}</Fact>
-            {voucher.feeBalanceEgp > 0 && <Fact label={t.money.feeBalance}><Money>{egp(voucher.feeBalanceEgp)}</Money></Fact>}
-            <Fact label={t.money.balanceOwed}><Money>{egp(view.balanceOwedEgp)}</Money></Fact>
-            {(view.feeBalanceOwedEgp ?? 0) > 0 && <Fact label={t.money.feeBalanceOwed}><Money>{egp(view.feeBalanceOwedEgp)}</Money></Fact>}
-          </dl>
-          {voucher.fxRate != null && voucher.fxRateDate && (
-            <p className="mt-2 text-[0.8125rem] text-ink-500">{fillTemplate(t.money.rate, { rate: `⁨${new Intl.NumberFormat(intlLocale(locale), { maximumSignificantDigits: 6 }).format(voucher.fxRate)}⁩`,
-              date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${voucher.fxRateDate}T00:00:00Z`)) })}</p>
-          )}
-        </div>
-      ) : reserved && <p className="mt-4 border-t border-line pt-3 text-[0.85rem] text-ink-600">{t.noVoucher}</p>}
+      {voucherFacts ? <div className="mt-4 border-t border-line pt-3">{voucherFacts}</div>
+        : reserved && <p className="mt-4 border-t border-line pt-3 text-[0.875rem] text-ink-600">{t.noVoucher}</p>}
 
       <div className="mt-4 border-t border-line pt-3">
         <h4 className="text-[0.875rem] font-bold text-ink-800">{t.checklist.title}</h4>
         {view.admissionBlockers.length === 0
-          ? <p className="mt-1 text-[0.85rem] text-ink-700">{t.checklist.clear}</p>
-          : <ul className="mt-1.5 list-disc space-y-1 ps-5 text-[0.85rem] text-ink-700">{view.admissionBlockers.map(code => <li key={code}>{pick(t.checklist.blockers, code)}</li>)}</ul>}
-        {view.emergencyOverride && <p className="mt-2 text-[0.85rem] font-semibold text-alert-800">{t.emergencyRecorded}</p>}
+          ? <p className="mt-1 text-[0.875rem] text-ink-700">{t.checklist.clear}</p>
+          : <ul className="mt-1.5 list-disc space-y-1 ps-5 text-[0.875rem] text-ink-700">{view.admissionBlockers.map(code => <li key={code}>{pick(t.checklist.blockers, code)}</li>)}</ul>}
+        {view.emergencyOverride && <p className="mt-2 text-[0.875rem] font-semibold text-alert-800">{t.emergencyRecorded}</p>}
       </div>
 
       {role === "operations" && (
@@ -223,7 +238,7 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
 
       {(role === "operations" || role === "coordinator") && (
         <Task title={t.firstAppointment.title} next={false}>
-          <p className="mb-3 text-[0.85rem] text-ink-600">{t.firstAppointment.hint}</p>
+          <p className="mb-3 text-[0.875rem] text-ink-600">{t.firstAppointment.hint}</p>
           <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(data => act(`/cases/${caseId}/first-confirmed-appointment`, { appointmentDate: text(data.get("appointmentDate")), reason: text(data.get("reason")) }))}>
             <label className="block text-sm font-semibold">{t.firstAppointment.date}<input className="field" name="appointmentDate" type="date" required /></label>
             <label className="block text-sm font-semibold">{t.firstAppointment.reason}<input className="field" name="reason" maxLength={500} required /></label>
@@ -232,13 +247,10 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         </Task>
       )}
 
-      {role === "doctor" && caseStatus === "ARRIVAL_CONFIRMED" && !view.emergencyOverride && <EmergencyAdmission t={t} busy={busy}
-        onRecord={reason => act(`/doctor/cases/${caseId}/emergency-admission`, { reason })}/>}
-
-      <details className="mt-3 border-t border-line pt-1">
-        <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-bold text-brand-700">{t.trail.title} ({view.evidence.length})</summary>
-        {view.evidence.length === 0 ? <p className="pb-2 text-[0.85rem] text-ink-500">{t.trail.empty}</p> : (
-          <ol className="divide-y divide-line text-[0.85rem]">
+      <details className="group mt-3 border-t border-line pt-1">
+        <Summary>{t.trail.title} ({view.evidence.length})</Summary>
+        {view.evidence.length === 0 ? <p className="pb-2 text-[0.875rem] text-ink-500">{t.trail.empty}</p> : (
+          <ol className="divide-y divide-line text-[0.875rem]">
             {view.evidence.map(row => (
               <li key={row.id} className={`py-2 ${row.superseded ? "text-ink-500" : "text-ink-800"}`}>
                 <p className="flex flex-wrap items-baseline justify-between gap-x-3">
@@ -256,6 +268,30 @@ export function AdmissionPanel({ locale, role, caseId, caseStatus, currentCode, 
         )}
       </details>
     </section>
+  );
+}
+
+/** The frozen voucher: its number, what each side pays, what is still owed, and the rate it was frozen at. */
+function VoucherFacts({ t, locale, voucher, view, egp }: { t: Copy; locale: Locale; voucher: NonNullable<AdmissionView["voucher"]>; view: AdmissionView; egp: (n?: number | null) => string }) {
+  return (
+    <>
+      <p className="text-[0.875rem] text-ink-500">{t.voucher} <bdi dir="ltr" translate="no" className="font-bold text-ink-900">{voucher.voucherNumber}</bdi> · {fillTemplate(t.voucherRevision, { revision: String(voucher.revision) })}</p>
+      <dl className="mt-2 grid gap-x-6 gap-y-2 text-[0.875rem] tabular-nums sm:grid-cols-2 lg:grid-cols-3">
+        <Fact label={t.money.packageTotal}><Money>{egp(voucher.packageTotalEgp)}</Money></Fact>
+        <Fact label={t.money.platformFee}><Money>{egp(voucher.platformFeeEgp)}</Money></Fact>
+        <Fact label={t.money.depositPaid}><Money>{egp(voucher.depositPaidEgp)}</Money></Fact>
+        <Fact label={t.money.depositCredit}><Money>{egp(voucher.depositCreditEgp)}</Money></Fact>
+        <Fact label={t.money.patientPays}><Money>{egp(voucher.patientPaysAtFacilityEgp)}</Money>
+          {voucher.displayCurrency && voucher.displayCurrency !== "EGP" && voucher.patientPaysAtFacilityDisplay != null && <span className="font-normal text-ink-600"> · <Money>{formatMoney(voucher.patientPaysAtFacilityDisplay, voucher.displayCurrency, locale)}</Money></span>}</Fact>
+        {voucher.feeBalanceEgp > 0 && <Fact label={t.money.feeBalance}><Money>{egp(voucher.feeBalanceEgp)}</Money></Fact>}
+        <Fact label={t.money.balanceOwed}><Money>{egp(view.balanceOwedEgp)}</Money></Fact>
+        {(view.feeBalanceOwedEgp ?? 0) > 0 && <Fact label={t.money.feeBalanceOwed}><Money>{egp(view.feeBalanceOwedEgp)}</Money></Fact>}
+      </dl>
+      {voucher.fxRate != null && voucher.fxRateDate && (
+        <p className="mt-2 text-[0.8125rem] text-ink-500">{fillTemplate(t.money.rate, { rate: `⁨${new Intl.NumberFormat(intlLocale(locale), { maximumSignificantDigits: 6 }).format(voucher.fxRate)}⁩`,
+          date: new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${voucher.fxRateDate}T00:00:00Z`)) })}</p>
+      )}
+    </>
   );
 }
 
@@ -281,11 +317,11 @@ function LetterDecision({ t, letter, variance, referenceMax, egp, busy, primary,
   return (
     <div id={primary ? "admission-next" : undefined} className="mt-3 border-t border-line pt-3">
       <h4 className="text-[0.875rem] font-bold text-ink-800">{t.finance.letterTitle}</h4>
-      <dl className="mt-1.5 grid gap-x-6 gap-y-1 text-[0.85rem] tabular-nums sm:grid-cols-2">
+      <dl className="mt-1.5 grid gap-x-6 gap-y-1 text-[0.875rem] tabular-nums sm:grid-cols-2">
         <Fact label={t.finance.quoted}><Money>{egp(letter.amountEgp)}</Money>{letter.reference && <span className="font-normal text-ink-600"> · <bdi dir="ltr">{letter.reference}</bdi></span>}</Fact>
         {referenceMax != null && <Fact label={t.referenceMax}><Money>{egp(referenceMax)}</Money></Fact>}
       </dl>
-      {variance && <p className="mt-2 text-[0.85rem] font-semibold text-alert-800">{t.letterCheck.VARIANCE_OPEN}</p>}
+      {variance && <p className="mt-2 text-[0.875rem] font-semibold text-alert-800">{t.letterCheck.VARIANCE_OPEN}</p>}
       <label htmlFor={`${id}-note`} className="mt-3 block text-sm font-semibold">{t.finance.note}</label>
       <textarea id={`${id}-note`} className="field" rows={2} maxLength={2000} value={note} onChange={event => { setNote(event.target.value); if (missing) setMissing(null); }}
                 aria-invalid={missing ? true : undefined} aria-describedby={missing ? `${id}-missing` : undefined}/>
@@ -304,7 +340,7 @@ function Countersign({ t, row, when, egp, busy, primary, onConfirm }: {
 }) {
   const [confirming, setConfirming] = useState(false);
   return (
-    <li id={primary ? "admission-next" : undefined} className="flex flex-wrap items-center justify-between gap-3 py-2 text-[0.85rem]">
+    <li id={primary ? "admission-next" : undefined} className="flex flex-wrap items-center justify-between gap-3 py-2 text-[0.875rem]">
       <span className="min-w-0">
         <span className="font-semibold text-ink-900">{pick(t.trail.kinds, row.kind)}</span>
         {row.amountEgp != null && <> · <Money>{egp(row.amountEgp)}</Money></>}
@@ -323,8 +359,8 @@ function EmergencyAdmission({ t, busy, onRecord }: { t: Copy; busy: boolean; onR
   const [reason, setReason] = useState("");
   const [confirming, setConfirming] = useState(false);
   return (
-    <details className="mt-3 border-t border-line">
-      <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-bold text-brand-700">{t.emergency.title}</summary>
+    <details className="group mt-3 border-t border-line">
+      <Summary>{t.emergency.title}</Summary>
       <form className="pb-3" onSubmit={event => { event.preventDefault(); if (reason.trim()) setConfirming(true); }}>
         <p className="max-w-[65ch] text-[0.8125rem] leading-5 text-ink-600">{t.emergency.body}</p>
         <label htmlFor={`${id}-reason`} className="mt-3 block text-sm font-semibold">{t.emergency.reason}</label>

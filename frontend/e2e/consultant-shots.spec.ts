@@ -33,6 +33,13 @@ for (const locale of ["en", "ar"] as const) for (const width of [390, 1440]) {
           const tab = page.getByRole("tab", { name: locale === "ar" ? /سريري|السريرية/ : /^Clinical/ });
           if (await tab.count()) { await tab.first().click(); await settle(page); }
         }
+        // UX 3-2: the panel holding the Consultant's step comes first; after discharge Follow-up leads and Discharge carries the stamp.
+        const panelIds = await page.locator("#case-tab-panel section[id$='-panel']").evaluateAll(nodes => nodes.map(node => node.id));
+        if (id === "treat" || id === "discharge") expect(panelIds[0]).toBe(id === "treat" ? "treatment-panel" : "discharge-panel");
+        if (id === "follow") {
+          expect(panelIds.slice(0, 2)).toEqual(["follow-up-panel", "discharge-panel"]);
+          await expect(page.locator("#discharge-panel .case-stamp")).toBeVisible();
+        }
         await page.screenshot({ path: shot(`case-${id}-${locale}-${width}`), fullPage: true });
       }
       await page.goto(`/${locale}/portal/virtual-clinic`);

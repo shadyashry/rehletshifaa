@@ -61,10 +61,13 @@ describe("FollowUpPanel — Consultant", () => {
     expect(primaries()).toEqual([]);
   });
 
-  it("on REVIEW_COMPLICATION opens the review first as the one primary action and records it", async () => {
+  it("on REVIEW_COMPLICATION opens the panel with the patient's report and the review, the one primary action, and records it", async () => {
     const { mutate } = setup("doctor", { currentCode: "REVIEW_COMPLICATION" });
-    const form = (await screen.findByText("Review the reported complication (Day 30)", { selector: "summary" })).closest("details")!;
-    expect(form.open).toBe(true);
+    // UX 3-2: the report comes first — the patient's own words, then what to do, then the review — above the schedule.
+    const form = await screen.findByRole("group", { name: "The patient reported a problem" });
+    expect(within(form).getByText("Fever since yesterday").tagName).toBe("BLOCKQUOTE");
+    expect(form.compareDocumentPosition(screen.getByRole("heading", { name: "Contacts" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByText("Fever since yesterday")).toHaveLength(1);
     expect(primaries()).toHaveLength(1);
     fireEvent.change(within(form).getByLabelText("What you did or advised"), { target: { value: "Advised antipyretics and a local review." } });
     fireEvent.click(within(form).getByRole("button", { name: "Record the review" }));

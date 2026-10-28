@@ -1208,6 +1208,7 @@
       "hint": "Up to 30 days. For a longer absence, ask your lead to reassign your cases."
     },
     "caseView": {
+      "panelFailed": "{panel} could not be shown. The rest of the case still works; reload the page to try again.",
       "startTreatment": {
         "title": "Start treatment",
         "hint": "After your final assessment, once the patient is cleared for admission, record where and when treatment starts. Milestones, the discharge pack and follow-up have their own sections.",
@@ -1891,6 +1892,9 @@
       "accept": "Accept assignment",
       "done": "Mark done",
       "work": {
+        "COMPLETE_DISCHARGE_PACK": "Complete the discharge pack",
+        "CONFIRM_RETURN": "Confirm the return",
+        "CONFIRM_DEPARTURE": "Confirm the departure",
         "REVIEW_PATIENT_RESPONSE": "Accept & continue",
         "CLINICAL_REVIEW": "Start clinical review",
         "PREPARE_PROPOSAL": "Prepare proposal",
@@ -2924,6 +2928,9 @@
       "sendLinkHint": "Sends the patient a link to their payment step: the account details and where to enter the transfer reference."
     },
     "workTitles": {
+      "COMPLETE_DISCHARGE_PACK": "Complete the discharge pack",
+      "CONFIRM_RETURN": "Confirm the patient's return home",
+      "CONFIRM_DEPARTURE": "Confirm the patient has left",
       "PROPOSAL_TERMS_CALL": "Go through the proposal terms in Arabic",
       "REVIEW_PATIENT_RESPONSE": "Review the patient's response",
       "CONSULTANT_ASSIGNMENT": "New case assignment",
@@ -3590,6 +3597,11 @@
       "askLead": "Ask your coordinator lead to add or approve a Consultant for {area}."
     },
     "admission": {
+      "summary": {
+        "title": "Admission",
+        "waiting": "Before treatment can start:",
+        "money": "The voucher and what is owed"
+      },
       "firstAppointment": {
         "title": "First confirmed appointment",
         "hint": "Record the earliest confirmed appointment date. This date determines the refund cutoff; record a reason when correcting it.",
@@ -4023,6 +4035,7 @@
       }
     },
     "discharge": {
+      "details": "The discharge pack, the letter and the journey home",
       "title": "Discharge",
       "loadFailed": "The discharge details could not be loaded.",
       "automatic": "Discharge happens on its own once nothing above blocks it; there is no discharge button.",
@@ -4310,6 +4323,11 @@
       }
     },
     "followUp": {
+      "complicationFirst": {
+        "title": "The patient reported a problem",
+        "safety": "Contact the patient or the person answering for them, then record what you did or advised. An incident is open for this report, so the care team follows it too.",
+        "coordinator": "The patient reported a problem at {point}. The Consultant reviews it; the clinical details stay in their record."
+      },
       "title": "Follow-up",
       "loadFailed": "The follow-up could not be loaded. Reload the page to try again.",
       "window": {
