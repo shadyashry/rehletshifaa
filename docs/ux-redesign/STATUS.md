@@ -438,6 +438,7 @@ Update at the end of every phase.
 | Public site (finish-plan Close) | `.impeccable/critique/2026-10-09T14-11-07Z__dev-rehletshifaa-com.md` | 24/36 (67%; heuristic 7 n/a) |
 | Area 2 coordinator workspace (close) | `.impeccable/critique/2026-10-16T05-53-19Z__frontend-src-components-portal-staffcaseview-tsx.md` | 28/40 (from 21) |
 | Area 3 Consultant portal + Virtual Clinic (close) | `.impeccable/critique/2026-10-28T08-44-42Z__frontend-src-components-portal-clinicalreview-tsx.md` | 28/40 (from 17) |
+| Area 5 Operations (before) | `.impeccable/critique/2026-10-28T10-24-59Z__frontend-src-components-portal-admissionpanel-tsx.md` | 19/40 |
 
 ## Future (out of scope for this run)
 
@@ -1264,6 +1265,55 @@ The final assessment gets a Save draft, kept the way the clinical review's is. A
 - **Frontend.** One rule in `StaffCaseView` tells the Consultant's words apart: written since arrival (the timeline's ARRIVAL_CONFIRMED) is this stage's, whether saved or a draft; the latest approved before it is the preliminary recommendation. The form starts from the latest standing review since arrival, else the preliminary one. `FinalAssessment` gains Save draft (refused at the button when empty, as in the review), "Draft saved on {date}. It is not your final assessment until you save it." when it reopens on a draft, and "Not saved. What you entered is still here; try again." in place when a save or a draft fails. Copy: `clinicalDecision.finalDraftSaved` and `clinicalDecision.errors.notSaved` (en + ar, inserted textually).
 
 **Verify.** `FinalAssessmentStepTest`: a draft leaves the step and the work item open, keeps its lines, a later draft supersedes the earlier one, and saving supersedes the draft. A draft is refused before arrival (`CASE_STATE_CONFLICT`), for the coordinator, and for a Consultant off the case (403). Backend `mvn -o -q test`: 996 tests, 3 skipped, 1 failure in `IntakeConversationIntegrationTest.theListSaysWhoIsOwedAReplyUntilStaffAnswer`, which is unrelated (WhatsApp intake, timing) and passes alone (9/9). `pnpm typecheck` ok, eslint on the touched files clean. vitest: 97 files / 767 tests, 766 pass (the known `StaffOperationalUi` W-44). `FinalAssessment.test.tsx` 11/11, covering draft save, empty draft, the reopen on a draft and the failed save. Playwright on :3100 (production build): consultant-shots, staff-chrome, hospital-agreement-audit and a11y, en + ar: 54/54. The shots they overwrote are restored. `PostgresJpaMappingTest` was not run (no schema change).
+
+## UX area 5 — Operations: critique, plan, slice 5-0 the travel plan (2026-10-28, worktree `ux-5-operations-27e3fd`, branch `claude/ux-5-operations-27e3fd` from `feat/review-p0` @ `a6e1a6fe`)
+
+Scope: `remaining-work-prioritized.md` 1.7 (reservation, admission letter, balance receipt, travel plan, departure; the travel
+form's copy). P1-15, P1-17 and B-3-1b are on this line, so no integration merge was needed.
+
+**Fixture and shots.** `e2e/operations-fixture.ts` (synthetic only: My work with five items in the backend's order; cases at
+travel coordination with nothing reserved, reserved without a letter, arrived with the receipt owed, cleared with the number
+owed, discharged with the departure owed; a long Arabic hospital name and patient name). `e2e/operations-shots.spec.ts` writes
+`screenshots/area-5/<AREA5_SHOTS|before>/` — my-work and case-plan/letter/balance/admit/depart × en/ar × 390/1440.
+
+**Critique: 19/40** (dual-agent; `.impeccable/critique/2026-10-28T10-24-59Z__frontend-src-components-portal-admissionpanel-tsx.md`;
+first run for this target). P0: the strip says "Arrange travel and arrival" for the whole of travel coordination while the
+admission panel opens "Reserve the hospital", and the travel Save is always filled (two filled buttons). P1: the travel form
+reopens blank on a PUT that replaces the whole plan (**a re-save cleared the stored arrival, flight and visa**), with its copy
+inline and the arrival as a plain field; two hospital pickers; Arabic parity ("Also open" in English, Latin runs); the
+cashier's seven-field receipt on a phone. P2: stale states (logistics "Arrived" after discharge, the rail, reconciliation for
+Operations). Detector 0; scan: 0 off-ladder sizes, tints, physical direction or raw colours; 1 inline table + 10 ternaries (all
+in the travel form); 11 datetime-local fields without a hint.
+
+**Plan** `plans/operations-workspace.md` (no owner gate; assumptions [A]): 5-0 the travel plan → 5-1 the hospital file (one act
+at a time, one filled button across panels, the reservation owns the hospital, stage-true logistics; backend follow-up **B-5-1**
+step codes for the reservation and the letter) → 5-2 the cashier (receipt prefill and disclosure, voucher one-liner,
+confirmations and date hints) → 5-3 going home + close (re-critique, target ≥ 28/40).
+
+**Slice 5-0 — the travel plan.** `TravelPlanPanel.tsx` replaces `CaseWorkflowActions.tsx` (deleted with its test; StaffCaseView
+renders it for Operations while `UPDATE_TRAVEL_PLAN` is offered, inside a `PanelBoundary`):
+- reopens on everything stored and resends it (incl. the arrival arrangements and `exceptions`, which the form never sent), so
+  a save never clears the plan; a stored hospital the directory has not loaded (or no longer lists) stays selected;
+- arrival arrangements (airport reception, accommodation, transport, companion) behind a disclosure; booking as two radios;
+  "Booked and confirmed" without a planned arrival refused at the field;
+- the patient's arrival is its own act: empty or future times refused in place, then a confirmation that shows the time,
+  because it moves the case to ARRIVAL_CONFIRMED;
+- one filled button (Save until booked, then Record the arrival); date fields `dir="ltr"` with a hint; option text isolated;
+- copy in `portalWork.travelPlan` (en + ar, inserted textually); `TravelPlanView` gains the arrangement fields.
+- Shared: the `Task` disclosure (panel-parts) now uses `Summary`, so every panel task shows its chevron (the reviewers found
+  no open/closed cue).
+
+**Reviews.** RB: HIGH ×1 fixed (the late hospital directory). WG, RTL/i18n, Pro Max: no CRITICAL/HIGH; fixed the MEDIUMs (disclosure
+cue, localized validation, the time in the confirmation, the no-hospitals note at its field, `dir="ltr"` dates, isolates) and
+the Arabic wording LOWs; the rest in backlog.md "Area 5 — Operations".
+
+**Verify.** `pnpm typecheck` ok; eslint on the touched files clean; vitest 97 files / 770 tests, 769 pass (the known
+`StaffOperationalUi` W-44); `TravelPlanPanel.test.tsx` 8/8 (whole-plan resend, late directory, re-seed, at-field refusal,
+confirm/cancel, empty/future arrival, Arabic); panel suites 50/50. Playwright on :3152 (production build): operations-shots,
+consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58; operations-shots re-run on :3153 after the
+fieldset fix 4/4. Overwritten shots restored. Shots: `screenshots/area-5/before/` and `screenshots/area-5/5-0/`.
+
+**Next:** slice 5-1 — the hospital file, started in a new session from this branch.
 
 ## Control Center — Consultant public profiles (2026-10-17)
 

@@ -5,7 +5,7 @@ import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { createContext, use, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
-import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
+import { TravelPlanPanel, TRAVEL_STAGES } from "@/components/portal/TravelPlanPanel";
 import { AdmissionPanel, ADMISSION_STAGES, ADMISSION_WORK, type AdmissionRole } from "@/components/portal/AdmissionPanel";
 import { TreatmentPanel, TREATMENT_WORK } from "@/components/portal/TreatmentPanel";
 import { DischargePanel, DISCHARGE_STAGES, DISCHARGE_WORK, type DischargeRole } from "@/components/portal/DischargePanel";
@@ -114,8 +114,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   // Only a real consultant assignment earns a second identity row. Falling back to the coordinator
   // here printed the same person twice under two labels, one of them the internal word "assignee".
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
- // Operations and consultants keep their stage forms; the coordinator's work is driven by the current action.
- const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired} travelPlan={value.travelPlan??null} busy={busy}/></div>:null;
+ // UX 5-0: Operations' travel plan, while the backend offers it (ACCEPTED, TRAVEL_COORDINATION); the other roles' work is driven by the
+ // current action and the stage panels.
+ const workflowBlock=role==="operations"&&showActions&&available.includes("UPDATE_TRAVEL_PLAN")&&TRAVEL_STAGES.has(c.status)?<div id="case-actions"><PanelBoundary key={c.id} title={work.travelPlan.title} message={fillTemplate(cv.panelFailed,{panel:work.travelPlan.title})}><TravelPlanPanel caseId={c.id} plan={value.travelPlan??null} facilities={facilities} busy={busy} mutate={mutate}/></PanelBoundary></div>:null;
  // P1-15: the reservation, the voucher, the balance and its evidence, for every staff role on the case from travel coordination to treatment.
  const admissionRole=(["operations","finance","coordinator","doctor"] as string[]).includes(role)?role as AdmissionRole:null;
  const admissionPanel=admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview?<PanelBoundary key={c.id} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;

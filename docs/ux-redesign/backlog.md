@@ -637,6 +637,24 @@ instead of "releases the hold on closing"; a due check-in shows its date alone b
 | LOW | The DISCHARGED stamp's coral/alert colour on the page where alert red means a reported problem; an ink or brand variant for the line stamp (brand decision, propose first). | critique | `brand/CaseStamp.tsx` | owner |
 | LOW | The change order's "Withdraw" drawn as a chevron disclosure, like a section. | critique | `TreatmentPanel.tsx` | /impeccable polish |
 | LOW | Change-order number "RS-CO-RS-2026-000013-1" doubles the prefix. | critique | backend numbering | backend |
-| LOW | `CaseWorkflowActions` still has one en/ar table, 9 inline ternaries and ~15 English strings (Operations' travel form) — area 5. | detector scan | `CaseWorkflowActions.tsx` | area 5 |
+| ~~LOW~~ DONE | ~~`CaseWorkflowActions` still has one en/ar table, 9 inline ternaries and ~15 English strings (Operations' travel form) — area 5.~~ **Done 2026-10-28 (5-0):** `TravelPlanPanel` replaces it; copy in `portalWork.travelPlan`. | detector scan | `TravelPlanPanel.tsx` | area 5 |
 | LOW | `.error-text` is 0.86rem (off the ladder); ConsultantRouting's two bordered radio tiles. | detector scan | `globals.css`, `ConsultantRouting.tsx` | /impeccable polish |
 | LOW | Carried from 3-1/3-2: documents "Show all" past ~10 files; a note when a seeded catalogue line was deactivated; the evidence heading level in the rail; the unused `followUp.outcomes.reviewForm` key; a coordinator-side panel order by the current task; "Refer this case" alone below the review; the orphan "Keyboard shortcuts ?" footer. | 3-1, 3-2, critique | various | /impeccable polish |
+
+## Area 5 — Operations (2026-10-28)
+
+Critique 19/40 (`.impeccable/critique/2026-10-28T10-24-59Z__frontend-src-components-portal-admissionpanel-tsx.md`); plan
+`plans/operations-workspace.md`. Slices 5-1..5-3 take the P0/P1 items; these are the 5-0 reviews' deferred MEDIUM/LOW findings
+and the critique's minor observations.
+
+| Severity | Finding | Source | Where | Next |
+|---|---|---|---|---|
+| MEDIUM | Two filled buttons in one Operations view during travel coordination: the travel plan's Save and the admission panel's "Reserve the hospital" (the strip says "Arrange travel and arrival" for the whole stage). | critique P0, scan | `StaffCaseView.tsx`, `AdmissionPanel.tsx`, `TravelPlanPanel.tsx` | 5-1 (+ B-5-1 step codes) |
+| MEDIUM | The travel plan and the reservation each pick a hospital; the logistics card reads the travel one and says "Arrived" after discharge; its dates use `locale`, not `intlLocale`. | critique P1/P2 | `StaffCaseView.tsx` (`logistics`) | 5-1 |
+| LOW | No "Saving…" text or `aria-busy` while `busy`; buttons are only disabled (portal-wide pattern). | WG, Pro Max | `TravelPlanPanel.tsx`, other panels | portal-wide polish |
+| LOW | The arrangements disclosure's `open` follows the stored values on every render (a user-closed section can reopen after a save). | WG | `TravelPlanPanel.tsx` | 5-1 |
+| LOW | Under reduced motion `.btn-primary:hover` still moves 1px (instantly). | Pro Max | `globals.css` | polish |
+| LOW | The arrival's failure is reported by the portal's general error only (the time stays in the field). | RB | `TravelPlanPanel.tsx` | 5-1 |
+| LOW | "Consultant Operations" / "Control Center" product names in `noHospitals` without `translate="no"`. | WG | messages | area X |
+| LOW | The pre-release Operations plan textarea has only an `aria-label`. | scan | `StaffCaseView.tsx` (`RoleActions`) | 5-1 |
+| LOW | "First confirmed appointment" shows for Operations at every stage; the PNR Save does not say its effect. | critique | `AdmissionPanel.tsx` | 5-2 |

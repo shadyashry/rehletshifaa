@@ -3583,6 +3583,47 @@
       "seeConsultants": "See Consultants for {area} in the Control Center",
       "askLead": "Ask your coordinator lead to add or approve a Consultant for {area}."
     },
+    "travelPlan": {
+      "title": "Travel and arrival",
+      "status": {
+        "PLANNING": "Planning",
+        "CONFIRMED": "Booked",
+        "ARRIVED": "Arrived"
+      },
+      "hospital": "Hospital",
+      "chooseHospital": "Choose a hospital",
+      "hospitalOption": "{name} · {city}",
+      "noHospitals": "No active hospital is set up yet. Ask Consultant Operations to add one in the Control Center.",
+      "plannedArrival": "Planned arrival",
+      "timeHint": "Date and time on this device's clock.",
+      "arrivalRequired": "Add the planned arrival before confirming the booking.",
+      "flight": "Flight",
+      "flightHint": "Airline, flight number and landing time.",
+      "visa": "Visa",
+      "visaHint": "For example: not needed, applied, issued.",
+      "arrangements": "Arrival arrangements",
+      "airportReception": "Airport reception",
+      "accommodation": "Accommodation",
+      "localTransport": "Local transport",
+      "companion": "Companion",
+      "booking": "Booking",
+      "planning": "Still planning",
+      "confirmed": "Booked and confirmed",
+      "confirmedHint": "Confirming needs a planned arrival. The patient's identity, consents and deposit are checked first.",
+      "save": "Save the travel plan",
+      "arrival": {
+        "title": "Record the arrival",
+        "at": "Arrived at",
+        "hint": "Recording it confirms the patient is in Egypt and moves the case to admission.",
+        "record": "Record the arrival",
+        "confirmTitle": "Record the patient's arrival?",
+        "confirmBody": "The patient arrived at {at}. This moves the case to admission and cannot be undone from here.",
+        "cancel": "Cancel",
+        "needsPlan": "Save the travel plan first.",
+        "missing": "Enter when the patient arrived.",
+        "future": "The arrival cannot be in the future."
+      }
+    },
     "admission": {
       "summary": {
         "title": "Admission",

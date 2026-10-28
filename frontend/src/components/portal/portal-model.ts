@@ -101,7 +101,7 @@ export function statusLabel(value:string,locale:Locale){return STATUS_LABELS[val
 export type DirectoryPackage={id:string;procedureCode:string;name:string;careCategory:string;minEgp:number;maxEgp:number;validTo?:string|null};
 export type DirectoryFacility={id:string;name:string;city:string;kind:string;accreditationStatus:string;packages:DirectoryPackage[]};
 
-export type TravelPlanView={id:string;status:string;plannedArrival?:string|null;confirmedArrival?:string|null;visaStatus?:string|null;flightDetails?:string|null;facilityId?:string|null;facilityName?:string|null;exceptions?:string|null;updatedAt:string};
+export type TravelPlanView={id:string;status:string;plannedArrival?:string|null;confirmedArrival?:string|null;visaStatus?:string|null;flightDetails?:string|null;airportReception?:string|null;accommodation?:string|null;localTransport?:string|null;companionDetails?:string|null;facilityId?:string|null;facilityName?:string|null;exceptions?:string|null;updatedAt:string};
 /** P1-15: one evidence-ledger row as staff see it (the payload stays server-side). */
 export type AdmissionEvidence={id:string;kind:string;stage?:string|null;documentId?:string|null;reference?:string|null;amountEgp?:number|null;effectiveAt?:string|null;recordedBy?:string|null;recordedRole?:string|null;recordedAt:string;countersignedBy?:string|null;countersignedRole?:string|null;countersignedAt?:string|null;supersedesId?:string|null;superseded:boolean};
 /** P1-15: the frozen voucher; EGP amounts and, at the frozen rate, the patient's currency. */

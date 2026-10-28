@@ -33,8 +33,8 @@ export type PanelDocument = { documentId: string; fileName: string; status: stri
 /** One recording task: a disclosure whose summary names the outcome; the next task opens first and carries the `anchor` id. */
 export function Task({ title, next, anchor, children }: { title: string; next: boolean; anchor: string; children: ReactNode }) {
   return (
-    <details className="border-t border-line" open={next || undefined} id={next ? anchor : undefined}>
-      <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-bold text-brand-700">{title}</summary>
+    <details className="group border-t border-line" open={next || undefined} id={next ? anchor : undefined}>
+      <Summary>{title}</Summary>
       <div className="pb-3">{children}</div>
     </details>
   );
