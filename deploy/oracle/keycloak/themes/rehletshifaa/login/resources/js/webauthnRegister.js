@@ -1,4 +1,5 @@
-// Copy of Keycloak 26.7.3 theme/base/login/resources/js/webauthnRegister.js; only the label prompt is changed (QA W-40).
+// Copy of Keycloak 26.7.3 theme/base/login/resources/js/webauthnRegister.js; only the label prompt is changed (QA W-40):
+// no prompt, the passkey is stored under the default label the page passes (initLabel).
 import { base64url } from "rfc4648";
 
 export async function registerByWebAuthn(input) {
@@ -70,7 +71,7 @@ export async function registerByWebAuthn(input) {
 
     try {
         const result = await doRegister(publicKey);
-        returnSuccess(result, input.initLabel, input.initLabelPrompt);
+        returnSuccess(result, input.initLabel);
     } catch (error) {
         returnFailure(error);
     }
@@ -121,7 +122,7 @@ function getTransportsAsString(transportsList) {
     return transportsList.join();
 }
 
-function returnSuccess(result, initLabel, initLabelPrompt) {
+function returnSuccess(result, initLabel) {
     document.getElementById("clientDataJSON").value = base64url.stringify(new Uint8Array(result.response.clientDataJSON), {pad: false});
     document.getElementById("attestationObject").value = base64url.stringify(new Uint8Array(result.response.attestationObject), {pad: false});
     document.getElementById("publicKeyCredentialId").value = base64url.stringify(new Uint8Array(result.rawId), {pad: false});

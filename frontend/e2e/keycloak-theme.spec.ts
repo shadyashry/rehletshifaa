@@ -14,14 +14,12 @@ const folder = process.env.AREA7_SHOTS;
 const repo = path.join(__dirname, "..", "..");
 const shot = (name: string) => path.join(repo, "docs/ux-redesign/screenshots/area-7", folder ?? "", `${name}.png`);
 
-// Keep in step with Render.java's scenarios.
-const PAGES = [
-  "login", "login-error", "reset-password", "setup-start", "setup-start-two", "setup-password", "setup-password-error",
-  "setup-done", "setup-expired", "setup-expired-no-client",
-  "verify-email", "verify-email-sent", "otp-setup", "otp-setup-manual", "otp", "otp-choose", "otp-error", "passkey-setup",
-  "passkey", "passkey-several",
-] as const;
 const LOCALES = ["en", "ar"] as const;
+// The scenarios are Render.java's own list (pages.txt), so the spec cannot drift from the harness; the first test
+// holds the count and the en/ar pairing.
+const PAGES = harness
+  ? [...new Set(readFileSync(path.join(harness, "pages.txt"), "utf8").trim().split("\n").map(f => f.replace(/-(en|ar)\.html$/, "")))]
+  : [];
 
 async function open(page: Page, name: string) {
   await page.goto(pathToFileURL(path.join(harness ?? "", `${name}.html`)).href);
@@ -31,8 +29,9 @@ async function open(page: Page, name: string) {
 test.describe("Keycloak theme", () => {
   test.skip(!harness, "set KC_HARNESS_DIR to the theme harness output");
 
-  test("every harness page was rendered", () => {
+  test("every scenario was rendered in both languages", () => {
     const pages = readFileSync(path.join(harness ?? "", "pages.txt"), "utf8").trim().split("\n");
+    expect(PAGES.length).toBeGreaterThanOrEqual(24);
     expect(pages.toSorted()).toEqual(PAGES.flatMap(p => LOCALES.map(l => `${p}-${l}.html`)).toSorted());
   });
 
@@ -107,10 +106,9 @@ test.describe("Keycloak theme", () => {
   const KEYCLOAK_VOICE = /[«»]|we are sorry|\bsubmit\b|barcode|device name|\botp\b|webauthn|click here|نعتذر|انقر هنا/i;
   // Text that is not copy: the account's email and the authenticator apps' own names.
   const NOT_COPY = [/\S+@\S+/g, /FreeOTP|Google Authenticator|Microsoft Authenticator/g];
-  // Keys a page may still take from Keycloak's own bundles (Render.java lists them in stock-keys.txt): reviewed as
-  // plain enough, or app names.
+  // Keys a page may still take from Keycloak's own bundles (Render.java lists them in stock-keys.txt): only the
+  // authenticator apps' own names (7-3 close: every other key is ours).
   const STOCK_OK = new Set([
-    "showPassword", "hidePassword", "passwordConfirm", "logoutOtherSessions",
     "totpAppFreeOTPName", "totpAppGoogleName", "totpAppMicrosoftAuthenticatorName",
   ]);
 
@@ -149,7 +147,7 @@ test.describe("Keycloak theme", () => {
         });
         const where = `${name}-${locale}`;
         // A template change that moved these strings would otherwise skip them silently.
-        if (name === "passkey-setup") expect.soft(strings.scripted, `${where}: script texts found`).toBe(3);
+        if (name === "passkey-setup") expect.soft(strings.scripted, `${where}: script texts found`).toBe(2);
         const copy = strings.out.map(s => NOT_COPY.reduce((t, re) => t.replace(re, ""), s));
         expect.soft(copy.filter(s => RAW_KEY.test(s)), `${where}: raw message keys`).toEqual([]);
         expect.soft(copy.filter(s => KEYCLOAK_VOICE.test(s)), `${where}: Keycloak's voice`).toEqual([]);
@@ -170,7 +168,42 @@ test.describe("Keycloak theme", () => {
       }
       await open(page, `otp-error-${locale}`);
       await expect.soft(page.locator("#otp")).toHaveAttribute("aria-describedby", "input-error-otp-code");
+      await open(page, `otp-setup-error-${locale}`);
+      await expect.soft(page.locator("#totp")).toHaveAttribute("aria-describedby", "input-error-otp-code");
+      await expect.soft(page.locator("#totp")).toBeFocused();
+      // "Try another way" submits its form: a button, not a link.
+      await open(page, `otp-${locale}`);
+      await expect.soft(page.locator("button#try-another-way")).toBeVisible();
     }
+  });
+
+  // 7-3 close: an expired setup link always has a way on, with or without a client, and a route to the coordinator.
+  test("expired link: sign in and the coordinator", async ({ page }) => {
+    for (const locale of LOCALES) {
+      for (const name of ["setup-expired", "setup-expired-no-client"]) {
+        await open(page, `${name}-${locale}`);
+        await expect.soft(page.locator("#backToApplication"), `${name}-${locale}: sign in`).toBeVisible();
+        await expect.soft(page.locator("#kc-contact-coordinator"), `${name}-${locale}: coordinator`)
+          .toHaveAttribute("href", new RegExp(`/${locale}/whatsapp$`));
+      }
+      await open(page, `setup-expired-no-client-${locale}`);
+      await expect.soft(page.locator("#backToApplication")).toHaveAttribute("href", new RegExp(`/${locale}/portal$`));
+    }
+  });
+
+  // 7-3 close: the password rule ticks as the person types (a hint; the realm's policy still decides).
+  test("password rule ticks as you type", async ({ page }) => {
+    await open(page, "setup-password-en");
+    const field = page.locator("#password-new");
+    await expect(page.locator("#kc-password-rule li[data-met]")).toHaveCount(0);
+    await field.fill("Abcdefghijk1!");
+    await expect(page.locator("#kc-password-rule li:not([data-met])")).toHaveCount(0);
+    await expect(page.locator("#kc-password-rule li[data-rule=upper] .rs-rule-state")).toHaveText(" (done)");
+    await field.fill("abc");
+    await expect(page.locator("#kc-password-rule li[data-rule=upper]")).not.toHaveAttribute("data-met");
+    // As Keycloak's policy: an Arabic letter is a letter, never a symbol.
+    await field.fill("كلمة");
+    await expect(page.locator("#kc-password-rule li[data-rule=special]")).not.toHaveAttribute("data-met");
   });
 
   for (const locale of LOCALES) for (const width of [390, 1440]) {

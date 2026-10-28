@@ -31,7 +31,7 @@
                 <div class="${properties.kcInputWrapperClass!}">
                     <input id="otp" name="otp" type="text" class="${properties.kcInputClass!}"
                            autocomplete="one-time-code" inputmode="numeric" spellcheck="false" autocapitalize="off"
-                           autofocus dir="ltr"
+                           autofocus required dir="ltr"
                            aria-invalid="<#if messagesPerField.existsError('totp')>true</#if>"
                            <#if messagesPerField.existsError('totp')>aria-describedby="input-error-otp-code"</#if> />
 

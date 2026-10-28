@@ -47,8 +47,9 @@
                         </div>
                         <#if totp.policy.type = "totp">
                             <div id="kc-totp-period">
+                                <#-- The unit sits in the term, so the number never has to agree with it (Arabic plurals). -->
                                 <dt>${msg("loginTotpInterval")}</dt>
-                                <dd>${msg("loginTotpIntervalSeconds", totp.policy.period?c)}</dd>
+                                <dd>${totp.policy.period?c}</dd>
                             </div>
                         <#elseif totp.policy.type = "hotp">
                             <div id="kc-totp-counter">
@@ -87,7 +88,7 @@
                 </div>
                 <div class="${properties.kcInputWrapperClass!}">
                     <input type="text" id="totp" name="totp" class="${properties.kcInputClass!}"
-                           autocomplete="one-time-code" inputmode="numeric" spellcheck="false" autocapitalize="off" dir="ltr"
+                           autocomplete="one-time-code" inputmode="numeric" spellcheck="false" autocapitalize="off" dir="ltr" required
                            <#-- After a refused save, focus lands on the field at fault so its error is read out. -->
                            <#if messagesPerField.existsError('totp') || !messagesPerField.existsError('userLabel')>autofocus</#if>
                            aria-invalid="<#if messagesPerField.existsError('totp')>true</#if>"

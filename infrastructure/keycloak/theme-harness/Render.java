@@ -70,6 +70,13 @@ public class Render {
 
         Properties properties = new Properties();
         for (Path dir : chain) load(properties, dir.resolve("theme.properties"));
+        // As Keycloak's ExtendingTheme.substituteProperties: ${env.NAME:default} from the environment, else the default.
+        for (String key : properties.stringPropertyNames()) {
+            properties.setProperty(key, java.util.regex.Pattern.compile("\\$\\{env\\.([A-Za-z0-9_]+)(?::([^}]*))?}")
+                .matcher(properties.getProperty(key))
+                .replaceAll(r -> java.util.regex.Matcher.quoteReplacement(
+                    System.getenv(r.group(1)) != null ? System.getenv(r.group(1)) : r.group(2) == null ? "" : r.group(2))));
+        }
 
         Configuration cfg = new Configuration(Configuration.VERSION_2_3_32);
         List<TemplateLoader> loaders = new ArrayList<>();
@@ -159,6 +166,18 @@ public class Render {
                 m.put("totp", totp(qr));
                 m.put("auth", new Auth(true));
             }),
+            // A refused save: the code was wrong (UpdateTotp's invalidTotpMessage on "totp").
+            new Scenario("otp-setup-error", "login-config-totp.ftl", m -> {
+                m.put("totp", totp(qr));
+                m.put("auth", new Auth(true));
+                m.put("messagesPerField", new Fields(m, Map.of("totp", "invalidTotpMessage")));
+            }),
+            // Started by the person from their account (app-initiated): a Cancel beside the save.
+            new Scenario("otp-setup-aia", "login-config-totp.ftl", m -> {
+                m.put("totp", totp(qr));
+                m.put("auth", new Auth(true));
+                m.put("isAppInitiatedAction", true);
+            }),
             // UpdateTotp sets "mode" from the query when the person asks for the key instead of the QR code.
             new Scenario("otp-setup-manual", "login-config-totp.ftl", m -> {
                 m.put("totp", totp(qr));
@@ -172,10 +191,13 @@ public class Render {
                     Map.of("id", "c2", "userLabel", ar ? "الهاتف الشخصي" : "Personal phone")), "selectedCredentialId", "c1"));
                 m.put("auth", new Auth(true));
             }),
+            // A staff member with an authenticator and a passkey: Keycloak offers "try another way".
             new Scenario("otp", "login-otp.ftl", m -> {
                 m.put("otpLogin", Map.of("userOtpCredentials", List.of(Map.of("id", "c1", "userLabel", "Phone")), "selectedCredentialId", "c1"));
-                m.put("auth", new Auth(true));
+                m.put("auth", new Auth(true, true));
             }),
+            // ...which leads here (the realm's browser flow has OTP, passkey and recovery-code alternatives).
+            new Scenario("select-authenticator", "select-authenticator.ftl", m -> m.put("auth", new Auth(true, false))),
             new Scenario("otp-error", "login-otp.ftl", m -> {
                 m.put("otpLogin", Map.of("userOtpCredentials", List.of(Map.of("id", "c1", "userLabel", "Phone")), "selectedCredentialId", "c1"));
                 m.put("auth", new Auth(true));
@@ -184,6 +206,11 @@ public class Render {
             new Scenario("passkey-setup", "webauthn-register.ftl", m -> {
                 m.putAll(webauthn());
                 m.put("auth", new Auth(true));
+            }),
+            new Scenario("passkey-setup-aia", "webauthn-register.ftl", m -> {
+                m.putAll(webauthn());
+                m.put("auth", new Auth(true));
+                m.put("isAppInitiatedAction", true);
             }),
             new Scenario("passkey", "webauthn-authenticate.ftl", m -> {
                 m.putAll(webauthn());
@@ -315,10 +342,19 @@ public class Render {
 
     public static class Auth {
         private final boolean showUsername;
-        Auth(boolean showUsername) { this.showUsername = showUsername; }
+        private final boolean tryAnotherWay;
+        Auth(boolean showUsername) { this(showUsername, false); }
+        Auth(boolean showUsername, boolean tryAnotherWay) { this.showUsername = showUsername; this.tryAnotherWay = tryAnotherWay; }
         public boolean showUsername() { return showUsername; }
         public boolean showResetCredentials() { return false; }
-        public boolean showTryAnotherWayLink() { return false; }
+        public boolean showTryAnotherWayLink() { return tryAnotherWay; }
+        /** As Keycloak's AuthenticationSelectionOption: the realm's alternatives to the second step. */
+        public List<Map<String, String>> getAuthenticationSelections() {
+            return List.of(
+                Map.of("authExecId", "e1", "displayName", "otp-display-name", "helpText", "otp-help-text", "iconCssClass", "kcAuthenticatorOTPClass"),
+                Map.of("authExecId", "e2", "displayName", "webauthn-display-name", "helpText", "webauthn-help-text", "iconCssClass", "kcAuthenticatorWebAuthnClass"),
+                Map.of("authExecId", "e3", "displayName", "recovery-authn-codes-display-name", "helpText", "recovery-authn-codes-help-text", "iconCssClass", "kcAuthenticatorRecoveryAuthnCodesClass"));
+        }
         public String getAttemptedUsername() { return USER; }
         public String getSelectedCredential() { return ""; }
     }

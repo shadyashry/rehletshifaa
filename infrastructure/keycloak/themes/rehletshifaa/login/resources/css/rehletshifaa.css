@@ -582,13 +582,23 @@ a:focus-visible {
 
 /* The way on from an info or error page is one primary button (UX 7-2), not a link in the text. */
 #kc-info-message a.pf-c-button,
-#kc-error-message a.pf-c-button {
+#kc-error-message a.pf-c-button,
+#kc-content a.pf-c-button {
   display: flex;
+  align-items: center;
   justify-content: center;
   inline-size: 100%;
   min-block-size: var(--rs-control-height);
-  color: #ffffff;
   text-decoration: none;
+}
+
+#kc-content a.pf-c-button.pf-m-primary {
+  color: #ffffff;
+}
+
+/* A secondary way on beside the primary one (the coordinator, a resend): the white secondary button. */
+#kc-content a.pf-c-button.btn-default {
+  color: var(--color-brand-900);
 }
 
 /* ---- Setup moments (UX 7-2): the next steps and the password rule, quiet text before the action ---- */
@@ -604,8 +614,42 @@ a:focus-visible {
   list-style: decimal;
 }
 
+/* Each line of the rule carries its state (UX 7-3 close): an open ring until passwordRule.js finds it met, then a check
+   in the success ink. */
 .rs-password-rule ul {
-  list-style: disc;
+  padding-inline-start: 0;
+  list-style: none;
+}
+
+.rs-password-rule li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.rs-password-rule li::before {
+  content: "";
+  flex: none;
+  inline-size: 1em;
+  block-size: 1em;
+  align-self: center;
+  background-color: var(--color-ink-350);
+  -webkit-mask: var(--rs-icon-ring) center / contain no-repeat;
+  mask: var(--rs-icon-ring) center / contain no-repeat;
+}
+
+.rs-password-rule li[data-met] {
+  color: var(--color-status-success-fg);
+}
+
+.rs-password-rule li[data-met]::before {
+  background-color: currentColor;
+  -webkit-mask-image: var(--rs-icon-check);
+  mask-image: var(--rs-icon-check);
+}
+
+#kc-content .rs-password-rule #kc-password-rule-latin {
+  margin-block-start: 0.375rem;
 }
 
 .rs-required-actions li,
@@ -614,7 +658,7 @@ a:focus-visible {
 }
 
 .rs-password-rule {
-  margin-block-end: 0.75rem;
+  margin-block: 0.75rem;
   font-size: 0.9375rem;
 }
 
@@ -714,11 +758,8 @@ a:focus-visible {
   font-weight: 500;
 }
 
-/* The menu opens below its 44px button, and on keyboard focus as well as hover. */
-#kc-locale-dropdown:focus-within ul {
-  display: block;
-}
-
+/* The menu opens below its 44px button. Keycloak's menu-button-links.js opens it from the keyboard (Enter, Space,
+   arrows) and keeps aria-expanded true while it shows; it no longer opens on mere focus (UX 7-3 close). */
 #kc-locale ul {
   inset-block-start: 100%;
   margin-block-start: 0.25rem;
@@ -756,13 +797,29 @@ span.required:not(.pf-c-form__helper-text) {
   color: var(--color-alert-700);
 }
 
-/* Keycloak's own select-authenticator page (not overridden). */
+/* Keycloak's own select-authenticator page (not overridden): petrol icons, ink headings (PatternFly painted them blue). */
 .select-auth-box-parent {
   text-align: start;
 }
 
+#kc-content .select-auth-box-headline {
+  color: var(--color-ink-800);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+#kc-content .select-auth-box-desc {
+  color: var(--color-ink-600);
+  font-size: 0.9375rem;
+}
+
+.select-auth-box-arrow {
+  color: var(--color-ink-500);
+}
+
 .select-auth-box-icon {
   margin-inline: 0 1rem;
+  color: var(--color-brand-600);
 }
 
 .select-auth-box-arrow {
@@ -966,6 +1023,27 @@ ol#kc-totp-settings {
   font-size: 0.875rem;
 }
 
+/* "Try another way" and "Switch organization" submit a form, so they are buttons dressed as the theme's links. */
+.rs-link-button {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-brand-600);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rs-link-button:hover,
+.rs-link-button:focus-visible {
+  color: var(--color-brand-700);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 /* A primary action with its Cancel: stacked, full width, the action first. */
 #kc-form-buttons.rs-actions {
   display: grid;
@@ -978,6 +1056,8 @@ ol#kc-totp-settings {
 
 /* ---- Icons: the theme's own line icons (24px grid, 2px stroke), drawn in the text colour through a mask ---- */
 :where(html) {
+  --rs-icon-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3C/svg%3E");
+  --rs-icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E");
   --rs-icon-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
@@ -1036,6 +1116,7 @@ input[type="radio"]:focus:not(:focus-visible) {
 @media (forced-colors: active) {
   .rs-icon,
   .rs-wordmark-i::after,
+  .rs-password-rule li::before,
   button#kc-current-locale-link::after {
     background-color: CanvasText;
     forced-color-adjust: none;

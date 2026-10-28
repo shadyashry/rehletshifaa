@@ -6,7 +6,8 @@
      - the lockup is the portal's (frontend/src/components/Logo.tsx): the mark, then the name in Alexandria in both scripts,
        live text instead of a background picture, so it centres, scales and survives forced colours;
      - the locale button keeps its place in the tab order (no positive tabindex) and each language is marked with its lang.
-     - the card is the page's <main> landmark.
+     - the lockup is the page's banner (<header>) and the card its <main> landmark;
+     - "try another way" and "switch organization" submit their forms as buttons (Keycloak: links with onclick).
      Everything else is Keycloak's, in Keycloak's order. -->
 <#import "footer.ftl" as loginFooter>
 <#import "theme-resources.ftl" as themeResourceTags>
@@ -114,7 +115,7 @@
 
 <body class="${properties.kcBodyClass!}" data-page-id="login-${pageId}">
 <div class="${properties.kcLoginClass!}">
-    <div id="kc-header" class="${properties.kcHeaderClass!}">
+    <header id="kc-header" class="${properties.kcHeaderClass!}">
         <#-- The brand's name is not translated: both scripts show on every page, as in the portal's header; assistive
              technology hears it once, in the page's language. -->
         <div id="kc-header-wrapper" class="${properties.kcHeaderWrapperClass!}">
@@ -127,7 +128,7 @@
                 </span>
             </span>
         </div>
-    </div>
+    </header>
     <#-- The card is the page's main landmark (Keycloak left every page without one). -->
     <main class="${properties.kcFormCardClass!}">
         <header class="${properties.kcFormHeaderClass!}">
@@ -192,8 +193,7 @@
               <form id="kc-select-try-another-way-form" action="${url.loginAction}" method="post">
                   <div class="${properties.kcFormGroupClass!}">
                       <input type="hidden" name="tryAnotherWay" value="on"/>
-                      <a href="#" id="try-another-way"
-                         onclick="document.forms['kc-select-try-another-way-form'].requestSubmit();return false;">${msg("doTryAnotherWay")}</a>
+                      <button type="submit" id="try-another-way" class="rs-link-button">${msg("doTryAnotherWay")}</button>
                   </div>
               </form>
           </#if>
@@ -202,8 +202,7 @@
               <form id="kc-switch-organization-form" action="${url.loginAction}" method="post">
                   <div class="${properties.kcFormGroupClass!}">
                       <input type="hidden" name="switchOrganization" value="true"/>
-                      <a href="#" id="switch-organization"
-                         onclick="document.forms['kc-switch-organization-form'].requestSubmit();return false;">${msg("doSwitchOrganization")}</a>
+                      <button type="submit" id="switch-organization" class="rs-link-button">${msg("doSwitchOrganization")}</button>
                   </div>
               </form>
           </#if>

@@ -2145,6 +2145,42 @@ branch; per the rules nothing was rebuilt. Native Arabic review still pending. S
 button, a live password checklist, `login.ftl` tabindex, the locale menu, harness gaps, the Oracle theme copy, and the live
 walk once this branch is the mounted theme.
 
+### Area 7 — open points closed (2026-10-29, same worktree and branch, on 7-3 `92dab570`)
+
+The owner asked to fix every open point left by 7-3. Done on the harness (no backend change):
+- **Expired setup link:** its own title ("This link no longer works"), "Sign in to see the case" (to the client, or the
+  portal's sign-in when Keycloak has no client) and "Talk to a coordinator" (the portal's `/{lang}/whatsapp` route).
+  The portal origin comes from `rsPortalUrl=${env.APP_ORIGIN:http://localhost:3000}` in `theme.properties` (Keycloak
+  26.7.3 substitutes `${env.*}` there: `ExtendingTheme.substituteProperties`, read from the bytecode); `deploy/oracle` already
+  sets `APP_ORIGIN`, and `docker-compose.tunnel.yml` now does for dev (next Keycloak restart; nothing was restarted).
+- **verify-email:** the send is the card's button (primary before sending, secondary after, works once); the spam hint only
+  after a link was sent.
+- **Password rule:** under the field; each line ticks as the person types (`passwordRule.js`, a classic deferred script,
+  counting as Keycloak's Java policies do, so Arabic letters are letters); "Use English letters" when letters are required;
+  the account for "different from your email" falls back to the attempted username (Keycloak exposes `user` only on
+  profile pages, so 7-2's hidden username field now uses the same fallback).
+- **`login.ftl`** overridden: positive tabindex gone, email field not spell-checked. "Try another way" is a submit button;
+  the locale menu no longer opens on focus (Keycloak's script drives it); the lockup is the page's `<header>` banner.
+- **Words:** the authenticator chooser in our words, our own show/hide/confirm-password and sign-out labels (the stock
+  list is now only the app names), TOTP interval as "Interval (seconds)" (no Arabic plural agreement needed).
+- **Harness:** `select-authenticator`, try-another-way, TOTP save error, app-initiated cancels; the spec reads its pages
+  from `pages.txt` (24 scenarios × en/ar) and checks the expired routes, the ticking rule (incl. Arabic letters) and focus
+  after a refused TOTP save.
+- **Oracle copy** synced from `infrastructure/keycloak/themes`.
+
+**Reviews** (code+RTL, WG+Pro Max): no CRITICAL/HIGH; every finding fixed (Unicode rule classes, unknown-email line left
+unmarked, once-only send, "Sign in to see the case" only toward the portal, banner landmark, «منسّقك», merged CSS rule).
+One fix withdrew a change: the "what happens next" line on the done page spoke to patients, but staff and patient setup
+emails both return to `/{lang}/portal`, so the page cannot tell them apart; left open in backlog (needs a patient-only
+redirect, plan O-2).
+
+**Verify.** `keycloak-theme.spec.ts` 14/14 (48 pages), eslint and `tsc` clean; shots re-taken in `7-3/` and `after/`.
+
+**Still open, and why:** the live walk (Keycloak :8180 mounts the main checkout's theme; never rebuilt here); the native
+Arabic review (owner's reviewer); portal-side items in shared polish (`--field-border-hover`, an on-primary token, the
+lockup accent's 4.45:1, which is `Logo.tsx`'s brand colour); owner review of the focus halo; plural-sensitive password
+refusals only if the realm policy rises.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

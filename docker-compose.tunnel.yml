@@ -5,6 +5,10 @@ services:
     - --import-realm
     - --hostname=https://auth-dev.rehletshifaa.com
     - --proxy-headers=xforwarded
+    environment:
+      # The login theme's links back to the portal (theme.properties rsPortalUrl: the expired link's sign-in and
+      # "Talk to a coordinator"). Takes effect on the next Keycloak restart.
+      APP_ORIGIN: https://dev.rehletshifaa.com
   backend:
     environment:
       SPRING_PROFILES_ACTIVE: local
