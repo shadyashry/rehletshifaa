@@ -438,6 +438,7 @@ Update at the end of every phase.
 | Public site (finish-plan Close) | `.impeccable/critique/2026-10-09T14-11-07Z__dev-rehletshifaa-com.md` | 24/36 (67%; heuristic 7 n/a) |
 | Area 2 coordinator workspace (close) | `.impeccable/critique/2026-10-16T05-53-19Z__frontend-src-components-portal-staffcaseview-tsx.md` | 28/40 (from 21) |
 | Area 3 Consultant portal + Virtual Clinic (close) | `.impeccable/critique/2026-10-28T08-44-42Z__frontend-src-components-portal-clinicalreview-tsx.md` | 28/40 (from 17) |
+| Area 5 Operations (before) | `.impeccable/critique/2026-10-28T10-24-59Z__frontend-src-components-portal-admissionpanel-tsx.md` | 19/40 |
 
 ## Future (out of scope for this run)
 
@@ -1264,6 +1265,395 @@ The final assessment gets a Save draft, kept the way the clinical review's is. A
 - **Frontend.** One rule in `StaffCaseView` tells the Consultant's words apart: written since arrival (the timeline's ARRIVAL_CONFIRMED) is this stage's, whether saved or a draft; the latest approved before it is the preliminary recommendation. The form starts from the latest standing review since arrival, else the preliminary one. `FinalAssessment` gains Save draft (refused at the button when empty, as in the review), "Draft saved on {date}. It is not your final assessment until you save it." when it reopens on a draft, and "Not saved. What you entered is still here; try again." in place when a save or a draft fails. Copy: `clinicalDecision.finalDraftSaved` and `clinicalDecision.errors.notSaved` (en + ar, inserted textually).
 
 **Verify.** `FinalAssessmentStepTest`: a draft leaves the step and the work item open, keeps its lines, a later draft supersedes the earlier one, and saving supersedes the draft. A draft is refused before arrival (`CASE_STATE_CONFLICT`), for the coordinator, and for a Consultant off the case (403). Backend `mvn -o -q test`: 996 tests, 3 skipped, 1 failure in `IntakeConversationIntegrationTest.theListSaysWhoIsOwedAReplyUntilStaffAnswer`, which is unrelated (WhatsApp intake, timing) and passes alone (9/9). `pnpm typecheck` ok, eslint on the touched files clean. vitest: 97 files / 767 tests, 766 pass (the known `StaffOperationalUi` W-44). `FinalAssessment.test.tsx` 11/11, covering draft save, empty draft, the reopen on a draft and the failed save. Playwright on :3100 (production build): consultant-shots, staff-chrome, hospital-agreement-audit and a11y, en + ar: 54/54. The shots they overwrote are restored. `PostgresJpaMappingTest` was not run (no schema change).
+
+## UX area 5 — Operations: critique, plan, slice 5-0 the travel plan (2026-10-28, worktree `ux-5-operations-27e3fd`, branch `claude/ux-5-operations-27e3fd` from `feat/review-p0` @ `a6e1a6fe`)
+
+Scope: `remaining-work-prioritized.md` 1.7 (reservation, admission letter, balance receipt, travel plan, departure; the travel
+form's copy). P1-15, P1-17 and B-3-1b are on this line, so no integration merge was needed.
+
+**Fixture and shots.** `e2e/operations-fixture.ts` (synthetic only: My work with five items in the backend's order; cases at
+travel coordination with nothing reserved, reserved without a letter, arrived with the receipt owed, cleared with the number
+owed, discharged with the departure owed; a long Arabic hospital name and patient name). `e2e/operations-shots.spec.ts` writes
+`screenshots/area-5/<AREA5_SHOTS|before>/` — my-work and case-plan/letter/balance/admit/depart × en/ar × 390/1440.
+
+**Critique: 19/40** (dual-agent; `.impeccable/critique/2026-10-28T10-24-59Z__frontend-src-components-portal-admissionpanel-tsx.md`;
+first run for this target). P0: the strip says "Arrange travel and arrival" for the whole of travel coordination while the
+admission panel opens "Reserve the hospital", and the travel Save is always filled (two filled buttons). P1: the travel form
+reopens blank on a PUT that replaces the whole plan (**a re-save cleared the stored arrival, flight and visa**), with its copy
+inline and the arrival as a plain field; two hospital pickers; Arabic parity ("Also open" in English, Latin runs); the
+cashier's seven-field receipt on a phone. P2: stale states (logistics "Arrived" after discharge, the rail, reconciliation for
+Operations). Detector 0; scan: 0 off-ladder sizes, tints, physical direction or raw colours; 1 inline table + 10 ternaries (all
+in the travel form); 11 datetime-local fields without a hint.
+
+**Plan** `plans/operations-workspace.md` (no owner gate; assumptions [A]): 5-0 the travel plan → 5-1 the hospital file (one act
+at a time, one filled button across panels, the reservation owns the hospital, stage-true logistics; backend follow-up **B-5-1**
+step codes for the reservation and the letter) → 5-2 the cashier (receipt prefill and disclosure, voucher one-liner,
+confirmations and date hints) → 5-3 going home + close (re-critique, target ≥ 28/40).
+
+**Slice 5-0 — the travel plan.** `TravelPlanPanel.tsx` replaces `CaseWorkflowActions.tsx` (deleted with its test; StaffCaseView
+renders it for Operations while `UPDATE_TRAVEL_PLAN` is offered, inside a `PanelBoundary`):
+- reopens on everything stored and resends it (incl. the arrival arrangements and `exceptions`, which the form never sent), so
+  a save never clears the plan; a stored hospital the directory has not loaded (or no longer lists) stays selected;
+- arrival arrangements (airport reception, accommodation, transport, companion) behind a disclosure; booking as two radios;
+  "Booked and confirmed" without a planned arrival refused at the field;
+- the patient's arrival is its own act: empty or future times refused in place, then a confirmation that shows the time,
+  because it moves the case to ARRIVAL_CONFIRMED;
+- one filled button (Save until booked, then Record the arrival); date fields `dir="ltr"` with a hint; option text isolated;
+- copy in `portalWork.travelPlan` (en + ar, inserted textually); `TravelPlanView` gains the arrangement fields.
+- Shared: the `Task` disclosure (panel-parts) now uses `Summary`, so every panel task shows its chevron (the reviewers found
+  no open/closed cue).
+
+**Reviews.** RB: HIGH ×1 fixed (the late hospital directory). WG, RTL/i18n, Pro Max: no CRITICAL/HIGH; fixed the MEDIUMs (disclosure
+cue, localized validation, the time in the confirmation, the no-hospitals note at its field, `dir="ltr"` dates, isolates) and
+the Arabic wording LOWs; the rest in backlog.md "Area 5 — Operations".
+
+**Verify.** `pnpm typecheck` ok; eslint on the touched files clean; vitest 97 files / 770 tests, 769 pass (the known
+`StaffOperationalUi` W-44); `TravelPlanPanel.test.tsx` 8/8 (whole-plan resend, late directory, re-seed, at-field refusal,
+confirm/cancel, empty/future arrival, Arabic); panel suites 50/50. Playwright on :3152 (production build): operations-shots,
+consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58; operations-shots re-run on :3153 after the
+fieldset fix 4/4. Overwritten shots restored. Shots: `screenshots/area-5/before/` and `screenshots/area-5/5-0/`.
+
+**Next:** slice 5-1 — the hospital file, started in a new session from this branch.
+
+## UX area 5 — slice 5-1 the hospital file (2026-10-28, worktree `elastic-lederberg-eace3a`, branch `claude/elastic-lederberg-eace3a` from 5-0 @ `da2f014c`)
+
+Plan direction 2 (`plans/operations-workspace.md`); no owner gate (standing instruction), assumptions as planned.
+
+**One hospital file.** For Operations the "Admission & money" panel opens on an ordered list of acts (`OperationsFile` in
+`AdmissionPanel.tsx`, `aria-label` "Hospital file"): reserve → admission letter → travel and arrival → cashier receipt →
+admission number. Only the current act is open and it carries the view's one filled button. The travel plan is part of
+that count: in travel coordination it is an act in the file, drawn through a `travel` slot that StaffCaseView fills with
+`TravelAct`, and it is current once the reservation and the letter are in. A done act is one line with its correction behind
+a disclosure ("Reserved · Nile Heart Hospital · Cairo · admission 30 Oct 2026" / "Change the reservation"; "Admission letter ·
+Waiting for Finance's check" / "Record a new letter"; "Arrived · …"; "Cashier receipt recorded · EGP … · waiting for
+Finance's countersignature" / "Record another receipt"; "Admission number …" / "Correct the admission number"). A recorded act
+that still waits on someone else shows a clock, and a variance shows an alert icon. A later act is named, muted, with an sr-only
+"Later:". The voucher, the point of no return and the first appointment follow as side tasks, and none of them is primary. The
+reference maximum and the point of no return stay as facts. The act now sits about 1,000px higher on the cashier case
+(case-balance-en-1440). New shared pieces in `panel-parts.tsx`: `DoneAct` (tone done / waiting / warning), `LaterAct`, and
+`localInput` (moved from the travel form). The reservation's form now reopens on its stored date.
+- `next` for Operations: reserve (unless cleared) → letter (unless cleared: an emergency admission can clear a case with no
+  letter, and then no letter act shows) → travel (in travel coordination, when the slot is offered) → what the backend's step
+  names (receipt, number). One stage (`view.caseStatus ?? caseStatus`) decides both `next` and `cleared`.
+- When an act is recorded its form is replaced by its fact, so focus moves on to the act that is now open, or to the panel's
+  heading.
+- When the admission view cannot be read, the travel act still stands under the error.
+
+**The reservation owns the hospital.** The travel form no longer has a hospital picker. It resends the stored `facilityId`
+with everything else, because the PUT replaces the whole plan. `TravelPlanPanel` (its own card, h3) is now used only before a
+reservation can exist (ACCEPTED). `TravelAct` (h4, not a landmark) is the act in the file: when it is not current it is one line
+("Planned arrival: …"), with the form behind "Change the travel plan" / "Plan the travel" and no filled button.
+
+**Stage-true logistics.** "Destination & treatment" reads the reservation back from the admission panel (`onView`, held through
+a ref so the reads never re-run): it shows the hospital · city and the planned admission. The travel line follows the stage
+(Arrived, before admission / cleared for admission / In hospital / Discharged / in follow-up / Case closed), so it never says
+"Arrived" after discharge. Dates go through `intlLocale`. "Facility" is now "Hospital", and the booking reads "Booked" in both
+places. The card states the hospital only when it knows it.
+
+**5-1 backlog items.** Done: the arrangements disclosure keeps the officer's open/closed state through a re-seed; a refused
+arrival is reported at the field ("…Read the message above, check the time, then try again."); the pre-release Operations plan
+textarea has a visible label and a hint. **B-5-1 was recorded, not built.** It touches `CaseActionService`, stage work and
+`WorkCopy`, `SlaPolicy`, `JourneyStageRegistry` and the parity tests, so it is not small. Details are in backlog.md
+"Area 5 — Operations"; until it lands, the strip says "Arrange travel and arrival" while the file opens the reservation or the
+letter.
+
+Copy is in en + ar, inserted textually: `admission.acts.*` and `admission.forms.{hospitalOption,noHospitals,newLetter,
+anotherReceipt,correctNumber}`; `travelPlan.{change,start,nothingYet,noArrivalYet,arriving,arrived,arrival.failed}`;
+`caseView.logistics.{admission,notPlanned,stage.*}`; `caseView.release.{operationsPlan,operationsPlanHint}`. The travel form's
+four picker keys were removed.
+
+**Reviews** (four read-only reviewers):
+- RB + composition: HIGH ×1 fixed (an emergency-cleared case with no letter left the view with no primary and a "done" letter).
+  MEDIUMs fixed: the travel act was offered as current with no slot; a partial or wrong receipt could not be recorded again;
+  `onView` sat in the read effects' deps.
+- Web design guidelines: HIGH ×1 fixed (focus dropped to `<body>` when an act became its fact). MEDIUMs fixed: the waiting /
+  warning icon on the letter, and the arrival failure copy.
+- RTL/i18n: no CRITICAL/HIGH. Fixed: `dir` on the receipt, number and date inputs; name and city isolated separately; the
+  Arabic wording (تم الحجز · موعد الدخول, اعتماد المالية, إيصال خزينة المستشفى, خرج من المستشفى, "خطوة لاحقة:").
+- Pro Max: no CRITICAL/HIGH. Contrast passes (ink-500 7.5:1 on paper). Fixed: wrapping of long facts.
+- The rest is in backlog.md "Area 5 — Operations". Detector 0 on the four files.
+
+**Verify.** `pnpm typecheck` ok; eslint on the touched files clean; vitest 97 files / 779 tests, 778 pass (the known `StaffOperationalUi` W-44); `AdmissionPanel.test.tsx` 21/21 (new "hospital file" block: order and one primary, travel handed the primary after the letter, travel standing on a failed read, emergency-cleared without a letter, receipt as one line with "Record another receipt"), `TravelPlanPanel.test.tsx` 12/12 (no picker, stored hospital resent from the act, arrangements state through a re-seed, arrival failure at the field, the act not current / current). Playwright on :3162 (production build): operations-shots (`AREA5_SHOTS=5-1`), consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58. Overwritten shots restored. Shots: `screenshots/area-5/5-1/`.
+
+**Next:** slice 5-2 — the cashier, started in a new session from this branch.
+
+## UX area 5 — slice 5-2 the cashier (2026-10-28, worktree `kind-shtern-f926c7`, branch `claude/kind-shtern-f926c7` fast-forwarded to 5-1 @ `7f6798c6`)
+
+Plan direction 3 (`plans/operations-workspace.md`); no owner gate (standing instruction).
+
+**The receipt on a phone.** Four visible fields: receipt number, amount prefilled with the hospital balance still owed (its
+hint says so and names the figure), paid-at prefilled with now, method. "Paid at" moves on to now each time the officer comes
+back to the receipt while it is untouched, so a file left open never records an old time. Currency, the amount in that
+currency and the receipt copy sit behind "Paid in another currency or with a copy". The currency is a list (the patient's
+currency first, then the platform's others, labelled per locale); choosing one makes its amount required; a field refused
+inside the closed disclosure opens it. Money and date inputs are `dir="ltr"`.
+
+**The voucher as one line.** Operations reads "Patient pays at the cashier: EGP 195,500 · $3,988.20" (a template, so the
+Arabic order is the copy's); every other figure, the voucher number and the frozen rate are behind "The voucher and what is
+owed". Finance and the coordinator keep the full facts.
+
+**What moves the case asks first.** The admission number on a cleared case (Operations, and the Consultant after an
+emergency admission) confirms with the number typed and its effect ("Recording it starts treatment: the case moves to
+Treatment in progress…"); a correction does not ask. The point of no return says its effect above the field and confirms
+with the time.
+
+**Shared (`panel-parts.tsx`).** `ActForm`: a backend refusal is said at the form ("Not saved." + the portal's own reason,
+which on a phone is scrolled out of view), focus moves to that line, typing clears it, and what was typed stays; an optional
+`confirm` asks first. `TimeField`: every `datetime-local` in the panel carries its clock hint (reservation, receipt, point of
+no return, Finance's fee balance). `Summary`'s chevron now reads its own `<details>`, not a `group`, so a closed disclosure
+inside an open one no longer shows the open marker (found on the shots).
+
+**5-2 backlog rows done.** Refusals at the form with focus (every form in the panel); specific submit labels ("Save the
+reservation", "Record the letter", "Record the receipt", "Record the admission number" / "Save the corrected number", "Set the
+point of no return", "Record the appointment", "Record the fee balance"; `forms.save` / `forms.record` removed); the
+reservation's date hint; `paidCurrency` is a list; "First confirmed appointment" for Operations only before admission, and
+"Correct the first confirmed appointment" once recorded; the PNR says its effect.
+
+Copy en + ar, inserted textually: `admission.forms.{saveReservation,recordLetter,recordReceipt,amountHint,timeHint,
+paidAtHint,otherCurrency,egpOnly,pnrHint,pnrConfirm,numberConfirm,numberConfirmBody,saveNumber,refused,refusedRetry}`,
+`admission.money.patientPaysLine`, `admission.firstAppointment.{record,correct}`, `admission.finance.recordFee`; Arabic
+"وقت الدفع" / "وقت الاستلام" for the date-and-time fields.
+
+**Reviews** (four read-only reviewers): RB + composition: no CRITICAL/HIGH (MEDIUM fixed: the stale paid-at; LOW fixed: a
+rejected command now shows the refusal). Web design guidelines: HIGH ×2 fixed (the refusal pointed "above" with no reason at
+the form; the alert was cut off by the focus move to the field — focus now goes to the alert). MEDIUMs fixed: currency and
+amount tied, `toFixed(2)` prefill. RTL/i18n: no CRITICAL/HIGH; fixed the one-line template, the PNR hint, «عند», the amount
+hint, «وقت». Pro Max: HIGH ×2 fixed (the same refusal reason; the stale paid-at); MEDIUMs fixed (the PNR button aligned under
+its hint, the closed disclosure opening for an invalid field, the refusal clearing on input). The rest is in backlog.md
+"Area 5 — Operations" (the currency list is not the rated FX list: Operations has no FX read; no pending text; enterKeyHint;
+the collapsed disclosure's contents). Design hook 0 on the touched files.
+
+**Verify.** `pnpm typecheck` ok; eslint on the touched files clean; vitest 97 files / 786 tests, 785 pass (the known
+`StaffOperationalUi` W-44); `AdmissionPanel.test.tsx` 28/28 (new "the cashier" block: one money line, the disclosure and the
+currency list, the refusal at the form with focus and clearing, currency → amount required, PNR confirmation, a correction
+without a confirmation, the first appointment before admission only). Playwright on a production build on :3173 (rerun after
+the chevron fix; the first run on :3172 was also 58/58): operations-shots (`AREA5_SHOTS=5-2`), consultant-shots,
+staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58. Overwritten shots restored. Shots: `screenshots/area-5/5-2/`.
+
+**Next:** slice 5-3 — going home + close (re-critique, after shots, area closed), started in a new session from this branch.
+
+## UX area 5 — slice 5-3 going home + close; area 5 closed (2026-10-28, worktree `infallible-fermi-5c9b5b`, branch `claude/infallible-fermi-5c9b5b` fast-forwarded to 5-2 @ `78f86a4c`)
+
+Plan direction 4 (`plans/operations-workspace.md`); no owner gate (standing instruction).
+
+**Going home, as Operations' acts.** For Operations the Discharge panel opens on an ordered list (`OperationsHome` in
+`DischargePanel.tsx`, `aria-label` "Going home"): the hospital's final invoice → the return → the departure. A done act is one line
+("Final invoice NHH-INV-9031 · EGP 204,000 · countersigned by Finance"; "Return confirmed · Flight, leaving … · reference MS-912";
+"The patient left … · Operations' part is done"), with its correction behind a disclosure while it still takes one ("Correct the final
+invoice" reopens on the stored invoice; "Change the return" on the stored return, keyed on it). Only the current act is open with the
+view's one filled button; a later act is named ("Later: Confirm the departure"). The departure starts at now (moved on to now while
+untouched), carries its clock hint and asks first — "Confirm the patient left at …?" — because it ends Operations' part. Every form is an
+`ActForm` (refusal said at the form, focus to it) with `TimeField`; once an act becomes its fact, focus moves to the act now open or the
+panel's heading. A step that still names a stored return hands the primary to the departure. The pack and the letter are two summary
+lines ("Discharge pack: 4 of 4 recorded · fit to fly valid until …"; "Handover letter generated on …") with the detail behind "The pack,
+the follow-up plan and the letter". The Consultant and the coordinator keep their layout; the Consultant's follow-up and fit-to-fly
+times moved onto `TimeField`.
+
+**Reconciliation for Operations** is its status line only: the workbench card is no longer drawn for Operations (presentation; the
+Discharge panel's state line says it is being reconciled or reconciled). `SettlementRole` is now Finance and coordinator.
+
+**"Also open on this case"** never repeats the step: `isStepItem` (`CurrentAction.tsx`) matches by id when the step is a work item, and
+by the step's code or work type when the backend resolved the step from the stage (a stage-step item is set aside there, so the step has
+no item id) — only for the viewer's own step. Its titles are Arabic on the Arabic page: `workItemText` falls back to the step's own
+title (`currentAction.states`, never a waiting state) when a type has no work title.
+
+**From the re-critique.** The cashier line ("Patient pays at the cashier …") now sits above the hospital file, so the officer reads the
+total before the form that records it. The shots fixture carries `myWorkCount` per case as the backend does (My work said "No cases
+need action" above five items).
+
+Copy en + ar, inserted textually: `discharge.acts.*` (16 keys); Arabic `discharge.invoice.countersigned` aligned to «اعتمدتها المالية».
+
+**Reviews** (four read-only reviewers): RB + composition: no CRITICAL/HIGH; MEDIUMs fixed (the stale-step primary, `ReturnForm` keyed on
+the stored return, `isStepItem` only for the viewer's own step); LOWs fixed (stale departure time, invoice correction prefill, `forms`
+memoized). Web design guidelines: no CRITICAL/HIGH; fixed focus after an act, the hidden primary, `role="list"`, the Arabic «في». RTL/i18n:
+no CRITICAL/HIGH; fixed «أُكِّدت العودة», «العودة إلى البلد», «تعديل/حفظ بيانات العودة», the countersign wording, the fallback's waiting
+states. Pro Max: HIGH ×1 fixed (the primary inside a closed disclosure on a stale `CONFIRM_RETURN`); contrast, focus, motion, targets
+pass. The rest is in backlog.md "Area 5 — Operations". Detector 0.
+
+**Re-critique: 29/40** (from 19; target ≥ 28), dual-agent,
+`.impeccable/critique/2026-10-28T11-53-36Z__frontend-src-components-portal-admissionpanel-tsx.md`. The first A pass on the pre-fix
+shots scored 27; its two cheap P1s were fixed (the cashier line, the fixture) and A ran again on the final shots. Detector 0; one filled
+button per Operations view (was 2–3); 0 inline copy; 0 money inputs without `dir="ltr"`. Open P1s: the strip names the stage, not the
+act (B-5-1); the cards around the file repeat it. Both are in backlog.md "Area 5 — Operations".
+
+**Verify.** `pnpm typecheck` ok; eslint on the touched files clean; vitest 97 files / 791 tests, 790 pass (the known `StaffOperationalUi`
+W-44); `DischargePanel.test.tsx` 13/13 (new: the acts in order with one primary and the summaries, the stale return step, the departure's
+confirmation and refusal at the form, the part done after departure), `portal-labels.test.ts` (new: `isStepItem`, the Arabic fallback),
+`ReconciliationPanel.test.tsx` (read-only case now the coordinator's). Playwright on a production build on :3185 (first run :3184, also
+58/58): operations-shots (`AREA5_SHOTS=after`), consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58. Overwritten
+shots restored. After shots: `screenshots/area-5/after/`.
+
+**Area 5 closed.** 5-0 travel plan (`da2f014c`), 5-1 hospital file (`7f6798c6`), 5-2 cashier (`78f86a4c`), 5-3 going home + close (this
+commit). Follow-ups: B-5-1 (backend step codes), the reservation summary on the workspace, folding the side cards into the file.
+
+### B-5-1 — Operations' step names the hospital file's open act (2026-10-28)
+
+The strip and My work said "Arrange travel and arrival" for all of treatment coordination while the hospital file's open act
+was the reservation or the letter. `AdmissionReadiness.hospitalStep` now names Operations' act from the reservation and the
+ledger: `RESERVE_HOSPITAL` while nothing is reserved, `RECORD_ADMISSION_LETTER` while no letter is recorded or Finance refused
+the latest (the refusal's own `REVISE_ADMISSION_LETTER` item still leads, and the stage step stays out of the queue beside it),
+then `UPDATE_TRAVEL_PLAN`. `CaseActionService.stageFallback` reads it in `TRAVEL_COORDINATION` only (ACCEPTED is unchanged). Both
+codes are stage work (one work item each, with English text and `WorkCopy`), have SLA rows (2 working days, the travel plan's
+window) and en/ar copy (`currentAction.states`, `actions`, `workTitles`, `workCopy`). While either leads, `availableActions` keeps
+`UPDATE_TRAVEL_PLAN`, so the travel plan stays live in the file. `AdmissionService.letterCheck` and the step share one refusal
+rule. Not added to `JourneyStageRegistry` or the V45 authorization mapping: that registry is the journey engine's catalog of
+handler-backed actions, whose graphs end at the proposal. An entry without a handler would offer an act no graph can run.
+`RECORD_FINAL_ASSESSMENT` and `PREPARE_TRAVEL_PACKAGE` are not in it either. So the journey parity tests are unchanged and green.
+
+Frontend: `AdmissionPanel`'s Operations `next` reads the step code in travel coordination (reserve, letter or the refused
+letter's item, else the travel act). After arrival it keeps the derived order, since the backend names no reservation step
+there. The operations fixture's plan and letter cases carry the real step codes and work types.
+
+**Verify.** Backend `mvn -o test` 998 tests, 0 failures, 3 environment skips (new `HospitalFileStepTest`: reserve → letter →
+travel plan, the refusal, ACCEPTED unchanged; `CoordinatorCaseActionsTest` now expects `RESERVE_HOSPITAL`). `pnpm typecheck`
+clean; vitest 788/791 → after the test update all green but the known `StaffOperationalUi` W-44; `AdmissionPanel.test.tsx` 28/28.
+Playwright on a production build on :3131: operations-shots + a11y en/ar 34/34; the plan shot's strip reads "Reserve the
+hospital" with the reservation's Save as the one filled button. Overwritten shots restored.
+
+## UX area 5 — slice 5-4: the side cards folded into the hospital file (2026-10-28, worktree `sharp-antonelli-b6a40e`, branch `claude/sharp-antonelli-b6a40e` reset to 5-3 @ `6fbce9be`)
+
+Follow-up to the area-5 re-critique (29/40) P1 #2 and P2 #3; presentation only, Operations only. No owner gate (standing instruction).
+B-5-1 (the strip's step codes, AdmissionPanel's `next`, the `currentAction`/`workTitles`/`workCopy` copy) runs in another session and was
+left alone so the branches merge cleanly.
+
+**One file, one sequence.** For Operations "Destination & treatment" is not drawn while the file, the travel card or the going-home acts are on
+the page (`StaffCaseView` `fileShowsIt`). "Before admission" became "Before admission, waiting on others" (an `h4` with its list): only what
+Operations cannot clear — consent, the final quote, the fee balance, a receipt not yet countersigned by Finance; the voucher, an unrecorded
+receipt and the number are the file's own acts. The file's list is the sequence: reserve → letter → point of no return (once set, a done fact,
+changeable until Finance approves) → travel → voucher → receipt → number. The voucher is a done line once issued (its money breakdown behind
+it); before that it is issued by hand only when possible now (letter checked, no final quote waiting; the backend's two refusals), else a later
+act. Travel inside the file is one ✓ (booked) or waiting line while it is not the act now ("Plan the travel" until there is a date); it opens
+with its forms only when it is the act, and its arrival act only then and once booked. Later acts show "Later:" with a dashed marker
+(`LaterAct`, shared with Discharge), so they no longer read as radios.
+
+**Only acts possible now; the record behind one disclosure.** "Also possible now: Point of no return · First confirmed appointment" — one
+closed group under the list, named by its contents — holds the acts that are possible now but no step of the sequence (the point of no return
+before it is set; the first appointment while owed, once a hospital is reserved). "File history (n)" holds the record — the evidence trail and
+the recorded appointment's correction — and is hidden while empty. The accepted estimate maximum is the letter price's hint. The cashier line
+asks for money only while it is owed and no receipt waits on Finance. `FirstAppointment` and `Trail` are components; the coordinator keeps
+both as before.
+
+**Harden.** The Arabic case tabs fit at 390 (`px-2 gap-0` below `sm`; `operations-shots` now asserts the tab strip does not overflow). The
+receipt and letter amounts are `AmountInput`: a grouped text field ("195,432.10", Latin digits like `formatMoney`), regrouped on leaving; it
+reads Arabic-Indic digits and separators and a currency word around the figure, and refuses an ambiguous amount ("195,50", "1,2", "0", "-5")
+with a localized `setCustomValidity` message instead of re-reading it. Focus after an act now finds the travel form (`travel-plan-next` /
+`travel-arrival-next`; the old `travel-next` id did not exist). Disclosure labels wrap beside their marker (`Summary` no longer wraps).
+
+Copy en + ar, inserted textually: `admission.acts.waitingOn`, `.alsoNow`, `.history`, `admission.forms.changePnr`, `.quotedHint`,
+`.amountInvalid`; removed `travelPlan.arrival.needsPlan`.
+
+**Reviews** (four read-only reviewers). RB + composition: HIGH ×1 fixed (blur re-read "195,50" as 19,550 — amounts now parse strictly);
+MEDIUMs fixed (the receipt awaiting countersignature, zero refused, the first appointment hidden in history). Web design guidelines: HIGH ×1
+fixed (the browser's own pattern message, Arabic digits refused); MEDIUMs fixed (the waiting heading, the appointment as an act). RTL/i18n:
+HIGH ×2 fixed (Arabic-Indic digits, the pattern); MEDIUMs fixed (the double full stop in «…ج.م..», the letter price on the same field,
+«بانتظار أطراف أخرى»). Pro Max: no CRITICAL/HIGH; contrast, focus, motion, icons pass. The rest is in backlog.md "Area 5 — Operations".
+
+**Re-critique: 30/40** (from 29; target ≥ 32 not reached), dual-agent,
+`.impeccable/critique/2026-10-28T13-12-53Z__frontend-src-components-portal-admissionpanel-tsx.md`. A ran four times (30, 30, 31, 30), the
+in-scope P2s of each pass fixed before the next (the depart card, the arrival gate, the cashier line after payment, the side acts' group and
+its label, the travel line, the voucher's line, the dashed later rows). What holds it at 30 is outside this slice: the strip naming the stage
+above a ✓ travel line (B-5-1) and the act names differing between My work and the case (with English queue summaries in Arabic). Heuristic 8
+rose to 3. Detector 0; one filled button per Operations view; 390 pages 2,250–2,870px (were 2,500–3,320; letter 3,125 → 2,463).
+
+**Verify.** `pnpm typecheck` ok; eslint on the touched files clean; vitest 97 files / 799 tests, 798 pass (the known `StaffOperationalUi`
+W-44; one `CaseStatusAccess` timeout under parallel load passed 39/39 alone). New tests: blockers only others clear, File history and the
+side group, the voucher by hand vs later, the point of no return as a fact, the cashier line after payment, grouped amounts, Arabic-Indic
+digits and refused ambiguous amounts, travel as one line in the file. Playwright on a production build on :3187: operations-shots
+(`AREA5_SHOTS=5-4`), consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58. Overwritten shots restored. After shots:
+`screenshots/area-5/5-4/`.
+
+## UX area 4 — Finance: critique, plan, slice 4-0 the deposit and the approval (2026-10-28, worktree `ux-4-finance-aa276b`, branch `claude/ux-4-finance-aa276b` from area 5's close @ `3ad22c7a`)
+
+Scope: `PLAN.md` row 4 (owner C2, a complete revamp): the verification queue, the commercial approval, change-order pricing,
+the reconciliation workbench, statements, Finance's parts of the admission panel and the transfer/deposit panels, and
+Control Center › Commercial where Finance works. P1-15, P1-16, P1-17 and DEP-3 are on this line, so no integration merge
+was needed.
+
+**Fixture and shots.** `e2e/finance-fixture.ts` uses synthetic data only. It holds My work with seven Finance items in the
+backend's order, and one case per Finance moment:
+- deposit (a USD bank transfer to confirm);
+- approve (commercial terms with a manual line);
+- letter (the hospital's quote 262,500 against a cap of 240,000);
+- receipt (cashier receipt to countersign);
+- fee (platform fee balance, no work item);
+- change (change order to price, interim bill);
+- reconcile (OPEN);
+- variance (above the band, for a Finance Manager);
+- statement (CLOSED, e-invoice owed).
+
+`e2e/finance-shots.spec.ts` writes `screenshots/area-4/<AREA4_SHOTS|before>/`: my-work and case-<id> × en/ar × 390/1440. It
+runs one test per page, so the pages shoot in parallel and a slow page never costs the others.
+
+**Critique: 20/40** (dual-agent; `.impeccable/critique/2026-10-28T15-30-37Z__frontend-src-components-portal-financeapproval-tsx.md`;
+first run for this target).
+- P0: panels multiplied on a case in treatment. P0: money was committed on one click (9 commands).
+- P1: the strip disagreed with the page (fee, statement); the proposal, deposit and refund blocks showed on every case;
+  Arabic parity was broken (English contexts, the inline approval table, a reference broken mid-token, tables clipped at 390).
+- P2: EGP read as the sub-line; the letter gap and the fee derivation were not stated.
+- Detector 0. Mechanical scan: 14 off-ladder sizes, 1 inline en/ar table (44 strings), 2 always-filled buttons, 7 raw
+  Finance forms.
+- One finding of A's (the variance's "charged" total) came from fixture data and was corrected in the fixture.
+
+The change case has no before shot. The page grew to 324k–563k px and timed out the capture: that is the bug below.
+
+**Plan** `plans/finance-workspace.md` (no owner gate; assumptions [A]):
+- 4-0 the deposit and the approval;
+- 4-1 the admission money (letter gap + confirmation, receipt, fee derivation, `DoneAct` lines);
+- 4-2 the treatment and the settlement (price and lines confirmed, variance verdict first, Approve/Return as two acts,
+  ladder sizes, phone ledger);
+- 4-3 the Finance sheet + close (the act first, proposal/checklist folded, strip agreement, Arabic contexts, Control
+  Center › Commercial, re-critique ≥ 28/40).
+
+Backend follow-up **B-4-1**: step codes for the fee balance and the e-invoice.
+
+**Slice 4-0.**
+- **Panels that stay put.** `StaffCaseView` rendered the travel, admission, treatment, discharge, reconciliation and
+  follow-up panels with the same `key={c.id}`, as siblings of one fragment. On a case in treatment React appended copies on
+  every render (79 children in the overview). Each panel now has its own key. This fix affects every role.
+- **The deposit transfer.**
+  - "Confirm payment received" goes through `ActForm` with a confirmation: "Record EGP 43,200 received against
+    QNB-…?". A refusal is said at the form. The idempotency key is kept per transfer until it succeeds, so a retry never
+    records the money twice.
+  - "Return to the patient" sits behind "Can't confirm this transfer?" with its own confirmation.
+  - The reference wraps only when it cannot fit (`dir="auto"`, FSI in titles), and the last refusal's reason is isolated.
+- **Finance's deposit card.**
+  - EGP leads and the patient's currency follows. The coordinator's view is unchanged.
+  - Outside its moment the deposit is one `DoneAct` line ("Coordination deposit & payments · Paid · EGP 43,200 ·
+    $881.28"; `DoneAct` gains a `neutral` tone for cancelled or refunded deposits). Focus moves to that line when Finance's
+    own act closes the moment.
+  - The refund sits behind "Refund part of this deposit?", and only once something was paid.
+- **`FinanceApproval`.**
+  - Its copy moved from an inline en/ar table into `portalWork.financeApproval`.
+  - Approving goes through `ActForm` with a confirmation carrying the patient's total. The fallback approve in
+    `RoleActions` asks too.
+  - The manual line is a `StatusBadge`. On a phone each line is a short block; at `sm`+ the table sits in a focusable region.
+  - The rate reads "1 US$ = EGP 49.0196", and the currency is named.
+
+Copy is in en + ar, inserted textually: `financeApproval.*`; `depositTransfer.{confirmTitle,confirmBody,cantConfirm,rejectTitle,
+rejectBody}`; `caseView.deposit.refundOpen`.
+
+**Reviews** (four read-only reviewers; no CRITICAL):
+- Pro Max: HIGH ×1 fixed (a 64–80-character reference could scroll the page sideways). Contrast passes.
+- Web design guidelines: MEDIUMs fixed: focus after the act, the refusal at the approval form, the scroll region, the
+  unconfirmed fallback approve, the unlabelled one-line figure.
+- RB + composition: MEDIUMs fixed: the same name on the summary and the button, the figure fallback. LOW fixed: the
+  idempotency key.
+- RTL/i18n: Arabic wording fixed (تأكيد استلام … للتحويل ذي الرقم المرجعي…؛ اعتماد الشروط المالية بإجمالي…؛ تعذّر تأكيد…؛ سعر
+  يدوي), plus the currency name, rate precision and isolates.
+- The rest is in backlog.md "Area 4 — Finance".
+
+**Verify.**
+- `pnpm typecheck` ok; eslint on the touched files clean.
+- vitest 97 files / 801 tests, 800 pass (the known `StaffOperationalUi` W-44). `FinanceApproval.test.tsx` 4/4 (manual line
+  and totals, confirm-before-approve with the total, the rate as Finance quotes it, Arabic).
+- Playwright on a production build on :3205: finance-shots (`AREA4_SHOTS=4-0`), finance-workspace (new: one panel each on
+  the change case, the transfer confirmation names amount and reference and posts once, the one-line deposit with the refund
+  disclosure in Arabic, approval after a question with the total), operations-shots, consultant-shots, staff-chrome,
+  hospital-agreement-audit, a11y en+ar: 100/100.
+- Overwritten shots restored. Shots: `screenshots/area-4/before/` (without the change case) and `screenshots/area-4/4-0/`.
+  The change case is now 3,160px at en-1440.
+
+**Next:** slice 4-1, the admission money, started in a new session from this branch.
 
 ## Control Center — Consultant public profiles (2026-10-17)
 

@@ -1,7 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CaseWorkflowActions } from "./CaseWorkflowActions";
 import { refreshAfterRejectedAction } from "./portal-model";
 import { RoleActions } from "./StaffCaseView";
 import { renderWithWork } from "./test-copy";
@@ -32,22 +31,6 @@ describe("server-authoritative proposal actions", () => {
     cleanup();
     renderWithWork(<RoleActions role="operations" t={t} c={c} proposal={proposal} gates={{ ...gates, operationsRequired: false }} availableActions={["UPDATE_TRAVEL_PLAN"]} mutate={vi.fn()}/>);
     expect(screen.getByRole("button", { name: /complete operational plan/i })).toBeTruthy();
-  });
-
-  it("renders the frozen-v1 Operations subset only when the backend offers it", () => {
-    const mutate = vi.fn().mockResolvedValue({ status: "SAVED" });
-    const accepted = { id: "case-1", status: "ACCEPTED", version: 1 };
-    const { rerender } = render(<CaseWorkflowActions locale="en" role="operations" caseSummary={accepted} availableActions={[]} mutate={mutate}/>);
-    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
-    rerender(<CaseWorkflowActions locale="en" role="operations" caseSummary={accepted} availableActions={["UPDATE_TRAVEL_PLAN"]} mutate={mutate}/>);
-    expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
-  });
-
-  // UX 3-1: the follow-up plan is recorded in the discharge panel (P1-17); the legacy duplicate form is retired.
-  it("offers no legacy follow-up form to a Consultant after discharge", () => {
-    const { container } = render(<CaseWorkflowActions locale="en" role="doctor" caseSummary={{ id: "case-1", status: "DISCHARGED", version: 1 }} availableActions={[]} mutate={vi.fn()}/>);
-    expect(container.innerHTML).toBe("");
-    expect(screen.queryByText("Schedule follow-up")).toBeNull();
   });
 
   it("refreshes queue and workspace after a stale/direct API rejection", async () => {

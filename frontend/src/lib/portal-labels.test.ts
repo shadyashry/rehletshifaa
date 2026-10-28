@@ -4,7 +4,8 @@ import { intlLocale } from "@/lib/i18n";
 import en from "@/messages/en.json";
 import ar from "@/messages/ar.json";
 
-import { careAreaLabel, coordinatorLabel, plural, priorityLabel, tabKeyTarget, waitingLabel, waitingReasonText, workCopyText } from "./portal-labels";
+import { isStepItem } from "@/components/portal/CurrentAction";
+import { careAreaLabel, coordinatorLabel, plural, priorityLabel, tabKeyTarget, waitingLabel, waitingReasonText, workCopyText, workItemText } from "./portal-labels";
 
 const keys = (value: unknown, prefix = ""): string[] =>
   value && typeof value === "object"
@@ -128,5 +129,28 @@ describe("waitingReasonText", () => {
     const base = { code: "CASE_OWNERSHIP_TRANSFERRED", params: { caseNumber: "RS-2026-000001" } };
     expect(workCopyText(base, en.portalWork.workCopy)?.context).not.toContain("Transferred by");
     expect(workCopyText({ ...base, params: { ...base.params, by: "Sara Ahmed" } }, en.portalWork.workCopy)?.context).toContain("Transferred by ⁨Sara Ahmed⁩.");
+  });
+});
+
+// UX 5-3: "Also open on this case" never repeats the step, and words a step-named item in Arabic.
+describe("the case's other open work", () => {
+  const item = (id: string, type: string) => ({ id, type, title: "Record the receipt", context: null, copy: null });
+
+  it("treats the step's own item as the step, by id when the step has one, else by its code or work type", () => {
+    expect(isStepItem({ code: "WORK_ITEM", kind: "COMPLETE", workItemId: "w1", workType: "COUNTERSIGN_MILESTONE" }, item("w2", "COUNTERSIGN_MILESTONE"))).toBe(false);
+    expect(isStepItem({ code: "WORK_ITEM", kind: "COMPLETE", workItemId: "w1" }, item("w1", "X"))).toBe(true);
+    expect(isStepItem({ code: "RECORD_HOSPITAL_BALANCE", kind: "FOCUS" }, item("w3", "RECORD_HOSPITAL_BALANCE"))).toBe(true);
+    expect(isStepItem({ code: "UPDATE_TRAVEL_PLAN", kind: "FOCUS", workType: "TRAVEL" }, item("w4", "TRAVEL"))).toBe(true);
+    expect(isStepItem({ code: "RECORD_HOSPITAL_BALANCE", kind: "FOCUS" }, item("w5", "RECORD_ADMISSION_NUMBER"))).toBe(false);
+    // A step that waits on someone else hides none of the viewer's work.
+    expect(isStepItem({ code: "TRAVEL", kind: "WAIT" }, item("w6", "TRAVEL"))).toBe(false);
+  });
+
+  it("titles a step-named item with the step's own words in Arabic, and keeps the backend's English in English", () => {
+    expect(workItemText(item("w3", "RECORD_HOSPITAL_BALANCE"), "ar", ar.portalWork).title).toBe(ar.portalWork.currentAction.states.RECORD_HOSPITAL_BALANCE.title);
+    expect(workItemText(item("w3", "RECORD_HOSPITAL_BALANCE"), "en", en.portalWork).title).toBe("Record the receipt");
+    expect(workItemText(item("w6", "CONFIRM_DEPARTURE"), "ar", ar.portalWork).title).toBe(ar.portalWork.workTitles.CONFIRM_DEPARTURE);
+    // Never a waiting state's words.
+    expect(workItemText(item("w7", "WAIT_OPERATIONS"), "ar", ar.portalWork).title).toBe("Record the receipt");
   });
 });

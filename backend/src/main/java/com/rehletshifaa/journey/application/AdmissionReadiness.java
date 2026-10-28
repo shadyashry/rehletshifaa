@@ -2,8 +2,11 @@ package com.rehletshifaa.journey.application;
 
 import com.rehletshifaa.casemanagement.infrastructure.ConsentRecordRepository;
 import com.rehletshifaa.journey.domain.AdmissionVoucher;
+import com.rehletshifaa.journey.domain.CaseEvidence;
+import com.rehletshifaa.journey.domain.FacilityAdmission;
 import com.rehletshifaa.journey.domain.CaseEvidence.Kind;
 import com.rehletshifaa.journey.infrastructure.AdmissionVoucherRepository;
+import com.rehletshifaa.journey.infrastructure.FacilityAdmissionRepository;
 import com.rehletshifaa.journey.infrastructure.ProposalDecisionRepository;
 import com.rehletshifaa.journey.infrastructure.ProposalVersionRepository;
 import com.rehletshifaa.journey.infrastructure.TravelPlanRepository;
@@ -51,12 +54,14 @@ public class AdmissionReadiness {
     private final ProposalDecisionRepository proposalDecisions;
     private final ConsentRecordRepository consents;
     private final TravelPlanRepository travelPlans;
+    private final FacilityAdmissionRepository admissions;
     private final Clock clock;
 
     public AdmissionReadiness(EvidenceLedger ledger, AdmissionVoucherRepository vouchers, ProposalVersionRepository proposalVersions,
-                              ProposalDecisionRepository proposalDecisions, ConsentRecordRepository consents, TravelPlanRepository travelPlans, Clock clock) {
+                              ProposalDecisionRepository proposalDecisions, ConsentRecordRepository consents, TravelPlanRepository travelPlans,
+                              FacilityAdmissionRepository admissions, Clock clock) {
         this.ledger = ledger; this.vouchers = vouchers; this.proposalVersions = proposalVersions; this.proposalDecisions = proposalDecisions; this.consents = consents;
-        this.travelPlans = travelPlans; this.clock = clock;
+        this.travelPlans = travelPlans; this.admissions = admissions; this.clock = clock;
     }
 
     /**
@@ -69,6 +74,27 @@ public class AdmissionReadiness {
         if (plan == null || !"CONFIRMED".equals(plan.getStatus()) || plan.getPlannedArrival() == null) return false;
         if (ledger.latest(caseId, Kind.PATIENT_ARRIVED).isPresent()) return false;
         return !plan.getPlannedArrival().isAfter(clock.instant().plus(Duration.ofDays(1)));
+    }
+
+    /** B-5-1: Operations' acts on the hospital file before the travel plan, in the order they happen. */
+    public static final String RESERVE_HOSPITAL = "RESERVE_HOSPITAL", RECORD_ADMISSION_LETTER = "RECORD_ADMISSION_LETTER";
+
+    /**
+     * B-5-1: Operations' open act on the hospital file in treatment coordination: {@code RESERVE_HOSPITAL} while nothing is reserved,
+     * {@code RECORD_ADMISSION_LETTER} while the hospital's letter is owed (none yet, or Finance refused the latest); empty once
+     * both are on file, when their step is the travel plan.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> hospitalStep(UUID caseId) {
+        if (admissions.findByCaseId(caseId).filter(a -> a.getStatus() != FacilityAdmission.Status.CANCELLED).isEmpty()) return Optional.of(RESERVE_HOSPITAL);
+        CaseEvidence letter = ledger.latest(caseId, Kind.FACILITY_ADMISSION_LETTER).orElse(null);
+        return letter == null || letterRefused(caseId, letter) ? Optional.of(RECORD_ADMISSION_LETTER) : Optional.empty();
+    }
+
+    /** Finance refused this letter (a refusal recorded after it) and it is not countersigned: the hospital is asked again. */
+    boolean letterRefused(UUID caseId, CaseEvidence letter) {
+        return !letter.countersigned() && ledger.latest(caseId, Kind.PRICE_VARIANCE_CHECK)
+                .filter(c -> "REFUSED".equals(c.getReference()) && !c.getRecordedAt().isBefore(letter.getRecordedAt())).isPresent();
     }
 
     /** Whether a receipt is recorded and waiting for Finance's countersignature (the patient's "we are checking it"). */

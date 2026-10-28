@@ -5,13 +5,13 @@ import { ConsultantReferrals } from "@/components/portal/ConsultantRouting";
 import { createContext, use, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import dynamic from "next/dynamic";
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Gauge, MessageSquare, MoreHorizontal } from "lucide-react";
-import { CaseWorkflowActions } from "@/components/portal/CaseWorkflowActions";
+import { TravelAct, TravelDone, TravelPlanPanel, TRAVEL_STAGES } from "@/components/portal/TravelPlanPanel";
 import { AdmissionPanel, ADMISSION_STAGES, ADMISSION_WORK, type AdmissionRole } from "@/components/portal/AdmissionPanel";
 import { TreatmentPanel, TREATMENT_WORK } from "@/components/portal/TreatmentPanel";
 import { DischargePanel, DISCHARGE_STAGES, DISCHARGE_WORK, type DischargeRole } from "@/components/portal/DischargePanel";
 import { ReconciliationPanel, SETTLEMENT_STAGES, SETTLEMENT_WORK, type SettlementRole } from "@/components/portal/ReconciliationPanel";
 import { FollowUpPanel, FOLLOW_UP_STAGES, FOLLOW_UP_WORK } from "@/components/portal/FollowUpPanel";
-import { PanelBoundary } from "@/components/portal/panel-parts";
+import { ActForm, ConfirmAction, DoneAct, Money, PanelBoundary, Summary } from "@/components/portal/panel-parts";
 import { BASE, CaseEvidence, DecisionSummary, EstimateLines, RecommendationFields, currencyName, useClinicalDecision } from "@/components/portal/ClinicalDecision";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
@@ -21,7 +21,7 @@ import { IntakeHistory } from "@/components/portal/IntakeHistory";
 import type { ConversationDetail } from "@/components/portal/ConversationsView";
 import type { ProposalCopy } from "@/components/portal/PatientProposal";
 import { JourneyPulse, FullJourneyDialog } from "@/components/portal/JourneySnapshot";
-import { CurrentActionPanel, actionTitle, focusCurrentAction, isOwnStep, stepLabel, type CaseActions, type CurrentActionView } from "@/components/portal/CurrentAction";
+import { CurrentActionPanel, actionTitle, focusCurrentAction, isOwnStep, isStepItem, stepLabel, type CaseActions, type CurrentActionView } from "@/components/portal/CurrentAction";
 import type { WorkItem } from "@/components/portal/MyWork";
 import { patientStepText } from "@/components/portal/patient-step";
 import { FinanceApproval } from "@/components/portal/FinanceApproval";
@@ -39,7 +39,7 @@ import type { PortalView as RoleKey } from "@/lib/access";
 import { scrollIntoView } from "@/lib/scroll";
 import { countryName } from "@/lib/countries";
 import { PROPOSAL_PAYMENT_TERMS_RECORD } from "@/lib/commercial-terms";
-import { type CaseView, type CatalogService, type DirectoryFacility, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
+import { type CaseView, type CatalogService, type DirectoryFacility, type FxRate, REFERRAL_ASSIGNMENTS, REFERRAL_CONFIRM_WORK, type CaseDocument, type VerifiedDoctor, type CareCategory, type StaffMember, type Review, type Proposal, type Task, type ProposalGates, type DeliveryStatus, type DepositView, type Workspace, type Mutate, type AdmissionView, CURRENCY_LABELS, money, formatBytes, statusLabel } from "@/components/portal/portal-model";
 import { useShortcutsEnabled, useStaffShortcut } from "@/components/portal/StaffShortcuts";
 import { copy, FeedbackContext, HeaderFact, CaseDrawer, ConfirmDialog, Panel, Empty, Status, LockedSection } from "@/components/portal/portal-ui";
 
@@ -114,21 +114,31 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   // Only a real consultant assignment earns a second identity row. Falling back to the coordinator
   // here printed the same person twice under two labels, one of them the internal word "assignee".
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
- // Operations and consultants keep their stage forms; the coordinator's work is driven by the current action.
- const workflowBlock=!isCoordinator&&showActions&&!(isDoctor&&doctorPhase)?<div id="case-actions"><CaseWorkflowActions locale={locale} role={role} caseSummary={c} availableActions={available} patientAction={value.patientAction} mutate={mutate} doctors={doctors} categories={categories} staff={staff??[]} documents={documents} facilities={facilities} travelPackage={!!c.travelPackageRequested} financeRequired={!!value.gates?.financeRequired} travelPlan={value.travelPlan??null} busy={busy}/></div>:null;
  // P1-15: the reservation, the voucher, the balance and its evidence, for every staff role on the case from travel coordination to treatment.
  const admissionRole=(["operations","finance","coordinator","doctor"] as string[]).includes(role)?role as AdmissionRole:null;
- const admissionPanel=admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview?<PanelBoundary key={c.id} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
+ const admissionShown=!!admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview;
+ // UX 5-0/5-1: Operations' travel plan, while the backend offers it (ACCEPTED, TRAVEL_COORDINATION). Once a reservation can exist it
+ // is an act of the hospital file (the admission panel), in its place between the letter and the receipt; before that, its own
+ // card. After travel coordination the file keeps the arrival as a done act. The other roles' work is driven by the current action.
+ const travelLive=role==="operations"&&showActions&&available.includes("UPDATE_TRAVEL_PLAN")&&TRAVEL_STAGES.has(c.status);
+ const travelBoundary=(node:ReactNode)=><PanelBoundary key={`travel-${c.id}`} title={work.travelPlan.title} message={fillTemplate(cv.panelFailed,{panel:work.travelPlan.title})}>{node}</PanelBoundary>;
+ const workflowBlock=travelLive&&!admissionShown?<div id="case-actions">{travelBoundary(<TravelPlanPanel caseId={c.id} plan={value.travelPlan??null} busy={busy} mutate={mutate}/>)}</div>:null;
+ const travelAct=role!=="operations"?undefined:travelLive?(currentAct:boolean)=>travelBoundary(<TravelAct caseId={c.id} plan={value.travelPlan??null} current={currentAct} busy={busy} mutate={mutate}/>)
+  :value.travelPlan?.confirmedArrival?()=><DoneAct fact={<TravelDone plan={value.travelPlan??null}/>}/>:undefined;
+ // The reservation the admission panel last showed, read back by the logistics card (the reservation owns the hospital).
+ const [reservation,setReservation]=useState<AdmissionView|null>(null);
+ const admissionPanel=admissionShown?<PanelBoundary key={`admission-${c.id}`} title={isDoctor?work.admission.summary.title:work.admission.title} message={fillTemplate(cv.panelFailed,{panel:isDoctor?work.admission.summary.title:work.admission.title})}><AdmissionPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} facilities={facilities} busy={busy} mutate={mutate} load={load} travel={travelAct} onView={setReservation}/></PanelBoundary>:null;
  // P1-16: milestones, change orders, the running money and the evidence checklist while the patient is in treatment (and for an
  // open Treatment work item afterwards, such as Finance's emergency change-order review, which survives the case's exit).
- const treatmentPanel=admissionRole&&!value.preview&&(c.status==="TREATMENT_IN_PROGRESS"||TREATMENT_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.treatment.title} message={fillTemplate(cv.panelFailed,{panel:work.treatment.title})}><TreatmentPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
+ const treatmentPanel=admissionRole&&!value.preview&&(c.status==="TREATMENT_IN_PROGRESS"||TREATMENT_WORK.has(current.workType??""))?<PanelBoundary key={`treatment-${c.id}`} title={work.treatment.title} message={fillTemplate(cv.panelFailed,{panel:work.treatment.title})}><TreatmentPanel key={c.id} locale={locale} role={admissionRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // P1-17: the discharge pack, the final invoice and the journey home, from treatment until the patient has left (Finance reads the
  // invoice in the reconciliation instead); and the reconciliation and statements once discharged, or for an open Finance item.
- const dischargePanel=admissionRole&&admissionRole!=="finance"&&!value.preview&&(DISCHARGE_STAGES.has(c.status)||DISCHARGE_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.discharge.title} message={fillTemplate(cv.panelFailed,{panel:work.discharge.title})}><DischargePanel key={c.id} locale={locale} role={admissionRole as DischargeRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} dischargedAt={value.timeline.find(entry=>entry.status==="DISCHARGED")?.occurredAt??null} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
- const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.reconciliation.title} message={fillTemplate(cv.panelFailed,{panel:work.reconciliation.title})}><ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
+ const dischargePanel=admissionRole&&admissionRole!=="finance"&&!value.preview&&(DISCHARGE_STAGES.has(c.status)||DISCHARGE_WORK.has(current.workType??""))?<PanelBoundary key={`discharge-${c.id}`} title={work.discharge.title} message={fillTemplate(cv.panelFailed,{panel:work.discharge.title})}><DischargePanel key={c.id} locale={locale} role={admissionRole as DischargeRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} dischargedAt={value.timeline.find(entry=>entry.status==="DISCHARGED")?.occurredAt??null} documents={documents} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
+ // UX 5-3: Operations reads the reconciliation as the Discharge panel's state line; the workbench is Finance's and the coordinator's.
+ const reconciliationPanel=admissionRole&&admissionRole!=="doctor"&&admissionRole!=="operations"&&!value.preview&&(SETTLEMENT_STAGES.has(c.status)||SETTLEMENT_WORK.has(current.workType??""))?<PanelBoundary key={`reconciliation-${c.id}`} title={work.reconciliation.title} message={fillTemplate(cv.panelFailed,{panel:work.reconciliation.title})}><ReconciliationPanel key={c.id} locale={locale} role={admissionRole as SettlementRole} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // P1-18: the follow-up window, contacts, check-ins, outcomes and what holds the case open, for the case's Consultant and coordinator
  // (never Finance or Operations), from discharge to a closed case, or for an open follow-up item (a review outlives the exit).
- const followUpPanel=(isDoctor||isCoordinator)&&!value.preview&&(FOLLOW_UP_STAGES.has(c.status)||FOLLOW_UP_WORK.has(current.workType??""))?<PanelBoundary key={c.id} title={work.followUp.title} message={fillTemplate(cv.panelFailed,{panel:work.followUp.title})}><FollowUpPanel key={c.id} locale={locale} role={isDoctor?"doctor":"coordinator"} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
+ const followUpPanel=(isDoctor||isCoordinator)&&!value.preview&&(FOLLOW_UP_STAGES.has(c.status)||FOLLOW_UP_WORK.has(current.workType??""))?<PanelBoundary key={`followUp-${c.id}`} title={work.followUp.title} message={fillTemplate(cv.panelFailed,{panel:work.followUp.title})}><FollowUpPanel key={c.id} locale={locale} role={isDoctor?"doctor":"coordinator"} caseId={c.id} caseStatus={c.status} currentCode={current.workType??current.code} busy={busy} mutate={mutate} load={load}/></PanelBoundary>:null;
  // UX 3-2: the Consultant's panels in the order of their work — the panel holding the current step first, then the stage's
  // own order (after discharge, Follow-up before Discharge; in treatment, Treatment before Discharge, the Admission summary last).
  // The Start treatment act stays with the admission it depends on. Presentation only: the panels still decide what they show.
@@ -141,15 +151,25 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   {key:"treatment",work:TREATMENT_WORK,node:treatmentPanel},
   {key:"admission",work:ADMISSION_WORK,node:admissionPanel||workflowBlock?<>{admissionPanel}{workflowBlock}</>:null},
  ].filter(panel=>panel.node).map(panel=>({...panel,rank:panel.work.has(stepCode)?0:1+stageOrder.indexOf(panel.key)})).toSorted((a,b)=>a.rank-b.rank):null;
- // P0-5: the destination read back with its facility named, for every staff role on the case.
- const when=(v?:string|null)=>v?new Intl.DateTimeFormat(locale,{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
- const logistics=value.travelPlan?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{cv.logistics.title}</h3>
-  {value.travelPlan&&<dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-4">
-   <div><dt className="text-ink-500">{cv.logistics.facility}</dt><dd className="font-semibold text-ink-900">{value.travelPlan.facilityName??cv.logistics.notChosen}</dd></div>
-   <div><dt className="text-ink-500">{cv.logistics.travelStatus}</dt><dd className="font-semibold text-ink-900">{label(cv.logistics.travel,value.travelPlan.status)}</dd></div>
-   <div><dt className="text-ink-500">{cv.logistics.plannedArrival}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.plannedArrival)}</dd></div>
-   <div><dt className="text-ink-500">{cv.logistics.confirmedArrival}</dt><dd className="font-semibold text-ink-900">{when(value.travelPlan.confirmedArrival)}</dd></div>
-  </dl>}
+ // P0-5, UX 5-1: the destination read back for every staff role on the case. The reservation names the hospital (the travel plan's
+ // own facility only until one is read); the travel line follows the stage, so it never says "Arrived" once the patient has left.
+ const when=(v?:string|null)=>v?new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(v)):"—";
+ const plan=value.travelPlan??null;
+ const reserved=reservation?.caseId===c.id&&reservation.admissionId?reservation:null;
+ const stageLine=cv.logistics.stage as Record<string,string>;
+ const travelLine=Object.hasOwn(stageLine,c.status)?stageLine[c.status]:plan?label(cv.logistics.travel,plan.status):cv.logistics.notPlanned;
+ // UX 5-4: Operations reads the destination in its own file (the reservation, the travel act, the arrival) and, at the end, in its
+ // going-home acts, so the card is left out while any of them is on the page.
+ const fileShowsIt=role==="operations"&&(admissionShown||travelLive||!!dischargePanel);
+ const logistics=(plan||reserved)&&!fileShowsIt?<section className="card p-5" aria-labelledby="logistics-title"><h3 id="logistics-title" className="title text-base">{cv.logistics.title}</h3>
+  <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] sm:grid-cols-2 lg:grid-cols-4">
+   {/* "Not chosen yet" only while one can still be chosen; later, a hospital not read here is left unsaid rather than denied. */}
+   {(reserved||plan?.facilityName||TRAVEL_STAGES.has(c.status))&&<div><dt className="text-ink-500">{cv.logistics.facility}</dt><dd className="font-semibold text-ink-900">{reserved?<><bdi>{reserved.facilityName??"—"}</bdi>{reserved.facilityCity&&<span className="font-normal text-ink-600"> · <bdi>{reserved.facilityCity}</bdi></span>}</>:plan?.facilityName?<bdi>{plan.facilityName}</bdi>:cv.logistics.notChosen}</dd></div>}
+   {reserved?.plannedAdmissionAt&&<div><dt className="text-ink-500">{cv.logistics.admission}</dt><dd className="font-semibold text-ink-900">{when(reserved.plannedAdmissionAt)}</dd></div>}
+   <div><dt className="text-ink-500">{cv.logistics.travelStatus}</dt><dd className="font-semibold text-ink-900">{travelLine}</dd></div>
+   {plan?.confirmedArrival?<div><dt className="text-ink-500">{cv.logistics.confirmedArrival}</dt><dd className="font-semibold text-ink-900">{when(plan.confirmedArrival)}</dd></div>
+    :<div><dt className="text-ink-500">{cv.logistics.plannedArrival}</dt><dd className="font-semibold text-ink-900">{when(plan?.plannedArrival)}</dd></div>}
+  </dl>
  </section>:null;
  const recommendationBlock=approved&&(approved.recommendedTreatment||approved.risksAndLimitations)?<div className="border-b border-line pb-4"><p className="mb-2 label-micro text-brand-700">{cv.recommendation}</p>{approved.recommendedTreatment&&<div className="mb-3"><p className="text-sm font-bold text-ink-800">{t.reviewTreatment}</p><p className="mt-0.5 whitespace-pre-wrap text-ink-700">{approved.recommendedTreatment}</p></div>}{approved.risksAndLimitations&&<div><p className="text-sm font-bold text-ink-800">{t.reviewRisks}</p><p className="mt-0.5 whitespace-pre-wrap text-sm text-ink-600">{approved.risksAndLimitations}</p></div>}</div>:null;
  // The proposal is the coordinator's work while it is being prepared or released (or, at arrival, finalised);
@@ -202,7 +222,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   // the move short before the control is on screen.
   const panelStep=current.workType==="DEPOSIT_RECORD"||[ADMISSION_WORK,TREATMENT_WORK,DISCHARGE_WORK,SETTLEMENT_WORK,FOLLOW_UP_WORK].some(set=>set.has(current.workType??current.code));
   const toDecision=isDoctor&&!panelStep&&(decisionSheet||secondOpinionOnly);
-  const focusAction=()=>{setTab(toDecision?"clinical":"overview");requestAnimationFrame(()=>{const target=(toDecision?(document.getElementById("clinical-decision")??document.getElementById("case-actions")):(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(current.workType??current.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel"))??document.getElementById("case-tab-panel");const control=target?.querySelector<HTMLElement>("textarea,select,input,button")??target;scrollIntoView(control,{behavior:"instant",block:"center"});control?.focus({preventScroll:true});});};
+  const focusAction=()=>{setTab(toDecision?"clinical":"overview");requestAnimationFrame(()=>{const target=(toDecision?(document.getElementById("clinical-decision")??document.getElementById("case-actions")):(current.workType==="DEPOSIT_RECORD"?document.getElementById("deposit-payment"):null)??(role==="operations"&&TRAVEL_STAGES.has(c.status)?document.getElementById("admission-next")??document.getElementById("travel-plan-next")??document.getElementById("travel-arrival-next"):null)??(ADMISSION_WORK.has(current.workType??current.code)?document.getElementById("admission-next")??document.getElementById("admission-panel"):null)??(TREATMENT_WORK.has(current.workType??current.code)?document.getElementById("treatment-next")??document.getElementById("treatment-panel"):null)??(DISCHARGE_WORK.has(current.workType??current.code)?document.getElementById("discharge-next")??document.getElementById("discharge-panel"):null)??(SETTLEMENT_WORK.has(current.workType??current.code)?document.getElementById("reconciliation-next")??document.getElementById("reconciliation-panel"):null)??(FOLLOW_UP_WORK.has(current.workType??current.code)?document.getElementById("follow-up-next")??document.getElementById("follow-up-panel"):null)??document.getElementById("case-actions")??document.getElementById("case-tab-panel"))??document.getElementById("case-tab-panel");const control=target?.querySelector<HTMLElement>("textarea,select,input,button")??target;scrollIntoView(control,{behavior:"instant",block:"center"});control?.focus({preventScroll:true});});};
   const completeWork=(evidence:string)=>{if(current.workItemId!=null)void mutate(`/tasks/${current.workItemId}/cases/${c.id}/complete`,{evidence,expectedVersion:current.workItemVersion??0});};
   const openMessages=()=>setOverlay("messages");
   // When the step is the patient's reply (the backend's action, never the stage) and this viewer is the one who answers the
@@ -231,7 +251,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   const openNext=nextItem&&openCaseById?()=>openCaseById(nextItem.caseId):null;
   // `n` (UX 2-2) is the same Next in My work, through the same leave guard.
   useStaffShortcut("KeyN",openNext);
-  const alsoOpen=workItems.filter(item=>item.caseId===c.id&&item.id!==current.workItemId);
+  const alsoOpen=workItems.filter(item=>item.caseId===c.id&&!isStepItem(current,item));
   const coverRef=useRef<HTMLElement>(null);
   const line=useCoverGone(coverRef);
 
@@ -283,7 +303,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
    onAcceptAssignment={()=>{if(!myPending)return;void mutate(`/${role}/cases/${c.id}/assignments/${myPending.id}`,{accept:true}).then(result=>{if(result&&isDoctor)setTab("clinical");});}}
    onDeclineAssignment={()=>setOverlay("decline")}
    form={financeApproval&&value.proposal&&value.commercial?<FinanceApproval locale={locale} commercial={value.commercial} busy={busy} approveLabel={t.financeApprove} feeLabel={proposalCopy.price.feeLabel}
-     onApprove={()=>void mutate(`/finance/cases/${c.id}/proposals/${value.proposal!.versionId}/approve`)}/>
+     onApprove={()=>mutate(`/finance/cases/${c.id}/proposals/${value.proposal!.versionId}/approve`)}/>
     :formAction?<CoordinatorActionForm locale={locale} code={formCode} caseId={c.id} version={c.version} careCategory={c.careCategory} categories={categories} staff={staff} busy={busy} mutate={mutate} load={load} consultantsHref={consultantsHref} proposal={value.proposal} representatives={value.representatives}/>:undefined}/>
    </div>
    {alsoOpen.length>0&&<AlsoOpen items={alsoOpen}/>}
@@ -299,9 +319,9 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   <div aria-busy={busy||undefined} className="min-w-0">
    <div className={`mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start ${evidence&&tab==="clinical"?"xl:grid-cols-[minmax(0,1fr)_22rem]":""}`}>
     <div className="min-w-0">
-     {<div role="tablist" aria-label={t.caseWorkspaceLabel} className="mb-4 flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-line-strong)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+     {<div role="tablist" aria-label={t.caseWorkspaceLabel} className="mb-4 flex gap-0 overflow-x-auto sm:gap-1 shadow-[inset_0_-1px_0_var(--color-line-strong)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {caseTabs.map(item=><button key={item.id} type="button" role="tab" id={`case-tab-${item.id}`} aria-controls="case-tab-panel" aria-selected={tab===item.id}
-        className={`min-h-11 flex-none whitespace-nowrap border-b-2 px-3 py-2 text-[0.875rem] font-bold transition-colors ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
+        className={`min-h-11 flex-none whitespace-nowrap border-b-2 px-2 py-2 sm:px-3 text-[0.875rem] font-bold transition-colors ${tab===item.id?"border-brand-600 text-brand-800":"border-transparent text-ink-500 hover:text-ink-800"}`}
         onKeyDown={event=>{const target=tabKeyTarget(event.key,caseTabs.findIndex(x=>x.id===tab),caseTabs.length,locale==="ar");if(target<0)return;event.preventDefault();const next=caseTabs[target];setTab(next.id);requestAnimationFrame(()=>document.getElementById(`case-tab-${next.id}`)?.focus());}}
         tabIndex={tab===item.id?0:-1}
         onClick={()=>setTab(item.id)}>{item.label}{item.count?<span className="ms-1.5 text-[0.8125rem] font-semibold text-ink-400">{item.count}</span>:null}</button>)}
@@ -713,47 +733,79 @@ export function FinalQuoteActions({reviewId,proposal,gates}:{reviewId?:string;pr
 /**
  * The patient's bank transfer (DEP-3): the reference they entered and where it stands. Finance confirms the amount received
  * against it, or returns it to the patient with a reason; there is nothing to confirm until the patient has sent one.
+ * UX 4-0: confirming asks first, with the amount and the reference in the question, and a refusal is said at the form;
+ * returning the reference is the second verb, behind its own disclosure, and asks too. The reference never breaks inside itself.
  */
-function TransferPanel({locale,deposit,caseId,isFinance,busy,mutate,tx,amountLabel}:{locale:Locale;deposit:DepositView;caseId:string;isFinance:boolean;busy:boolean;mutate:Mutate;tx:ReturnType<typeof useWorkCopy>["depositTransfer"];amountLabel:string}){
+function TransferPanel({locale,deposit,caseId,isFinance,busy,mutate}:{locale:Locale;deposit:DepositView;caseId:string;isFinance:boolean;busy:boolean;mutate:Mutate}){
+ const work=useWorkCopy();const tx=work.depositTransfer;const forms=work.admission.forms;
  const transfer=deposit.transfer;const pending=transfer?.status==="SUBMITTED";
+ const reference=transfer?`⁨${transfer.reference}⁩`:"";
+ // One idempotency key per transfer, kept through a refused or timed-out attempt so a retry can never record the money twice.
+ const key=useRef<{id:string;key:string}|null>(null);
+ const paymentKey=(id:string)=>{if(key.current?.id!==id)key.current={id,key:crypto.randomUUID()};return key.current.key;};
  return <section aria-label={tx.title} className="mt-4 border-t border-line pt-3">
   <h5 className="text-[0.875rem] font-bold text-ink-800">{tx.title}</h5>
-  {pending&&transfer?<p className="mt-1 text-sm text-ink-700">{transfer.method&&<span className="me-2 font-semibold text-ink-800">{tx.method[transfer.method as keyof typeof tx.method]??transfer.method} ·</span>}{transfer.agentName&&<>{tx.agent}: <bdi dir="auto" className="font-semibold text-ink-900">{transfer.agentName}</bdi> · </>}{tx.reference}: <bdi dir="ltr" translate="no" className="select-all break-all font-semibold text-ink-900">{transfer.reference}</bdi> <span className="text-ink-500">· {tx.sent} <bdi dir="ltr">{new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(transfer.submittedAt))}</bdi></span></p>
+  {pending&&transfer?<p className="mt-1 text-sm text-ink-700">{transfer.method&&<span className="me-2 font-semibold text-ink-800">{tx.method[transfer.method as keyof typeof tx.method]??transfer.method} ·</span>}{transfer.agentName&&<>{tx.agent}: <bdi dir="auto" className="font-semibold text-ink-900">{transfer.agentName}</bdi> · </>}{tx.reference}: <bdi dir="auto" translate="no" className="select-all font-semibold text-ink-900 [overflow-wrap:anywhere]">{transfer.reference}</bdi> <span className="text-ink-500">· {tx.sent} <bdi dir="ltr">{new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium",timeStyle:"short"}).format(new Date(transfer.submittedAt))}</bdi></span></p>
    :<p className="mt-1 text-sm text-ink-600">{tx.waiting}</p>}
-  {!pending&&transfer?.status==="REJECTED"&&<p className="mt-1 text-sm text-alert-700">{tx.rejectedLast.replace("{reason}",transfer.reason??"")}</p>}
+  {!pending&&transfer?.status==="REJECTED"&&<p className="mt-1 text-sm text-alert-700">{fillTemplate(tx.rejectedLast,{reason:`⁨${transfer.reason??""}⁩`})}</p>}
   {isFinance&&pending&&transfer&&<>
-   <form id="deposit-payment" className="mt-3 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/payments`,{amountEgp:Number(d.get("amount"))||0,idempotencyKey:crypto.randomUUID()}).then(result=>{if(result)f.reset();});}}>
-    <label className="text-[0.8125rem] font-bold">{amountLabel}<input className="field w-32" name="amount" type="number" min="0.01" step="0.01" max={deposit.balanceEgp??undefined} defaultValue={deposit.balanceEgp??undefined} required dir="ltr" inputMode="decimal" autoComplete="off"/></label>
-    <button className="btn-primary" disabled={busy}>{tx.confirm}</button>
-   </form>
-   <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();const f=e.currentTarget;const d=new FormData(f);void mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/transfers/${transfer.id}/reject`,{reason:String(d.get("reason")||"").trim()}).then(result=>{if(result)f.reset();});}}>
-    <label className="flex-1 text-[0.8125rem] font-bold">{tx.rejectReason}<input className="field" name="reason" required maxLength={500}/></label>
-    <button className="btn-secondary" disabled={busy}>{tx.reject}</button>
-   </form>
+   <div id="deposit-payment">
+    <ActForm className="mt-3 flex flex-wrap items-end gap-3" refused={forms.refused} retry={forms.refusedRetry}
+     confirm={{title:data=>fillTemplate(tx.confirmTitle,{amount:`⁦${money(Number(data.get("amount")),"EGP",locale)}⁩`,reference}),body:tx.confirmBody,confirm:tx.confirm,cancel:work.confirm.cancel}}
+     action={data=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/payments`,{amountEgp:Number(data.get("amount"))||0,idempotencyKey:paymentKey(transfer.id)}).then(result=>{if(result)key.current=null;return !!result;})}>
+     <label className="block text-sm font-semibold">{tx.amount}<input className="field mt-1 block w-44" name="amount" type="number" min="0.01" step="0.01" max={deposit.balanceEgp??undefined} defaultValue={deposit.balanceEgp??undefined} required dir="ltr" inputMode="decimal" autoComplete="off"/></label>
+     <button className="btn-primary" disabled={busy}>{tx.confirm}</button>
+    </ActForm>
+   </div>
+   <details className="group mt-2">
+    <Summary>{tx.cantConfirm}</Summary>
+    <ActForm className="flex flex-wrap items-end gap-3 pb-3" refused={forms.refused} retry={forms.refusedRetry}
+     confirm={{title:()=>fillTemplate(tx.rejectTitle,{reference}),body:tx.rejectBody,confirm:tx.reject,cancel:work.confirm.cancel}}
+     action={data=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/transfers/${transfer.id}/reject`,{reason:String(data.get("reason")||"").trim()}).then(result=>!!result)}>
+     <label className="block min-w-0 flex-1 basis-64 text-sm font-semibold">{tx.rejectReason}<input className="field" name="reason" required maxLength={500} dir="auto" autoComplete="off"/></label>
+     <button className="btn-secondary" disabled={busy}>{tx.reject}</button>
+    </ActForm>
+   </details>
   </>}
  </section>;
 }
 
 function DepositCard({deposit}:{deposit:DepositView}){
  const {locale,role,c:{id:caseId},busy,mutate}=useCaseWorkspace();
- const workCopy=useWorkCopy();const tx=workCopy.depositTransfer;const g=workCopy.caseView.deposit;
+ const workCopy=useWorkCopy();const g=workCopy.caseView.deposit;
  const isFinance=role==="finance";
- const amount=(n?:number)=>n==null?"—":money(n,deposit.currency||"EGP",locale);
- // QA W-26: Finance records in EGP, so each figure in the patient's currency carries its EGP amount.
- const foreign=(deposit.currency||"EGP")!=="EGP";
- const inEgp=(n?:number)=>foreign&&n!=null?<span className="block text-[0.8125rem] font-normal text-ink-500"><bdi dir="ltr">{money(n,"EGP",locale)}</bdi></span>:null;
+ const currency=deposit.currency||"EGP";
+ const amount=(n?:number)=>n==null?"—":money(n,currency,locale);
+ const foreign=currency!=="EGP";
+ // QA W-26: Finance records in EGP, so each figure carries its EGP amount. UX 4-0: for Finance the EGP figure leads and the
+ // patient's currency follows; the coordinator still reads the patient's currency first.
+ const figure=(display?:number,egp?:number)=>isFinance
+  ?<><Money>{egp!=null?money(egp,"EGP",locale):foreign?"—":amount(display)}</Money>{foreign&&display!=null&&<span className="block text-[0.8125rem] font-normal text-ink-500"><Money>{amount(display)}</Money></span>}</>
+  :<><Money>{amount(display)}</Money>{foreign&&egp!=null&&<span className="block text-[0.8125rem] font-normal text-ink-500"><Money>{money(egp,"EGP",locale)}</Money></span>}</>;
  const open=deposit.status==="REQUESTED"||deposit.status==="PARTIALLY_PAID";
  const tone=deposit.status==="PAID"?"success":(deposit.status==="REFUNDED"||deposit.status==="CANCELLED"||deposit.status==="WAIVED")?"neutral":"warning";
+ const status=label(workCopy.caseView.depositStatus,deposit.status);
+ // A refund is Finance's second verb on a deposit: behind its own disclosure, and only once something was paid.
+ const refund=isFinance&&(deposit.paidEgp??0)>0?<details className="group mt-2 border-t border-line">
+  <Summary>{g.refundOpen}</Summary>
+  <div className="pb-3"><RefundForm locale={locale} busy={busy} onRecord={request=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/refunds`,request)}/><p className="mt-2 text-[0.8125rem] text-ink-500">{g.note}</p></div>
+ </details>:null;
+ // UX 4-0: outside its own moment (nothing left to confirm) Finance reads the deposit as one line: what was paid, or what was
+ // asked when nothing was. When Finance's own act just closed the moment, focus moves to that line, so it is read next.
+ const line=useRef<HTMLDivElement>(null);
+ const wasOpen=useRef(open);
+ useEffect(()=>{if(wasOpen.current&&!open&&isFinance)line.current?.focus();wasOpen.current=open;},[open,isFinance]);
+ const paidSome=(deposit.paidEgp??0)>0;
+ if(isFinance&&!open)return <div ref={line} tabIndex={-1} className="mt-4 border-t border-line pt-2 outline-none">
+  <DoneAct tone={deposit.status==="PAID"?"done":"neutral"} fact={<><span className="font-semibold text-ink-900">{g.title}</span> · {status} · {deposit.status==="PAID"?null:<>{paidSome?g.paid:g.total} </>}<Money>{money(paidSome?deposit.paidEgp!:deposit.totalEgp,"EGP",locale)}</Money>{foreign&&<span className="text-ink-600"> · <Money>{amount(paidSome?deposit.paidDisplay:deposit.totalDisplay)}</Money></span>}</>}/>
+  {refund}
+ </div>;
  return <div className="mt-4 border-t border-line pt-4">
-  <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-bold text-ink-800">{g.title}</h4><StatusBadge tone={tone}>{label(workCopy.caseView.depositStatus,deposit.status)}</StatusBadge></div>
-  <div className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><span className="text-ink-500">{g.total}</span><br/><strong><bdi dir="ltr">{amount(deposit.totalDisplay)}</bdi>{inEgp(deposit.totalEgp)}</strong></div><div><span className="text-ink-500">{g.paid}</span><br/><strong><bdi dir="ltr">{amount(deposit.paidDisplay)}</bdi>{inEgp(deposit.paidEgp)}</strong></div><div><span className="text-ink-500">{g.balance}</span><br/><strong><bdi dir="ltr">{amount(deposit.balanceDisplay)}</bdi>{inEgp(deposit.balanceEgp)}</strong></div></div>
-  {deposit.components.length>0&&<ul className="mt-3 space-y-1 text-sm">{deposit.components.map((cp,i)=><li key={i} className="flex justify-between gap-3"><span>{cp.purpose} <span className="text-[0.8125rem] text-ink-400">({cp.beneficiary}{cp.creditedToFinal?` · ${g.credited}`:""})</span></span><strong className="whitespace-nowrap"><bdi dir="ltr">{amount(cp.amountDisplay)}</bdi></strong></li>)}</ul>}
-  {open&&<TransferPanel locale={locale} deposit={deposit} caseId={caseId} isFinance={isFinance} busy={busy} mutate={mutate} tx={tx} amountLabel={g.amount}/>}
-  {isFinance&&<>
-   <RefundForm locale={locale} busy={busy} onRecord={request=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/refunds`,request)}/>
-   <p className="mt-2 text-[0.8125rem] text-ink-500">{g.note}</p>
-  </>}
-
+  <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-bold text-ink-800">{g.title}</h4><StatusBadge tone={tone}>{status}</StatusBadge></div>
+  <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-3"><div><dt className="text-ink-500">{g.total}</dt><dd className="font-bold">{figure(deposit.totalDisplay,deposit.totalEgp)}</dd></div><div><dt className="text-ink-500">{g.paid}</dt><dd className="font-bold">{figure(deposit.paidDisplay,deposit.paidEgp)}</dd></div><div><dt className="text-ink-500">{g.balance}</dt><dd className="font-bold">{figure(deposit.balanceDisplay,deposit.balanceEgp)}</dd></div></dl>
+  {deposit.components.length>0&&<ul className="mt-3 space-y-1 text-sm">{deposit.components.map((cp,i)=><li key={i} className="flex justify-between gap-3"><span>{cp.purpose} <span className="text-[0.8125rem] text-ink-500">({cp.beneficiary}{cp.creditedToFinal?` · ${g.credited}`:""})</span></span><strong className="whitespace-nowrap"><Money>{isFinance?money(cp.amountEgp,"EGP",locale):amount(cp.amountDisplay)}</Money></strong></li>)}</ul>}
+  {open&&<TransferPanel locale={locale} deposit={deposit} caseId={caseId} isFinance={isFinance} busy={busy} mutate={mutate}/>}
+  {refund}
  </div>;
 }
 
@@ -772,11 +824,11 @@ function DeliveryCard({delivery,versionId,canResend=true}:{delivery:DeliveryStat
 /** Also rendered on its own (`AuthoritativeActions.test.tsx`), so it keeps explicit props rather than reading the case workspace. */
 export function RoleActions({role,t,c,proposal,gates,availableActions,mutate,approvalInCard=false}:{role:RoleKey;t:typeof copy.en;c:CaseView;proposal?:Proposal;gates?:ProposalGates|null;availableActions:string[];mutate:Mutate;/** The action card already carries Finance's approval (QA #20): no second button. */approvalInCard?:boolean}){
  const[operationsPlan,setOperationsPlan]=useState(proposal?.operationalPlan??"");
- const gl=useWorkCopy().caseView.release;
+ const work=useWorkCopy();const gl=work.caseView.release;
  const badge=(required:boolean,done:boolean)=><StatusBadge tone={!required?"neutral":done?"success":"warning"}>{!required?gl.notRequired:done?gl.done:gl.waiting}</StatusBadge>;
  const checklist=gates&&["coordinator","operations","finance"].includes(role)?<div className="mt-4 border-t border-line pt-3"><p className="mb-2 text-sm font-bold text-ink-800">{gl.checklist}</p><div className="space-y-1.5 text-sm"><div className="flex items-center justify-between gap-2"><span>{gl.operations}</span>{badge(gates.operationsRequired,gates.operationsCompleted)}</div><div className="flex items-center justify-between gap-2"><span>{gl.finance}</span>{badge(gates.financeRequired,gates.financeCompleted)}</div></div>{gates.financeRequired&&gates.financeReasons.length>0&&<p className="mt-2 text-[0.8125rem] text-ink-500">{gates.financeReasons.join(" ")}</p>}</div>:null;
- if(role==="operations")return <>{checklist}{(availableActions.includes("PREPARE_TRAVEL_PACKAGE")||availableActions.includes("UPDATE_TRAVEL_PLAN"))&&proposal?.status==="CLINICALLY_APPROVED"?<div className="mt-4 space-y-3"><textarea className="field min-h-28" aria-label={t.operationsComplete} maxLength={30000} required value={operationsPlan} onChange={event=>setOperationsPlan(event.target.value)}/><button className="btn-primary" disabled={!operationsPlan.trim()} onClick={()=>void mutate(`/operations/cases/${c.id}/proposals/${proposal.versionId}/complete`,{plan:operationsPlan.trim()})}>{t.operationsComplete}</button></div>:null}</>;
- if(role==="finance")return <>{checklist}{availableActions.includes("APPROVE_COMMERCIAL_TERMS")&&proposal&&!approvalInCard?<button className="btn-primary mt-4" onClick={()=>void mutate(`/finance/cases/${c.id}/proposals/${proposal.versionId}/approve`)}>{t.financeApprove}</button>:null}</>;
+ if(role==="operations")return <>{checklist}{(availableActions.includes("PREPARE_TRAVEL_PACKAGE")||availableActions.includes("UPDATE_TRAVEL_PLAN"))&&proposal?.status==="CLINICALLY_APPROVED"?<div className="mt-4 space-y-3"><div><label htmlFor={`${c.id}-operations-plan`} className="block text-sm font-semibold">{gl.operationsPlan}</label><p id={`${c.id}-operations-plan-hint`} className="mt-0.5 max-w-[65ch] text-[0.8125rem] text-ink-600">{gl.operationsPlanHint}</p><textarea id={`${c.id}-operations-plan`} className="field min-h-28" aria-describedby={`${c.id}-operations-plan-hint`} maxLength={30000} required dir="auto" value={operationsPlan} onChange={event=>setOperationsPlan(event.target.value)}/></div><button className="btn-primary" disabled={!operationsPlan.trim()} onClick={()=>void mutate(`/operations/cases/${c.id}/proposals/${proposal.versionId}/complete`,{plan:operationsPlan.trim()})}>{t.operationsComplete}</button></div>:null}</>;
+ if(role==="finance")return <>{checklist}{availableActions.includes("APPROVE_COMMERCIAL_TERMS")&&proposal&&!approvalInCard?<div className="mt-4"><ConfirmAction label={t.financeApprove} title={t.financeApprove} body={work.financeApproval.approveBody} confirm={t.financeApprove} cancel={work.confirm.cancel} primary busy={false} onConfirm={()=>mutate(`/finance/cases/${c.id}/proposals/${proposal.versionId}/approve`)}/></div>:null}</>;
  if(role==="coordinator")return <>{checklist}{gates?.readyForRelease&&proposal?<div className="mt-4"><button className="btn-primary" onClick={()=>void mutate(`/coordinator/cases/${c.id}/proposals/${proposal.versionId}/release`)}>{t.release}</button><p className="mt-2 text-[0.8125rem] text-ink-500">{gl.hint}</p></div>:(gates&&!gates.readyForRelease?<p className="mt-3 text-[0.8125rem] text-ink-500">{gl.hint}</p>:null)}</>;
  return null;
 }

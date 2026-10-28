@@ -140,6 +140,8 @@ public class CaseActionService {
                 ? patientSendActions(proposal, blockers) : List.of();
         List<String> available = new ArrayList<>(owned ? availableActions(f, proposal, patientAction, blockers)
                 : current.kind().equals("FOCUS") ? List.of(current.code()) : List.of());
+        // B-5-1: while the hospital file leads, the travel plan stays open beside it; its step comes after.
+        if (Set.of(AdmissionReadiness.RESERVE_HOSPITAL, AdmissionReadiness.RECORD_ADMISSION_LETTER).contains(current.code())) available.add("UPDATE_TRAVEL_PLAN");
         available.addAll(sends);
         // D-06: the coordinator, the patient's one voice, sees the step the patient's page shows (the patient's own rule).
         CurrentActionView patientStep = coordinator ? patientStepForStaff(caseId, f.status(), patientAction, blockers) : null;
@@ -282,7 +284,9 @@ public class CaseActionService {
             return ledger.latest(caseId, com.rehletshifaa.journey.domain.CaseEvidence.Kind.MILESTONE_DISCHARGE_PLANNED).isPresent()
                     && !discharge.packBlockers(caseId).isEmpty() ? simple("COMPLETE_DISCHARGE_PACK", "FOCUS") : simple("RECORD_MILESTONE", "FOCUS");
         if (role == Role.OPERATIONS) {
-            if (Set.of("ACCEPTED", "TRAVEL_COORDINATION").contains(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
+            if ("ACCEPTED".equals(s)) return simple("UPDATE_TRAVEL_PLAN", "FOCUS");
+            // B-5-1: in treatment coordination the hospital file comes first (the reservation, then the letter), then the travel plan.
+            if ("TRAVEL_COORDINATION".equals(s)) return simple(admission.hospitalStep(caseId).orElse("UPDATE_TRAVEL_PLAN"), "FOCUS");
             // P1-15: after arrival Operations records the cashier's receipt against the voucher; once cleared, the admission number.
             if ("ARRIVAL_CONFIRMED".equals(s) && admission.currentVoucher(caseId).isPresent() && !admission.paidToAdmit(caseId)
                     && !admission.balanceAwaitingCountersign(caseId)) return simple("RECORD_HOSPITAL_BALANCE", "FOCUS");
@@ -499,14 +503,15 @@ public class CaseActionService {
 
     /**
      * Steps a stage owes one named person that no event raises work for: the coordinator's intake review and internal
-     * sign-off steps up to the release (#3, #3b), Finance's approval and Operations' plans once they have accepted, and the
+     * sign-off steps up to the release (#3, #3b), Finance's approval and Operations' plans and hospital file once they have accepted, and the
      * Consultant's final assessment at arrival (B-3-1a). Each is
      * carried by one work item named after the step, so My work, "At a glance" and the current action read one source. The
      * step is still decided by {@link #stageFallback}; the item is its queue entry, and the current action keeps the step's
      * own code and form.
      */
     static final Set<String> STAGE_WORK = Set.of("ASSIGN_CONSULTANT", "ASSIGN_OPERATIONS_PLAN", "ASSIGN_FINANCE", "RELEASE_PROPOSAL",
-            "APPROVE_COMMERCIAL_TERMS", "PREPARE_TRAVEL_PACKAGE", "UPDATE_TRAVEL_PLAN", "RECORD_FINAL_ASSESSMENT");
+            "APPROVE_COMMERCIAL_TERMS", "PREPARE_TRAVEL_PACKAGE", AdmissionReadiness.RESERVE_HOSPITAL, AdmissionReadiness.RECORD_ADMISSION_LETTER,
+            "UPDATE_TRAVEL_PLAN", "RECORD_FINAL_ASSESSMENT");
     /** English title and context of each stage step's item; the portal words it from the step's code (EN/AR). */
     private static final Map<String, List<String>> STAGE_WORK_TEXT = Map.of(
             "ASSIGN_CONSULTANT", List.of("Prepare the case for a Consultant", "Complete anything missing, then assign a Consultant for this care area."),
@@ -515,6 +520,8 @@ public class CaseActionService {
             "RELEASE_PROPOSAL", List.of("Release the proposal to the patient", "Every internal sign-off is in. Check the release requirements, then release the secure link."),
             "APPROVE_COMMERCIAL_TERMS", List.of("Approve the commercial terms", "Review the manually priced services before the proposal can be released."),
             "PREPARE_TRAVEL_PACKAGE", List.of("Plan the travel package", "Describe the travel package for the proposal before it is released. Bookings and arrival are arranged only after the patient's deposit."),
+            AdmissionReadiness.RESERVE_HOSPITAL, List.of("Reserve the hospital", "Reserve the hospital and the planned admission date with the facility."),
+            AdmissionReadiness.RECORD_ADMISSION_LETTER, List.of("Record the admission letter", "Record the hospital's admission letter with its quoted package price, so Finance can check it."),
             "UPDATE_TRAVEL_PLAN", List.of("Arrange travel and arrival", "Keep the travel plan current; confirm it once every requirement is met."),
             "RECORD_FINAL_ASSESSMENT", List.of("Record the final assessment", "The patient has arrived. Examine them, then confirm or change your recommendation and its estimate lines."));
     /** Cases this thread is syncing: a change the sync makes announces itself again, and the outer pass already covers it. */

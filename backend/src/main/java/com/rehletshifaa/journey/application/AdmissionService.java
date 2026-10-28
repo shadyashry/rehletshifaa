@@ -541,9 +541,7 @@ public class AdmissionService {
         if (letter == null) return "NONE";
         boolean within = withinEstimate(caseId, letter.getAmountEgp());
         if (letter.countersigned()) return within ? WITHIN : VARIANCE_ACCEPTED;
-        boolean refused = ledger.latest(caseId, Kind.PRICE_VARIANCE_CHECK)
-                .filter(c -> "REFUSED".equals(c.getReference()) && !c.getRecordedAt().isBefore(letter.getRecordedAt())).isPresent();
-        if (refused) return REFUSED;
+        if (readiness.letterRefused(caseId, letter)) return REFUSED;
         return within ? CHECK_PENDING : VARIANCE_OPEN;
     }
 

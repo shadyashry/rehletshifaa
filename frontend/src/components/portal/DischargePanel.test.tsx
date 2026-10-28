@@ -134,7 +134,7 @@ describe("DischargePanel — Operations", () => {
 
   it("confirms a return flight on the fit to fly's window, and by land without one", async () => {
     const { mutate } = setup("operations", { currentCode: "CONFIRM_RETURN", data: discharged });
-    expect(await screen.findByText("NHH-FI-42")).toBeTruthy();
+    expect(await screen.findByText(/Final invoice .*NHH-FI-42/)).toBeTruthy();
     const form = screen.getByText("Confirm the return", { selector: "summary" }).closest("details")!;
     expect(form.open).toBe(true);
     const scope = within(form);
@@ -144,8 +144,9 @@ describe("DischargePanel — Operations", () => {
     fireEvent.change(scope.getByLabelText("Departure"), { target: { value: "2026-10-27T09:00" } });
     fireEvent.submit(scope.getByRole("button", { name: "Confirm the return" }).closest("form")!);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/discharge/return", expect.objectContaining({ mode: "GROUND", reference: null })));
-    // No departure before a confirmed return.
+    // No departure before a confirmed return: it is named as a later act.
     expect(screen.queryByText("Confirm the departure", { selector: "summary" })).toBeNull();
+    expect(screen.getByText("Confirm the departure").closest("p")!.textContent).toMatch(/^Later: Confirm the departure$/);
   });
 
   it("confirms the departure once the return is confirmed, in Arabic", async () => {
@@ -157,14 +158,73 @@ describe("DischargePanel — Operations", () => {
     expect(form.open).toBe(true);
     const scope = within(form);
     expect(primaries()).toEqual([scope.getByRole("button", { name: "تأكيد المغادرة" })]);
+    // The time starts at now, with its clock hint.
+    expect((scope.getByLabelText("وقت مغادرة المريض") as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(scope.getByText("التاريخ والوقت حسب ساعة هذا الجهاز.")).toBeTruthy();
     fireEvent.change(scope.getByLabelText("وقت مغادرة المريض"), { target: { value: "2026-10-27T09:30" } });
     fireEvent.submit(scope.getByRole("button", { name: "تأكيد المغادرة" }).closest("form")!);
+    // It ends Operations' part, so it asks first.
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText(/تأكيد مغادرة المريض في/)).toBeTruthy();
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "تأكيد المغادرة" }));
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/discharge/departure", expect.objectContaining({ departedAt: expect.any(String) })));
+  });
+
+  it("leads with its acts: the invoice and the return as one line each, the pack and the letter as summaries", async () => {
+    const returned = { ...discharged, finalInvoice: { ...discharged.finalInvoice!, countersignedAt: "2026-10-25T12:00:00Z" },
+      returnTravel: { evidenceId: "r1", mode: "FLIGHT", departureAt: "2026-10-27T09:00:00Z", reference: "MS 801", confirmedAt: "2026-10-26T09:00:00Z" } };
+    setup("operations", { currentCode: "CONFIRM_DEPARTURE", data: returned });
+    const acts = await screen.findByRole("list", { name: "Going home" });
+    const items = within(acts).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    expect(items[0].textContent).toMatch(/Final invoice .*NHH-FI-42.* · .*213,456\.78.* · countersigned by Finance/);
+    expect(items[1].textContent).toMatch(/Return confirmed · Flight, leaving .* · reference MS 801/);
+    // The return can still be changed (it reopens on what is stored); the departure is the one primary.
+    const change = within(items[1]).getByText("Change the return", { selector: "summary" }).closest("details")!;
+    expect(change.open).toBe(false);
+    expect((within(change).getByLabelText("Booking reference (optional)") as HTMLInputElement).value).toBe("MS 801");
+    expect(within(change).getByRole("button", { name: "Save the return" }).className).toContain("btn-secondary");
+    expect(primaries()).toEqual([within(items[2]).getByRole("button", { name: "Confirm the departure" })]);
+    // The invoice's correction reopens on the stored invoice.
+    expect((within(items[0]).getByLabelText("Invoice number") as HTMLInputElement).value).toBe("NHH-FI-42");
+    expect(screen.getByText(/Discharge pack: 4 of 4 recorded · fit to fly valid until/)).toBeTruthy();
+    expect(screen.getByText(/Handover letter generated/)).toBeTruthy();
+    const detail = screen.getByText("The pack, the follow-up plan and the letter", { selector: "summary" }).closest("details")!;
+    expect(detail.open).toBe(false);
+    expect(within(detail).getByText("Discharge pack")).toBeTruthy();
+  });
+
+  it("hands the primary to the departure when the step still names a return that is already stored", async () => {
+    setup("operations", { currentCode: "CONFIRM_RETURN", data: { ...discharged,
+      returnTravel: { evidenceId: "r1", mode: "FLIGHT", departureAt: "2026-10-27T09:00:00Z", reference: "MS 801", confirmedAt: "2026-10-26T09:00:00Z" } } });
+    const form = (await screen.findByText("Confirm the departure", { selector: "summary" })).closest("details")!;
+    expect(form.open).toBe(true);
+    expect(form.id).toBe("discharge-next");
+    expect(primaries()).toEqual([within(form).getByRole("button", { name: "Confirm the departure" })]);
+  });
+
+  it("says a refused departure at the form, and after the departure shows its part as done", async () => {
+    const returned = { ...discharged, returnTravel: { evidenceId: "r1", mode: "GROUND", departureAt: "2026-10-27T09:00:00Z", confirmedAt: "2026-10-26T09:00:00Z" } };
+    const { mutate } = setup("operations", { currentCode: "CONFIRM_DEPARTURE", data: returned });
+    const form = (await screen.findByText("Confirm the departure", { selector: "summary" })).closest("details")!;
+    mutate.mockResolvedValueOnce(null);
+    fireEvent.submit(within(form).getByRole("button", { name: "Confirm the departure" }).closest("form")!);
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Confirm the departure" }));
+    expect((await within(form).findByRole("alert")).textContent).toMatch(/^Not saved\./);
+    cleanup();
+    setup("operations", { data: { ...returned, departedAt: "2026-10-27T09:20:00Z" } });
+    expect(await screen.findByText(/The patient left .* · Operations' part is done/)).toBeTruthy();
+    // The return can no longer change; only the invoice's correction stays, until Finance has reconciled it.
+    expect(screen.queryByText("Change the return")).toBeNull();
+    expect([...document.querySelectorAll("#discharge-panel form")].map(f => f.closest("details")!.querySelector("summary")!.textContent)).toEqual(["Correct the final invoice"]);
+    expect(primaries()).toEqual([]);
   });
 
   it("is read-only for the coordinator", async () => {
     setup("coordinator", { data: discharged });
     expect(await screen.findByText("NHH-FI-42")).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "Going home" })).toBeNull();
     expect(screen.getByText(/being reconciled/)).toBeTruthy();
     expect(document.querySelectorAll("#discharge-panel form")).toHaveLength(0);
   });

@@ -206,6 +206,15 @@ function describe(action: CurrentActionView, role: string, t: ActionCopy, locali
   return state(t.states, action.code) ?? t.states.default;
 }
 
+/**
+ * Whether an open work item is the step itself, so a list of the case's other work never repeats it (UX 5-3). A step drawn
+ * from a work item is that item; a step the backend resolved from the stage carries no item id, and its own work item (a
+ * stage step's, kept in My work) has the step's code as its type. A step that waits on someone else is none of the viewer's work.
+ */
+export const isStepItem = (action: CurrentActionView, item: { id: string; type: string }) =>
+  action.workItemId ? item.id === action.workItemId
+    : isOwnStep(action) && (item.type === action.code || (!!action.workType && item.type === action.workType));
+
 /** Whether the step is the viewer's to take: a waiting or empty step reads as "This case now", never "Your step". */
 export const isOwnStep = (action: CurrentActionView) => action.kind !== "WAIT" && action.kind !== "NONE";
 export const stepLabel = (action: CurrentActionView, work: LocalizedWorkCopy) => isOwnStep(action) ? work.caseCover.yourStep : work.caseCover.now;

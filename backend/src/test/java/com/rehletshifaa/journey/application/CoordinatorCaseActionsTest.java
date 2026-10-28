@@ -484,7 +484,8 @@ class CoordinatorCaseActionsTest {
 
         authenticate("operations-subject", Role.OPERATIONS);
         journey.decideAssignment(caseId, operationsOffer.id(), new AssignmentDecisionRequest(true, null), Role.OPERATIONS);
-        assertOneSource(caseId, "travel and arrival", new Party("operations-subject", Role.OPERATIONS, "UPDATE_TRAVEL_PLAN"), COORDINATOR_WAITING, finance);
+        // B-5-1: the hospital file's first act, the reservation, before the travel plan.
+        assertOneSource(caseId, "hospital to reserve", new Party("operations-subject", Role.OPERATIONS, "RESERVE_HOSPITAL"), COORDINATOR_WAITING, finance);
         assertThat(operations).isNotNull();
     }
 
