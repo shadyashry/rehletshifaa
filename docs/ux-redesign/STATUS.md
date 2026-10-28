@@ -2244,7 +2244,9 @@ portal Arabic leading, `panel-parts` en-US, story captions, contrast candidates,
 
 **Verify.** `tsc` clean; eslint on the touched files 0 errors (4 pre-existing warnings); vitest 809/810 on the full run (the known
 `StaffOperationalUi` W-44), CC 166/166; Playwright (a11y en + ar, track-case, proposal-otp, status-access, activation-flow,
-home-quality, home-visual, how-it-works-visual, public-batch-3, my-care-polish, staff-home, portal-p2-pass-3): see below.
+home-quality, home-visual, how-it-works-visual, public-batch-3, my-care-polish, staff-home, portal-p2-pass-3) 131/133;
+`activation-flow` "fits 768px" timed out once under load and passed alone; `public-batch-3` "nothing on the home page waits
+for a scroll" fails on `/en` with this slice and on the base source (`307ddbc1`) alike: pre-existing, not Arabic.
 The specs' documentation PNGs were restored, not updated.
 
 **Next:** X-1 isolation and digits everywhere (plan row).
