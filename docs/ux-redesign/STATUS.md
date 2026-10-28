@@ -1725,6 +1725,92 @@ removed (the confirmations carry it).
 
 **Next:** slice 4-2, the treatment and the settlement, started in a new session from this branch.
 
+## UX area 4 — Finance: slice 4-2 the treatment and the settlement (2026-10-28, worktree `exciting-mcclintock-780c92`, branch `claude/exciting-mcclintock-780c92` fast-forwarded to 4-1 @ `2cf0dc01`)
+
+Scope: `TreatmentPanel.tsx`, `ReconciliationPanel.tsx` (+ tests), the shared `panel-parts.tsx`, `FinanceApproval.tsx` (+ test),
+`AdmissionPanel.tsx` (rate and `ReasonField` moved to the shared parts), `FxReapproval.tsx` (size), messages, the Finance fixture
+and behaviour spec, and one backend field (`facilityCity` on the reconciliation view).
+
+**The treatment money.**
+- **Change-order pricing on `ActForm`.** Each unit price is an `AmountInput` (read as printed, Arabic digits). A running line
+  says what was typed against what is left in the band ("Priced so far: EGP 63,190 · left in the band: EGP 15,000"; not a live
+  region). Saving asks first, with the total and where it falls against the band in the question: "Price RS-CO-… at EGP 63,190,
+  EGP 48,190 above the band?" The body says who decides (within: Finance, accepted at once; above: the patient). The band test is
+  the backend's own (`bandUsed + total <= bandLimit`), worked in whole cents. An emergency order is asked without the band.
+- **The interim bill.** Finance's countersign question names the bill and its amount ("Countersign bill NHH-IB-7 for EGP
+  96,500?") and its body the authorised total. Operations' record form is now an `ActForm` with `AmountInput` and a question
+  naming the bill number and amount.
+- **Change-order lines as stacked rows on a phone** (label at the start, figure at the end), the table from 640px in a
+  keyboard-scrollable region.
+
+**The settlement.**
+- The header names the hospital **and its city** ("Nile Heart Hospital · Cairo"; backend `SettlementBasis.facilityCity`).
+- **The verdict before the decision.** "The invoice is EGP 22,660 above what was authorised: EGP 7,660 above the band of EGP
+  15,000." (or within it, below it, or matching), worked out from the backend's variance and band with its own test
+  (`|variance| > band`). It sits under the header, alert-coloured with an icon when above the band.
+- **The Manager's decision comes next, before the evidence.** Approve ("Approve the variance") and Return are two buttons of
+  the same size side by side; the filled one is the panel's `next`. Approve asks with the variance in the question and the
+  verdict in its body. Return opens its reason (focus lands in it; a blank reason is refused in the page's words) and asks
+  "Return this reconciliation?" before sending; focus goes back to the button after. The group is described by the verdict.
+- **Opening** asks with the invoice number and amount ("Countersign invoice NHH-INV-9031 for EGP 247,350 and open the
+  reconciliation?").
+- **Lines submit with a question** ("Submit lines totalling EGP 247,350 against the invoice's EGP 247,350?", the body repeating
+  what was paid at the hospital). Amounts are `AmountInput`s (a discount line negative, "-1,200", "−1,200", "-EGP 1,200"; paid
+  may be zero). Lines that do not add up are **held at the form** before any question or fresh sign-in: the running line says
+  "not equal to the invoice yet", with an icon, as an alert.
+- **Dispute and e-invoice** on `ActForm`: "Record “The hospital withdrew the charge” for EGP 22,660?", "Record e-invoice
+  ETA-… on statement RS-ST-…?"; a refusal is said at the form.
+- **The ledger as stacked rows on a phone** (each line: description, code, then invoiced/authorised/charged one per row).
+- **Ladder sizes**: the 13 `text-[0.85rem]` are `0.875rem`; FxReapproval's `0.9rem` is `0.9375rem`.
+- **Statement totals labelled for Finance**: "Total charged (gross, before payments)", "Balance due (net of payments)",
+  "Credit due (net of payments)" (a staff copy override; the patient's statement is unchanged).
+
+**Backlog MEDIUM: the rate in Arabic.** `quotedRate` in `panel-parts` is the one rate formatter (each side isolated in Arabic,
+one LRI run in English); `FinanceApproval` and the voucher both use it.
+
+**Shared.** `AmountInput` gains `accepts` (`positive` | `zero` | `signed`) and `onValue` (a running total); `readAmount(value,
+signed)`. `ReasonField` moved to `panel-parts`.
+
+Copy in en + ar, inserted textually: `treatment.{refused,refusedRetry}`, `treatment.bills.{countersignTitle,countersignBody,
+recordTitle,recordBody,amountInvalid}`, `treatment.pricing.{hint,unitInvalid,running,runningEmpty,runningEmergency,
+confirmTitle,confirmTitleEmergency,within,above,bodyWithin,bodyAbove,bodyEmergency}`, `reconciliation.{refused,refusedRetry,
+hospital,openTitle}`, `reconciliation.verdict.*`, `reconciliation.countersign.{approve,approveTitle,returnConfirm,
+returnNoteRequired}`, `reconciliation.form.{amountInvalid,paidInvalid,confirmTitle,confirmBody,mismatch}`,
+`reconciliation.dispute.{confirmTitle,confirmBody}`, `reconciliation.statements.{confirmTitle,totalGross,balanceNet,creditNet}`;
+`reconciliation.figures.needsCountersign` removed (the verdict says it).
+
+**Reviews** (four read-only reviewers; no CRITICAL):
+- Pro Max: HIGH ×1 fixed (the phone's three-column figure rows overflowed at 390 with nowrap amounts; now one figure per row).
+  MEDIUMs fixed: Return's focus, the mismatch said in words, not shade. LOWs fixed: the emergency running line, the
+  change-order table's scroll region, the verdict describing the decision. The filled Approve is kept (the plan's rule) and
+  logged for owner review.
+- Web design guidelines: HIGH ×1 (same overflow) fixed. MEDIUMs fixed: focus after Return, the change-order table's scroll.
+  Deferred: `AmountInput`'s refusal as an inline message (MEDIUM, shared polish), the live total, `ReasonField` read twice,
+  the region labels (LOW).
+- RB + composition: MEDIUMs fixed (band math in whole cents; a mismatch held at the form instead of a refused round trip).
+  LOWs fixed: a minus before the currency word, `left` clamped at zero, the countersign body no longer claims "becomes billed to
+  date" (the latest countersigned bill is), the needless `useMemo`. Deferred: "(1,200)" as a discount.
+- RTL/i18n: MEDIUMs fixed (three Arabic wordings: the unauthorised line, the authorised amount's agreement, one countersign
+  verb). LOWs fixed (amount wording, "ضمن النطاق", gross label, two missing isolates). Deferred: `rateToday` direction and
+  Finance's two Arabic names (native review).
+
+**Verify.**
+- `pnpm typecheck` ok; eslint on the touched files clean. Backend: `SettlementServiceTest`, `DischargeServiceTest` green
+  (offline Maven).
+- vitest 97 files / 804 tests: 802 pass; the known `StaffOperationalUi` W-44 fails, and `CaseStatusAccess` failed once under
+  load (39/39 twice alone; untouched). `TreatmentPanel.test.tsx` 9/9 (pricing question and band, running line, bill question,
+  Operations' bill question), `ReconciliationPanel.test.tsx` 6/6 (city, open question, signed lines and the held mismatch,
+  submit question, verdict before the decision, equal acts and the blank return reason, dispute and e-invoice questions,
+  gross/net labels), `FinanceApproval.test.tsx` 5/5 (new: the Arabic rate isolated per side).
+- Playwright on a production build on :3212: finance-shots (`AREA4_SHOTS=4-2`), finance-workspace (new: pricing with the band in
+  the question; the reconcile header, verdict and submit question; Arabic phone verdict → two acts → stacked ledger, no
+  sideways scroll; gross/net totals and the e-invoice question), operations-shots, consultant-shots, staff-chrome,
+  hospital-agreement-audit, a11y en+ar: 109/109 (a first run lost two pages to `ERR_NETWORK_IO_SUSPENDED` and one to a slow
+  hydration; the re-run on the final code was clean).
+- Overwritten shots restored. Shots: `screenshots/area-4/4-2/`.
+
+**Next:** slice 4-3, the Finance sheet and the area's close, started in a new session from this branch.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

@@ -61,6 +61,13 @@ describe("FinanceApproval", () => {
     expect(screen.getByText(/Rate fixed at release: .*\$1 = EGP\s?50/)).toBeTruthy();
   });
 
+  it("states the rate in Arabic with each side isolated, so the equation reads right to left (UX 4-2)", () => {
+    renderWithWork(<FinanceApproval locale="ar" commercial={{ ...commercial, fxRate: 0.02 }} busy={false} approveLabel="اعتماد الشروط التجارية" onApprove={vi.fn()}/>, "ar");
+    const rate = screen.getByText(/\u2068[^\u2069]*1[^\u2069]*\u2069 = \u2068[^\u2069]*50[^\u2069]*\u2069/);
+    // No forced left-to-right run around the whole equation.
+    expect(rate.textContent).not.toContain("\u2066");
+  });
+
   it("says when no margin policy applies, in Arabic too", () => {
     renderWithWork(<FinanceApproval locale="ar" commercial={{ ...commercial, policyName: null, policyVersion: null, marginRate: 0, marginEgp: 0 }} busy={false}
       approveLabel="الموافقة على الشروط التجارية" onApprove={vi.fn()}/>, "ar");

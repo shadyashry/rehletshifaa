@@ -31,7 +31,7 @@ export function FxReapproval({ locale, copy, caseId, versionId, currency, total,
   return (
     <section aria-labelledby="fx-reapproval-title" className="card mt-6 p-5">
       <h3 id="fx-reapproval-title" className="title">{copy.title}</h3>
-      <p className="mt-2 max-w-[64ch] text-[0.9rem] leading-6 text-ink-700">{copy.body}</p>
+      <p className="mt-2 max-w-[64ch] text-[0.9375rem] leading-6 text-ink-700">{copy.body}</p>
       <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] tabular-nums sm:grid-cols-2">
         <div>
           <dt className="text-[0.8125rem] font-semibold text-ink-500">{copy.frozen}</dt>

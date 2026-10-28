@@ -86,5 +86,5 @@ public final class SettlementDtos {
                                      BigDecimal chargedEgp, BigDecimal varianceEgp, BigDecimal disputedEgp, BigDecimal paidAtFacilityEgp,
                                      boolean needsCountersign, String openedBy, Instant openedAt, String submittedBy, Instant submittedAt,
                                      String countersignedBy, Instant countersignedAt, Instant settledAt, String disputeOutcome, Instant disputeResolvedAt,
-                                     String note, String facilityName, List<StatementView> statements) {}
+                                     String note, String facilityName, String facilityCity, List<StatementView> statements) {}
 }

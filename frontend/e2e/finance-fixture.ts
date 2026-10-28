@@ -154,14 +154,15 @@ const statement = (id: string) => ({
 });
 const reconciliation = (id: FinanceCaseId) => {
   const opened = { caseId: id, caseStatus: cases[id].status, finalInvoice: invoice, reconciliationId: "rc1", authorisedEgp: 224690, bandLimitEgp: 15000, quote, needsCountersign: false,
-    paidAtFacilityEgp: 186800, openedBy: "Finance", openedAt: at(20), facilityName: "Nile Heart Hospital", statements: [] as unknown[] };
+    paidAtFacilityEgp: 186800, openedBy: "Finance", openedAt: at(20), facilityName: "Nile Heart Hospital", facilityCity: "Cairo", statements: [] as unknown[] };
   const lines = [
     { lineNo: 1, description: "Coronary bypass package", invoiceEgp: 200000, source: "PACKAGE", authorisedEgp: 200000, chargedEgp: 200000, varianceEgp: 0, varianceCode: "WITHIN_BAND" },
     { lineNo: 2, description: "ICU night", invoiceEgp: 24690, source: "CHANGE_ORDER_LINE", matchedId: "col-1", authorisedEgp: 24690, chargedEgp: 24690, varianceEgp: 0, varianceCode: "WITHIN_BAND" },
     { lineNo: 3, description: "Telemetry monitoring, 4 days", invoiceEgp: 22660, source: "NONE", authorisedEgp: null, chargedEgp: 0, varianceEgp: 22660, varianceCode: "UNAPPROVED_EXTRA" },
   ];
   switch (id) {
-    case "reconcile": return { ...opened, status: "OPEN", lines: [] };
+    // Before submission the variance is the invoice less what was authorised, as the backend returns it.
+    case "reconcile": return { ...opened, status: "OPEN", lines: [], varianceEgp: 22660, paidAtFacilityEgp: null };
     case "variance": return { ...opened, status: "AWAITING_COUNTERSIGN", needsCountersign: true, lines, chargedEgp: 224690, varianceEgp: 22660, disputedEgp: 22660, submittedBy: "Finance", submittedAt: at(9),
       note: "Telemetry was ordered by the ward and not on the change order." };
     case "statement": return { ...opened, caseStatus: "FOLLOW_UP", status: "CLOSED", lines: lines.slice(0, 2), finalInvoice: { ...invoice, amountEgp: 224690 }, chargedEgp: 224690, varianceEgp: 0, disputedEgp: 0,

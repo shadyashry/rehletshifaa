@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
-import { ActForm, AmountInput, DocumentPicker, DoneAct, Fact, LaterAct, Money, Summary, Task as PanelTask, TimeField, instant, localInput, pick, readAmount, text, type PanelDocument } from "@/components/portal/panel-parts";
+import { ActForm, AmountInput, DocumentPicker, DoneAct, Fact, LaterAct, Money, ReasonField, Summary, Task as PanelTask, TimeField, instant, localInput, pick, quotedRate, readAmount, text, type PanelDocument } from "@/components/portal/panel-parts";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { CURRENCY_LABELS, type AdmissionEvidence, type AdmissionView, type DirectoryFacility, type Mutate } from "@/components/portal/portal-model";
 
@@ -544,15 +544,11 @@ function FeeBalance({ t, voucher, owed, egp, busy, primary, onRecord }: {
 
 /** The frozen voucher: its number, what each side pays, what is still owed, and the rate it was frozen at. */
 function VoucherFacts({ t, locale, voucher, view, egp }: { t: Copy; locale: Locale; voucher: NonNullable<AdmissionView["voucher"]>; view: AdmissionView; egp: (n?: number | null) => string }) {
-  // UX 4-1: EGP is the ledger's figure and leads; the patient's currency is its sub-line. The stored rate is EGP → the patient's
-  // currency, and is printed the way Egyptian finance quotes it (1 US$ = EGP 49.0196). In Arabic each side is isolated and the
-  // equation reads right to left ("1 US$ = 49.0196 ج.م."); a forced left-to-right run would reverse only Intl's Arabic side.
+  // UX 4-1: EGP is the ledger's figure and leads; the patient's currency is its sub-line; the rate as Finance quotes it.
   const foreign = voucher.displayCurrency && voucher.displayCurrency !== "EGP" ? voucher.displayCurrency : null;
   const sub = (amount?: number | null) => foreign && amount != null
     ? <span className="block text-[0.8125rem] font-normal text-ink-600"><Money>{formatMoney(amount, foreign, locale)}</Money></span> : null;
-  const one = foreign ? formatMoney(1, foreign, locale) : "";
-  const egpPer = foreign && voucher.fxRate ? new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "EGP", maximumSignificantDigits: 6 }).format(1 / voucher.fxRate) : null;
-  const rate = egpPer == null ? null : locale === "ar" ? `${isolate(one)} = ${isolate(egpPer)}` : `⁦${one} = ${egpPer}⁩`;
+  const rate = foreign ? quotedRate(locale, foreign, voucher.fxRate) : null;
   return (
     <>
       <p className="text-[0.875rem] text-ink-500">{t.voucher} <bdi dir="ltr" translate="no" className="font-bold text-ink-900">{voucher.voucherNumber}</bdi> · {fillTemplate(t.voucherRevision, { revision: String(voucher.revision) })}</p>
@@ -613,31 +609,6 @@ function Trail({ t, evidence, when, egp }: { t: Copy; evidence: AdmissionEvidenc
 /** A recording task of this panel: its next one carries the panel's "do it" anchor. */
 function Task({ title, next, children }: { title: string; next: boolean; children: ReactNode }) {
   return <PanelTask title={title} next={next} anchor="admission-next">{children}</PanelTask>;
-}
-
-/**
- * A reason typed for a decision. When one is owed, the page refuses an empty or blank reason in its own words, at the field
- * and read out (the browser's own message would be in the browser's language, and a passing tooltip).
- */
-function ReasonField({ label, owed, hint }: { label: string; /** The page's own words when a reason is owed. */ owed?: string; hint?: string }) {
-  const id = useId();
-  const [missing, setMissing] = useState(false);
-  const described = missing ? `${id}-missing` : hint ? `${id}-hint` : undefined;
-  return (
-    <div className="w-full">
-      <label htmlFor={id} className="block text-sm font-semibold">{label}</label>
-      <textarea id={id} className="field" name="note" rows={2} maxLength={2000} dir="auto" required={!!owed} aria-invalid={missing || undefined} aria-describedby={described}
-        onInvalid={owed ? event => { event.currentTarget.setCustomValidity(owed); setMissing(true); } : undefined}
-        onInput={owed ? event => {
-          // A reason of spaces only is no reason: the backend refuses it, so the form does first.
-          const blank = !event.currentTarget.value.trim();
-          event.currentTarget.setCustomValidity(blank && event.currentTarget.value ? owed : "");
-          if (!blank) setMissing(false);
-        } : undefined}/>
-      {missing ? <p id={`${id}-missing`} role="alert" className="mt-1 text-[0.8125rem] font-semibold text-alert-800">{owed}</p>
-        : hint && <p id={`${id}-hint`} className="mt-1 text-[0.8125rem] text-ink-600">{hint}</p>}
-    </div>
-  );
 }
 
 /**

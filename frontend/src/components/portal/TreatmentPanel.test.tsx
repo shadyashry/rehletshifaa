@@ -132,7 +132,8 @@ describe("TreatmentPanel — Finance and Operations", () => {
     expect(load).toHaveBeenCalledWith("/finance/cases/c1/treatment");
     expect(screen.getAllByText("EGP 213,456.78").length).toBeGreaterThan(0);
     expect(screen.getByText("EGP 13,456.78").closest("span")?.parentElement?.textContent).toContain("over");
-    expect(screen.getAllByText("EGP 24,691")).toHaveLength(2);
+    // The priced order's line, on a phone's stacked row and in the table, and its total.
+    expect(screen.getAllByText("EGP 24,691")).toHaveLength(3);
     expect(screen.getByText("$503.71")).toBeTruthy();
     expect(screen.getByText(/Above the band: the patient decides/)).toBeTruthy();
     const price = screen.getByRole("button", { name: "Save prices" });
@@ -140,8 +141,15 @@ describe("TreatmentPanel — Finance and Operations", () => {
     // The bill waits behind the order: there, but secondary.
     expect(screen.getByRole("button", { name: /^Countersign\W+NHH-IB-7$/ }).className).toContain("btn-secondary");
     expect(screen.queryByText("Record a milestone", { selector: "summary" })).toBeNull();
-    fireEvent.change(screen.getByLabelText(/Unit price \(EGP\) for/), { target: { value: "38500" } });
+    expect(screen.getByText(/^Left in the band: .*15,000/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Unit price \(EGP\) for/), { target: { value: "38,500" } });
+    expect(screen.getByText(/^Priced so far: .*38,500.* · left in the band: .*15,000/)).toBeTruthy();
     fireEvent.click(price);
+    // UX 4-2: pricing asks first, with the total and where it falls against the band (0 used + 38,500 against 15,000).
+    const dialog = screen.getByRole("alertdialog", { name: /^Price .* at .*38,500.*, .*23,500.* above the band\?$/ });
+    expect(dialog.textContent).toContain("the patient decides");
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(dialog.querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/change-orders/o1/price", { lines: [{ lineId: "l1", unitEgp: 38500 }] }));
   });
 
@@ -150,7 +158,9 @@ describe("TreatmentPanel — Finance and Operations", () => {
     const countersign = await screen.findByRole("button", { name: /^Countersign\W+NHH-IB-7$/ });
     expect(primaries()).toEqual([countersign]);
     fireEvent.click(countersign);
-    fireEvent.click(screen.getByRole("alertdialog", { name: "Countersign this interim bill?" }).querySelector(".btn-primary") as HTMLElement);
+    const dialog = screen.getByRole("alertdialog", { name: /^Countersign bill .*NHH-IB-7.* for .*213,456\.78.*\?$/ });
+    expect(dialog.textContent).toMatch(/against .*200,000.* authorised. The latest countersigned bill is the billed-to-date figure/);
+    fireEvent.click(dialog.querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/treatment/interim-bills/b1/countersign", undefined));
   });
 
@@ -169,9 +179,10 @@ describe("TreatmentPanel — Finance and Operations", () => {
     expect(within(picker).queryByText("scan.pdf")).toBeNull();
     fireEvent.change(picker, { target: { value: "d1" } });
     fireEvent.change(bill.getByLabelText("Bill number"), { target: { value: "NHH-IB-8" } });
-    fireEvent.change(bill.getByLabelText("Amount to date (EGP)"), { target: { value: "220000" } });
+    fireEvent.change(bill.getByLabelText("Amount to date (EGP)"), { target: { value: "220,000" } });
     fireEvent.change(bill.getByLabelText("Issued at"), { target: { value: "2026-10-22T10:00" } });
     fireEvent.click(bill.getByRole("button", { name: "Record bill" }));
+    fireEvent.click(screen.getByRole("alertdialog", { name: /^Record bill .*NHH-IB-8.* for .*220,000.*\?$/ }).querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/operations/cases/c1/treatment/interim-bills", { documentId: "d1", billNumber: "NHH-IB-8", amountEgp: 220000,
       billedAt: new Date("2026-10-22T10:00").toISOString() }));
     expect(primaries()).toHaveLength(0);

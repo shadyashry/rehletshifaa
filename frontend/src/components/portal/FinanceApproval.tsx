@@ -4,7 +4,7 @@ import { formatMoney } from "@/lib/money";
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy } from "@/components/portal/portal-copy";
-import { ActForm, Money } from "@/components/portal/panel-parts";
+import { ActForm, Money, quotedRate } from "@/components/portal/panel-parts";
 import { currencyName } from "@/components/portal/ClinicalDecision";
 import { StatusBadge } from "@/components/portal/StatusBadge";
 import type { ProposalCommercial } from "@/components/portal/portal-model";
@@ -32,9 +32,7 @@ export function FinanceApproval({ locale, commercial, busy, approveLabel, feeLab
   const percent = new Intl.NumberFormat(intlLocale(locale), { style: "percent", maximumFractionDigits: 2 }).format(commercial.marginRate ?? 0);
   const manual = commercial.lines.filter(line => line.source === "MANUAL").length;
   const policy = commercial.policyName ? fillTemplate(t.policy, { name: `⁨${commercial.policyName}⁩`, version: String(commercial.policyVersion ?? "") }) : t.noPolicy;
-  // The stored rate is EGP → the patient's currency; Finance quotes the other way round. One left-to-right run in Arabic too.
-  // Six significant digits, as the rate was fixed (49.0196, not 49.02).
-  const rate = commercial.fxRate ? `⁦${formatMoney(1, commercial.currency, locale)} = ${new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "EGP", maximumSignificantDigits: 6 }).format(1 / commercial.fxRate)}⁩` : null;
+  const rate = quotedRate(locale, commercial.currency, commercial.fxRate);
   const name = (line: Line) => `${line.source === "PLATFORM" ? feeLabel ?? line.description : line.description}${line.quantity > 1 ? ` × ${line.quantity}` : ""}`;
   const source = (line: Line) => line.source === "MANUAL" ? <StatusBadge tone="warning">{t.manual}</StatusBadge>
     : <span className="text-[0.8125rem] text-ink-600">{line.source === "PLATFORM" ? t.platform

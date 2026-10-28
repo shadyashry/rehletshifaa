@@ -297,7 +297,7 @@ public class ReconciliationService {
                 r == null ? null : r.getOpenedBy(), r == null ? null : r.getOpenedAt(), r == null ? null : r.getSubmittedBy(), r == null ? null : r.getSubmittedAt(),
                 r == null ? null : r.getCountersignedBy(), r == null ? null : r.getCountersignedAt(), r == null ? null : r.getSettledAt(),
                 r == null || r.getDisputeOutcome() == null ? null : r.getDisputeOutcome().name(), r == null ? null : r.getDisputeResolvedAt(),
-                r == null ? null : r.getNote(), basis.facilityName(caseId), statements.staffStatements(caseId));
+                r == null ? null : r.getNote(), basis.facilityName(caseId), basis.facilityCity(caseId), statements.staffStatements(caseId));
     }
 
     // ---- internals ----

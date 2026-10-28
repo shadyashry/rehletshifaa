@@ -9,8 +9,8 @@ import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
-import { ConfirmAction, DocumentPicker, Fact, Money, Summary, Task as PanelTask, instant, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
-import type { AdmissionEvidence, ChangeOrder, Mutate, TreatmentMilestone, TreatmentView } from "@/components/portal/portal-model";
+import { ActForm, AmountInput, ConfirmAction, DocumentPicker, Fact, Money, Summary, Task as PanelTask, instant, pick, readAmount, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
+import type { AdmissionEvidence, ChangeOrder, Mutate, TreatmentMilestone, TreatmentMoney, TreatmentView } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["treatment"];
 export type TreatmentRole = "operations" | "finance" | "coordinator" | "doctor";
@@ -27,6 +27,8 @@ const UNDECIDED = new Set(["PROPOSED", "AWAITING_PATIENT"]);
 /** Finance's treatment work: only then does this panel carry the page's primary action (the admission panel may hold Finance's other). */
 const FINANCE_PRICING = new Set(["PRICE_CHANGE_ORDER", "EMERGENCY_CHANGE_ORDER_REVIEW"]);
 const ANCHOR = "treatment-next";
+/** A figure inside a sentence keeps its own direction. */
+const isolate = (value: string) => `⁨${value}⁩`;
 
 /**
  * P1-16, staff case page: the "Treatment" panel (design §5 stage 4). It shows the milestones with their countersign state and
@@ -112,7 +114,9 @@ export function TreatmentPanel({ locale, role, caseId, caseStatus, currentCode, 
         <ul className="mt-1 divide-y divide-line">
           {view.interimBills.map(b => <BillRow key={b.id} t={t} bill={b} roleName={pick(roles, b.recordedRole ?? "SYSTEM")} when={when} egp={egp}
             action={billsToSign.some(s => s.id === b.id)
-              ? <ConfirmAction label={t.bills.countersign} context={b.reference ?? undefined} title={t.bills.countersignTitle} body={`${t.bills.countersignBody} ${t.freshSignIn}`}
+              ? <ConfirmAction label={t.bills.countersign} context={b.reference ?? undefined}
+                               title={fillTemplate(t.bills.countersignTitle, { reference: isolate(b.reference ?? "—"), amount: isolate(egp(b.amountEgp)) })}
+                               body={`${fillTemplate(t.bills.countersignBody, { authorised: isolate(egp(view.money.authorisedEgp)) })} ${t.freshSignIn}`}
                                confirm={t.bills.countersign} cancel={t.cancel} primary={next === `bill:${b.id}`} busy={busy}
                                onConfirm={() => act(`/finance/cases/${caseId}/treatment/interim-bills/${b.id}/countersign`)}/>
               : null} primary={next === `bill:${b.id}`}/>)}
@@ -176,7 +180,7 @@ export function TreatmentPanel({ locale, role, caseId, caseStatus, currentCode, 
             {view.changeOrders.map(o => (
               <li key={o.id} id={next === `price:${o.id}` ? ANCHOR : undefined} className="py-3 text-[0.875rem]">
                 <OrderSummary t={t} order={o} locale={locale} when={when} egp={egp}/>
-                {priceable.some(p => p.id === o.id) && <PriceForm t={t} order={o} busy={busy} primary={next === `price:${o.id}`}
+                {priceable.some(p => p.id === o.id) && <PriceForm t={t} order={o} money={view.money} egp={egp} busy={busy} primary={next === `price:${o.id}`}
                   onPrice={lines => act(`/finance/cases/${caseId}/change-orders/${o.id}/price`, { lines })}/>}
                 {role === "doctor" && UNDECIDED.has(o.status) && <Withdraw t={t} order={o} busy={busy}
                   onWithdraw={reason => act(`/doctor/cases/${caseId}/change-orders/${o.id}/withdraw`, { reason })}/>}
@@ -224,15 +228,7 @@ export function TreatmentPanel({ locale, role, caseId, caseStatus, currentCode, 
             <MilestoneForm t={t} documents={documents} busy={busy} primary={false} onRecord={body => act(`/operations/cases/${caseId}/milestones`, body)}/>
           </Task>
           <Task title={t.bills.form} next={false}>
-            <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit(data => act(`/operations/cases/${caseId}/treatment/interim-bills`, {
-              documentId: data.get("documentId"), billNumber: String(data.get("billNumber") ?? "").trim(), amountEgp: Number(data.get("amountEgp")), billedAt: instant(data.get("billedAt")) }))}>
-              <DocumentPicker name="documentId" label={t.bills.document} empty={t.bills.chooseDocument} documents={documents} required/>
-              <label className="block text-sm font-semibold">{t.bills.billNumber}<input className="field" name="billNumber" maxLength={160} required autoComplete="off" spellCheck={false}/></label>
-              <label className="block text-sm font-semibold">{t.bills.amountEgp}<input className="field" name="amountEgp" type="number" inputMode="decimal" min="0.01" step="0.01" required/></label>
-              <label className="block text-sm font-semibold">{t.bills.billedAt}<input className="field" name="billedAt" type="datetime-local" required/></label>
-              {!documents.some(d => d.status === "CLEAN") && <p className="text-[0.8125rem] text-ink-600 sm:col-span-2">{t.bills.noDocuments}</p>}
-              <div className="sm:col-span-2"><button className="btn-secondary" disabled={busy}>{t.bills.record}</button></div>
-            </form>
+            <InterimBillForm t={t} documents={documents} egp={egp} busy={busy} onRecord={body => act(`/operations/cases/${caseId}/treatment/interim-bills`, body)}/>
           </Task>
         </div>
       )}
@@ -296,8 +292,22 @@ function OrderSummary({ t, order: o, locale, when, egp }: { t: Copy; order: Chan
         {o.decidedAt && <> · {fillTemplate(t.orders.decided, { channel: pick(t.orders.channels, o.decisionChannel ?? ""), when: when(o.decidedAt) })}</>}
       </p>
       {o.reason && <p className="mt-1.5 max-w-[65ch] text-ink-800"><span className="font-semibold">{t.orders.reason}: </span><span dir="auto" className="whitespace-pre-wrap">{o.reason}</span></p>}
-      <div className="mt-2 overflow-x-auto">
-        <table className="w-full min-w-[28rem] text-start text-[0.8125rem] tabular-nums">
+      {/* UX 4-2: a phone reads each line as a short block (what, how many, the unit and the amount); the table from 640px. */}
+      <ul className="mt-2 divide-y divide-line border-y border-line text-[0.8125rem] sm:hidden" aria-label={t.orders.title}>
+        {o.lines.map(line => (
+          <li key={line.id} className="py-2">
+            <p><span className="text-ink-600">{pick(t.orders.lineKinds, line.kind)}: </span><span dir="auto" className="text-ink-900">{line.description}</span></p>
+            <dl className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 tabular-nums">
+              <div className="contents"><dt className="text-ink-500">{t.orders.quantity}</dt><dd className="text-end text-ink-800"><bdi dir="ltr">{qty.format(line.quantity)}</bdi></dd></div>
+              <div className="contents"><dt className="text-ink-500">{t.orders.unit}</dt><dd className="text-end text-ink-800">{line.unitEgp == null ? "—" : <Money>{egp(line.unitEgp)}</Money>}</dd></div>
+              <div className="contents"><dt className="text-ink-500">{t.orders.lineTotal}</dt><dd className="text-end font-semibold text-ink-900">{line.lineEgp == null ? "—" : <Money>{egp(line.lineEgp)}</Money>}</dd></div>
+            </dl>
+          </li>
+        ))}
+      </ul>
+      {/* A region, so a keyboard can scroll the table when it is wider than its column. */}
+      <div role="region" aria-label={t.orders.title} tabIndex={0} className="mt-2 hidden overflow-x-auto rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:block">
+        <table className="w-full text-start text-[0.8125rem] tabular-nums">
           <thead className="text-ink-500">
             <tr className="border-b border-line">
               <th scope="col" className="py-1 pe-3 text-start font-semibold">{t.orders.description}</th>
@@ -458,23 +468,78 @@ function ChangeOrderForm({ t, hint, submitLabel, confirm, busy, onSubmit }: {
   );
 }
 
-/** Finance prices every line of the order in EGP (step-up); totals and the band are the backend's. */
-function PriceForm({ t, order, busy, primary, onPrice }: { t: Copy; order: ChangeOrder; busy: boolean; primary: boolean; onPrice: (lines: { lineId: string; unitEgp: number }[]) => Promise<boolean> }) {
+/**
+ * Finance prices every line of the order in EGP (step-up). UX 4-2: the amounts read as printed, a running total says what was typed
+ * against what is left in the band, and saving asks first, with the total and where it falls against the band in the question
+ * (the backend's own rule: what the band already holds plus this total, against the band). The stored total is the backend's.
+ */
+function PriceForm({ t, order, money, egp, busy, primary, onPrice }: {
+  t: Copy; order: ChangeOrder; money: TreatmentMoney; egp: (n?: number | null) => string; busy: boolean; primary: boolean;
+  onPrice: (lines: { lineId: string; unitEgp: number }[]) => Promise<boolean>;
+}) {
+  const id = useId();
+  const p = t.pricing;
+  const [units, setUnits] = useState<Record<string, number>>(() => Object.fromEntries(order.lines.map(line => [line.id, line.unitEgp ?? Number.NaN])));
+  // Whole cents throughout, as the backend compares exact decimals: a band used up exactly is still within it.
+  const cents = (unit: (lineId: string) => number) => order.lines.reduce((sum, line) => sum + Math.round(unit(line.id) * line.quantity * 100), 0);
+  const typed = cents(lineId => units[lineId] ?? Number.NaN);
+  const usedCents = Math.round(money.bandUsedEgp * 100), limitCents = Math.round(money.bandLimitEgp * 100);
+  const left = Math.max(0, limitCents - usedCents) / 100;
+  const totalOf = (data: FormData) => cents(lineId => readAmount(data.get(`unit-${lineId}`))) / 100;
+  const over = (total: number) => usedCents + Math.round(total * 100) - limitCents;
+  const within = (total: number) => over(total) <= 0;
+  const band = (total: number) => order.emergency ? ""
+    : within(total) ? p.within : fillTemplate(p.above, { amount: isolate(egp(over(total) / 100)) });
+  const body = (total: number) => order.emergency ? p.bodyEmergency : within(total) ? p.bodyWithin : p.bodyAbove;
   return (
-    <form className="mt-3 border-t border-line pt-3" onSubmit={submit(data => onPrice(order.lines.map(line => ({ lineId: line.id, unitEgp: Number(data.get(`unit-${line.id}`)) }))))}>
-      <p className="text-[0.875rem] font-bold text-ink-800">{fillTemplate(t.pricing.title, { orderNumber: `⁨${order.orderNumber}⁩` })}</p>
-      <p className="mt-0.5 max-w-[65ch] text-[0.8125rem] text-ink-600">{t.pricing.hint}</p>
+    <ActForm className="mt-3 border-t border-line pt-3" refused={t.refused} retry={t.refusedRetry}
+             action={data => onPrice(order.lines.map(line => ({ lineId: line.id, unitEgp: readAmount(data.get(`unit-${line.id}`)) })))}
+             confirm={{ title: data => fillTemplate(order.emergency ? p.confirmTitleEmergency : p.confirmTitle, { orderNumber: isolate(order.orderNumber), total: isolate(egp(totalOf(data))), band: band(totalOf(data)) }),
+                        body: data => `${body(totalOf(data))} ${t.freshSignIn}`, confirm: p.save, cancel: t.cancel }}>
+      <p className="text-[0.875rem] font-bold text-ink-800">{fillTemplate(p.title, { orderNumber: isolate(order.orderNumber) })}</p>
+      <p className="mt-0.5 max-w-[65ch] text-[0.8125rem] text-ink-600">{p.hint}</p>
       <div className="mt-2 grid gap-3 sm:grid-cols-2">
         {order.lines.map(line => (
-          <label key={line.id} className="block text-sm font-semibold">
-            {fillTemplate(t.pricing.unitEgp, { line: `⁨${line.description}⁩` })}
-            <input className="field" name={`unit-${line.id}`} type="number" inputMode="decimal" min="0" step="0.01" required dir="ltr" defaultValue={line.unitEgp ?? undefined}/>
-          </label>
+          <div key={line.id}>
+            <label htmlFor={`${id}-${line.id}`} className="block text-sm font-semibold">{fillTemplate(p.unitEgp, { line: isolate(line.description) })}</label>
+            <AmountInput id={`${id}-${line.id}`} name={`unit-${line.id}`} invalid={p.unitInvalid} accepts="zero" defaultValue={line.unitEgp ?? undefined}
+                         onValue={value => setUnits(all => ({ ...all, [line.id]: value }))}/>
+          </div>
         ))}
       </div>
-      <p className="mt-2 text-[0.8125rem] text-ink-500">{t.freshSignIn}</p>
-      <button className={`${primary ? "btn-primary" : "btn-secondary"} mt-2`} disabled={busy}>{t.pricing.save}</button>
-    </form>
+      {/* Not a live region: it would speak on every keystroke; the confirmation says the total and the band again. An emergency
+          change is not measured against the band. */}
+      <p className="mt-2 text-[0.8125rem] font-semibold text-ink-700">
+        {order.emergency ? (Number.isFinite(typed) ? fillTemplate(p.runningEmergency, { total: isolate(egp(typed / 100)) }) : null)
+          : Number.isFinite(typed) ? fillTemplate(p.running, { total: isolate(egp(typed / 100)), left: isolate(egp(left)) }) : fillTemplate(p.runningEmpty, { left: isolate(egp(left)) })}
+      </p>
+      <button className={`${primary ? "btn-primary" : "btn-secondary"} mt-2`} disabled={busy}>{p.save}</button>
+    </ActForm>
+  );
+}
+
+type BillBody = { documentId: FormDataEntryValue | null; billNumber: string; amountEgp: number; billedAt: string | null };
+
+/** Operations records the hospital's interim bill; UX 4-2: the amount reads as printed and the question names the bill and its amount. */
+function InterimBillForm({ t, documents, egp, busy, onRecord }: {
+  t: Copy; documents: PanelDocument[]; egp: (n?: number | null) => string; busy: boolean; onRecord: (body: BillBody) => Promise<boolean>;
+}) {
+  const id = useId();
+  return (
+    <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.refused} retry={t.refusedRetry}
+             action={data => onRecord({ documentId: data.get("documentId"), billNumber: String(data.get("billNumber") ?? "").trim(), amountEgp: readAmount(data.get("amountEgp")), billedAt: instant(data.get("billedAt")) })}
+             confirm={{ title: data => fillTemplate(t.bills.recordTitle, { reference: isolate(String(data.get("billNumber") ?? "").trim()), amount: isolate(egp(readAmount(data.get("amountEgp")))) }),
+                        body: t.bills.recordBody, confirm: t.bills.record, cancel: t.cancel }}>
+      <DocumentPicker name="documentId" label={t.bills.document} empty={t.bills.chooseDocument} documents={documents} required/>
+      <label className="block text-sm font-semibold">{t.bills.billNumber}<input className="field" name="billNumber" maxLength={160} required autoComplete="off" spellCheck={false} dir="ltr"/></label>
+      <div>
+        <label htmlFor={`${id}-amount`} className="block text-sm font-semibold">{t.bills.amountEgp}</label>
+        <AmountInput id={`${id}-amount`} name="amountEgp" invalid={t.bills.amountInvalid}/>
+      </div>
+      <label className="block text-sm font-semibold">{t.bills.billedAt}<input className="field" name="billedAt" type="datetime-local" required dir="ltr"/></label>
+      {!documents.some(d => d.status === "CLEAN") && <p className="text-[0.8125rem] text-ink-600 sm:col-span-2">{t.bills.noDocuments}</p>}
+      <div className="sm:col-span-2"><button className="btn-secondary" disabled={busy}>{t.bills.record}</button></div>
+    </ActForm>
   );
 }
 

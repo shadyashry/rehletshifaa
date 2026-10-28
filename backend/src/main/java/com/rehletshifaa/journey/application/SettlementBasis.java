@@ -143,6 +143,12 @@ public class SettlementBasis {
                 .flatMap(a -> facilities.active(a.getFacilityId())).map(f -> f.getName()).orElse(null);
     }
 
+    /** UX 4-2: the city of that facility, for the reconciliation's heading; null when none is on file. */
+    public String facilityCity(UUID caseId) {
+        return admissions.findByCaseId(caseId).filter(a -> a.getStatus() != FacilityAdmission.Status.CANCELLED)
+                .flatMap(a -> facilities.active(a.getFacilityId())).map(f -> f.getCity()).orElse(null);
+    }
+
     /** One message to the patient (portal link only, their channel and language), once per key. */
     public boolean notifyPatient(UUID caseId, String template, String key) { return notices.send(caseId, "SETTLEMENT", template, key); }
 

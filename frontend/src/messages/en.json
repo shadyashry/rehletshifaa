@@ -4122,9 +4122,20 @@
       },
       "pricing": {
         "title": "Price {orderNumber}",
-        "hint": "Enter an EGP unit price for every line. The total and the band are worked out when you save.",
+        "hint": "Enter an EGP unit price for every line. Saving asks first, with the total and where it falls against the band.",
         "unitEgp": "Unit price (EGP) for {line}",
-        "save": "Save prices"
+        "save": "Save prices",
+        "unitInvalid": "Type the unit price in figures, zero or more, for example 12,400.",
+        "running": "Priced so far: {total} · left in the band: {left}",
+        "runningEmpty": "Left in the band: {left}",
+        "confirmTitle": "Price {orderNumber} at {total}, {band}?",
+        "confirmTitleEmergency": "Price the emergency change {orderNumber} at {total}?",
+        "within": "within the band",
+        "above": "{amount} above the band",
+        "bodyWithin": "Within the band Finance decides: the change is accepted at this price and the Consultant is told.",
+        "bodyAbove": "Above the band the patient decides: they are asked to accept or decline the change at this price.",
+        "bodyEmergency": "The emergency change was applied already; this records its price, and the patient is told.",
+        "runningEmergency": "Priced so far: {total}"
       },
       "money": {
         "title": "Running money",
@@ -4144,8 +4155,8 @@
         "countersigned": "Countersigned",
         "awaiting": "Awaiting Finance",
         "countersign": "Countersign",
-        "countersignTitle": "Countersign this interim bill?",
-        "countersignBody": "You confirm the bill matches the hospital's statement. It becomes the billed-to-date figure.",
+        "countersignTitle": "Countersign bill {reference} for {amount}?",
+        "countersignBody": "You confirm the bill matches the hospital's statement, against {authorised} authorised. The latest countersigned bill is the billed-to-date figure.",
         "form": "Record an interim bill",
         "document": "Bill (case document)",
         "chooseDocument": "Choose a document",
@@ -4153,7 +4164,10 @@
         "billNumber": "Bill number",
         "amountEgp": "Amount to date (EGP)",
         "billedAt": "Issued at",
-        "record": "Record bill"
+        "record": "Record bill",
+        "recordTitle": "Record bill {reference} for {amount}?",
+        "recordBody": "Finance countersigns it before it counts as billed to date.",
+        "amountInvalid": "Type the amount to date in figures, above zero, for example 96,500."
       },
       "checklist": {
         "title": "Evidence checklist",
@@ -4183,7 +4197,9 @@
           "CHANGE_ORDERS_SETTLED": "Change orders settled",
           "INTERIM_BILLS_COUNTERSIGNED": "Interim bills countersigned"
         }
-      }
+      },
+      "refused": "Not saved.",
+      "refusedRetry": "Check the form, then try again."
     },
     "discharge": {
       "details": "The discharge pack, the letter and the journey home",
@@ -4362,7 +4378,7 @@
         "CLOSED": "Settled"
       },
       "open": "Open the reconciliation",
-      "openTitle": "Open the reconciliation?",
+      "openTitle": "Countersign invoice {number} for {amount} and open the reconciliation?",
       "openBody": "You countersign the hospital's final invoice and start matching its lines against what was authorised.",
       "quote": {
         "title": "What was authorised",
@@ -4410,7 +4426,12 @@
         "paidAtFacility": "Paid at the hospital (EGP)",
         "paidHint": "What the invoice shows the patient paid the hospital; at least the receipts countersigned at admission.",
         "note": "Note",
-        "submit": "Submit the reconciliation"
+        "submit": "Submit the reconciliation",
+        "amountInvalid": "Type the line's amount in figures, for example 22,660, or -1,200 for a discount.",
+        "paidInvalid": "Type the amount in figures, zero or more, for example 186,800.",
+        "confirmTitle": "Submit lines totalling {sum} against the invoice's {total}?",
+        "confirmBody": "Paid at the hospital: {paid}. A line nothing authorised is never charged to the patient.",
+        "mismatch": "not equal to the invoice yet"
       },
       "figures": {
         "authorised": "Authorised",
@@ -4418,8 +4439,7 @@
         "variance": "Variance",
         "disputed": "Billed, not charged",
         "paidAtFacility": "Paid at the hospital",
-        "band": "Band limit",
-        "needsCountersign": "The variance is above the band: a Finance Manager approves it."
+        "band": "Band limit"
       },
       "trail": {
         "opened": "Opened {when}",
@@ -4430,13 +4450,15 @@
       "countersign": {
         "title": "Finance Manager's countersign",
         "waiting": "A Finance Manager approves it or returns it to Finance.",
-        "approve": "Approve",
-        "approveTitle": "Approve this reconciliation?",
+        "approve": "Approve the variance",
+        "approveTitle": "Approve the variance of {variance}?",
         "approveBody": "The variance stands, the statement is issued to the patient and the case moves to follow-up.",
         "returnLabel": "Return to Finance",
         "returnNote": "What Finance should correct",
         "returnTitle": "Return this reconciliation?",
-        "returnBody": "Finance corrects the lines and submits it again."
+        "returnBody": "Finance corrects the lines and submits it again.",
+        "returnConfirm": "Send it back to Finance",
+        "returnNoteRequired": "Say what Finance should correct."
       },
       "dispute": {
         "title": "Dispute with the hospital",
@@ -4450,7 +4472,9 @@
         },
         "note": "Note (optional)",
         "resolve": "Record the outcome",
-        "resolved": "Settled: {outcome} · {when}"
+        "resolved": "Settled: {outcome} · {when}",
+        "confirmTitle": "Record “{outcome}” for {amount}?",
+        "confirmBody": "The dispute is settled with the hospital; the patient is never charged for it."
       },
       "credit": "The patient has a credit of {amount}: refund it with the deposit refund.",
       "statements": {
@@ -4463,7 +4487,21 @@
         "eInvoiceRecorded": "recorded {when}",
         "eInvoiceForm": "Record the e-invoice reference",
         "eInvoiceHint": "The tax authority's document id. It can be recorded once.",
-        "save": "Record the reference"
+        "save": "Record the reference",
+        "confirmTitle": "Record e-invoice {reference} on statement {number}?",
+        "totalGross": "Total charged (gross, before payments)",
+        "balanceNet": "Balance due (net of payments)",
+        "creditNet": "Credit due (net of payments)"
+      },
+      "refused": "Not saved.",
+      "refusedRetry": "Check the form, then try again.",
+      "hospital": "{name} · {city}",
+      "verdict": {
+        "above": "The invoice is {variance} above what was authorised: {beyond} above the band of {band}.",
+        "below": "The invoice is {variance} below what was authorised: {beyond} beyond the band of {band}.",
+        "withinAbove": "The invoice is {variance} above what was authorised, within the band of {band}.",
+        "withinBelow": "The invoice is {variance} below what was authorised, within the band of {band}.",
+        "none": "The invoice matches what was authorised."
       }
     },
     "statement": {

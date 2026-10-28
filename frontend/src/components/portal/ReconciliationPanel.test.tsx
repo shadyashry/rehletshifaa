@@ -17,7 +17,7 @@ const quote: ReconciliationView["quote"] = [
   { source: "CHANGE_ORDER_LINE", matchedId: "col-1", orderNumber: "RS-CO-RS-2026-000123-2", kind: "EXTRA_NIGHT", description: "Extra ICU night", quantity: 2, authorisedEgp: 24691 },
 ];
 const notOpened: ReconciliationView = {
-  caseId: "c1", caseStatus: "DISCHARGED", needsCountersign: false, quote, lines: [], statements: [], facilityName: "Nile Heart Hospital",
+  caseId: "c1", caseStatus: "DISCHARGED", needsCountersign: false, quote, lines: [], statements: [], facilityName: "Nile Heart Hospital", facilityCity: "Cairo",
   finalInvoice: { evidenceId: "e9", invoiceNumber: "NHH-FI-42", amountEgp: 227345.67, issuedAt: "2026-10-25T10:00:00Z", documentId: "d1", countersigned: false },
 };
 const open: ReconciliationView = { ...notOpened, reconciliationId: "r1", status: "OPEN", authorisedEgp: 224691, bandLimitEgp: 15000, openedAt: "2026-10-25T12:00:00Z",
@@ -28,11 +28,11 @@ const statement: StaffStatement = {
     feeBalancePaidEgp: 0, paidAtFacilityEgp: 224000, refundedEgp: 0, balanceDueEgp: 0, balanceDueDisplay: 0, creditDueEgp: 4364.55, creditDueDisplay: 89.04 },
   lines: [{ kind: "PACKAGE", description: "Coronary stent package", amountEgp: 200000, amountDisplay: 4080 }, { kind: "DEPOSIT_PAID", amountEgp: -38759.2, amountDisplay: -790.69 }],
 };
-const awaiting: ReconciliationView = { ...open, status: "AWAITING_COUNTERSIGN", needsCountersign: true, chargedEgp: 224691, varianceEgp: 2654.67, disputedEgp: 2654.67, paidAtFacilityEgp: 224000,
+const awaiting: ReconciliationView = { ...open, status: "AWAITING_COUNTERSIGN", needsCountersign: true, chargedEgp: 224691, varianceEgp: 22660, disputedEgp: 22660, paidAtFacilityEgp: 224000,
   submittedAt: "2026-10-25T13:00:00Z",
   lines: [
     { lineNo: 1, description: "Package", invoiceEgp: 200000, source: "PACKAGE", authorisedEgp: 200000, chargedEgp: 200000, varianceEgp: 0, varianceCode: "WITHIN_BAND" },
-    { lineNo: 2, description: "Telemetry", invoiceEgp: 2654.67, source: "NONE", authorisedEgp: null, chargedEgp: 0, varianceEgp: 2654.67, varianceCode: "UNAPPROVED_EXTRA" },
+    { lineNo: 2, description: "Telemetry", invoiceEgp: 22660, source: "NONE", authorisedEgp: null, chargedEgp: 0, varianceEgp: 22660, varianceCode: "UNAPPROVED_EXTRA" },
   ] };
 const settled: ReconciliationView = { ...awaiting, status: "DISPUTED", needsCountersign: false, settledAt: "2026-10-26T09:00:00Z", statements: [statement] };
 
@@ -54,13 +54,15 @@ describe("ReconciliationPanel — Finance", () => {
     expect(load).toHaveBeenCalledWith("/finance/cases/c1/reconciliation");
     expect(screen.getByText("Not opened")).toBeTruthy();
     expect(screen.getByText(/Final invoice .*NHH-FI-42/)).toBeTruthy();
+    // UX 4-2: the header names the hospital and its city.
+    expect(screen.getByText(/Nile Heart Hospital.* · .*Cairo/)).toBeTruthy();
     // The two columns: the quote side is listed before anything is submitted.
     expect(screen.getByText("Coronary stent package")).toBeTruthy();
     expect(screen.getByText("No line submitted yet.")).toBeTruthy();
     const button = screen.getByRole("button", { name: "Open the reconciliation" });
     expect(primaries()).toEqual([button]);
     fireEvent.click(button);
-    const dialog = screen.getByRole("alertdialog", { name: "Open the reconciliation?" });
+    const dialog = screen.getByRole("alertdialog", { name: /^Countersign invoice .*NHH-FI-42.* for .*227,345\.67.* and open the reconciliation\?$/ });
     expect(dialog.textContent).toContain("sign in again");
     fireEvent.click(dialog.querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/reconciliation", undefined));
@@ -77,31 +79,49 @@ describe("ReconciliationPanel — Finance", () => {
       fireEvent.change(scope.getAllByLabelText("Amount (EGP)")[index], { target: { value: amount } });
       fireEvent.change(scope.getAllByLabelText("Authorised by")[index], { target: { value: match } });
     };
-    fill(0, "Package", "200000", "PACKAGE");
+    // UX 4-2: amounts read as printed, a discount line negative.
+    fill(0, "Package", "200,000", "PACKAGE");
+    // Lines that do not add up are held here, before any question or fresh sign-in.
+    fireEvent.click(scope.getByRole("button", { name: "Submit the reconciliation" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(scope.getByRole("alert").textContent).toContain("not equal to the invoice yet");
     fireEvent.click(scope.getByRole("button", { name: "Add a line" }));
     fill(1, "ICU nights", "24691", "LINE:col-1");
     fireEvent.click(scope.getByRole("button", { name: "Add a line" }));
-    fill(2, "Telemetry", "2654.67", "NONE");
+    fill(2, "Telemetry", "2,754.67", "NONE");
+    fireEvent.click(scope.getByRole("button", { name: "Add a line" }));
+    fill(3, "Discount", "-100", "PACKAGE");
     fireEvent.change(scope.getByLabelText("Why it was not authorised"), { target: { value: "BILLING_ERROR" } });
-    expect(scope.getByText(/^Lines entered: .*227,345\.67 of .*227,345\.67$/)).toBeTruthy();
+    expect(scope.getByText(/^Lines entered: .*227,345\.67.* of .*227,345\.67.*$/)).toBeTruthy();
     fireEvent.change(scope.getByLabelText("Paid at the hospital (EGP)"), { target: { value: "224000" } });
     fireEvent.submit(scope.getByRole("button", { name: "Submit the reconciliation" }).closest("form")!);
+    // Submitting asks first, with the lines' total against the invoice's and what was paid at the hospital.
+    const dialog = screen.getByRole("alertdialog", { name: /^Submit lines totalling .*227,345\.67.* against the invoice's .*227,345\.67.*\?$/ });
+    expect(dialog.textContent).toMatch(/Paid at the hospital: .*224,000/);
+    expect(dialog.textContent).not.toContain("do not add up");
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(dialog.querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/reconciliation/submit", {
       lines: [
         { description: "Package", invoiceEgp: 200000, source: "PACKAGE", matchedId: null, code: null },
         { description: "ICU nights", invoiceEgp: 24691, source: "CHANGE_ORDER_LINE", matchedId: "col-1", code: null },
-        { description: "Telemetry", invoiceEgp: 2654.67, source: "NONE", matchedId: null, code: "BILLING_ERROR" },
+        { description: "Telemetry", invoiceEgp: 2754.67, source: "NONE", matchedId: null, code: "BILLING_ERROR" },
+        { description: "Discount", invoiceEgp: -100, source: "PACKAGE", matchedId: null, code: null },
       ],
       paidAtFacilityEgp: 224000, note: null }));
   });
 
   it("shows the variance codes as returned and waits for a Finance Manager above the band", async () => {
     setup("finance", { currentCode: "RECONCILE_INVOICE", data: awaiting });
-    expect(await screen.findByText("Unapproved extra · not charged")).toBeTruthy();
-    expect(screen.getByText("At the package price")).toBeTruthy();
-    expect(screen.getByText("The variance is above the band: a Finance Manager approves it.")).toBeTruthy();
-    expect(screen.getByText("A Finance Manager approves it or returns it to Finance.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    // The phone's stacked rows and the table both carry the codes (CSS shows one of them).
+    expect((await screen.findAllByText("Unapproved extra · not charged")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("At the package price").length).toBeGreaterThan(0);
+    // UX 4-2: the verdict against the band, worked out, before the decision.
+    const verdict = screen.getByText(/^The invoice is .*22,660.* above what was authorised: .*7,660.* above the band of .*15,000.*\.$/);
+    const waiting = screen.getByText("A Finance Manager approves it or returns it to Finance.");
+    expect(verdict.compareDocumentPosition(waiting) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(waiting.compareDocumentPosition(screen.getByText("The hospital's invoice")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Approve/ })).toBeNull();
     expect(primaries()).toEqual([]);
   });
 });
@@ -111,13 +131,27 @@ describe("ReconciliationPanel — Finance Manager", () => {
 
   it("approves from the COUNTERSIGN_RECONCILIATION work item, or returns it with what to correct", async () => {
     const { mutate } = setup("finance", { currentCode: "COUNTERSIGN_RECONCILIATION", data: awaiting });
-    const approve = await screen.findByRole("button", { name: "Approve" });
+    // Two equal acts side by side; the filled one is the work item's.
+    const approve = await screen.findByRole("button", { name: "Approve the variance" });
+    const giveBack = screen.getByRole("button", { name: "Return to Finance" });
     expect(primaries()).toEqual([approve]);
+    expect(giveBack.className).toContain("btn-secondary");
     fireEvent.click(approve);
-    fireEvent.click(screen.getByRole("alertdialog", { name: "Approve this reconciliation?" }).querySelector(".btn-primary") as HTMLElement);
+    const dialog = screen.getByRole("alertdialog", { name: /^Approve the variance of .*22,660.*\?$/ });
+    expect(dialog.textContent).toMatch(/7,660.* above the band/);
+    fireEvent.click(dialog.querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/reconciliation/countersign", { decision: "APPROVE", note: null }));
-    fireEvent.change(screen.getByLabelText("What Finance should correct"), { target: { value: "Line 2 is a billing error" } });
-    fireEvent.submit(screen.getByLabelText("What Finance should correct").closest("form")!);
+    expect(giveBack.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(giveBack);
+    expect(giveBack.getAttribute("aria-expanded")).toBe("true");
+    // A blank reason is refused in the page's words.
+    const note = screen.getByLabelText("What Finance should correct");
+    fireEvent.input(note, { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Send it back to Finance" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toBe("Say what Finance should correct.");
+    fireEvent.input(note, { target: { value: "Line 2 is a billing error" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send it back to Finance" }));
     fireEvent.click(screen.getByRole("alertdialog", { name: "Return this reconciliation?" }).querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/reconciliation/countersign", { decision: "RETURN", note: "Line 2 is a billing error" }));
   });
@@ -129,13 +163,17 @@ describe("ReconciliationPanel — Finance Manager", () => {
     expect(primaries()).toEqual([resolve]);
     fireEvent.change(screen.getByLabelText("How it ended"), { target: { value: "FACILITY_WITHDREW" } });
     fireEvent.submit(resolve.closest("form")!);
+    fireEvent.click(screen.getByRole("alertdialog", { name: /^Record “The hospital withdrew the charge” for .*22,660.*\?$/ }).querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/reconciliation/dispute/resolve", { outcome: "FACILITY_WITHDREW", note: null }));
     // The statement, exactly as returned, and the patient's credit to refund.
     expect(screen.getByRole("heading", { name: /Statement\W+RS-ST-RS-2026-000123-1/ })).toBeTruthy();
-    expect(screen.getByText("Credit due")).toBeTruthy();
+    // Finance reads the totals as a ledger: gross charged, net owed.
+    expect(screen.getByText("Total charged (gross, before payments)")).toBeTruthy();
+    expect(screen.getByText("Credit due (net of payments)")).toBeTruthy();
     expect(screen.getByText(/The patient has a credit of .*4,364\.55/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("E-invoice reference"), { target: { value: "ETA-77" } });
     fireEvent.submit(screen.getByRole("button", { name: "Record the reference" }).closest("form")!);
+    fireEvent.click(screen.getByRole("alertdialog", { name: /^Record e-invoice .*ETA-77.* on statement .*RS-ST-RS-2026-000123-1.*\?$/ }).querySelector(".btn-primary") as HTMLElement);
     await waitFor(() => expect(mutate).toHaveBeenCalledWith("/finance/cases/c1/statements/s1/e-invoice", { reference: "ETA-77" }));
   });
 

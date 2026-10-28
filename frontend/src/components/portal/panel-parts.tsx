@@ -3,6 +3,8 @@
 import { Component, use, useEffect, useId, useRef, useState, type FocusEventHandler, type FormEvent, type ReactNode } from "react";
 import { Check, ChevronDown, CircleAlert, CircleDashed, CircleDot, Clock } from "lucide-react";
 
+import { intlLocale, type Locale } from "@/lib/i18n";
+import { formatMoney } from "@/lib/money";
 import { ConfirmDialog, FeedbackContext } from "@/components/portal/portal-ui";
 
 /**
@@ -140,28 +142,82 @@ const groupAmount = (value: number) => (Number.isInteger(value) ? WHOLE : CENTS)
  * and a currency word around the figure is dropped ("EGP 195,500"); anything else ambiguous — "195,50", "1,2" — is refused,
  * never re-read as another amount.
  */
-export function readAmount(value: FormDataEntryValue | string | null) {
-  const latin = String(value ?? "").trim()
+export function readAmount(value: FormDataEntryValue | string | null, signed = false) {
+  const strip = (text: string) => text.replace(/^[\p{L}\p{Sc}\s]+|[\p{L}\p{Sc}\s.]+$/gu, "");
+  let latin = String(value ?? "").trim()
     .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
-    .replace(/٫/g, ".").replace(/٬/g, ",").replace(/^[\p{L}\p{Sc}\s]+|[\p{L}\p{Sc}\s.]+$/gu, "");
-  return AMOUNT.test(latin) ? Number(latin.replaceAll(",", "")) : Number.NaN;
+    .replace(/٫/g, ".").replace(/٬/g, ",");
+  // UX 4-2: an invoice's discount line is negative ("-1,200", "−1,200", "-EGP 1,200" or "EGP -1,200"), only where the field says so.
+  const minus = /^[-−]/;
+  let negative = signed && minus.test(latin);
+  if (negative) latin = latin.slice(1);
+  latin = strip(latin);
+  if (signed && !negative && minus.test(latin)) { negative = true; latin = latin.slice(1).trim(); }
+  return AMOUNT.test(latin) ? (negative ? -1 : 1) * Number(latin.replaceAll(",", "")) : Number.NaN;
 }
+
+/** Which amounts a field takes: above zero (a price, a receipt), zero or more (what was paid), or any but zero (an invoice line). */
+export type AmountRange = "positive" | "zero" | "signed";
+const inRange = (value: number, accepts: AmountRange) => accepts === "positive" ? value > 0 : accepts === "zero" ? value >= 0 : Number.isFinite(value) && value !== 0;
 
 /**
  * UX 5-4: an EGP amount the officer copies from paper (the letter's price, the cashier's receipt; UX 4-1: Finance's fee and refund). It reads as
  * printed ("195,500.00"), is grouped again when left, and says in the page's language when it is not an amount above zero.
+ * UX 4-2: `accepts` widens the range (zero paid, a negative discount line); `onValue` hands each keystroke's reading to a running total.
  */
-export function AmountInput({ id, name, invalid, defaultValue, describedBy }: { id: string; name: string; invalid: string; defaultValue?: number; describedBy?: string }) {
+export function AmountInput({ id, name, invalid, defaultValue, describedBy, accepts = "positive", onValue }: {
+  id: string; name: string; invalid: string; defaultValue?: number; describedBy?: string; accepts?: AmountRange; onValue?: (value: number) => void;
+}) {
   const check = (field: HTMLInputElement) => {
-    const value = readAmount(field.value);
-    field.setCustomValidity(field.value.trim() && !(value > 0) ? invalid : "");
+    const value = readAmount(field.value, accepts === "signed");
+    field.setCustomValidity(field.value.trim() && !inRange(value, accepts) ? invalid : "");
     return value;
   };
   return (
     <input id={id} className="field tabular-nums" name={name} type="text" inputMode="decimal" required dir="ltr" autoComplete="off" spellCheck={false}
            defaultValue={defaultValue != null ? groupAmount(defaultValue) : undefined} aria-describedby={describedBy}
-           onChange={event => { check(event.currentTarget); }}
-           onBlur={event => { const value = check(event.currentTarget); if (value > 0) event.currentTarget.value = groupAmount(value); }}/>
+           onChange={event => { const value = check(event.currentTarget); onValue?.(value); }}
+           onBlur={event => {
+             const value = check(event.currentTarget);
+             if (inRange(value, accepts)) event.currentTarget.value = `${value < 0 ? "-" : ""}${groupAmount(Math.abs(value))}`;
+           }}/>
+  );
+}
+
+/**
+ * UX 4-1/4-2: a fixed rate the way Egyptian finance quotes it ("1 US$ = EGP 49.0196", six significant digits, as it was fixed).
+ * The stored rate is EGP → the patient's currency. In Arabic each side is isolated and the equation reads right to left; a forced
+ * left-to-right run would reverse only Intl's Arabic side.
+ */
+export function quotedRate(locale: Locale, currency: string, fxRate?: number | null) {
+  if (!fxRate || currency === "EGP") return null;
+  const one = formatMoney(1, currency, locale);
+  const egpPer = new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "EGP", maximumSignificantDigits: 6 }).format(1 / fxRate);
+  return locale === "ar" ? `⁨${one}⁩ = ⁨${egpPer}⁩` : `⁦${one} = ${egpPer}⁩`;
+}
+
+/**
+ * A reason typed for a decision. When one is owed, the page refuses an empty or blank reason in its own words, at the field
+ * and read out (the browser's own message would be in the browser's language, and a passing tooltip).
+ */
+export function ReasonField({ label, owed, hint }: { label: string; /** The page's own words when a reason is owed. */ owed?: string; hint?: string }) {
+  const id = useId();
+  const [missing, setMissing] = useState(false);
+  const described = missing ? `${id}-missing` : hint ? `${id}-hint` : undefined;
+  return (
+    <div className="w-full">
+      <label htmlFor={id} className="block text-sm font-semibold">{label}</label>
+      <textarea id={id} className="field" name="note" rows={2} maxLength={2000} dir="auto" required={!!owed} aria-invalid={missing || undefined} aria-describedby={described}
+        onInvalid={owed ? event => { event.currentTarget.setCustomValidity(owed); setMissing(true); } : undefined}
+        onInput={owed ? event => {
+          // A reason of spaces only is no reason: the backend refuses it, so the form does first.
+          const blank = !event.currentTarget.value.trim();
+          event.currentTarget.setCustomValidity(blank && event.currentTarget.value ? owed : "");
+          if (!blank) setMissing(false);
+        } : undefined}/>
+      {missing ? <p id={`${id}-missing`} role="alert" className="mt-1 text-[0.8125rem] font-semibold text-alert-800">{owed}</p>
+        : hint && <p id={`${id}-hint`} className="mt-1 text-[0.8125rem] text-ink-600">{hint}</p>}
+    </div>
   );
 }
 

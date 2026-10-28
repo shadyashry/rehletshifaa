@@ -1,16 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { CircleAlert, X } from "lucide-react";
 
 import { intlLocale, type Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
-import { ConfirmDialog } from "@/components/portal/portal-ui";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { StatementSheet } from "@/components/portal/GoingHomeStory";
-import { ConfirmAction, Fact, Money, Task as PanelTask, pick, submit, text } from "@/components/portal/panel-parts";
+import { ActForm, AmountInput, ConfirmAction, Fact, Money, ReasonField, Task as PanelTask, pick, readAmount, text } from "@/components/portal/panel-parts";
 import type { InvoiceLine, Mutate, QuoteLine, ReconciliationView, StaffStatement } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["reconciliation"];
@@ -22,6 +21,8 @@ export const SETTLEMENT_WORK: ReadonlySet<string> = new Set(["RECONCILE_INVOICE"
 /** Finance works the invoice from treatment (it can be recorded before discharge); everyone reads the result once discharged. */
 export const SETTLEMENT_STAGES: ReadonlySet<string> = new Set(["DISCHARGED", "FOLLOW_UP"]);
 const ANCHOR = "reconciliation-next";
+/** A figure or a name inside a sentence keeps its own direction. */
+const isolate = (value: string) => `⁨${value}⁩`;
 
 /**
  * P1-17, staff case page: the reconciliation of the hospital's final invoice and the patient's statements (design §5 stage 5).
@@ -30,6 +31,9 @@ const ANCHOR = "reconciliation-next";
  * and submits the lines with what the patient paid at the hospital, and records a statement's e-invoice reference; a Finance
  * Manager approves or returns a variance above the band and settles a facility dispute from their work item. Every command is
  * step-up, through the portal's re-sign-in and replay. Amounts are exactly as `GET /{role}/cases/{id}/reconciliation` returns them.
+ * UX 4-2: every command asks first, with the amount in the question, and a refusal is said at its form. The variance is said as a
+ * verdict against the band ("EGP 7,660 above the band") before the Manager's decision, which comes before the evidence; Approve
+ * and Return are two equal acts. On a phone the invoice lines are stacked rows.
  */
 export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentCode, busy, mutate, load }: {
   locale: Locale; role: SettlementRole; caseId: string; caseStatus: string;
@@ -75,6 +79,9 @@ export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentC
     : currentCode === "RECONCILE_INVOICE" ? (canOpen ? "open" : canSubmit ? "submit" : null)
     : managerCountersign ? "countersign" : managerDispute ? "dispute" : null;
   const current = view.statements.find(s => s.current) ?? null;
+  const hospital = !view.facilityName ? null
+    : view.facilityCity ? fillTemplate(t.hospital, { name: isolate(view.facilityName), city: isolate(view.facilityCity) }) : isolate(view.facilityName);
+  const verdict = view.reconciliationId ? varianceVerdict(t, view.varianceEgp, view.bandLimitEgp, egp) : null;
 
   return (
     <section id="reconciliation-panel" aria-labelledby={`${id}-title`} className="card p-5">
@@ -83,16 +90,34 @@ export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentC
         <StatusBadge tone={statusTone(view.status)}>{view.status ? pick(t.status, view.status) : t.notOpened}</StatusBadge>
       </div>
 
-      {!invoice ? <p className="mt-2 text-[0.85rem] text-ink-600">{t.noInvoice}</p> : (
-        <p className="mt-1 text-[0.85rem] text-ink-800">
-          {fillTemplate(t.invoice, { number: `⁨${invoice.invoiceNumber ?? "—"}⁩`, amount: egp(invoice.amountEgp) })}
-          <span className="text-ink-600"> · {fillTemplate(t.issued, { when: when(invoice.issuedAt) })}{view.facilityName && <> · <bdi>{view.facilityName}</bdi></>}</span>
+      {!invoice ? <p className="mt-2 text-[0.875rem] text-ink-600">{t.noInvoice}</p> : (
+        <p className="mt-1 text-[0.875rem] text-ink-800">
+          {fillTemplate(t.invoice, { number: isolate(invoice.invoiceNumber ?? "—"), amount: isolate(egp(invoice.amountEgp)) })}
+          <span className="text-ink-600"> · {fillTemplate(t.issued, { when: when(invoice.issuedAt) })}{hospital && <> · {hospital}</>}</span>
         </p>
       )}
-      {canOpen && (
+      {canOpen && invoice && (
         <div id={next === "open" ? ANCHOR : undefined} className="mt-3">
-          <ConfirmAction label={t.open} title={t.openTitle} body={`${t.openBody} ${t.freshSignIn}`} confirm={t.open} cancel={t.cancel}
+          <ConfirmAction label={t.open} title={fillTemplate(t.openTitle, { number: isolate(invoice.invoiceNumber ?? "—"), amount: isolate(egp(invoice.amountEgp)) })}
+                         body={`${t.openBody} ${t.freshSignIn}`} confirm={t.open} cancel={t.cancel}
                          primary={next === "open"} busy={busy} onConfirm={() => act(`/finance/cases/${caseId}/reconciliation`)}/>
+        </div>
+      )}
+
+      {/* THE VERDICT: the variance against the band, said before anyone decides on it */}
+      {verdict && (
+        <p id={`${id}-verdict`} className={`mt-3 flex items-start gap-2 text-[0.9375rem] font-semibold ${verdict.above ? "text-alert-800" : "text-ink-800"}`}>
+          {verdict.above && <CircleAlert size={18} aria-hidden className="mt-0.5 flex-none"/>}<span className="min-w-0">{verdict.text}</span>
+        </p>
+      )}
+
+      {/* FINANCE MANAGER: approve or return a variance above the band, before the evidence it rests on */}
+      {awaiting && (
+        <div id={next === "countersign" ? ANCHOR : undefined} className="mt-3 border-t border-line pt-3">
+          <h4 className="text-[0.875rem] font-bold text-ink-800">{t.countersign.title}</h4>
+          {managerCountersign ? <Countersign t={t} verdict={verdict?.text ?? ""} verdictId={verdict ? `${id}-verdict` : undefined} variance={isolate(egp(view.varianceEgp))} busy={busy} primary={next === "countersign"}
+                                             onDecide={(decision, note) => act(`/finance/cases/${caseId}/reconciliation/countersign`, { decision, note })}/>
+            : <p className="mt-1 text-[0.875rem] text-ink-600">{t.countersign.waiting}</p>}
         </div>
       )}
 
@@ -106,7 +131,7 @@ export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentC
 
       {/* THE FIGURES, as returned */}
       {view.reconciliationId && (
-        <dl className="mt-4 grid gap-x-6 gap-y-2 border-t border-line pt-3 text-[0.85rem] tabular-nums sm:grid-cols-2 lg:grid-cols-3">
+        <dl className="mt-4 grid gap-x-6 gap-y-2 border-t border-line pt-3 text-[0.875rem] tabular-nums sm:grid-cols-2 lg:grid-cols-3">
           <Fact label={t.figures.authorised}><Money>{egp(view.authorisedEgp)}</Money></Fact>
           <Fact label={t.figures.charged}><Money>{egp(view.chargedEgp)}</Money></Fact>
           <Fact label={t.figures.variance}><Money>{egp(view.varianceEgp)}</Money></Fact>
@@ -115,7 +140,6 @@ export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentC
           <Fact label={t.figures.band}><Money>{egp(view.bandLimitEgp)}</Money></Fact>
         </dl>
       )}
-      {view.needsCountersign && <p className="mt-2 text-[0.8125rem] font-semibold text-ink-800">{t.figures.needsCountersign}</p>}
       {view.reconciliationId && (
         <p className="mt-2 text-[0.8125rem] text-ink-600">
           {[view.openedAt && fillTemplate(t.trail.opened, { when: when(view.openedAt) }), view.submittedAt && fillTemplate(t.trail.submitted, { when: when(view.submittedAt) }),
@@ -135,39 +159,30 @@ export function ReconciliationPanel({ locale, role, caseId, caseStatus, currentC
         </div>
       )}
 
-      {/* FINANCE MANAGER: approve or return a variance above the band */}
-      {awaiting && (
-        <div id={next === "countersign" ? ANCHOR : undefined} className="mt-4 border-t border-line pt-3">
-          <h4 className="text-[0.875rem] font-bold text-ink-800">{t.countersign.title}</h4>
-          {managerCountersign ? <Countersign t={t} busy={busy} primary={next === "countersign"}
-                                             onDecide={(decision, note) => act(`/finance/cases/${caseId}/reconciliation/countersign`, { decision, note })}/>
-            : <p className="mt-1 text-[0.85rem] text-ink-600">{t.countersign.waiting}</p>}
-        </div>
-      )}
-
       {/* FINANCE MANAGER: what was billed but not charged is settled with the hospital, never with the patient */}
       {(disputeOpen || view.disputeOutcome) && (
         <div id={next === "dispute" ? ANCHOR : undefined} className="mt-4 border-t border-line pt-3">
           <h4 className="text-[0.875rem] font-bold text-ink-800">{t.dispute.title}</h4>
           {view.disputeOutcome
-            ? <p className="mt-1 text-[0.85rem] text-ink-800">{fillTemplate(t.dispute.resolved, { outcome: pick(t.dispute.outcomes, view.disputeOutcome), when: when(view.disputeResolvedAt) })}</p>
+            ? <p className="mt-1 text-[0.875rem] text-ink-800">{fillTemplate(t.dispute.resolved, { outcome: pick(t.dispute.outcomes, view.disputeOutcome), when: when(view.disputeResolvedAt) })}</p>
             : <>
-                <p className="mt-1 max-w-[65ch] text-[0.85rem] text-ink-700">{fillTemplate(t.dispute.body, { amount: egp(view.disputedEgp) })}</p>
-                {managerDispute ? <DisputeForm t={t} busy={busy} primary={next === "dispute"} onResolve={body => act(`/finance/cases/${caseId}/reconciliation/dispute/resolve`, body)}/>
-                  : <p className="mt-1 text-[0.85rem] text-ink-600">{t.dispute.waiting}</p>}
+                <p className="mt-1 max-w-[65ch] text-[0.875rem] text-ink-700">{fillTemplate(t.dispute.body, { amount: isolate(egp(view.disputedEgp)) })}</p>
+                {managerDispute ? <DisputeForm t={t} amount={isolate(egp(view.disputedEgp))} busy={busy} primary={next === "dispute"}
+                                               onResolve={body => act(`/finance/cases/${caseId}/reconciliation/dispute/resolve`, body)}/>
+                  : <p className="mt-1 text-[0.875rem] text-ink-600">{t.dispute.waiting}</p>}
               </>}
         </div>
       )}
 
       {finance && current && current.totals.creditDueEgp > 0 && (
-        <p className="mt-3 text-[0.85rem] font-semibold text-ink-800">{fillTemplate(t.credit, { amount: egp(current.totals.creditDueEgp) })}</p>
+        <p className="mt-3 text-[0.875rem] font-semibold text-ink-800">{fillTemplate(t.credit, { amount: isolate(egp(current.totals.creditDueEgp)) })}</p>
       )}
 
       {/* STATEMENTS */}
       {(view.statements.length > 0 || view.status === "CLOSED") && (
         <div className="mt-4 border-t border-line pt-3">
           <h4 className="text-[0.875rem] font-bold text-ink-800">{t.statements.title}</h4>
-          {view.statements.length === 0 ? <p className="mt-1 text-[0.85rem] text-ink-600">{t.statements.empty}</p> : (
+          {view.statements.length === 0 ? <p className="mt-1 text-[0.875rem] text-ink-600">{t.statements.empty}</p> : (
             <ul className="mt-2 space-y-5">
               {view.statements.map(s => <StatementItem key={s.id} t={t} locale={locale} statement={s} when={when} busy={busy}
                 canRecord={finance && s.current && !s.eInvoiceRef} onRecord={reference => act(`/finance/cases/${caseId}/statements/${s.id}/e-invoice`, { reference })}/>)}
@@ -191,13 +206,27 @@ function varianceTone(code?: string | null): StatusTone {
   return code === "UNAPPROVED_EXTRA" || code === "BILLING_ERROR" ? "warning" : code === "CREDIT" ? "info" : "neutral";
 }
 
+/**
+ * UX 4-2: the variance as a verdict against the band, worked out from the two figures the backend returned (the band is the
+ * backend's own test: the variance's size against the band limit). "The invoice is EGP 22,660 above what was authorised: EGP
+ * 7,660 above the band of EGP 15,000."
+ */
+function varianceVerdict(t: Copy, variance: number | null | undefined, band: number | null | undefined, egp: (n?: number | null) => string) {
+  if (variance == null || band == null) return null;
+  const size = Math.abs(variance);
+  if (variance === 0) return { above: false, text: t.verdict.none };
+  const words = { variance: isolate(egp(size)), beyond: isolate(egp(size - band)), band: isolate(egp(band)) };
+  if (size > band) return { above: true, text: fillTemplate(variance > 0 ? t.verdict.above : t.verdict.below, words) };
+  return { above: false, text: fillTemplate(variance > 0 ? t.verdict.withinAbove : t.verdict.withinBelow, words) };
+}
+
 /** The left column: what can authorise an invoice line, as the backend lists it. */
 function QuoteColumn({ t, quote, egp }: { t: Copy; quote: QuoteLine[]; egp: (n?: number | null) => string }) {
   return (
     <div className="min-w-0">
       <h4 className="text-[0.875rem] font-bold text-ink-800">{t.quote.title}</h4>
-      {quote.length === 0 ? <p className="mt-1 text-[0.85rem] text-ink-600">{t.quote.empty}</p> : (
-        <ul className="mt-1 divide-y divide-line text-[0.85rem]">
+      {quote.length === 0 ? <p className="mt-1 text-[0.875rem] text-ink-600">{t.quote.empty}</p> : (
+        <ul className="mt-1 divide-y divide-line text-[0.875rem]">
           {quote.map((line, index) => (
             <li key={`${line.source}-${line.matchedId ?? index}`} className="flex items-baseline justify-between gap-3 py-1.5">
               <span className="min-w-0">
@@ -213,13 +242,31 @@ function QuoteColumn({ t, quote, egp }: { t: Copy; quote: QuoteLine[]; egp: (n?:
   );
 }
 
-/** The right column: the invoice lines as submitted, with what each was matched to and the variance code the backend gave it. */
+/**
+ * The right column: the invoice lines as submitted, with what each was matched to and the variance code the backend gave it.
+ * UX 4-2: a phone reads each line as a short block (the line, its code, then the three figures); the table from 640px.
+ */
 function LinesColumn({ t, lines, egp }: { t: Copy; lines: InvoiceLine[]; egp: (n?: number | null) => string }) {
+  const figure = (n?: number | null) => n == null ? "—" : <Money>{egp(n)}</Money>;
   return (
     <div className="min-w-0">
       <h4 className="text-[0.875rem] font-bold text-ink-800">{t.lines.title}</h4>
-      {lines.length === 0 ? <p className="mt-1 text-[0.85rem] text-ink-600">{t.lines.empty}</p> : (
-        <div className="mt-1 overflow-x-auto">
+      {lines.length === 0 ? <p className="mt-1 text-[0.875rem] text-ink-600">{t.lines.empty}</p> : <>
+        <ul className="mt-1 divide-y divide-line border-y border-line text-[0.8125rem] sm:hidden" aria-label={t.lines.title}>
+          {lines.map(line => (
+            <li key={line.lineNo} className="py-2">
+              <p dir="auto" className="text-ink-900">{line.description}</p>
+              {line.varianceCode && <p className="mt-1"><StatusBadge tone={varianceTone(line.varianceCode)}>{pick(t.lines.codes, line.varianceCode)}</StatusBadge></p>}
+              <dl className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 tabular-nums">
+                <div className="contents"><dt className="text-ink-500">{t.lines.invoice}</dt><dd className="text-end text-ink-800">{figure(line.invoiceEgp)}</dd></div>
+                <div className="contents"><dt className="text-ink-500">{t.lines.authorised}</dt><dd className="text-end text-ink-800">{figure(line.authorisedEgp)}</dd></div>
+                <div className="contents"><dt className="text-ink-500">{t.lines.charged}</dt><dd className="text-end font-semibold text-ink-900">{figure(line.chargedEgp)}</dd></div>
+              </dl>
+            </li>
+          ))}
+        </ul>
+        {/* A region, so a keyboard can scroll the table when it is wider than its column. */}
+        <div role="region" aria-label={t.lines.title} tabIndex={0} className="mt-1 hidden overflow-x-auto rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:block">
           <table className="w-full min-w-[26rem] text-[0.8125rem] tabular-nums">
             <thead className="text-ink-500">
               <tr className="border-b border-line">
@@ -236,56 +283,70 @@ function LinesColumn({ t, lines, egp }: { t: Copy; lines: InvoiceLine[]; egp: (n
                     <span dir="auto" className="block text-ink-900">{line.description}</span>
                     {line.varianceCode && <StatusBadge tone={varianceTone(line.varianceCode)}>{pick(t.lines.codes, line.varianceCode)}</StatusBadge>}
                   </td>
-                  <td className="py-1.5 pe-3 text-end"><Money>{egp(line.invoiceEgp)}</Money></td>
-                  <td className="py-1.5 pe-3 text-end">{line.authorisedEgp == null ? "—" : <Money>{egp(line.authorisedEgp)}</Money>}</td>
-                  <td className="py-1.5 text-end">{line.chargedEgp == null ? "—" : <Money>{egp(line.chargedEgp)}</Money>}</td>
+                  <td className="py-1.5 pe-3 text-end">{figure(line.invoiceEgp)}</td>
+                  <td className="py-1.5 pe-3 text-end">{figure(line.authorisedEgp)}</td>
+                  <td className="py-1.5 text-end">{figure(line.chargedEgp)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      )}
+      </>}
     </div>
   );
 }
 
-type Row = { key: number; description: string; amount: string; match: string; code: string };
+type Row = { key: number; description: string; amount: number; match: string; code: string };
 type SubmitBody = { lines: { description: string; invoiceEgp: number; source: string; matchedId: string | null; code: string | null }[]; paidAtFacilityEgp: number; note: string | null };
 
-/** Whole cents, so the typed lines can be compared with the invoice total without floating-point drift. */
-const cents = (value: string | number | null | undefined) => { const n = Number(value); return Number.isFinite(n) ? Math.round(n * 100) : 0; };
+/** Whole cents, so the typed lines can be compared with the invoice total without floating-point drift; an unread amount counts 0. */
+const cents = (value: number | null | undefined) => value != null && Number.isFinite(value) ? Math.round(value * 100) : 0;
 
 /**
  * Finance enters each invoice line and what authorised it: the package, one counted change-order line (each once), or nothing
  * (an unapproved extra or a billing error, never charged). The running count of what was typed is input help only; the backend
- * checks that the lines add up to the invoice.
+ * checks that the lines add up to the invoice. UX 4-2: amounts read as printed (a discount line negative); submitting asks first,
+ * with the lines' total against the invoice's in the question, and says so when they do not add up.
  */
 function LinesForm({ t, quote, invoiceTotal, egp, busy, primary, onSubmit }: {
   t: Copy; quote: QuoteLine[]; invoiceTotal: number | null; egp: (n?: number | null) => string; busy: boolean; primary: boolean; onSubmit: (body: SubmitBody) => Promise<boolean>;
 }) {
   const f = t.form;
   const id = useId();
-  const fresh = (key: number): Row => ({ key, description: "", amount: "", match: "", code: "UNAPPROVED_EXTRA" });
+  const fresh = (key: number): Row => ({ key, description: "", amount: Number.NaN, match: "", code: "UNAPPROVED_EXTRA" });
   const [rows, setRows] = useState<Row[]>(() => [fresh(0)]);
   const update = (key: number, patch: Partial<Row>) => setRows(all => all.map(row => row.key === key ? { ...row, ...patch } : row));
   const options = quote.map((line, index) => ({
     value: line.source === "PACKAGE" ? "PACKAGE" : `LINE:${line.matchedId ?? index}`,
-    label: line.source === "PACKAGE" ? (line.orderNumber ? fillTemplate(f.package, { voucher: `⁨${line.orderNumber}⁩` }) : f.packagePlain)
-      : fillTemplate(f.changeLine, { order: `⁨${line.orderNumber ?? ""}⁩`, description: line.description ?? "" }),
+    label: line.source === "PACKAGE" ? (line.orderNumber ? fillTemplate(f.package, { voucher: isolate(line.orderNumber) }) : f.packagePlain)
+      : fillTemplate(f.changeLine, { order: isolate(line.orderNumber ?? ""), description: isolate(line.description ?? "") }),
     line,
   }));
   const typed = rows.reduce((sum, row) => sum + cents(row.amount), 0);
+  const amountOf = (data: FormData, row: Row) => readAmount(data.get(`amount-${row.key}`), true);
+  const sumOf = (data: FormData) => rows.reduce((sum, row) => sum + cents(amountOf(data, row)), 0);
+  // Lines that do not add up to the invoice are refused here, before the question and the fresh sign-in, not by the portal after.
+  const [held, setHeld] = useState(false);
+  const total = useRef<HTMLParagraphElement>(null);
+  const off = invoiceTotal != null && typed !== cents(invoiceTotal);
+  const mismatch = off && (held || rows.some(row => Number.isFinite(row.amount)));
   const body = (data: FormData): SubmitBody => ({
     lines: rows.map(row => {
       const chosen = options.find(o => o.value === row.match)?.line;
       const source = row.match === "PACKAGE" ? "PACKAGE" : chosen ? "CHANGE_ORDER_LINE" : "NONE";
-      return { description: row.description.trim(), invoiceEgp: Number(row.amount), source, matchedId: source === "CHANGE_ORDER_LINE" ? chosen?.matchedId ?? null : null,
+      return { description: row.description.trim(), invoiceEgp: amountOf(data, row), source, matchedId: source === "CHANGE_ORDER_LINE" ? chosen?.matchedId ?? null : null,
         code: source === "NONE" ? row.code : null };
     }),
-    paidAtFacilityEgp: Number(data.get("paidAtFacilityEgp")), note: text(data.get("note")),
+    paidAtFacilityEgp: readAmount(data.get("paidAtFacilityEgp")), note: text(data.get("note")),
   });
   return (
-    <form className="mt-1" onSubmit={submit(async data => { const done = await onSubmit(body(data)); if (done) setRows([fresh(0)]); return done; })}>
+    <ActForm className="mt-1" refused={t.refused} retry={t.refusedRetry}
+             action={async data => { const done = await onSubmit(body(data)); if (done) setRows([fresh(0)]); return done; }}
+             confirm={{
+               title: data => fillTemplate(f.confirmTitle, { sum: isolate(egp(sumOf(data) / 100)), total: isolate(egp(invoiceTotal)) }),
+               body: data => `${fillTemplate(f.confirmBody, { paid: isolate(egp(readAmount(data.get("paidAtFacilityEgp")))) })} ${t.freshSignIn}`,
+               confirm: f.submit, cancel: t.cancel,
+             }}>
       <p className="max-w-[65ch] text-[0.8125rem] leading-5 text-ink-600">{f.hint}</p>
       <fieldset className="mt-3">
         <legend className="sr-only">{f.title}</legend>
@@ -293,14 +354,15 @@ function LinesForm({ t, quote, invoiceTotal, egp, busy, primary, onSubmit }: {
           {rows.map((row, index) => {
             const n = String(index + 1);
             return (
-              <li key={row.key} className="grid gap-2 border-t border-line pt-2 sm:grid-cols-[minmax(0,1.4fr)_8rem_minmax(0,1.2fr)_auto] sm:items-end">
+              <li key={row.key} className="grid gap-2 border-t border-line pt-2 sm:grid-cols-[minmax(0,1.4fr)_9rem_minmax(0,1.2fr)_auto] sm:items-end">
                 <span className="sr-only">{fillTemplate(f.line, { n })}</span>
                 <label className="block text-[0.8125rem] font-semibold">{f.description}
                   <input className="field" required maxLength={500} autoComplete="off" dir="auto" value={row.description} onChange={event => update(row.key, { description: event.target.value })}/>
                 </label>
-                <label className="block text-[0.8125rem] font-semibold">{f.amount}
-                  <input className="field" type="number" inputMode="decimal" step="0.01" required dir="ltr" value={row.amount} onChange={event => update(row.key, { amount: event.target.value })}/>
-                </label>
+                <div>
+                  <label htmlFor={`${id}-amount-${row.key}`} className="block text-[0.8125rem] font-semibold">{f.amount}</label>
+                  <AmountInput id={`${id}-amount-${row.key}`} name={`amount-${row.key}`} invalid={f.amountInvalid} accepts="signed" onValue={amount => update(row.key, { amount })}/>
+                </div>
                 <div className="grid gap-2">
                   <label className="block text-[0.8125rem] font-semibold">{f.match}
                     <select className="field" required value={row.match} onChange={event => update(row.key, { match: event.target.value })}>
@@ -326,51 +388,78 @@ function LinesForm({ t, quote, invoiceTotal, egp, busy, primary, onSubmit }: {
         {rows.length < 100 && <button type="button" className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-brand-700"
           onClick={() => setRows(all => [...all, fresh(Math.max(...all.map(r => r.key)) + 1)])}>{f.addLine}</button>}
       </fieldset>
-      <p aria-live="polite" className={`mt-2 text-[0.8125rem] font-semibold ${invoiceTotal != null && typed !== cents(invoiceTotal) ? "text-ink-800" : "text-ink-600"}`}>
-        {fillTemplate(f.typed, { sum: egp(typed / 100), total: egp(invoiceTotal) })}
+      {/* The mismatch is said in words and marked, not shown by a shade alone. */}
+      <p ref={total} tabIndex={-1} aria-live="polite" role={held && mismatch ? "alert" : undefined}
+         className={`mt-2 flex items-start gap-2 text-[0.8125rem] font-semibold outline-none ${held && mismatch ? "text-alert-800" : mismatch ? "text-ink-800" : "text-ink-600"}`}>
+        {mismatch && <CircleAlert size={16} aria-hidden className="mt-0.5 flex-none text-alert-800"/>}
+        <span className="min-w-0">{fillTemplate(f.typed, { sum: isolate(egp(typed / 100)), total: isolate(egp(invoiceTotal)) })}{mismatch && <> · {f.mismatch}</>}</span>
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor={`${id}-paid`} className="block text-sm font-semibold">{f.paidAtFacility}</label>
           <p id={`${id}-paid-hint`} className="text-[0.8125rem] text-ink-500">{f.paidHint}</p>
-          <input id={`${id}-paid`} className="field" name="paidAtFacilityEgp" type="number" inputMode="decimal" min="0" step="0.01" required dir="ltr" aria-describedby={`${id}-paid-hint`}/>
+          <AmountInput id={`${id}-paid`} name="paidAtFacilityEgp" invalid={f.paidInvalid} accepts="zero" describedBy={`${id}-paid-hint`}/>
         </div>
         <label className="block text-sm font-semibold sm:col-span-2">{f.note}<textarea className="field" name="note" rows={2} maxLength={2000} dir="auto"/></label>
       </div>
-      <p className="mt-2 text-[0.8125rem] text-ink-500">{t.freshSignIn}</p>
-      <button className={`${primary ? "btn-primary" : "btn-secondary"} mt-2`} disabled={busy}>{f.submit}</button>
-    </form>
+      <button className={`${primary ? "btn-primary" : "btn-secondary"} mt-3`} disabled={busy} onClick={event => {
+        // A click is also what Enter does in a field, so this holds both.
+        if (off) { event.preventDefault(); setHeld(true); total.current?.focus(); } else setHeld(false);
+      }}>{f.submit}</button>
+    </ActForm>
   );
 }
 
-/** A Finance Manager approves (after a confirmation) or returns the reconciliation to Finance with what to correct. */
-function Countersign({ t, busy, primary, onDecide }: { t: Copy; busy: boolean; primary: boolean; onDecide: (decision: "APPROVE" | "RETURN", note: string | null) => Promise<boolean> }) {
+/**
+ * A Finance Manager approves or returns the reconciliation. UX 4-2: two equal acts side by side; the filled one is the panel's
+ * `next`. Approving asks first with the variance in the question and the verdict in its body; returning opens its reason (owed,
+ * refused blank in the page's words) and asks first too.
+ */
+function Countersign({ t, verdict, verdictId, variance, busy, primary, onDecide }: {
+  t: Copy; verdict: string; /** The verdict line above, which the two acts are described by. */ verdictId?: string; variance: string; busy: boolean; primary: boolean; onDecide: (decision: "APPROVE" | "RETURN", note: string | null) => Promise<boolean>;
+}) {
   const id = useId();
   const c = t.countersign;
-  const [note, setNote] = useState("");
   const [returning, setReturning] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const reason = useRef<HTMLDivElement>(null);
+  // Opening the return lands in its reason; closing it (or returning it) goes back to the button, never to the page's start.
+  const open = (next: boolean) => {
+    setReturning(next);
+    if (next) requestAnimationFrame(() => reason.current?.querySelector("textarea")?.focus());
+    else requestAnimationFrame(() => toggle.current?.focus());
+  };
   return (
     <div className="mt-2">
-      <ConfirmAction label={c.approve} title={c.approveTitle} body={`${c.approveBody} ${t.freshSignIn}`} confirm={c.approve} cancel={t.cancel}
-                     primary={primary} busy={busy} onConfirm={() => onDecide("APPROVE", null)}/>
-      <details className="mt-2">
-        <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-bold text-brand-700">{c.returnLabel}</summary>
-        <form className="pb-1" onSubmit={event => { event.preventDefault(); if (note.trim()) setReturning(true); }}>
-          <label htmlFor={`${id}-note`} className="block text-sm font-semibold">{c.returnNote}</label>
-          <textarea id={`${id}-note`} className="field" rows={2} maxLength={2000} required dir="auto" value={note} onChange={event => setNote(event.target.value)}/>
-          <button className="btn-secondary mt-2" disabled={busy}>{c.returnLabel}</button>
-        </form>
-        {returning && <ConfirmDialog title={c.returnTitle} body={`${c.returnBody} ${t.freshSignIn}`} confirm={c.returnLabel} cancel={t.cancel}
-                                     onConfirm={() => { setReturning(false); void onDecide("RETURN", note.trim()).then(done => { if (done) setNote(""); }); }} onCancel={() => setReturning(false)}/>}
-      </details>
+      <div role="group" aria-describedby={verdictId} className="flex flex-wrap gap-3">
+        <ConfirmAction label={c.approve} title={fillTemplate(c.approveTitle, { variance })} body={[verdict, c.approveBody, t.freshSignIn].filter(Boolean).join(" ")}
+                       confirm={c.approve} cancel={t.cancel} primary={primary} busy={busy} onConfirm={() => onDecide("APPROVE", null)}/>
+        <button ref={toggle} type="button" className="btn-secondary" aria-expanded={returning} aria-controls={`${id}-return`} disabled={busy} onClick={() => open(!returning)}>{c.returnLabel}</button>
+      </div>
+      <div ref={reason} id={`${id}-return`} hidden={!returning}>
+        {returning && (
+          <ActForm className="mt-3 grid max-w-xl gap-2" refused={t.refused} retry={t.refusedRetry}
+                   action={async data => { const done = await onDecide("RETURN", text(data.get("note"))); if (done) open(false); return done; }}
+                   confirm={{ title: () => c.returnTitle, body: `${c.returnBody} ${t.freshSignIn}`, confirm: c.returnConfirm, cancel: t.cancel }}>
+            <ReasonField label={c.returnNote} owed={c.returnNoteRequired}/>
+            <div><button className="btn-secondary" disabled={busy}>{c.returnConfirm}</button></div>
+          </ActForm>
+        )}
+      </div>
     </div>
   );
 }
 
-function DisputeForm({ t, busy, primary, onResolve }: { t: Copy; busy: boolean; primary: boolean; onResolve: (body: { outcome: string; note: string | null }) => Promise<boolean> }) {
+/** UX 4-2: the dispute's outcome, asked first with the outcome and the amount in the question; a refusal said at the form. */
+function DisputeForm({ t, amount, busy, primary, onResolve }: {
+  t: Copy; amount: string; busy: boolean; primary: boolean; onResolve: (body: { outcome: string; note: string | null }) => Promise<boolean>;
+}) {
   const d = t.dispute;
+  const outcome = (data: FormData) => String(data.get("outcome") ?? "");
   return (
-    <form className="mt-2 grid gap-3 sm:grid-cols-2" onSubmit={submit(data => onResolve({ outcome: String(data.get("outcome") ?? ""), note: text(data.get("note")) }))}>
+    <ActForm className="mt-2 grid gap-3 sm:grid-cols-2" refused={t.refused} retry={t.refusedRetry}
+             action={data => onResolve({ outcome: outcome(data), note: text(data.get("note")) })}
+             confirm={{ title: data => fillTemplate(d.confirmTitle, { outcome: pick(d.outcomes, outcome(data)), amount }), body: `${d.confirmBody} ${t.freshSignIn}`, confirm: d.resolve, cancel: t.cancel }}>
       <label className="block text-sm font-semibold">{d.outcome}
         <select className="field" name="outcome" required defaultValue="">
           <option value="" disabled>{d.choose}</option>
@@ -378,16 +467,19 @@ function DisputeForm({ t, busy, primary, onResolve }: { t: Copy; busy: boolean; 
         </select>
       </label>
       <label className="block text-sm font-semibold sm:col-span-2">{d.note}<textarea className="field" name="note" rows={2} maxLength={2000} dir="auto"/></label>
-      <p className="text-[0.8125rem] text-ink-500 sm:col-span-2">{t.freshSignIn}</p>
       <div className="sm:col-span-2"><button className={primary ? "btn-primary" : "btn-secondary"} disabled={busy}>{d.resolve}</button></div>
-    </form>
+    </ActForm>
   );
 }
 
 function StatementItem({ t, locale, statement: s, when, busy, canRecord, onRecord }: {
   t: Copy; locale: Locale; statement: StaffStatement; when: (iso?: string | null) => string; busy: boolean; canRecord: boolean; onRecord: (reference: string) => Promise<boolean>;
 }) {
-  const statementCopy = useWorkCopy().statement;
+  const id = useId();
+  const patientCopy = useWorkCopy().statement;
+  // UX 4-2: Finance reads the totals as a ledger does: the total charged is gross (before payments), the balance or credit net.
+  const statementCopy = { ...patientCopy, totalCharged: t.statements.totalGross, balanceDue: t.statements.balanceNet, creditDue: t.statements.creditNet };
+  const reference = (data: FormData) => String(data.get("reference") ?? "").trim();
   return (
     <li>
       <p className="mb-1 flex flex-wrap items-center gap-2 text-[0.8125rem] text-ink-600">
@@ -402,13 +494,18 @@ function StatementItem({ t, locale, statement: s, when, busy, canRecord, onRecor
       {canRecord && (
         <details className="mt-1">
           <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-bold text-brand-700">{t.statements.eInvoiceForm}</summary>
-          <form className="grid gap-2 pb-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end" onSubmit={submit(data => onRecord(String(data.get("reference") ?? "").trim()))}>
-            <label className="block text-sm font-semibold">{t.statements.eInvoice}
-              <input className="field" name="reference" required maxLength={80} autoComplete="off" spellCheck={false} dir="ltr"/>
-            </label>
+          <ActForm className="grid gap-2 pb-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end" refused={t.refused} retry={t.refusedRetry}
+                   action={data => onRecord(reference(data))}
+                   confirm={{ title: data => fillTemplate(t.statements.confirmTitle, { reference: isolate(reference(data)), number: isolate(s.statementNumber) }),
+                              body: `${t.statements.eInvoiceHint} ${t.freshSignIn}`, confirm: t.statements.save, cancel: t.cancel }}>
+            <div>
+              <label htmlFor={`${id}-reference`} className="block text-sm font-semibold">{t.statements.eInvoice}</label>
+              <input id={`${id}-reference`} className="field" name="reference" required maxLength={80} autoComplete="off" spellCheck={false} dir="ltr"
+                     aria-describedby={`${id}-reference-hint`}/>
+            </div>
             <button className="btn-secondary" disabled={busy}>{t.statements.save}</button>
-            <p className="text-[0.8125rem] text-ink-500 sm:col-span-2">{t.statements.eInvoiceHint} {t.freshSignIn}</p>
-          </form>
+            <p id={`${id}-reference-hint`} className="text-[0.8125rem] text-ink-500 sm:col-span-2">{t.statements.eInvoiceHint}</p>
+          </ActForm>
         </details>
       )}
     </li>
