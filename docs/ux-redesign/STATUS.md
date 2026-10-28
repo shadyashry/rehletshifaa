@@ -1562,6 +1562,99 @@ digits and refused ambiguous amounts, travel as one line in the file. Playwright
 (`AREA5_SHOTS=5-4`), consultant-shots, staff-chrome, hospital-agreement-audit, a11y en+ar — 58/58. Overwritten shots restored. After shots:
 `screenshots/area-5/5-4/`.
 
+## UX area 4 — Finance: critique, plan, slice 4-0 the deposit and the approval (2026-10-28, worktree `ux-4-finance-aa276b`, branch `claude/ux-4-finance-aa276b` from area 5's close @ `3ad22c7a`)
+
+Scope: `PLAN.md` row 4 (owner C2, a complete revamp): the verification queue, the commercial approval, change-order pricing,
+the reconciliation workbench, statements, Finance's parts of the admission panel and the transfer/deposit panels, and
+Control Center › Commercial where Finance works. P1-15, P1-16, P1-17 and DEP-3 are on this line, so no integration merge
+was needed.
+
+**Fixture and shots.** `e2e/finance-fixture.ts` uses synthetic data only. It holds My work with seven Finance items in the
+backend's order, and one case per Finance moment:
+- deposit (a USD bank transfer to confirm);
+- approve (commercial terms with a manual line);
+- letter (the hospital's quote 262,500 against a cap of 240,000);
+- receipt (cashier receipt to countersign);
+- fee (platform fee balance, no work item);
+- change (change order to price, interim bill);
+- reconcile (OPEN);
+- variance (above the band, for a Finance Manager);
+- statement (CLOSED, e-invoice owed).
+
+`e2e/finance-shots.spec.ts` writes `screenshots/area-4/<AREA4_SHOTS|before>/`: my-work and case-<id> × en/ar × 390/1440. It
+runs one test per page, so the pages shoot in parallel and a slow page never costs the others.
+
+**Critique: 20/40** (dual-agent; `.impeccable/critique/2026-10-28T15-30-37Z__frontend-src-components-portal-financeapproval-tsx.md`;
+first run for this target).
+- P0: panels multiplied on a case in treatment. P0: money was committed on one click (9 commands).
+- P1: the strip disagreed with the page (fee, statement); the proposal, deposit and refund blocks showed on every case;
+  Arabic parity was broken (English contexts, the inline approval table, a reference broken mid-token, tables clipped at 390).
+- P2: EGP read as the sub-line; the letter gap and the fee derivation were not stated.
+- Detector 0. Mechanical scan: 14 off-ladder sizes, 1 inline en/ar table (44 strings), 2 always-filled buttons, 7 raw
+  Finance forms.
+- One finding of A's (the variance's "charged" total) came from fixture data and was corrected in the fixture.
+
+The change case has no before shot. The page grew to 324k–563k px and timed out the capture: that is the bug below.
+
+**Plan** `plans/finance-workspace.md` (no owner gate; assumptions [A]):
+- 4-0 the deposit and the approval;
+- 4-1 the admission money (letter gap + confirmation, receipt, fee derivation, `DoneAct` lines);
+- 4-2 the treatment and the settlement (price and lines confirmed, variance verdict first, Approve/Return as two acts,
+  ladder sizes, phone ledger);
+- 4-3 the Finance sheet + close (the act first, proposal/checklist folded, strip agreement, Arabic contexts, Control
+  Center › Commercial, re-critique ≥ 28/40).
+
+Backend follow-up **B-4-1**: step codes for the fee balance and the e-invoice.
+
+**Slice 4-0.**
+- **Panels that stay put.** `StaffCaseView` rendered the travel, admission, treatment, discharge, reconciliation and
+  follow-up panels with the same `key={c.id}`, as siblings of one fragment. On a case in treatment React appended copies on
+  every render (79 children in the overview). Each panel now has its own key. This fix affects every role.
+- **The deposit transfer.**
+  - "Confirm payment received" goes through `ActForm` with a confirmation: "Record EGP 43,200 received against
+    QNB-…?". A refusal is said at the form. The idempotency key is kept per transfer until it succeeds, so a retry never
+    records the money twice.
+  - "Return to the patient" sits behind "Can't confirm this transfer?" with its own confirmation.
+  - The reference wraps only when it cannot fit (`dir="auto"`, FSI in titles), and the last refusal's reason is isolated.
+- **Finance's deposit card.**
+  - EGP leads and the patient's currency follows. The coordinator's view is unchanged.
+  - Outside its moment the deposit is one `DoneAct` line ("Coordination deposit & payments · Paid · EGP 43,200 ·
+    $881.28"; `DoneAct` gains a `neutral` tone for cancelled or refunded deposits). Focus moves to that line when Finance's
+    own act closes the moment.
+  - The refund sits behind "Refund part of this deposit?", and only once something was paid.
+- **`FinanceApproval`.**
+  - Its copy moved from an inline en/ar table into `portalWork.financeApproval`.
+  - Approving goes through `ActForm` with a confirmation carrying the patient's total. The fallback approve in
+    `RoleActions` asks too.
+  - The manual line is a `StatusBadge`. On a phone each line is a short block; at `sm`+ the table sits in a focusable region.
+  - The rate reads "1 US$ = EGP 49.0196", and the currency is named.
+
+Copy is in en + ar, inserted textually: `financeApproval.*`; `depositTransfer.{confirmTitle,confirmBody,cantConfirm,rejectTitle,
+rejectBody}`; `caseView.deposit.refundOpen`.
+
+**Reviews** (four read-only reviewers; no CRITICAL):
+- Pro Max: HIGH ×1 fixed (a 64–80-character reference could scroll the page sideways). Contrast passes.
+- Web design guidelines: MEDIUMs fixed: focus after the act, the refusal at the approval form, the scroll region, the
+  unconfirmed fallback approve, the unlabelled one-line figure.
+- RB + composition: MEDIUMs fixed: the same name on the summary and the button, the figure fallback. LOW fixed: the
+  idempotency key.
+- RTL/i18n: Arabic wording fixed (تأكيد استلام … للتحويل ذي الرقم المرجعي…؛ اعتماد الشروط المالية بإجمالي…؛ تعذّر تأكيد…؛ سعر
+  يدوي), plus the currency name, rate precision and isolates.
+- The rest is in backlog.md "Area 4 — Finance".
+
+**Verify.**
+- `pnpm typecheck` ok; eslint on the touched files clean.
+- vitest 97 files / 801 tests, 800 pass (the known `StaffOperationalUi` W-44). `FinanceApproval.test.tsx` 4/4 (manual line
+  and totals, confirm-before-approve with the total, the rate as Finance quotes it, Arabic).
+- Playwright on a production build on :3205: finance-shots (`AREA4_SHOTS=4-0`), finance-workspace (new: one panel each on
+  the change case, the transfer confirmation names amount and reference and posts once, the one-line deposit with the refund
+  disclosure in Arabic, approval after a question with the total), operations-shots, consultant-shots, staff-chrome,
+  hospital-agreement-audit, a11y en+ar: 100/100.
+- Overwritten shots restored. Shots: `screenshots/area-4/before/` (without the change case) and `screenshots/area-4/4-0/`.
+  The change case is now 3,160px at en-1440.
+
+**Next:** slice 4-1, the admission money, started in a new session from this branch.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

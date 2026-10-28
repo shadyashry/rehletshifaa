@@ -1,7 +1,7 @@
 "use client";
 
 import { Component, use, useEffect, useId, useRef, useState, type FocusEventHandler, type FormEvent, type ReactNode } from "react";
-import { Check, ChevronDown, CircleAlert, CircleDashed, Clock } from "lucide-react";
+import { Check, ChevronDown, CircleAlert, CircleDashed, CircleDot, Clock } from "lucide-react";
 
 import { ConfirmDialog, FeedbackContext } from "@/components/portal/portal-ui";
 
@@ -45,14 +45,15 @@ export function Task({ title, next, anchor, children }: { title: string; next: b
  * still takes one, sits behind its own disclosure.
  */
 export function DoneAct({ fact, tone = "done", change, children }: {
-  fact: ReactNode; /** "waiting": recorded, someone else still checks it; "warning": recorded, with a problem the fact names. */ tone?: "done" | "waiting" | "warning";
+  fact: ReactNode; /** "waiting": recorded, someone else still checks it; "warning": recorded, with a problem the fact names; "neutral": closed
+   * without being done (a cancelled or refunded deposit, UX 4-0), so no check. */ tone?: "done" | "waiting" | "warning" | "neutral";
   /** The correction's disclosure label. */ change?: string; children?: ReactNode;
 }) {
-  const Icon = tone === "warning" ? CircleAlert : tone === "waiting" ? Clock : Check;
+  const Icon = tone === "warning" ? CircleAlert : tone === "waiting" ? Clock : tone === "neutral" ? CircleDot : Check;
   return (
     <div className="py-2">
       <p className="flex items-start gap-2 text-[0.875rem] text-ink-800">
-        <Icon size={16} aria-hidden className={`mt-0.5 flex-none ${tone === "warning" ? "text-alert-800" : tone === "waiting" ? "text-ink-500" : "text-brand-600"}`}/>
+        <Icon size={16} aria-hidden className={`mt-0.5 flex-none ${tone === "warning" ? "text-alert-800" : tone === "waiting" || tone === "neutral" ? "text-ink-500" : "text-brand-600"}`}/>
         <span className="min-w-0 [overflow-wrap:anywhere]">{fact}</span>
       </p>
       {change && children && <details className="group ps-6"><Summary>{change}</Summary><div className="pb-3">{children}</div></details>}

@@ -701,3 +701,28 @@ and the critique's minor observations.
 | LOW | Three status vocabularies on one view (strip tag "Travel coordination", panel badge "Reserved"/"Confirmed", rail "Treatment"); the panel badge now repeats the ✓ trail. | critique 13-12-53Z | `AdmissionPanel.tsx`, `StaffCaseView.tsx` | distill |
 | LOW | A letter price above the accepted estimate maximum is only a hint before submit (Finance decides the variance); a one-line note at the field would say it goes to Finance as above the estimate. The "Also possible now" label names the point of no return without what it commits. | critique 13-12-53Z | `AdmissionPanel.tsx` | clarify |
 | LOW | The receipt's foreign `paidAmount`, the Finance fee, the final invoice and the deposit amounts are still `type="number"`: not grouped, no Arabic-Indic digits. Move them onto `AmountInput` (lift it to `panel-parts.tsx`). | detector (5-4) | `AdmissionPanel.tsx`, `DischargePanel.tsx`, `StaffCaseView.tsx` | harden |
+
+## Area 4 — Finance (2026-10-28)
+
+Critique 20/40 (`.impeccable/critique/2026-10-28T15-30-37Z__frontend-src-components-portal-financeapproval-tsx.md`). Plan:
+`plans/finance-workspace.md`. Slices 4-1..4-3 take the critique's P0/P1 items. Listed here are the 4-0 reviews' deferred
+MEDIUM/LOW findings, the critique's minor observations, and the items that later slices own.
+
+| Severity | Finding | Source | Where | Next |
+|---|---|---|---|---|
+| Done (4-0) | Five staff panels shared `key={c.id}` as siblings of one fragment, and React appended copies on every render of a case in treatment (79 children; a page 324k–563k px tall) | critique runtime probe | `StaffCaseView.tsx` | — |
+| P0 | Money committed on one click: letter accept/refuse, change-order price, reconciliation submit, dispute resolve, e-invoice record (raw `<form>`, refusal only in the banner) | critique, detector scan | `AdmissionPanel.tsx`, `TreatmentPanel.tsx`, `ReconciliationPanel.tsx` | 4-1, 4-2 |
+| P1 | The strip says "Nothing needs you" on the fee and statement cases while the page holds the act; My work says "another party" for Finance's own items | critique | `CurrentAction.tsx`, `MyWork.tsx`; backend B-4-1 | 4-3 + B-4-1 |
+| P1 | Finance's work contexts stay English on the Arabic page (`copy: null`; `LOCALIZED_FORM_HINT` only knows PROPOSAL_TERMS_CALL); `currentAction.work.APPROVE_COMMERCIAL_TERMS` missing | detector scan | `CurrentAction.tsx`, messages | 4-3 |
+| P1 | The proposal card and the release checklist (with the backend's English `financeReasons`) show for Finance on every case | critique | `StaffCaseView.tsx` (`proposalPanel`, `RoleActions`) | 4-3 |
+| P2 | The letter shows the quote and the cap but not the gap; the fee balance is not derived; EGP is the sub-line in the voucher facts | critique | `AdmissionPanel.tsx` | 4-1 |
+| P2 | Variance: the verdict ("EGP 7,660 above the band") sits below six figures; Approve is filled and Return a link | critique | `ReconciliationPanel.tsx` | 4-2 |
+| MEDIUM | 13 × `text-[0.85rem]` (ReconciliationPanel), 1 × `text-[0.9rem]` (FxReapproval), off the ladder | detector scan | `ReconciliationPanel.tsx`, `FxReapproval.tsx` | 4-2 |
+| LOW | The deposit form's amount has `max={balanceEgp}` with no visible "Balance due" hint, so an over-amount gets the browser's own range message | WG | `StaffCaseView.tsx` (`TransferPanel`) | 4-1 polish |
+| LOW | `RefundForm`: labels are `text-[0.8125rem] font-bold` while the new forms use `text-sm font-semibold`; the amount lacks `inputMode`/`autoComplete`, the detail lacks `dir="auto"`; it is a raw form with its own dialog, not `ActForm` (no refusal at the form) | Pro Max, WG | `RefundForm.tsx` | 4-1 |
+| LOW | `Money` is a bare `<bdi>`: "EGP" can wrap away from its number at 375, and a long figure can split under `overflow-wrap:anywhere` | Pro Max | `panel-parts.tsx` (`Money`) | shared polish |
+| LOW | `DepositCard`/`TransferPanel` branch on `isFinance` in four places; split them into Finance and coordinator variants sharing the figures | RB (composition) | `StaffCaseView.tsx` | 4-3 |
+| LOW | My work lists the overdue item after two "High" items (the backend's order); every row repeats the care-area icon and the document count | critique | `MyWork.tsx`, backend order | 4-3 |
+| LOW | The reconcile header leaves out the city; the variance "Approve" has no object | critique | `ReconciliationPanel.tsx` | 4-2 |
+| LOW | `pick()` falls back to lower-cased codes for blockers Finance sees ("fee balance not paid", "price variance open") | critique | `AdmissionPanel.tsx`, messages | 4-1 |
+| LOW | The deposit component's raw beneficiary ("Rehlet Shifaa") and the purpose come from the backend in English | critique | `StaffCaseView.tsx` (`DepositCard`), backend | 4-3 / backend copy |

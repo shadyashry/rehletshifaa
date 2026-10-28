@@ -2,34 +2,65 @@
 
 import { formatMoney } from "@/lib/money";
 import { intlLocale, type Locale } from "@/lib/i18n";
+import { fillTemplate } from "@/lib/portal-labels";
+import { useWorkCopy } from "@/components/portal/portal-copy";
+import { ActForm, Money } from "@/components/portal/panel-parts";
+import { currencyName } from "@/components/portal/ClinicalDecision";
+import { StatusBadge } from "@/components/portal/StatusBadge";
 import type { ProposalCommercial } from "@/components/portal/portal-model";
+
+type Line = ProposalCommercial["lines"][number];
 
 /**
  * QA #19 / #20 (A4): what Finance approves, in the one place it approves it. Each line says whether its price comes from the
  * Consultant's approved list or was entered by hand (the reason Finance is asked), with the Consultant's EGP base price beside
  * the patient's price; then the margin the policy adds and the totals. The approve button is here and nowhere else.
+ * UX 4-0: the copy is the portal's (en + ar); approving asks first, with the patient's total in the question; on a phone each
+ * line is a short block instead of a five-column table; the rate reads the way Finance quotes it (1 USD = EGP 49.0196).
  */
 export function FinanceApproval({ locale, commercial, busy, approveLabel, feeLabel, onApprove }: {
-  locale: Locale; commercial: ProposalCommercial; busy: boolean; approveLabel: string; onApprove: () => void;
+  locale: Locale; commercial: ProposalCommercial; busy: boolean; approveLabel: string; onApprove: () => Promise<unknown>;
   /** The patient-facing name of the platform's fee line (its stored description is English). */
   feeLabel?: string;
 }) {
-  const t = copy[locale];
+  const work = useWorkCopy();
+  const t = work.financeApproval;
   const egp = (n?: number | null) => (n == null ? "—" : formatMoney(n, "EGP", locale));
   const quoted = (n?: number | null) => (n == null ? "—" : formatMoney(n, commercial.currency, locale));
   const foreign = commercial.currency !== "EGP";
+  const inCurrency = fillTemplate(t.inCurrency, { currency: currencyName(commercial.currency, locale) });
   const percent = new Intl.NumberFormat(intlLocale(locale), { style: "percent", maximumFractionDigits: 2 }).format(commercial.marginRate ?? 0);
   const manual = commercial.lines.filter(line => line.source === "MANUAL").length;
-  const policy = commercial.policyName
-    ? t.policy.replace("{name}", commercial.policyName).replace("{version}", String(commercial.policyVersion ?? ""))
-    : t.noPolicy;
-  const rate = commercial.fxRate == null ? null : new Intl.NumberFormat(intlLocale(locale), { maximumSignificantDigits: 6 }).format(commercial.fxRate);
+  const policy = commercial.policyName ? fillTemplate(t.policy, { name: `⁨${commercial.policyName}⁩`, version: String(commercial.policyVersion ?? "") }) : t.noPolicy;
+  // The stored rate is EGP → the patient's currency; Finance quotes the other way round. One left-to-right run in Arabic too.
+  // Six significant digits, as the rate was fixed (49.0196, not 49.02).
+  const rate = commercial.fxRate ? `⁦${formatMoney(1, commercial.currency, locale)} = ${new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "EGP", maximumSignificantDigits: 6 }).format(1 / commercial.fxRate)}⁩` : null;
+  const name = (line: Line) => `${line.source === "PLATFORM" ? feeLabel ?? line.description : line.description}${line.quantity > 1 ? ` × ${line.quantity}` : ""}`;
+  const source = (line: Line) => line.source === "MANUAL" ? <StatusBadge tone="warning">{t.manual}</StatusBadge>
+    : <span className="text-[0.8125rem] text-ink-600">{line.source === "PLATFORM" ? t.platform
+      : line.source === "FACILITY_PACKAGE" ? <>{t.facilityPackage}{line.facilityName && <> · <bdi>{line.facilityName}</bdi></>}</> : t.catalogue}</span>;
 
   return (
     <div className="mt-4">
-      <p className="text-[0.875rem] text-ink-700">{manual === 0 ? t.intro : (manual === 1 ? t.introManualOne : t.introManual).replace("{count}", new Intl.NumberFormat(intlLocale(locale)).format(manual))}</p>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[34rem] border-collapse text-[0.85rem] tabular-nums">
+      <p className="text-[0.875rem] text-ink-700">{manual === 0 ? t.intro : manual === 1 ? t.introManualOne : fillTemplate(t.introManual, { count: new Intl.NumberFormat(intlLocale(locale)).format(manual) })}</p>
+
+      {/* A phone reads each line as a short block: the service, where its price comes from, then the two prices. */}
+      <ul className="mt-3 divide-y divide-line border-y border-line sm:hidden" aria-label={t.caption}>
+        {commercial.lines.map(line => (
+          <li key={line.id} className="py-2.5 text-[0.875rem]">
+            <p className="font-semibold text-ink-900">{name(line)}</p>
+            <div className="mt-1">{source(line)}</div>
+            <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
+              <div><dt className="text-[0.8125rem] text-ink-500">{t.base}</dt><dd className="text-ink-800"><Money>{egp(line.baseEgp)}</Money></dd></div>
+              <div><dt className="text-[0.8125rem] text-ink-500">{t.patient}</dt><dd className="font-semibold text-ink-900"><Money>{egp(line.patientEgp)}</Money></dd></div>
+              {foreign && <div><dt className="text-[0.8125rem] text-ink-500">{inCurrency}</dt><dd className="text-ink-800"><Money>{quoted(line.displayUnitPrice)}</Money></dd></div>}
+            </dl>
+          </li>
+        ))}
+      </ul>
+      {/* A region, so a keyboard can scroll the table when it is wider than its column. */}
+      <div role="region" aria-label={t.caption} tabIndex={0} className="mt-3 hidden overflow-x-auto rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:block">
+        <table className="w-full border-collapse text-[0.875rem] tabular-nums">
           <caption className="sr-only">{t.caption}</caption>
           <thead>
             <tr className="border-b border-line-strong text-[0.8125rem] text-ink-500">
@@ -37,72 +68,44 @@ export function FinanceApproval({ locale, commercial, busy, approveLabel, feeLab
               <th scope="col" className="py-2 pe-3 text-start font-semibold">{t.source}</th>
               <th scope="col" className="py-2 pe-3 text-end font-semibold">{t.base}</th>
               <th scope="col" className="py-2 pe-3 text-end font-semibold">{t.patient}</th>
-              {foreign && <th scope="col" className="py-2 text-end font-semibold">{t.inCurrency.replace("{currency}", commercial.currency)}</th>}
+              {foreign && <th scope="col" className="py-2 text-end font-semibold">{inCurrency}</th>}
             </tr>
           </thead>
           <tbody>
             {commercial.lines.map(line => (
               <tr key={line.id} className="border-b border-line align-baseline">
-                <td className="py-2 pe-3 text-ink-800">{line.source === "PLATFORM" ? feeLabel ?? line.description : line.description}{line.quantity > 1 ? ` × ${line.quantity}` : ""}</td>
-                <td className="py-2 pe-3">
-                  {line.source === "MANUAL"
-                    ? <span className="rounded bg-status-warning-surface px-1.5 py-0.5 text-[0.8125rem] font-bold text-status-warning-fg">{t.manual}</span>
-                    : line.source === "PLATFORM" ? <span className="text-[0.8125rem] text-ink-600">{t.platform}</span>
-                    : line.source === "FACILITY_PACKAGE" ? <span className="text-[0.8125rem] text-ink-600">{t.facilityPackage}{line.facilityName ? ` · ${line.facilityName}` : ""}</span>
-                    : <span className="text-[0.8125rem] text-ink-600">{t.catalogue}</span>}
-                </td>
-                <td className="py-2 pe-3 text-end whitespace-nowrap"><bdi dir="ltr">{egp(line.baseEgp)}</bdi></td>
-                <td className="py-2 pe-3 text-end whitespace-nowrap"><bdi dir="ltr">{egp(line.patientEgp)}</bdi></td>
-                {foreign && <td className="py-2 text-end whitespace-nowrap"><bdi dir="ltr">{quoted(line.displayUnitPrice)}</bdi></td>}
+                <th scope="row" className="py-2 pe-3 text-start font-normal text-ink-800">{name(line)}</th>
+                <td className="py-2 pe-3">{source(line)}</td>
+                <td className="py-2 pe-3 text-end whitespace-nowrap"><Money>{egp(line.baseEgp)}</Money></td>
+                <td className="py-2 pe-3 text-end whitespace-nowrap"><Money>{egp(line.patientEgp)}</Money></td>
+                {foreign && <td className="py-2 text-end whitespace-nowrap"><Money>{quoted(line.displayUnitPrice)}</Money></td>}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
       <dl className="mt-3 grid gap-x-6 gap-y-2 text-[0.875rem] tabular-nums sm:grid-cols-2">
-        <div><dt className="text-[0.8125rem] font-semibold text-ink-500">{t.baseTotal}</dt><dd className="font-bold text-ink-900"><bdi dir="ltr">{egp(commercial.baseTotalEgp)}</bdi></dd></div>
+        <div><dt className="text-[0.8125rem] font-semibold text-ink-500">{t.baseTotal}</dt><dd className="font-bold text-ink-900"><Money>{egp(commercial.baseTotalEgp)}</Money></dd></div>
         <div>
           <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.margin}</dt>
-          <dd className="font-bold text-ink-900"><bdi dir="ltr">{egp(commercial.marginEgp)}</bdi> <span className="font-normal text-ink-600">· {percent}</span></dd>
+          <dd className="font-bold text-ink-900"><Money>{egp(commercial.marginEgp)}</Money> <span className="font-normal text-ink-600">· {percent}</span></dd>
           <dd className={`text-[0.8125rem] ${commercial.policyName ? "text-ink-500" : "font-semibold text-status-warning-fg"}`}>{policy}</dd>
         </div>
-        <div><dt className="text-[0.8125rem] font-semibold text-ink-500">{t.patientTotal}</dt><dd className="font-bold text-brand-900"><bdi dir="ltr">{egp(commercial.patientTotalEgp)}</bdi></dd></div>
+        <div><dt className="text-[0.8125rem] font-semibold text-ink-500">{t.patientTotal}</dt><dd className="font-bold text-brand-900"><Money>{egp(commercial.patientTotalEgp)}</Money></dd></div>
         {foreign && (
           <div>
-            <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.inCurrency.replace("{currency}", commercial.currency)}</dt>
-            <dd className="font-bold text-brand-900"><bdi dir="ltr">{quoted(commercial.displayTotal)}</bdi></dd>
-            <dd className="text-[0.8125rem] text-ink-500">{rate == null ? t.rateLater : t.rateFixed.replace("{rate}", rate).replace("{currency}", commercial.currency)}</dd>
+            <dt className="text-[0.8125rem] font-semibold text-ink-500">{inCurrency}</dt>
+            <dd className="font-bold text-brand-900"><Money>{quoted(commercial.displayTotal)}</Money></dd>
+            <dd className="text-[0.8125rem] text-ink-500">{rate == null ? t.rateLater : fillTemplate(t.rateFixed, { rate })}</dd>
           </div>
         )}
       </dl>
-      <button type="button" className="btn-primary mt-4" disabled={busy} onClick={onApprove}>{approveLabel}</button>
+      {/* Approving asks first, and a refusal is said here, above the button, not only in the page's banner. */}
+      <ActForm className="mt-4" refused={work.admission.forms.refused} retry={work.admission.forms.refusedRetry} action={() => onApprove().then(result => !!result)}
+               confirm={{ title: () => fillTemplate(t.approveTitle, { amount: `⁦${egp(commercial.patientTotalEgp)}⁩` }), body: t.approveBody, confirm: approveLabel, cancel: work.confirm.cancel }}>
+        <button className="btn-primary" disabled={busy}>{approveLabel}</button>
+      </ActForm>
     </div>
   );
 }
-
-const copy = {
-  en: {
-    intro: "Check the prices and the margin, then approve.",
-    introManualOne: "1 line is priced by the Consultant outside their approved list — check its price before you approve.",
-    introManual: "{count} lines are priced by the Consultant outside their approved list — check their prices before you approve.",
-    caption: "Proposal lines with the Consultant's base price and the patient's price",
-    service: "Service", source: "Price source", base: "Consultant price (EGP)", patient: "Patient price (EGP)", inCurrency: "In {currency}",
-    platform: "Platform fee", manual: "Manual — needs your approval", catalogue: "Approved list", facilityPackage: "Approved facility package",
-    baseTotal: "Consultant price total", margin: "Platform margin", patientTotal: "Patient total (EGP)",
-    policy: "Policy: {name} (version {version})", noPolicy: "No margin policy applies to this care area — no margin is added.",
-    rateLater: "At today's rate; the rate is fixed when the proposal is sent to the patient.",
-    rateFixed: "Rate fixed at release: 1 EGP = {rate} {currency}.",
-  },
-  ar: {
-    intro: "راجع الأسعار والهامش، ثم وافق.",
-    introManualOne: "بند واحد سعّره الاستشاري خارج قائمته المعتمدة — راجع سعره قبل الموافقة.",
-    introManual: "بنود سعّرها الاستشاري خارج قائمته المعتمدة ({count}) — راجع أسعارها قبل الموافقة.",
-    caption: "بنود العرض بسعر الاستشاري وسعر المريض",
-    service: "الخدمة", source: "مصدر السعر", base: "سعر الاستشاري (ج.م)", patient: "سعر المريض (ج.م)", inCurrency: "بعملة {currency}",
-    platform: "رسوم المنصة", manual: "يدوي — يحتاج موافقتك", catalogue: "القائمة المعتمدة", facilityPackage: "باقة منشأة معتمدة",
-    baseTotal: "إجمالي سعر الاستشاري", margin: "هامش المنصة", patientTotal: "إجمالي المريض (ج.م)",
-    policy: "السياسة: {name} (الإصدار {version})", noPolicy: "لا تنطبق سياسة هامش على مجال الرعاية هذا — لا يُضاف هامش.",
-    rateLater: "بسعر صرف اليوم؛ ويُثبَّت السعر عند إرسال العرض إلى المريض.",
-    rateFixed: "سعر الصرف المثبَّت عند الإرسال: 1 ج.م = {rate} {currency}.",
-  },
-} as const;
