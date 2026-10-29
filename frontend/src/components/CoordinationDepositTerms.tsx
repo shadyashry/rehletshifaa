@@ -16,7 +16,7 @@ export function CoordinationDepositTerms({ id, locale, amount, currency, level =
     <section aria-labelledby={`${id}-title`} id={id} className={framed ? "rounded-lg border border-line bg-white p-4 sm:p-5" : undefined}>
       {locale === "ar" && <p lang="ar" dir="rtl" className="mb-3 text-[0.875rem] leading-6 text-ink-700">{ARABIC_PENDING_NOTICE}</p>}
       <div lang="en" dir="ltr" className="text-start">
-        <Heading id={`${id}-title`} className="text-[0.95rem] font-bold text-brand-900">{depositTerms.title}</Heading>
+        <Heading id={`${id}-title`} className="text-[0.95rem] rtl:text-[1.0625rem] font-bold text-brand-900">{depositTerms.title}</Heading>
         {amount && (
           <p className="mt-2 text-[0.92rem] text-ink-800">{depositTerms.amountLabel}: <strong className="tabular-nums text-ink-900">{amount}</strong></p>
         )}

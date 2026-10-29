@@ -1085,6 +1085,8 @@
 .case-story-ring-track { fill: none; stroke: color-mix(in srgb, var(--color-coral) 22%, transparent); stroke-width: 2.5; }
 .case-story-ring-fill { fill: none; stroke: var(--color-coral); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 1; }
 .case-story-tab-label { display: block; font-size: 0.75rem; font-weight: 600; line-height: 1.25; hyphens: auto; }
+/* Arabic: a tab label is text to read, not a badge, so it sits on the micro-label role (DESIGN.md "Arabic scale"). */
+[dir="rtl"] .case-story-tab-label { font-size: 0.8125rem; line-height: 1.4; }
 .case-story-tab[data-state="active"] .case-story-tab-label { color: var(--color-brand-900); font-weight: 700; }
 .case-story-tab:focus-visible { outline: none; }
 .case-story-tab:focus-visible .case-story-node { outline: 2px solid var(--color-brand-600); outline-offset: 5px; }

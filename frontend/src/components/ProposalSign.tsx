@@ -476,10 +476,10 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                     <ul className="mt-1">
                       <li className="flex items-baseline justify-between gap-6 border-t border-line py-3">
                         <span className="min-w-0">
-                          <span className="block text-[0.95rem] leading-6 text-ink-800">{price.feeLabel}</span>
+                          <span className="block text-[0.95rem] leading-6 rtl:text-base rtl:leading-[1.85] text-ink-800">{price.feeLabel}</span>
                           <span className="block text-[0.85rem] leading-5 text-ink-600">{price.feeNote}</span>
                         </span>
-                        <span className="flex-none whitespace-nowrap text-[0.95rem] font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(feeItem.quantity * feeItem.unitPrice)}</bdi></span>
+                        <span className="flex-none whitespace-nowrap text-[0.95rem] rtl:text-base font-bold tabular-nums text-ink-900"><bdi dir="ltr">{money(feeItem.quantity * feeItem.unitPrice)}</bdi></span>
                       </li>
                     </ul>
                   )}

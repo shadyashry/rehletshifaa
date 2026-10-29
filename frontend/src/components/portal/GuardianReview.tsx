@@ -58,7 +58,7 @@ export function GuardianReview({ locale, caseId, ageBand, canEdit, busy, mutate,
   return (
     <section aria-labelledby={`${id}-title`} className="card p-4 sm:p-5">
       <h3 id={`${id}-title`} className="title text-base">{t.title}</h3>
-      <dl className="mt-3 text-[0.9rem]">
+      <dl className="mt-3 text-[0.9rem] rtl:text-base">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
           <dt className="text-ink-500">{bands.label}</dt>
           <dd className="min-w-0 flex-1 text-end font-semibold text-ink-900">
@@ -79,7 +79,7 @@ export function GuardianReview({ locale, caseId, ageBand, canEdit, busy, mutate,
           </dd>
         </div>
       </dl>
-      {minor && <div className="mt-3 space-y-3 text-[0.9rem]">
+      {minor && <div className="mt-3 space-y-3 text-[0.9rem] rtl:text-base rtl:leading-[1.85]">
         <p className="text-[0.85rem] text-ink-600">{bands.minor}</p>
         {guardian === null && <p role="alert" className="text-[0.85rem] text-alert-800">{t.loadFailed}</p>}
         {guardian && (

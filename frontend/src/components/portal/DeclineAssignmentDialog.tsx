@@ -69,7 +69,7 @@ export function DeclineAssignmentDialog({ locale, caseNumber, busy, onConfirm, o
         </button>
       </div>
 
-      <p className="mt-2 text-[0.9rem] leading-6 text-ink-600">{t.intro}</p>
+      <p className="mt-2 text-[0.9rem] leading-6 rtl:text-base rtl:leading-[1.85] text-ink-600">{t.intro}</p>
 
       <form className="mt-5 space-y-5" onSubmit={submit} noValidate>
         <fieldset>
@@ -80,7 +80,7 @@ export function DeclineAssignmentDialog({ locale, caseNumber, busy, onConfirm, o
           <ul className="mt-2.5 space-y-2">
             {REASONS.map((entry, index) => (
               <li key={entry.code}>
-                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-line px-3.5 py-2.5 text-[0.9rem] transition has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-line px-3.5 py-2.5 text-[0.9rem] rtl:text-base transition has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
                   <input type="radio" name={`${groupId}-reason`} value={entry.code} className="h-4 w-4 flex-none accent-brand-600"
                          checked={code === entry.code} autoFocus={index === 0}
                          onChange={() => { setCode(entry.code); setTouched(false); }}/>

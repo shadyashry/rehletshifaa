@@ -63,8 +63,8 @@ export function HowYourPriceWorks({ copy, headingId, layout = "stack", Heading =
           <li key={step.title} className={`flex gap-3 ${layout === "columns" ? "" : "py-3.5"}`}>
             <span aria-hidden className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-brand-100 text-[0.78rem] font-bold text-brand-800">{index + 1}</span>
             <div className="min-w-0">
-              <p className="text-[0.95rem] font-semibold leading-6 text-ink-900">{step.title}</p>
-              <p className="mt-0.5 max-w-[62ch] text-[0.9rem] leading-6 text-ink-700">{step.body}</p>
+              <p className="text-[0.95rem] rtl:text-[1.0625rem] font-semibold leading-6 text-ink-900">{step.title}</p>
+              <p className="mt-0.5 max-w-[62ch] text-[0.9rem] leading-6 rtl:text-base rtl:leading-[1.85] text-ink-700">{step.body}</p>
             </div>
           </li>
         ))}
@@ -101,7 +101,7 @@ export function AcceptanceHold({ copy, locale, state }: { copy: PriceCopy; local
     : state.coolingUnknown ? copy.cooling.unknown
     : copy.fxPending;
   return (
-    <p id={ACCEPTANCE_HOLD_ID} role="status" className="rounded-xl border border-line bg-mist p-4 text-[0.95rem] leading-7 text-ink-800">
+    <p id={ACCEPTANCE_HOLD_ID} role="status" className="rounded-xl border border-line bg-mist p-4 text-[0.95rem] leading-7 rtl:text-base rtl:leading-[1.85] text-ink-800">
       <span className="block max-w-[66ch]">{message}</span>
     </p>
   );

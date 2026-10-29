@@ -172,7 +172,7 @@ export function MoreActions({ locale, caseId, available, travelPackage, version,
                 className={`flex w-full items-start gap-3 py-3 text-start transition hover:bg-mist/70 disabled:opacity-60 ${item.tone === "danger" ? "text-alert-700" : "text-ink-800"}`}>
           <span className={`mt-0.5 flex-none ${item.tone === "danger" ? "text-alert-600" : "text-brand-600"}`}>{item.icon}</span>
           <span className="min-w-0">
-            <span className="block text-[0.9rem] font-bold">{item.label}</span>
+            <span className="block text-[0.9rem] rtl:text-base font-bold">{item.label}</span>
             <span className="block text-[0.8rem] leading-5 text-ink-500">{item.hint}</span>
           </span>
         </button>
@@ -215,7 +215,7 @@ export function CancelCaseDialog({ caseId, version, status, busy, mutate, onClos
         <h2 id={`${id}-title`} className="title">{t.title}</h2>
         <button type="button" className="icon-button" aria-label={t.keep} onClick={() => dialog.current?.close()}><X size={20}/></button>
       </div>
-      <p className="mt-2 text-[0.9rem] leading-6 text-ink-600">{t.hint}</p>
+      <p className="mt-2 text-[0.9rem] leading-6 rtl:text-base rtl:leading-[1.85] text-ink-600">{t.hint}</p>
       <form className="mt-5 space-y-5" onSubmit={submit} noValidate>
         <fieldset aria-describedby={touched && !reason ? `${id}-required` : undefined}>
           <legend className="text-[0.8rem] font-bold text-ink-800">
@@ -282,7 +282,7 @@ export function UrgencyDialog({ caseId, urgency, busy, mutate, onClose }: {
         <h2 id={`${id}-title`} className="title">{t.title}</h2>
         <button type="button" className="icon-button" aria-label={t.keep} onClick={() => dialog.current?.close()}><X size={20}/></button>
       </div>
-      <p className="mt-2 text-[0.9rem] leading-6 text-ink-600">{t.hint}</p>
+      <p className="mt-2 text-[0.9rem] leading-6 rtl:text-base rtl:leading-[1.85] text-ink-600">{t.hint}</p>
       <form className="mt-5 space-y-5" onSubmit={save} noValidate>
         <fieldset aria-describedby={touched && unchanged ? `${id}-unchanged` : undefined}>
           <legend className="text-[0.8rem] font-bold text-ink-800">{t.label}</legend>

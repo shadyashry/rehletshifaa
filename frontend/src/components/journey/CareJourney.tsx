@@ -61,7 +61,7 @@ function StageBlock({ number, stage, labels, tone = "clinical", strong = false, 
       <span aria-hidden className={`journey-marker relative z-[1] ${marker}`}>{String(number).padStart(2, "0")}</span>
       <div className="min-w-0 pt-0.5">
         <h3 id={id} className="text-[1.1875rem] font-semibold leading-[1.3] tracking-[-0.01em] text-brand-900 lg:text-[1.3rem] rtl:text-[1.0625rem] rtl:leading-[1.4] rtl:tracking-normal lg:rtl:text-[1.25rem]">{stage.title}</h3>
-        <p className="mt-2 max-w-[46ch] text-[0.95rem] leading-6 text-ink-600 sm:text-[1rem] sm:leading-7">{stage.what}</p>
+        <p className="mt-2 max-w-[46ch] text-[0.95rem] leading-6 rtl:text-base rtl:leading-[1.85] text-ink-600 sm:text-[1rem] sm:leading-7">{stage.what}</p>
         <StageNotes stage={stage} labels={labels} />
         {children}
       </div>
@@ -98,7 +98,7 @@ function PhaseHeader({ index, phase, labels, tone = "clinical" }: { index: numbe
       <span aria-hidden className={`relative z-[1] mx-auto block h-2.5 w-2.5 rounded-full ring-4 ring-surface-pearl ${tone === "warm" ? "bg-accent-warm" : "bg-brand-500"}`} />
       <div>
         <p className="eyebrow">{labels.phase} {index}</p>
-        <h2 id={`phase-${index}`} className="mt-0.5 text-[1.0625rem] font-semibold leading-6 text-brand-900 lg:text-[1.125rem]">{phase.title}</h2>
+        <h2 id={`phase-${index}`} className="mt-0.5 text-[1.0625rem] font-semibold leading-6 text-brand-900 lg:text-[1.125rem] rtl:text-base lg:rtl:text-base">{phase.title}</h2>
       </div>
     </header>
   );

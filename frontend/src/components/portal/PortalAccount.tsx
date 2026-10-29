@@ -76,7 +76,7 @@ export function PortalAccount({ locale, name, email, role, api, signOut, prefere
         <section aria-labelledby="profile-details" className="mt-5">
           <h3 id="profile-details" className="label-micro text-ink-500">{text.details}</h3>
           {profileError ? <p role="alert" className="mt-2 text-sm text-alert-800">{profileError}</p> : !profile ? <p className="mt-2 text-sm text-ink-500">{text.loading}</p> : (
-            <dl className="mt-2 grid gap-x-6 gap-y-2.5 text-[0.9rem] sm:grid-cols-2">
+            <dl className="mt-2 grid gap-x-6 gap-y-2.5 text-[0.9rem] rtl:text-base sm:grid-cols-2">
               {([
                 [text.givenName, profile.givenName], [text.familyName, profile.familyName], [text.preferredName, profile.preferredName],
                 [text.dob, profile.dateOfBirth ? formatCalendarDate(profile.dateOfBirth, locale) : null],

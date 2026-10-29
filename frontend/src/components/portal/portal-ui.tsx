@@ -59,8 +59,8 @@ export function CaseDrawer({locale,title,onClose,children}:{locale:Locale;title:
  return <dialog ref={dialog} className="account-dialog case-drawer !w-[min(36rem,calc(100%-2rem))]" aria-labelledby={titleId} onClose={onClose}>
   <div className="sticky -top-6 z-10 -mx-6 -mt-6 flex items-start justify-between gap-4 border-b border-line bg-white px-6 pb-3 pt-6"><h2 id={titleId} className="title">{title}</h2><button type="button" className="icon-button" aria-label={locale==="ar"?"إغلاق":"Close"} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
   <div className="mt-4">
-   {feedback.error&&feedback.error!==errorAtOpen&&<p role="alert" className="mb-4 rounded-lg bg-alert-50 p-3 text-[0.9rem] text-alert-800">{feedback.error}</p>}
-   {feedback.notice&&<p role="status" className="mb-4 rounded-lg bg-brand-50 p-3 text-[0.9rem] text-brand-800">{feedback.notice}</p>}
+   {feedback.error&&feedback.error!==errorAtOpen&&<p role="alert" className="mb-4 rounded-lg bg-alert-50 p-3 text-[0.9rem] rtl:text-base rtl:leading-[1.85] text-alert-800">{feedback.error}</p>}
+   {feedback.notice&&<p role="status" className="mb-4 rounded-lg bg-brand-50 p-3 text-[0.9rem] rtl:text-base rtl:leading-[1.85] text-brand-800">{feedback.notice}</p>}
    {children}
   </div>
  </dialog>;

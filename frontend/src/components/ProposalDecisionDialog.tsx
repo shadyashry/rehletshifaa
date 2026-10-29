@@ -80,7 +80,7 @@ export function ProposalDecisionDialog({ locale, kind, busy, onConfirm, onClose 
         </button>
       </div>
 
-      <p className="mt-2 text-[0.9rem] leading-6 text-ink-600">{revision ? t.revisionIntro : t.declineIntro}</p>
+      <p className="mt-2 text-[0.9rem] leading-6 rtl:text-base rtl:leading-[1.85] text-ink-600">{revision ? t.revisionIntro : t.declineIntro}</p>
 
       <form className="mt-5 space-y-5" onSubmit={submit} noValidate>
         {revision && (
@@ -92,7 +92,7 @@ export function ProposalDecisionDialog({ locale, kind, busy, onConfirm, onClose 
             <ul className="mt-2.5 space-y-2">
               {TOPICS.map((entry, index) => (
                 <li key={entry.code}>
-                  <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-line px-3.5 py-2.5 text-[0.9rem] transition has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
+                  <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-line px-3.5 py-2.5 text-[0.9rem] rtl:text-base transition has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50">
                     <input type="radio" name={`${groupId}-topic`} value={entry.code} className="h-4 w-4 flex-none accent-brand-600"
                            ref={index === 0 ? (firstControl as React.RefObject<HTMLInputElement>) : undefined}
                            checked={code === entry.code}

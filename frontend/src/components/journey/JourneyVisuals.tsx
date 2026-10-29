@@ -121,7 +121,7 @@ export function ProposalVisual({ v }: { v: How["proposalVisual"] }) {
       <div className="mx-[25%] mt-2 hidden h-3 rounded-b-lg border-x border-b border-brand-300 lg:block" />
       <Stem />
       <div className="text-center">
-        <Node strong className="px-5 py-1.5 text-[0.9rem]">{v.options}</Node>
+        <Node strong className="px-5 py-1.5 text-[0.9rem] rtl:text-sm">{v.options}</Node>
       </div>
       <p className="mt-2.5 text-center text-[0.8125rem] leading-5 text-ink-500">{v.note}</p>
     </div>
