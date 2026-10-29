@@ -478,13 +478,13 @@ describe("CaseQueue", () => {
     renderWithWork(<CaseQueue {...props} role="finance"/>);
     expect(screen.getByText("Cases you are on, or with a deposit to record.")).toBeTruthy();
     cleanup();
-    renderWithWork(<MyWork locale="en" role="finance" items={[]} busy={false} onOpen={vi.fn()}/>);
+    renderWithWork(<MyWork locale="en" role="finance" items={[item]} busy={false} onOpen={vi.fn()}/>);
     expect(screen.getByText("Work for you or your team, most urgent first.")).toBeTruthy();
     cleanup();
-    renderWithWork(<MyWork locale="ar" role="finance" items={[]} busy={false} onOpen={vi.fn()}/>, "ar");
+    renderWithWork(<MyWork locale="ar" role="finance" items={[item]} busy={false} onOpen={vi.fn()}/>, "ar");
     expect(screen.getByText("العمل المسند إليك أو إلى فريقك، الأكثر إلحاحًا أولًا.")).toBeTruthy();
     cleanup();
-    renderWithWork(<MyWork locale="en" role="coordinator" items={[]} busy={false} onOpen={vi.fn()}/>);
+    renderWithWork(<MyWork locale="en" role="coordinator" items={[item]} busy={false} onOpen={vi.fn()}/>);
     expect(screen.getByText("Work assigned to you personally, most urgent first.")).toBeTruthy();
   });
 

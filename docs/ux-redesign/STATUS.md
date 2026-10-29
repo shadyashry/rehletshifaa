@@ -2390,6 +2390,25 @@ MetaWhatsAppChannel) 107/107; full `mvn -o -q test` green (1001 tests, 0 failure
 **Deferred** (backlog "Area X"): the other six consents' recorded vs shown wording (legal), «يرجى» in four frontend files, re-submitting
 registered Meta Arabic templates.
 
+### X-C the area X backlog, closed in code (2026-10-29, same worktree and branch, after X-B)
+
+**Delivered** (one commit each). Register and spelling outside the messages: the last five «يرجى» (auth callback, account
+link, identity step, re-authentication) as imperatives; X-3's shadda moved from the last letter to the middle one («تحققّ» →
+«تحقّق», 81 sites in `ar.json` and components); the Control Center and the backend carry «تحقّق/تعذّر/تحدّث» (70);
+`arabic-terms.mjs` fails on «يرجى» or a missing/misplaced shadda in messages, components and Java. Refusals beside the field:
+`AmountInput` (`aria-invalid`, linked inline message), the change-order quantity (our en/ar message, not the browser's pattern
+bubble), the case form (focus to the first field to fix; phone and age radiogroup marked invalid). Arabic scale: 20 off-ladder
+sites on the body/title/label roles, how-it-works phase heading below the stage title, story tab labels 13px. Control Center:
+one `NumberInput` for all 32 `type="number"` fields (Arabic keypad digits kept, min/max/decimals refused in the page's
+language). Tests: the stale `staff-activation` e2e (lands on «My cases») and the W-44 unit test (it rendered the empty state).
+
+**Verify.** `arabic-terms.mjs` green; `tsc` clean; eslint 0 errors (10 pre-existing warnings); vitest 818/818; Playwright
+(a11y en + ar, case-flow, activation-flow, track-case, care-coordination, finance-workspace, my-care, staff-activation) 98
+passed, 12 skipped; browser at 390 on /ar/how-it-works and /ar (sizes as above, no overflow); backend `mvn -o -q test` green (1001 tests, 0 failures, 0 errors).
+
+**Left** (not code): legal/native sign-off (`native-arabic-review.md`), the six consents' recorded vs shown wording (legal),
+Meta template re-submission; raw counts stay `String(n)` until the native review moves counts to Arabic-Indic.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The
