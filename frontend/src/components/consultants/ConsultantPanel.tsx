@@ -6,7 +6,7 @@ import { useState, useSyncExternalStore } from "react";
 import { SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import type { CareAreaIconName, CareSystem } from "@/lib/care-area-catalog";
 import type { ConsultantProfile } from "@/lib/consultants";
-import type { Locale } from "@/lib/i18n";
+import { formatCount, type Locale } from "@/lib/i18n";
 import { ConsultantCard } from "./ConsultantCard";
 
 export type PanelEntry = { profile: ConsultantProfile; system: CareSystem; icon: CareAreaIconName; href: string; viewOf: string };
@@ -50,7 +50,7 @@ export function ConsultantPanel({ entries, systems, locale, copy }: {
   };
   const searched = entries.filter(matches);
   const visible = searched.filter((entry) => !system || entry.system === system);
-  const count = (n: number) => (n === 1 ? copy.countOne : copy.countMany.replace("{n}", String(n)));
+  const count = (n: number) => (n === 1 ? copy.countOne : copy.countMany.replace("{n}", formatCount(n, locale)));
   const order = (key: CareSystem) => systems.findIndex((s) => s.key === key);
   const ordered = [...visible].sort((a, b) => order(a.system) - order(b.system));
 

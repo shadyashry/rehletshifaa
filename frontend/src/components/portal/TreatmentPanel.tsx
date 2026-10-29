@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { Check, X } from "lucide-react";
 
-import { intlLocale, type Locale } from "@/lib/i18n";
+import { intlLocale, latinDigits, type Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
@@ -412,6 +412,8 @@ function MilestoneForm({ t, documents, busy, primary, onRecord }: { t: Copy; doc
 }
 
 type Line = { key: number; kind: string; description: string; quantity: string };
+/** UX X-1: a quantity above zero with up to two decimals, typed in a text field (a number field drops an Arabic keypad's digits). */
+const QUANTITY = "(?!0+(\\.0+)?$)[0-9]+(\\.[0-9]{1,2})?";
 type OrderBody = { reason: string; lines: { kind: string; description: string; quantity: number }[] };
 
 /** The Consultant's change order (1–20 lines); the emergency variant asks for a confirmation before it is recorded. */
@@ -425,7 +427,7 @@ function ChangeOrderForm({ t, hint, submitLabel, confirm, busy, onSubmit }: {
   const [lines, setLines] = useState<Line[]>(() => [fresh(0)]);
   const [confirming, setConfirming] = useState(false);
   const update = (key: number, patch: Partial<Line>) => setLines(rows => rows.map(row => row.key === key ? { ...row, ...patch } : row));
-  const body = (): OrderBody => ({ reason: reason.trim(), lines: lines.map(l => ({ kind: l.kind, description: l.description.trim(), quantity: Number(l.quantity) })) });
+  const body = (): OrderBody => ({ reason: reason.trim(), lines: lines.map(l => ({ kind: l.kind, description: l.description.trim(), quantity: readAmount(l.quantity) })) });
   const send = async () => { if (await onSubmit(body())) { setReason(""); setLines([fresh(0)]); } };
   return (
     <form className="mt-1" onSubmit={event => { event.preventDefault(); if (confirm) setConfirming(true); else void send(); }}>
@@ -450,7 +452,8 @@ function ChangeOrderForm({ t, hint, submitLabel, confirm, busy, onSubmit }: {
                   <input className="field" required maxLength={500} autoComplete="off" value={line.description} onChange={event => update(line.key, { description: event.target.value })}/>
                 </label>
                 <label className="block text-[0.8125rem] font-semibold">{f.quantity}
-                  <input className="field" type="number" inputMode="decimal" min="0.01" step="0.01" required dir="ltr" value={line.quantity} onChange={event => update(line.key, { quantity: event.target.value })}/>
+                  <input className="field tabular-nums" type="text" inputMode="decimal" pattern={QUANTITY} required dir="ltr" autoComplete="off" value={line.quantity}
+                         onChange={event => update(line.key, { quantity: latinDigits(event.target.value).replace(/٫/g, ".") })}/>
                 </label>
                 {lines.length > 1 && <button type="button" className="btn-secondary" onClick={() => setLines(rows => rows.filter(row => row.key !== line.key))}>
                   <X size={16} aria-hidden/><span className="sr-only">{fillTemplate(f.removeLine, { n })}</span></button>}

@@ -308,7 +308,7 @@ function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, 
   const receiptForm = (
     <ActForm className="grid gap-3 sm:grid-cols-2" refused={t.forms.refused} retry={t.forms.refusedRetry} onFocusCapture={freshPaidAt} action={data => act(`/operations/cases/${caseId}/admission/balance`, {
       receiptNumber: data.get("receiptNumber"), amountEgp: readAmount(data.get("amountEgp")), paidAt: instant(data.get("paidAt")), method: data.get("method"),
-      documentId: data.get("documentId") || null, paidCurrency: text(data.get("paidCurrency")), paidAmount: data.get("paidAmount") ? Number(data.get("paidAmount")) : null })}>
+      documentId: data.get("documentId") || null, paidCurrency: text(data.get("paidCurrency")), paidAmount: data.get("paidAmount") ? readAmount(data.get("paidAmount")) : null })}>
       <label className="block text-sm font-semibold">{t.forms.receiptNumber}<input className="field" name="receiptNumber" maxLength={160} required autoComplete="off" spellCheck={false} dir="ltr"/></label>
       <div>
         <label htmlFor={`${id}-amount`} className="block text-sm font-semibold">{t.forms.amountEgp}</label>
@@ -330,7 +330,9 @@ function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, 
             </select>
           </label>
           {/* A currency needs its amount: the two are recorded together. */}
-          <label className="block text-sm font-semibold">{t.forms.paidAmount}<input className="field" name="paidAmount" type="number" inputMode="decimal" min="0.01" step="0.01" dir="ltr" required={!!paidIn}/></label>
+          {/* UX X-1: a text field read by readAmount, so an Arabic keypad's digits count (a number field drops them). */}
+          <div><label htmlFor={`${id}-paid`} className="block text-sm font-semibold">{t.forms.paidAmount}</label>
+            <AmountInput id={`${id}-paid`} name="paidAmount" invalid={t.forms.amountInvalid} required={!!paidIn}/></div>
           <DocumentPicker name="documentId" label={t.forms.receiptDocument} empty={t.forms.none} documents={documents}/>
         </div>
       </details>

@@ -30,7 +30,7 @@ describe("Finance's exchange-rate re-approval", () => {
     const mutate = setup();
     expect(screen.getByRole("heading", { name: price.fxReapproval.title })).toBeInTheDocument();
     expect(screen.getByText("$1,200")).toBeInTheDocument();
-    expect(screen.getByText("0.0204")).toBeInTheDocument();
+    expect(screen.getByText("\u20661 USD = 49.0196 EGP\u2069")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: price.fxReapproval.keep }));
     expect(screen.getByRole("alertdialog", { name: price.fxReapproval.keepTitle })).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
@@ -41,7 +41,7 @@ describe("Finance's exchange-rate re-approval", () => {
       commercial={{ versionId: "v2", currency: "USD", fxRate: 0.0204, fxRateDate: "2026-10-01", fxReapprovalRate: 0.019, fxReapprovalTotal: 1116, requiresFinanceApproval: false, displayTotal: 1200, lines: [] }} busy={false} mutate={vi.fn()} />);
     expect(screen.getByText("$1,116")).toBeInTheDocument();
     expect(screen.getByText(/7%/)).toBeInTheDocument();
-    expect(screen.getByText("0.019")).toBeInTheDocument();
+    expect(screen.getByText("\u20661 USD = 52.6316 EGP\u2069")).toBeInTheDocument();
     expect(screen.getByText("$1,200")).toBeInTheDocument();
   });
 

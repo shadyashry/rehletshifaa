@@ -4,8 +4,8 @@ import { Component, use, useEffect, useId, useRef, useState, type FocusEventHand
 import { Check, ChevronDown, CircleAlert, CircleDashed, CircleDot, Clock } from "lucide-react";
 
 import { intlLocale, latinDigits, type Locale } from "@/lib/i18n";
-import { formatMoney } from "@/lib/money";
 import { ConfirmDialog, FeedbackContext } from "@/components/portal/portal-ui";
+import { useWorkCopy } from "@/components/portal/portal-copy";
 
 /**
  * The small pieces the staff evidence panels share (P1-15 "Admission & money", P1-16 "Treatment"): a recording task that
@@ -133,10 +133,14 @@ export function text(value: FormDataEntryValue | null) { const v = String(value 
 
 /** An EGP amount copied from paper: plain digits, or thousands grouped by commas throughout, with up to two decimals. */
 const AMOUNT = /^(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]{1,2})?$/;
-const WHOLE = new Intl.NumberFormat("en-US");
-const CENTS = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-/** Grouped with Latin digits, as `formatMoney` writes amounts in both languages; cents kept when there are any. */
-const groupAmount = (value: number) => (Number.isInteger(value) ? WHOLE : CENTS).format(value);
+/** Grouped with Latin digits through `intlLocale`, as `formatMoney` writes amounts in both languages; cents kept when there are any. */
+const GROUPING = new Map<Locale, { whole: Intl.NumberFormat; cents: Intl.NumberFormat }>();
+const groupAmount = (value: number, locale: Locale) => {
+  let formats = GROUPING.get(locale);
+  if (!formats) GROUPING.set(locale, formats = { whole: new Intl.NumberFormat(intlLocale(locale)),
+    cents: new Intl.NumberFormat(intlLocale(locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+  return (Number.isInteger(value) ? formats.whole : formats.cents).format(value);
+};
 /**
  * The amount typed, or NaN when it is not one. Arabic-Indic digits and separators read as Latin (an Arabic keypad types them)
  * and a currency word around the figure is dropped ("EGP 195,500"); anything else ambiguous — "195,50", "1,2" — is refused,
@@ -164,35 +168,39 @@ const inRange = (value: number, accepts: AmountRange) => accepts === "positive" 
  * printed ("195,500.00"), is grouped again when left, and says in the page's language when it is not an amount above zero.
  * UX 4-2: `accepts` widens the range (zero paid, a negative discount line); `onValue` hands each keystroke's reading to a running total.
  */
-export function AmountInput({ id, name, invalid, defaultValue, describedBy, accepts = "positive", onValue }: {
-  id: string; name: string; invalid: string; defaultValue?: number; describedBy?: string; accepts?: AmountRange; onValue?: (value: number) => void;
+export function AmountInput({ id, name, invalid, defaultValue, describedBy, accepts = "positive", max, required = true, className, onValue }: {
+  id: string; name: string; invalid: string; defaultValue?: number; describedBy?: string; accepts?: AmountRange;
+  /** UX X-1: the most the field takes (a deposit's balance); above it the field says `invalid`, as for any other refusal. */
+  max?: number; required?: boolean; className?: string; onValue?: (value: number) => void;
 }) {
+  const { locale } = useWorkCopy();
+  const fits = (value: number) => inRange(value, accepts) && (max == null || value <= max);
   const check = (field: HTMLInputElement) => {
     const value = readAmount(field.value, accepts === "signed");
-    field.setCustomValidity(field.value.trim() && !inRange(value, accepts) ? invalid : "");
+    field.setCustomValidity(field.value.trim() && !fits(value) ? invalid : "");
     return value;
   };
   return (
-    <input id={id} className="field tabular-nums" name={name} type="text" inputMode="decimal" required dir="ltr" autoComplete="off" spellCheck={false}
-           defaultValue={defaultValue != null ? groupAmount(defaultValue) : undefined} aria-describedby={describedBy}
+    <input id={id} className={`field tabular-nums ${className ?? ""}`} name={name} type="text" inputMode="decimal" required={required} dir="ltr" autoComplete="off" spellCheck={false}
+           defaultValue={defaultValue != null ? groupAmount(defaultValue, locale) : undefined} aria-describedby={describedBy}
            onChange={event => { const value = check(event.currentTarget); onValue?.(value); }}
            onBlur={event => {
              const value = check(event.currentTarget);
-             if (inRange(value, accepts)) event.currentTarget.value = `${value < 0 ? "-" : ""}${groupAmount(Math.abs(value))}`;
+             if (fits(value)) event.currentTarget.value = `${value < 0 ? "-" : ""}${groupAmount(Math.abs(value), locale)}`;
            }}/>
   );
 }
 
 /**
- * UX 4-1/4-2: a fixed rate the way Egyptian finance quotes it ("1 US$ = EGP 49.0196", six significant digits, as it was fixed).
- * The stored rate is EGP → the patient's currency. In Arabic each side is isolated and the equation reads right to left; a forced
- * left-to-right run would reverse only Intl's Arabic side.
+ * UX 4-1/4-2: a fixed rate the way Egyptian finance quotes it, the patient's currency first ("1 USD = 49.0196 EGP", six
+ * significant digits, as it was fixed). The stored rate is EGP → the patient's currency.
+ * UX X-1 (DESIGN.md "A rate is one run"): ISO codes and Latin digits only, so one left-to-right isolate reads the same way round
+ * in both languages; the sentence around it carries the date.
  */
 export function quotedRate(locale: Locale, currency: string, fxRate?: number | null) {
   if (!fxRate || currency === "EGP") return null;
-  const one = formatMoney(1, currency, locale);
-  const egpPer = new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "EGP", maximumSignificantDigits: 6 }).format(1 / fxRate);
-  return locale === "ar" ? `⁨${one}⁩ = ⁨${egpPer}⁩` : `⁦${one} = ${egpPer}⁩`;
+  const egpPer = new Intl.NumberFormat(intlLocale(locale), { maximumSignificantDigits: 6 }).format(1 / fxRate);
+  return `\u20661 ${currency} = ${egpPer} EGP\u2069`;
 }
 
 /**

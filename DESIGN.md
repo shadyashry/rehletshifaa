@@ -339,7 +339,10 @@ The hierarchy must survive the step-down: in Arabic a statement stays smaller th
 than a statement, and a wider screen never sets a role smaller than a phone does. A component that sizes a heading
 with a utility sets its Arabic size at the call site (`rtl:text-[…]`): utilities outrank the component layer, so a
 `[dir="rtl"] .text-2xl` rule in CSS never applies (`text-2xl`, 24px, is already inside the Arabic headline range). Below 13px Arabic is set only for badges, initials and figures (12px); the home story scenes may draw
-at 12px because they are pictures of a page, not text to read.
+at 12px because they are pictures of a page, not text to read. The portal sets Arabic running text at the body leading
+(1.85) as well, `text-sm` paragraphs included: the Operate surfaces take no leading exception for running text, since
+Arabic marks need the room whatever the density. Single-line figures and labels are not running text: table cells sit
+at 1.5 and status badges at 1.4.
 
 ### Numerals and isolation (area X, 2026-10-29)
 **One digit set: Latin digits (0–9) in both languages.** Every amount, date, time, count, percentage, case number,
@@ -353,7 +356,8 @@ running Arabic prose to Arabic-Indic, which is one change in `intlLocale`. **Ide
 
 - **Format through one helper.** Every `Intl.*` constructor and `toLocale*String` takes `intlLocale(locale)`
   (`"ar-u-nu-latn"` for Arabic); never pass `"ar"`, `"ar-EG"` or a hard-coded `"en-US"` for Arabic text. Money goes
-  through `formatMoney`. Month names follow the Egyptian set (أكتوبر, not تشرين الأول); the native review checks this
+  through `formatMoney`, a count in running text through `formatCount`. ESLint refuses an `"ar"`, `"ar-EG"` or `"en-US"`
+  literal in `Intl.*` and `toLocale*String` (`eslint.config.mjs`). Month names follow the Egyptian set (أكتوبر, not تشرين الأول); the native review checks this
   for Iraqi readers.
 - **Accept both on input.** Fields that take digits (amounts, codes, phone numbers) accept Latin, Arabic-Indic and
   Persian digits and the Arabic decimal and thousands marks, and normalise to Latin; they are `type="text"` with an
@@ -363,11 +367,13 @@ running Arabic prose to Arabic-Indic, which is one change in `intlLocale`. **Ide
   `<bdi dir="ltr">` (amounts also `tabular-nums` when they line up in a column); names and free text in `<bdi>` or
   `dir="auto"`. Where markup cannot go (`aria-label`, `title`, `<option>`, emails, WhatsApp, Keycloak bundles), wrap
   the run in Unicode isolates: LRI…PDI (U+2066…U+2069) for a left-to-right value, FSI…PDI (U+2068…U+2069) for a
-  name. Never fix an order with LRM/RLM marks or with `dir="ltr"` on a whole line.
+  name. `fillTemplate` does this itself in an Arabic template for `{caseNumber}`, `{rate}` and `{amount}` (LRI, as `Money` draws
+  an amount) and `{date}` (FSI, since Intl writes Arabic month names), unless the caller already isolated the value. Never fix an order with LRM/RLM marks or with `dir="ltr"` on a whole line.
 - **A rate is one run.** An exchange rate is one isolated equation, `1 USD = 50.25 EGP`, the same way round in both
   languages, with ISO currency codes; the Arabic sentence around it carries the date.
 - **Never break an identifier.** Case numbers, codes and amounts are `white-space: nowrap`; a long Arabic line wraps
-  around them, not through them.
+  around them, not through them. Case numbers carry `whitespace-nowrap` where they are drawn and amounts get it from
+  `Money`; free text in an isolate (a typed reference, an email, an IBAN, a bank name) still wraps, so it never runs off a phone.
 
 ### Named Rules
 **The Ladder Rule.** Fixed sizes come from one ladder: 12 (badges and initials only), 13 (smallest label), 14, 15,

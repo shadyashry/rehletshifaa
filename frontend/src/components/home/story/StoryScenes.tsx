@@ -241,7 +241,7 @@ export function RecommendationScene({ s, step, dir, validUntil }: { s: Story; st
             <span aria-hidden className="s-pulse h-2.5 w-2.5 rounded-full bg-[var(--color-coral)]" style={at(1.2)} />
             {t.ready}
           </span>
-          <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[0.6875rem] font-semibold text-ink-500">{validUntil}</span>
+          <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[0.6875rem] font-semibold text-ink-500 rtl:text-[0.75rem]">{validUntil}</span>
           </span>
         </span>
       </PhotoBand>
@@ -251,7 +251,7 @@ export function RecommendationScene({ s, step, dir, validUntil }: { s: Story; st
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-2">
               <span className="text-[1rem] font-bold text-brand-900">{t.title}</span>
-              <span className="s-pop rounded-full bg-[var(--color-coral)] px-2.5 py-0.5 text-[0.6875rem] font-bold text-brand-900" style={at(0.9)}>{t.recommended}</span>
+              <span className="s-pop rounded-full bg-[var(--color-coral)] px-2.5 py-0.5 text-[0.6875rem] font-bold text-brand-900 rtl:text-[0.75rem]" style={at(0.9)}>{t.recommended}</span>
             </span>
             <span className="mt-0.5 block text-[0.8125rem] leading-5 text-ink-500">{t.why}</span>
           </span>
@@ -270,7 +270,7 @@ export function RecommendationScene({ s, step, dir, validUntil }: { s: Story; st
             <span className="flex items-baseline gap-1.5 text-[0.8125rem] font-bold text-brand-900">
               {t.estimateValue}
               <span className="sr-only">{t.currencyLabel}</span>
-              <span aria-hidden className="inline-grid text-[0.6875rem] text-brand-600">
+              <span aria-hidden className="inline-grid text-[0.6875rem] text-brand-600 rtl:text-[0.75rem]">
                 {t.currencies.map((code, index) => (
                   <span key={code} className={`s-currency s-currency-${index} rounded-[0.3rem] bg-brand-50 px-1.5 [grid-area:1/1]`} style={at(2)}>{code}</span>
                 ))}
@@ -283,7 +283,7 @@ export function RecommendationScene({ s, step, dir, validUntil }: { s: Story; st
             ))}
           </div>
           {/* Phones keep the bar and drop its legend: the legend would make this the tallest scene by far. */}
-          <ul className="mt-1.5 hidden flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] font-semibold text-ink-600 sm:flex">
+          <ul className="mt-1.5 hidden flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] font-semibold text-ink-600 sm:flex rtl:text-[0.75rem]">
             {t.includes.map((item, index) => (
               <li key={item} className="flex items-center gap-1.5">
                 <span aria-hidden className={`h-2 w-2 rounded-[2px] ${segments[index].className}`} />
@@ -318,7 +318,7 @@ export function DecideScene({ s, step, dir }: { s: Story; step: Story["steps"][n
           <ol className="mt-2.5 flex flex-col gap-2 text-[0.75rem] leading-snug text-brand-100 sm:text-[0.8125rem]">
             {t.continueSteps.map((item, index) => (
               <li key={item} className="s-slide flex items-center gap-2.5" style={at(0.8 + index * 0.3)}>
-                <span aria-hidden className="grid h-5 w-5 flex-none place-items-center rounded-full text-[0.6875rem] font-bold text-white ring-[1.5px] ring-brand-300">{index + 1}</span>
+                <span aria-hidden className="grid h-5 w-5 flex-none place-items-center rounded-full text-[0.6875rem] font-bold text-white ring-[1.5px] ring-brand-300 rtl:text-[0.75rem]">{index + 1}</span>
                 {item}
               </li>
             ))}
@@ -343,7 +343,7 @@ export function CareScene({ s, step, dir }: { s: Story; step: Story["steps"][num
   return (
     <div className="flex h-full flex-col">
       <PhotoBand src="/media/rehletshifaa-hero-consultation.jpg" alt={t.photoAlt} position="50% 22%">
-        <Tag dir={dir} place={{ insetInlineStart: "5%", top: "72%" }} start={0.9} tone="coral" icon={<span className="text-[0.5625rem] font-extrabold">{t.youTag}</span>}>{t.youLabel}</Tag>
+        <Tag dir={dir} place={{ insetInlineStart: "5%", top: "72%" }} start={0.9} tone="coral" icon={<span className="story-tag-word text-[0.75rem] font-extrabold leading-none">{t.youTag}</span>}>{t.youLabel}</Tag>
         <Tag dir={dir} place={{ insetInlineEnd: "4%", top: "56%" }} start={1.3} icon={<Stethoscope size={11} strokeWidth={2.2} />}>{t.consultantTag}</Tag>
       </PhotoBand>
       <SceneBody className="flex flex-col gap-3">
@@ -356,8 +356,8 @@ export function CareScene({ s, step, dir }: { s: Story; step: Story["steps"][num
               {t.days.map((day, index) => (
                 <li key={day.day} className="flex flex-col items-center gap-1 text-center first:-ms-[10%] last:-me-[10%]">
                   <span aria-hidden className="s-node h-5 w-5 rounded-full bg-brand-600" style={at(nodeAt[index])} />
-                  <span className="text-[0.6875rem] font-bold text-brand-900">{day.day}</span>
-                  <span className="text-[0.6875rem] leading-tight text-ink-500">{day.label}</span>
+                  <span className="text-[0.6875rem] font-bold text-brand-900 rtl:text-[0.75rem]">{day.day}</span>
+                  <span className="text-[0.6875rem] leading-tight text-ink-500 rtl:text-[0.75rem]">{day.label}</span>
                 </li>
               ))}
             </ol>

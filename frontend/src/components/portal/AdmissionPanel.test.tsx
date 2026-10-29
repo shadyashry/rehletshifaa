@@ -291,7 +291,7 @@ describe("AdmissionPanel — Finance", () => {
     expect(lines.at(-1)).toBe("Admission number NHH-ADM-1");
     expect(screen.queryByRole("button", { name: /countersign/i })).toBeNull();
     // The rate as Finance quotes it, inside the voucher's money.
-    expect(screen.getByText(/= EGP\s?49\.0196/).closest("details")?.open).toBe(false);
+    expect(screen.getByText(/1 USD = 49\.0196 EGP/).closest("details")?.open).toBe(false);
     expect(screen.getByText(/^Evidence trail/).closest("details")?.open).toBe(false);
   });
 

@@ -157,7 +157,7 @@ export const formatDate = (iso: string | null | undefined, locale: Locale) => (i
 /** A licensing country for people: the localized country name, never the bare ISO code the backend stores. */
 export function countryName(code: string | null | undefined, locale: Locale) {
   if (!code) return "—";
-  try { const name = new Intl.DisplayNames([locale === "ar" ? "ar" : "en"], { type: "region" }).of(code.toUpperCase()); if (name && name !== code.toUpperCase()) return name; } catch { /* unknown code */ }
+  try { const name = new Intl.DisplayNames([intlLocale(locale)],{ type: "region" }).of(code.toUpperCase()); if (name && name !== code.toUpperCase()) return name; } catch { /* unknown code */ }
   return COUNTRIES.find((c) => c.iso2 === code.toUpperCase())?.name ?? code;
 }
 /** Country options for a picker, sorted by their localized name; the value stays the ISO code the backend expects. */

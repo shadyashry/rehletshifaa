@@ -1328,8 +1328,8 @@
         "currency": "Patient's quote currency",
         "rateNote": "Set by the Consultant when recording the estimate; the patient sees the quote in this currency.",
         "total": "Total",
-        "rateToday": "Today's rate: ⁦1 EGP = {rate} {currency}⁩. The rate is frozen when the proposal is released.",
-        "rateTodayDated": "Today's rate: ⁦1 EGP = {rate} {currency}⁩ ({date}). The rate is frozen when the proposal is released.",
+        "rateToday": "Today's rate: {rate}. The rate is frozen when the proposal is released.",
+        "rateTodayDated": "Today's rate: {rate} ({date}). The rate is frozen when the proposal is released.",
         "noRate": "No exchange rate is available for {currency} right now, so the amounts cannot be quoted in it and the proposal cannot be created until a rate is available."
       },
       "finalQuote": {
@@ -2963,6 +2963,7 @@
       "rejectedLast": "Last reference not confirmed: {reason}",
       "confirmedLast": "Last reference confirmed.",
       "amount": "Amount received (EGP)",
+      "amountInvalid": "Enter the amount received in figures, above zero and no more than the balance, for example 12,500.",
       "confirm": "Confirm payment received",
       "rejectReason": "Why it can't be confirmed (shown to the patient)",
       "reject": "Return to the patient",

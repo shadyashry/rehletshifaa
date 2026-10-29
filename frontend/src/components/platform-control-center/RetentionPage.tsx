@@ -308,7 +308,7 @@ function ErasurePreviewSheet({ locale, copy, api, caseNumber, preview, onErased,
     <h3 className="cc-subhead">{t.casesTitle}</h3>
     <ul className="cc-retention-cases">
       {preview.cases.map((c) => <li key={c.caseNumber}>
-        <strong><bdi dir="ltr">{c.caseNumber}</bdi></strong>
+        <strong><bdi dir="ltr" className="whitespace-nowrap">{c.caseNumber}</bdi></strong>
         <span className="cc-row-sub">{c.purged ? t.casePurged : c.draft ? t.caseDraft : t.caseKept}{c.draft ? null : <> · {statusLabel(c.status, locale)}</>}</span>
       </li>)}
     </ul>

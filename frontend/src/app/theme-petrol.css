@@ -1133,6 +1133,8 @@
 }
 .story-tag-icon { display: grid; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 9999px; background: var(--color-brand-600); color: #fff; }
 .story-tag-icon-coral { background: var(--color-coral); color: var(--color-brand-900); }
+/* UX X-1: a word in the icon (the coral «أنت» / "You") sets at the 12px floor, so the circle becomes a pill around it. */
+.story-tag-icon:has(> .story-tag-word) { width: auto; min-width: 1.25rem; padding-inline: 0.3125rem; }
 .story-bubble {
   border-start-start-radius: 0.75rem;
   border-start-end-radius: 0.75rem;

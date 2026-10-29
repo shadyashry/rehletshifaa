@@ -161,13 +161,13 @@ export function MyCare({ locale, caseSummary, actions, milestones, patientAction
         <div className="min-w-0">
           {/* The case's heading, and where focus lands when the case or the view changes. */}
           <h2 id="case-heading" tabIndex={-1} className="headline scroll-mt-28 break-words rounded-sm text-brand-900 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600">
-            {!c.patientName ? <bdi dir="ltr">{c.caseNumber}</bdi>
+            {!c.patientName ? <bdi dir="ltr" className="whitespace-nowrap">{c.caseNumber}</bdi>
               : representative ? fillTemplate(work.patient.careFor, { name: `⁨${c.patientName}⁩` }) : <bdi>{c.patientName}</bdi>}
           </h2>
           <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[0.9375rem] leading-6">
             {/* Without a name, the heading already is the case number. */}
             {c.patientName && <><span className="sr-only">{t.header.caseNumber}: </span>
-            <bdi dir="ltr" className="font-semibold text-brand-700 tabular-nums">{c.caseNumber}</bdi></>}
+            <bdi dir="ltr" className="font-semibold text-brand-700 tabular-nums whitespace-nowrap">{c.caseNumber}</bdi></>}
             {c.patientName && c.careCategory && <span aria-hidden className="text-ink-350">·</span>}
             {c.careCategory && <span className="text-ink-600">{careAreaLabel(c.careCategory, work.careAreas)}</span>}
           </p>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { PriceCopy } from "@/components/PriceTransparency";
+import { quotedRate } from "@/components/portal/panel-parts";
 import { ConfirmDialog } from "@/components/portal/portal-ui";
 import type { Mutate, ProposalCommercial } from "@/components/portal/portal-model";
 import { intlLocale, type Locale } from "@/lib/i18n";
@@ -21,8 +22,9 @@ export function FxReapproval({ locale, copy, caseId, versionId, currency, total,
 }) {
   const [choice, setChoice] = useState<Choice | null>(null);
   const base = `/finance/cases/${caseId}/final-quotes/${versionId}/fx-rate`;
-  const rate = commercial?.fxRate == null ? null : new Intl.NumberFormat(intlLocale(locale), { maximumSignificantDigits: 6 }).format(commercial.fxRate);
-  const todayRate = commercial?.fxReapprovalRate == null ? null : new Intl.NumberFormat(intlLocale(locale), { maximumSignificantDigits: 6 }).format(commercial.fxReapprovalRate);
+  // UX X-1: each rate as the one run Finance fixed, the patient's currency first ("1 USD = 49.0196 EGP").
+  const rate = quotedRate(locale, currency, commercial?.fxRate);
+  const todayRate = quotedRate(locale, currency, commercial?.fxReapprovalRate);
   const todayTotal = commercial?.fxReapprovalTotal ?? null;
   const change = todayTotal == null || total === 0 ? null : (todayTotal - total) / total;
   const percent = change == null ? null : new Intl.NumberFormat(intlLocale(locale), { style: "percent", maximumFractionDigits: 1, signDisplay: "exceptZero" }).format(change);
@@ -46,13 +48,13 @@ export function FxReapproval({ locale, copy, caseId, versionId, currency, total,
         {todayRate && (
           <div>
             <dt className="text-[0.8125rem] font-semibold text-ink-500">{copy.todayRate}</dt>
-            <dd className="font-bold text-ink-900"><bdi dir="ltr">{todayRate}</bdi></dd>
+            <dd className="font-bold text-ink-900 whitespace-nowrap">{todayRate}</dd>
           </div>
         )}
         {rate && (
           <div>
             <dt className="text-[0.8125rem] font-semibold text-ink-500">{copy.frozenRate}</dt>
-            <dd className="font-bold text-ink-900"><bdi dir="ltr">{rate}</bdi>{rateDate && <span className="font-normal text-ink-600"> · <bdi>{rateDate}</bdi></span>}</dd>
+            <dd className="font-bold text-ink-900"><span className="whitespace-nowrap">{rate}</span>{rateDate && <span className="font-normal text-ink-600"> · <bdi>{rateDate}</bdi></span>}</dd>
           </div>
         )}
       </dl>

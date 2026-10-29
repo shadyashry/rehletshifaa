@@ -5,7 +5,7 @@ import en from "@/messages/en.json";
 import ar from "@/messages/ar.json";
 
 import { isStepItem } from "@/components/portal/CurrentAction";
-import { careAreaLabel, coordinatorLabel, plural, priorityLabel, tabKeyTarget, waitingLabel, waitingReasonText, workCopyText, workItemText } from "./portal-labels";
+import { careAreaLabel, coordinatorLabel, fillTemplate, plural, priorityLabel, tabKeyTarget, waitingLabel, waitingReasonText, workCopyText, workItemText } from "./portal-labels";
 
 const keys = (value: unknown, prefix = ""): string[] =>
   value && typeof value === "object"
@@ -162,5 +162,19 @@ describe("the case's other open work", () => {
     expect(workItemText(finance("COUNTERSIGN_BALANCE"), "en", en.portalWork).context).toBe("Operations recorded the cashier's receipt.");
     // A type with no entry keeps the backend's sentence.
     expect(workItemText(finance("NOT_A_TYPE"), "ar", ar.portalWork).context).toBe("Operations recorded the cashier's receipt.");
+  });
+});
+
+describe("fillTemplate isolation (UX X-1)", () => {
+  it("isolates a case number, a rate and an amount left to right and a date by its first letter, in an Arabic sentence", () => {
+    const text = fillTemplate("الحالة {caseNumber} بمبلغ {amount} في {date} بسعر {rate} لـ {name}",
+      { caseNumber: "RS-2026-000123", amount: "1,200 ج.م.", date: "29 أكتوبر 2026", rate: "1 USD = 50 EGP", name: "Layla" });
+    expect(text).toBe("الحالة \u2066RS-2026-000123\u2069 بمبلغ \u20661,200 ج.م.\u2069 في \u206829 أكتوبر 2026\u2069 بسعر \u20661 USD = 50 EGP\u2069 لـ Layla");
+  });
+
+  it("leaves an English sentence and an already isolated value as they are", () => {
+    expect(fillTemplate("Case {caseNumber} for {amount}", { caseNumber: "RS-2026-000123", amount: "EGP 1,200" })).toBe("Case RS-2026-000123 for EGP 1,200");
+    expect(fillTemplate("المبلغ {amount}", { amount: "\u2066EGP 5\u2069" })).toBe("المبلغ \u2066EGP 5\u2069");
+    expect(fillTemplate("المبلغ {amount}", { amount: "" })).toBe("المبلغ ");
   });
 });

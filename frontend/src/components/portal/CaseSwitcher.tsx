@@ -6,6 +6,7 @@ import { ChevronDown, CircleDot, Plus } from "lucide-react";
 import { CareAreaIcon } from "@/components/care-areas/CareAreaIcon";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 import { careAreaMeta } from "@/lib/care-area-catalog";
+import { formatCount } from "@/lib/i18n";
 import { careAreaLabel, fillTemplate } from "@/lib/portal-labels";
 import type { CaseSummary } from "@/components/portal/MyCare";
 
@@ -74,7 +75,7 @@ export function CaseSwitcher({ cases, currentId, phases, onOpenCase, newCaseHref
         <details className="group mt-3" open={pastHoldsCurrent || undefined}>
           <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-[0.9375rem] font-semibold text-brand-700 hover:text-brand-800 hover:underline [&::-webkit-details-marker]:hidden">
             <ChevronDown size={16} aria-hidden className="transition-transform group-open:rotate-180"/>
-            {t.past} <span className="text-ink-500 tabular-nums">({past.length})</span>
+            {t.past} <span className="text-ink-500 tabular-nums">({formatCount(past.length, work.locale)})</span>
           </summary>
           <ul role="list" className="case-row mt-2">{past.map(card)}</ul>
         </details>
@@ -109,7 +110,7 @@ function CaseCard({ item, current, phases, onOpenCase }: { item: CaseSummary; cu
           <CareAreaMark slug={item.careCategory}/>
           <span className="min-w-0">
             {area && <span className="block truncate text-[1rem] font-semibold leading-6 text-brand-900" title={area}>{area}</span>}
-            <span className={`block tabular-nums ${area ? "text-[0.8125rem] leading-5 text-ink-500" : "text-[1rem] font-semibold leading-6 text-brand-900"}`}><bdi dir="ltr">{item.caseNumber}</bdi></span>
+            <span className={`block tabular-nums ${area ? "text-[0.8125rem] leading-5 text-ink-500" : "text-[1rem] font-semibold leading-6 text-brand-900"}`}><bdi dir="ltr" className="whitespace-nowrap">{item.caseNumber}</bdi></span>
           </span>
         </span>
         <span className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">

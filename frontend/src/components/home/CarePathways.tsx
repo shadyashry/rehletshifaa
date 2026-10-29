@@ -4,7 +4,7 @@ import { TrackedLink } from "@/components/TrackedLink";
 import { careAreaAtlas, careAtlasSystems, type CareAreaIconName, type CareSystem } from "@/lib/care-area-catalog";
 import { getConsultants } from "@/lib/consultants";
 import type { Dictionary } from "@/lib/dictionary";
-import type { Locale } from "@/lib/i18n";
+import { formatCount, type Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 import { CareSystemsGrid, type GridSystem } from "./CareSystemsGrid";
 
@@ -53,7 +53,7 @@ export async function CarePathways({ locale, d }: { locale: Locale; d: Dictionar
         <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-end lg:gap-16">
           <div>
             <p className="eyebrow">{d.home.areasEyebrow}</p>
-            <h2 id="home-areas-title" className="headline mt-2 [text-wrap:balance]">{d.home.areasTitle.replace("{count}", String(areas.length)).replace("{systems}", String(systems.length))}</h2>
+            <h2 id="home-areas-title" className="headline mt-2 [text-wrap:balance]">{d.home.areasTitle.replace("{count}", formatCount(areas.length, locale)).replace("{systems}", formatCount(systems.length, locale))}</h2>
             <p className="mt-3 max-w-[56ch] text-[1rem] leading-7 text-ink-600">{d.home.areasIntro}</p>
           </div>
           <TrackedLink event="send_case_cta_clicked" className="link-cta text-[0.9375rem] lg:justify-self-end" href={localeHref(locale, "care-areas")}>

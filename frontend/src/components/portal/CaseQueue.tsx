@@ -263,7 +263,7 @@ export function CaseQueue<T extends QueueCase>({locale,role,cases,subject,lead,b
             const tab=roving.secondary(item.id);
             // Only the number is isolated left-to-right, so "الحالة RS-…" still reads right-to-left in Arabic.
             const [titleBefore,titleAfter=""]=text.caseTitle.split("{number}");
-            const title=item.patientName?<bdi>{patientNameLabel(item.patientName,work)}</bdi>:<>{titleBefore}<bdi dir="ltr">{item.caseNumber}</bdi>{titleAfter}</>;
+            const title=item.patientName?<bdi>{patientNameLabel(item.patientName,work)}</bdi>:<>{titleBefore}<bdi dir="ltr" className="whitespace-nowrap">{item.caseNumber}</bdi>{titleAfter}</>;
             const actions=<>
               {claimable&&<button type="button" className={`${item.id===leadClaim?"btn-primary":"btn-secondary"} !min-h-11 !px-3 !text-[0.8125rem]`} disabled={busy} tabIndex={tab} aria-label={named(text.claim)} onClick={()=>void quick(`/coordinator/cases/${item.id}/claim`)}><Check size={14} aria-hidden/>{text.claim}</button>}
               {pending&&<button type="button" className="btn-primary !min-h-11 !px-3 !text-[0.8125rem]" disabled={busy} tabIndex={tab} aria-label={named(text.accept)} onClick={()=>void quick(`/${role}/cases/${item.id}/assignments/${item.assignmentId}`,{accept:true})}>{text.accept}</button>}

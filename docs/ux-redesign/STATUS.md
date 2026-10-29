@@ -2251,6 +2251,48 @@ The specs' documentation PNGs were restored, not updated.
 
 **Next:** X-1 isolation and digits everywhere (plan row).
 
+### X-1 isolation and digits everywhere (2026-10-29, worktree `keen-grothendieck-2d8319`, branch `claude/keen-grothendieck-2d8319` from X-0 @ `3784f052`)
+
+**Delivered.**
+- ESLint (`eslint.config.mjs`): `no-restricted-syntax` refuses any Arabic tag (`ar`, `ar-EG`, `ar-SA`…) or `"en-US"` as a literal in
+  `Intl.*` (new or called, direct, in an array or a ternary) and `toLocale*String`; `src/**` minus tests. It found three:
+  `admin-labels` `DisplayNames` and `panel-parts`' two `en-US` formatters, all now through `intlLocale`.
+- `fillTemplate` (`lib/portal-labels.ts`): in an Arabic template, `{caseNumber}`, `{rate}` and `{amount}` are isolated LRI…PDI (as
+  `Money` draws amounts) and `{date}` FSI…PDI (Intl's Arabic month names); a value already one isolate is left alone; English
+  templates are untouched. Unit tests in `portal-labels.test.ts`.
+- One rate direction (backlog 738): `quotedRate` writes one LRI run with ISO codes, the patient's currency first, `1 USD = 49.0196 EGP`,
+  in both languages; `rateToday`/`rateTodayDated` (en + ar) now take that run as `{rate}`; the proposal send form and FxReapproval's
+  frozen/today rates use it (FxReapproval showed the bare reverse figure).
+- Digits in: the staff amount fields (`AdmissionPanel` paid amount, `DischargePanel` final invoice, `StaffCaseView` deposit transfer
+  with its balance as `max`) are `AmountInput`s read by `readAmount`; the change-order quantity is a text field normalised through
+  `latinDigits` and read by `readAmount`; VirtualClinic hours through `latinDigits`. `AmountInput` reads its locale from the work copy,
+  groups through a cached `intlLocale` formatter, and takes `max`/`required`/`className`. New key `depositTransfer.amountInvalid`.
+- Counts (backlog 373): `formatCount` in `lib/i18n.ts`; CaseSwitcher past count, the My Care journey markers, home areas title,
+  consultant count, discharge pack count. Identifiers: case numbers drawn in `<bdi dir="ltr">`/`<strong dir="ltr">` carry
+  `whitespace-nowrap` (15 sites); free-text references, emails and IBANs still wrap.
+- Type: the home story's 11px Arabic captions at 12px (`rtl:text-[0.75rem]`), CareSystemsGrid initials 12px, the coral «أنت»/"You"
+  at 12px in a pill (`.story-tag-icon:has(> .story-tag-word)`). Portal Arabic body leading **1.85, no Operate exception** (DESIGN.md):
+  `text-sm`/`text-xs` paragraphs too; table cells 1.5 and status badges 1.4 (single-line, not running text).
+- Contrast on the home story checked by hand on /ar (composited backgrounds): lowest 4.64:1 («إن تابعت», 12px bold on brand-700);
+  «صالح حتى» 6.4:1; coral chips ≥ 5.1:1; «فحص واحد عند الوصول» ink-900 on coral-light about 14:1. No change needed.
+- Reviewer doc: three Arabic strings appended (rate keys, new field message). No native sign-off claimed.
+
+**Reviews** (four, read-only). Fixed: the first cut's global `bdi[dir="ltr"]{nowrap}` (WG HIGH ×5, RB, RTL, Pro Max: typed references,
+IBANs, scope lists would overflow phones), replaced by per-site `whitespace-nowrap` on case numbers; one amount drawn two ways
+round (RTL: FSI vs `Money`'s LTR → LRI); FxReapproval's reverse rate (RTL, Pro Max); badge/table/`text-sm` leading (Pro Max); the
+pill's leading and English 9px "You" (WG); `ISOLATED` now requires one isolate end to end (RTL); formatter cache (RB); wider ESLint
+tag regex (RB, RTL); `next-env.d.ts` dev churn reverted (RB). Deferred to backlog "Area X": `AmountInput` inline error/`aria-invalid`,
+quantity's browser message, three reused field messages, the remaining raw counts, Control Center `type="number"` fields,
+no-argument `toLocaleString`, placeholder-only Arabic templates, «ج.م.» vs `EGP` on the voucher.
+
+**Verify.** `tsc` clean; eslint over `src` 0 errors (touched files: 4 pre-existing warnings); vitest 811/812 (the known
+`StaffOperationalUi` W-44); Playwright (a11y en + ar, home-quality, home-visual, public-batch-3, finance-workspace, finance-shots,
+operations-shots, my-care-polish, staff-home, portal-p2-pass-3, my-care-admission) 172/174: `finance-workspace` expected the
+transfer field's raw "43200" (now grouped "43,200"; spec updated, 17/17), and `public-batch-3` "nothing waits for a scroll" fails as
+on the base. The specs' PNGs were restored, not updated.
+
+**Next:** X-2 one term per concept (plan row).
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

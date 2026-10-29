@@ -128,7 +128,7 @@ function AffiliationsBody({ locale, copy, view, directory, base, call, onEdit, o
     {view.flags.length > 0 && <Part title={copy.flagsTitle} lead={copy.flagsIntro}>
       <ul className="mt-3 divide-y divide-line border-t border-line">
         {view.flags.map((flag) => <li key={flag.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 text-[0.9375rem]">
-          <span className="min-w-0"><bdi dir="ltr" className="font-semibold tabular-nums text-ink-900">{flag.caseNumber}</bdi> · <bdi>{nameOf(flag.facilityId, flag.facilityName)}</bdi>
+          <span className="min-w-0"><bdi dir="ltr" className="font-semibold tabular-nums text-ink-900 whitespace-nowrap">{flag.caseNumber}</bdi> · <bdi>{nameOf(flag.facilityId, flag.facilityName)}</bdi>
             <span className="block text-[0.8125rem] text-ink-500">{fillTemplate(copy.flagRaised, { date: day(flag.raisedAt) })}{flag.clearedAt && <> · {fillTemplate(copy.flagCleared, { date: day(flag.clearedAt) })}</>}</span></span>
           {!flag.clearedAt && <StatusBadge tone="warning">{copy.flagOpen}</StatusBadge>}
         </li>)}

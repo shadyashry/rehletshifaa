@@ -865,6 +865,12 @@
   .portal-shell { min-height: 70vh; padding-block: 2rem 4rem; font-size: 1rem; line-height: 1.65; }
   .portal-shell .headline { font-size: clamp(1.5rem, 3vw, 2rem); }
   .portal-shell .title { font-size: 1.1rem; }
+  /* UX X-1: Arabic running text in the portal keeps the Arabic body leading (DESIGN.md "Arabic scale", 1.85); no Operate exception. */
+  [dir="rtl"] .portal-shell { line-height: 1.85; }
+  /* text-sm/text-xs set their own leading through --tw-leading; an explicit leading-* utility still wins. */
+  [dir="rtl"] .portal-shell p:where(.text-sm, .text-xs) { --tw-leading: 1.85; }
+  /* Single-line figures and labels are not running text. */
+  [dir="rtl"] .portal-shell :is(th, td) { line-height: 1.5; }
   /* The portal's own heading sizes step down in Arabic like the site's (DESIGN.md, Arabic scale). */
   [dir="rtl"] .portal-shell .headline { font-size: clamp(1.375rem, 2.6vw, 1.75rem); line-height: 1.36; }
   [dir="rtl"] .portal-shell .title { font-size: 1.0625rem; }
@@ -885,7 +891,7 @@
   .portal-shell .card { box-shadow: var(--shadow-card); }
   .portal-shell fieldset:disabled { opacity: .65; }
   .portal-shell h2, .portal-shell h3 { scroll-margin-top: 7rem; }
-  .status-badge { display: inline-flex; align-items: center; gap: 0.25rem; border: 1px solid var(--badge-border); border-radius: var(--badge-radius); padding: var(--badge-padding); background: var(--badge-bg); color: var(--badge-fg); font-size: var(--badge-font-size); font-weight: var(--badge-font-weight); }
+  .status-badge { display: inline-flex; align-items: center; gap: 0.25rem; border: 1px solid var(--badge-border); border-radius: var(--badge-radius); padding: var(--badge-padding); background: var(--badge-bg); color: var(--badge-fg); font-size: var(--badge-font-size); font-weight: var(--badge-font-weight); line-height: 1.4; }
   .status-badge[data-tone="success"] { --badge-bg: var(--badge-success-bg); --badge-fg: var(--badge-success-fg); --badge-border: var(--badge-success-border); }
   .status-badge[data-tone="warning"] { --badge-bg: var(--badge-warning-bg); --badge-fg: var(--badge-warning-fg); --badge-border: var(--badge-warning-border); }
   .status-badge[data-tone="danger"] { --badge-bg: var(--badge-danger-bg); --badge-fg: var(--badge-danger-fg); --badge-border: var(--badge-danger-border); }

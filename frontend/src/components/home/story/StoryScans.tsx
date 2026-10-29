@@ -85,7 +85,7 @@ function ScanTile({ label, tickAt, counter, counterAt = 0, black = false, childr
           <Check size={9} strokeWidth={3.4} />
         </span>
       </div>
-      <p className="mt-1 text-[0.6875rem] font-semibold leading-tight text-ink-500">{label}</p>
+      <p className="mt-1 text-[0.6875rem] font-semibold leading-tight text-ink-500 rtl:text-[0.75rem]">{label}</p>
     </li>
   );
 }

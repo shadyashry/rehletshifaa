@@ -418,7 +418,7 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
                 </div>
                 <div>
                   <dt className="text-[0.8125rem] font-semibold text-ink-500">{t.caseRef}</dt>
-                  <dd className="mt-0.5 font-bold text-ink-900"><bdi dir="ltr">{proposal.caseNumber}</bdi></dd>
+                  <dd className="mt-0.5 font-bold text-ink-900"><bdi dir="ltr" className="whitespace-nowrap">{proposal.caseNumber}</bdi></dd>
                 </div>
                 {/* The technical version number stays internal; a patient only needs to know this document was updated. */}
                 {proposal.versionNumber != null && proposal.versionNumber > 1 && (

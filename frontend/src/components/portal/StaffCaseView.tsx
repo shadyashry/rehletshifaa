@@ -11,7 +11,7 @@ import { TreatmentPanel, TREATMENT_WORK } from "@/components/portal/TreatmentPan
 import { DischargePanel, DISCHARGE_STAGES, DISCHARGE_WORK, type DischargeRole } from "@/components/portal/DischargePanel";
 import { ReconciliationPanel, SETTLEMENT_STAGES, SETTLEMENT_WORK, type SettlementRole } from "@/components/portal/ReconciliationPanel";
 import { FollowUpPanel, FOLLOW_UP_STAGES, FOLLOW_UP_WORK } from "@/components/portal/FollowUpPanel";
-import { ActForm, ConfirmAction, DoneAct, Money, PanelBoundary, Summary } from "@/components/portal/panel-parts";
+import { ActForm, AmountInput, ConfirmAction, DoneAct, Money, PanelBoundary, Summary, quotedRate, readAmount } from "@/components/portal/panel-parts";
 import { BASE, CaseEvidence, DecisionSummary, EstimateLines, RecommendationFields, currencyName, useClinicalDecision } from "@/components/portal/ClinicalDecision";
 import { CaseBlockers } from "@/components/portal/CaseBlockers";
 import { CancelCaseDialog, CoordinatorActionForm, MoreActions, UrgencyDialog, type Urgency } from "@/components/portal/CoordinatorActions";
@@ -298,7 +298,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
     <div className="min-w-0">
      {/* Spaced by the gap; a screen reader hears a separator between the facts. */}
      <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.8125rem] text-ink-500">
-      <bdi dir="ltr" className="font-bold text-brand-700">{c.caseNumber}</bdi>
+      <bdi dir="ltr" className="font-bold text-brand-700 whitespace-nowrap">{c.caseNumber}</bdi>
       {[c.careCategory?careAreaLabel(c.careCategory,work.careAreas):null,countryName(c.country,locale),c.preferredLanguage==="ar"?cover.languages.ar:cover.languages.en].filter(Boolean).map(fact=><span key={fact}><span className="sr-only">{cover.separator}</span>{fact}</span>)}
      </p>
      <h2 id="case-heading" tabIndex={-1} className="mt-1 scroll-mt-28 rounded-sm text-[1.125rem] font-bold leading-7 text-brand-900 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600">{c.patientName?<bdi>{patientNameLabel(c.patientName,work)}</bdi>:cover.untitled}</h2>
@@ -507,7 +507,7 @@ function NextInMyWork({item,onOpen}:{item:WorkItem;onOpen:()=>void}){
  const shortcuts=useShortcutsEnabled();
  return <button type="button" className="link-cta text-[0.875rem]" aria-keyshortcuts={shortcuts?"n":undefined} onClick={onOpen}>
   {work.caseCover.nextInMyWork}
-  <span className="inline-flex min-w-0 items-baseline max-sm:sr-only"><span className="sr-only">{sep}</span><span aria-hidden className="text-ink-300">·&nbsp;</span><bdi dir="ltr" className="font-semibold">{item.caseNumber}</bdi>
+  <span className="inline-flex min-w-0 items-baseline max-sm:sr-only"><span className="sr-only">{sep}</span><span aria-hidden className="text-ink-300">·&nbsp;</span><bdi dir="ltr" className="font-semibold whitespace-nowrap">{item.caseNumber}</bdi>
    {item.patientName&&<><span className="sr-only">{sep}</span><span aria-hidden className="text-ink-300">&nbsp;·&nbsp;</span><bdi className="max-w-[16ch] truncate font-semibold">{patientNameLabel(item.patientName,work)}</bdi></>}</span>
   <ArrowRight size={16} aria-hidden className="flex-none rtl:rotate-180"/>
  </button>;
@@ -538,7 +538,7 @@ function CaseLine({top,action,title,next}:{top:number;action:CurrentActionView;t
  return <div ref={bar} role="region" aria-label={fillTemplate(cover.lineLabel,{caseNumber:c.caseNumber})} style={{top}} className="fixed start-0 end-0 z-40 border-b border-line bg-white">
   <div className="container-site flex items-center gap-x-5">
    <p className="min-w-0 flex-1 py-1.5 text-[0.875rem] leading-5">
-    <span className="block truncate"><bdi dir="ltr" className="font-bold text-brand-700">{c.caseNumber}</bdi><span className="sr-only">{cover.separator}</span><span aria-hidden className="text-ink-300"> · </span><bdi className="font-semibold text-ink-900">{patientNameLabel(c.patientName,work)||cover.untitled}</bdi></span>
+    <span className="block truncate"><bdi dir="ltr" className="font-bold text-brand-700 whitespace-nowrap">{c.caseNumber}</bdi><span className="sr-only">{cover.separator}</span><span aria-hidden className="text-ink-300"> · </span><bdi className="font-semibold text-ink-900">{patientNameLabel(c.patientName,work)||cover.untitled}</bdi></span>
     <span dir="auto" className="block truncate text-ink-600">{fillTemplate(cover.stepLine,{label:stepLabel(action,work),title})}</span>
    </p>
    {isOwnStep(action)&&<button type="button" className="link-cta flex-none text-[0.875rem]" onClick={focusCurrentAction}>{cover.goToStep}</button>}
@@ -692,7 +692,9 @@ function ProposalSendForm({estimate,onSend}:{estimate:Review;onSend:(caseId:stri
  const items=estimates.map((item,index)=>({category:"MEDICAL",description:item.serviceDescription,quantity:1,unitPrice:item.estimatedCost,optional:false,sortOrder:index,quotedPrice:item.quotedCost??null}));
  const total=items.reduce((a,i)=>a+i.unitPrice,0);
  const quotedTotal=quoted?items.reduce((a,i)=>a+(i.quotedPrice??0),0):null;
- const rateNote=quoted&&estimate?.quoteRate?fillTemplate(estimate.quoteRateDate?labels.rateTodayDated:labels.rateToday,{rate:new Intl.NumberFormat(intlLocale(locale),{maximumFractionDigits:6}).format(estimate.quoteRate),currency:proposalCurrency,date:estimate.quoteRateDate?new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium"}).format(new Date(estimate.quoteRateDate)):""}):null;
+ // UX X-1: the rate one way round, the patient's currency first, as Finance fixes it (DESIGN.md "A rate is one run").
+ const quoteRate=quoted?quotedRate(locale,proposalCurrency,estimate?.quoteRate):null;
+ const rateNote=quoteRate?fillTemplate(estimate?.quoteRateDate?labels.rateTodayDated:labels.rateToday,{rate:quoteRate,date:estimate?.quoteRateDate?new Intl.DateTimeFormat(intlLocale(locale),{dateStyle:"medium"}).format(new Date(estimate.quoteRateDate)):""}):null;
  const send=()=>{if(!items.length)return;onSend(caseId,{clinicalReviewId:reviewId,language,includedServices:items.map(i=>i.description).join("; "),paymentTerms:PROPOSAL_PAYMENT_TERMS_RECORD,coordinatorNotes:notes.trim()||undefined,validUntil:validUntilInDays(14),items});};
  return <div className="mt-4 space-y-5">
   <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex items-baseline gap-2 text-sm font-bold text-ink-700">{labels.currency}<span className="text-[0.9375rem] text-ink-900">{CURRENCY_LABELS[proposalCurrency]?.[locale]??proposalCurrency}</span></span><span className="text-[0.8125rem] text-ink-500">{labels.rateNote}</span></div>
@@ -780,15 +782,18 @@ function TransferActs({deposit,transfer,onConfirmed}:{deposit:DepositView;transf
  const {locale,c:{id:caseId},busy,mutate}=useCaseWorkspace();
  const work=useWorkCopy();const tx=work.depositTransfer;const forms=work.admission.forms;
  const reference=`⁨${transfer.reference}⁩`;
+ const amountId=useId();
  // One idempotency key per transfer, kept through a refused or timed-out attempt so a retry can never record the money twice.
  const key=useRef<{id:string;key:string}|null>(null);
  const paymentKey=(id:string)=>{if(key.current?.id!==id)key.current={id,key:crypto.randomUUID()};return key.current.key;};
  return <>
   <div id="deposit-payment">
    <ActForm className="mt-3 flex flex-wrap items-end gap-3" refused={forms.refused} retry={forms.refusedRetry}
-    confirm={{title:data=>fillTemplate(tx.confirmTitle,{amount:`⁦${money(Number(data.get("amount")),"EGP",locale)}⁩`,reference}),body:tx.confirmBody,confirm:tx.confirm,cancel:work.confirm.cancel}}
-    action={data=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/payments`,{amountEgp:Number(data.get("amount"))||0,idempotencyKey:paymentKey(transfer.id)}).then(result=>{if(result){key.current=null;if(Number(data.get("amount"))>=(deposit.balanceEgp??0))onConfirmed();}return !!result;})}>
-    <label className="block text-sm font-semibold">{tx.amount}<input className="field mt-1 block w-44" name="amount" type="number" min="0.01" step="0.01" max={deposit.balanceEgp??undefined} defaultValue={deposit.balanceEgp??undefined} required dir="ltr" inputMode="decimal" autoComplete="off"/></label>
+    confirm={{title:data=>fillTemplate(tx.confirmTitle,{amount:money(readAmount(data.get("amount")),"EGP",locale),reference}),body:tx.confirmBody,confirm:tx.confirm,cancel:work.confirm.cancel}}
+    action={data=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/payments`,{amountEgp:readAmount(data.get("amount"))||0,idempotencyKey:paymentKey(transfer.id)}).then(result=>{if(result){key.current=null;if(readAmount(data.get("amount"))>=(deposit.balanceEgp??0))onConfirmed();}return !!result;})}>
+    {/* UX X-1: a text field read by readAmount, so an Arabic keypad's digits count (a number field drops them). */}
+    <div><label htmlFor={amountId} className="block text-sm font-semibold">{tx.amount}</label>
+     <AmountInput id={amountId} name="amount" invalid={tx.amountInvalid} className="mt-1 block w-44" max={deposit.balanceEgp??undefined} defaultValue={deposit.balanceEgp??undefined}/></div>
     <button className="btn-primary" disabled={busy}>{tx.confirm}</button>
    </ActForm>
   </div>

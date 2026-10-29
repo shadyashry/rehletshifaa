@@ -25,7 +25,7 @@ test("Finance confirms a transfer only after a question that names the amount an
   // The deposit moment: EGP leads, nothing paid yet so no refund, and the return is the second verb behind a disclosure.
   await expect(page.getByRole("button", { name: "Record a refund" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Return to the patient" })).toBeHidden();
-  await expect(page.getByLabel("Amount received (EGP)")).toHaveValue("43200");
+  await expect(page.getByLabel("Amount received (EGP)")).toHaveValue("43,200");
   await page.getByRole("button", { name: "Confirm payment received" }).click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toContainText(/Record .?EGP\s?43,200.? received against .*QNB-2026-10-27-558211/);

@@ -56,16 +56,14 @@ describe("FinanceApproval", () => {
     expect(onApprove).toHaveBeenCalledTimes(1);
   });
 
-  it("states a fixed rate the way Finance quotes it", () => {
+  it("states a fixed rate the way Finance quotes it, the patient's currency first", () => {
     renderWithWork(<FinanceApproval locale="en" commercial={{ ...commercial, fxRate: 0.02 }} busy={false} approveLabel="Approve commercial terms" onApprove={vi.fn()}/>);
-    expect(screen.getByText(/Rate fixed at release: .*\$1 = EGP\s?50/)).toBeTruthy();
+    expect(screen.getByText(/Rate fixed at release: \u20661 USD = 50 EGP\u2069/)).toBeTruthy();
   });
 
-  it("states the rate in Arabic with each side isolated, so the equation reads right to left (UX 4-2)", () => {
+  it("states the rate in Arabic as the same one left-to-right run, ISO codes and Latin digits (UX X-1)", () => {
     renderWithWork(<FinanceApproval locale="ar" commercial={{ ...commercial, fxRate: 0.02 }} busy={false} approveLabel="اعتماد الشروط التجارية" onApprove={vi.fn()}/>, "ar");
-    const rate = screen.getByText(/\u2068[^\u2069]*1[^\u2069]*\u2069 = \u2068[^\u2069]*50[^\u2069]*\u2069/);
-    // No forced left-to-right run around the whole equation.
-    expect(rate.textContent).not.toContain("\u2066");
+    expect(screen.getByText(/\u20661 USD = 50 EGP\u2069/).textContent).not.toMatch(/[\u0660-\u0669]|\u2068/);
   });
 
   it("says when no margin policy applies, in Arabic too", () => {

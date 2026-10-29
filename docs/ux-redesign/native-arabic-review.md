@@ -52,8 +52,11 @@ synthetic cases (never real patient data), and the Keycloak pages; `messages/ar.
 
 ## Changed strings
 
-Filled per slice (key · before · after). X-0 changed no message string; X-2 and X-3 append their lists here.
+Filled per slice (key · before · after). X-0 changed no message string; X-1 changed the rate sentences and added one field message; X-2 and X-3 append their lists here.
 
 | Slice | File | Key | Before | After |
 |---|---|---|---|---|
 | X-0 | — | — | — | (no strings changed: rules, type and digit input only) |
+| X-1 | ar.json | `portalWork.caseView.send.rateToday` | سعر الصرف اليوم: ⁦1 EGP = {rate} {currency}⁩. يُثبَّت السعر النهائي عند إرسال العرض. | سعر الصرف اليوم: {rate}. يُثبَّت السعر النهائي عند إرسال العرض. — `{rate}` is now one run, the patient's currency first: `1 USD = 49.0196 EGP` (same in English) |
+| X-1 | ar.json | `portalWork.caseView.send.rateTodayDated` | سعر الصرف اليوم: ⁦1 EGP = {rate} {currency}⁩ ({date}). يُثبَّت السعر النهائي عند إرسال العرض. | سعر الصرف اليوم: {rate} ({date}). يُثبَّت السعر النهائي عند إرسال العرض. |
+| X-1 | ar.json | `portalWork.depositTransfer.amountInvalid` (new) | — | أدخل المبلغ المستلَم بالأرقام، أكبر من صفر ولا يزيد على الرصيد المتبقي، مثل 12,500. |

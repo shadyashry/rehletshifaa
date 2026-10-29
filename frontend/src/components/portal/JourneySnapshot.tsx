@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Check, X } from "lucide-react";
 
-import { intlLocale, type Locale } from "@/lib/i18n";
+import { formatCount, intlLocale, type Locale } from "@/lib/i18n";
 import { useWorkCopy } from "@/components/portal/portal-copy";
 
 export type TimelineEvent = {
@@ -18,7 +18,8 @@ export type TimelineEvent = {
  * rail never competes with the current action or repeats it.
  */
 export function JourneyPulse({ stage, onViewJourney }: { stage: string; onViewJourney: () => void }) {
-  const t = useWorkCopy().caseCover.journey;
+  const work = useWorkCopy();
+  const t = work.caseCover.journey;
   const currentIndex = phaseIndex(stage);
 
   return (
@@ -31,7 +32,7 @@ export function JourneyPulse({ stage, onViewJourney }: { stage: string; onViewJo
           return (
             <li key={PHASES[index]?.key ?? index} className="journey-step" aria-current={state === "current" ? "step" : undefined}>
               {index < t.phases.length - 1 && <span aria-hidden className="journey-link" data-reached={index < currentIndex || undefined}/>}
-              <span aria-hidden className="journey-marker relative z-10 flex-none" data-state={state}>{index + 1}</span>
+              <span aria-hidden className="journey-marker relative z-10 flex-none" data-state={state}>{formatCount(index + 1, work.locale)}</span>
               <span className={`text-[0.875rem] leading-5 ${state === "current" ? "font-semibold text-brand-900" : "text-ink-600"}`}>
                 {label}
                 {state === "reached" && <span className="sr-only"> ({t.done})</span>}

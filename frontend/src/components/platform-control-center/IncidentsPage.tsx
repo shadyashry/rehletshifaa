@@ -70,7 +70,7 @@ export function Incidents({ locale, copy, api, canManage }: { locale: Locale; co
       <ul className="cc-list">
         <li className="cc-list-head" aria-hidden><span>{copy.case}</span><span>{copy.severityLabel}</span><span>{copy.owner}</span><span /></li>
         {data.map((incident) => <li key={incident.id}>
-          <span><strong dir="ltr">{incident.caseNumber}</strong><span className="cc-row-sub">{label(copy.types, incident.type)} · {date.format(new Date(incident.raisedAt))}</span></span>
+          <span><strong dir="ltr" className="whitespace-nowrap">{incident.caseNumber}</strong><span className="cc-row-sub">{label(copy.types, incident.type)} · {date.format(new Date(incident.raisedAt))}</span></span>
           <span><StatusBadge tone={severityTone(incident.severity)}>{label(copy.severity, incident.severity)}</StatusBadge><span className="cc-row-sub">{label(copy.status, incident.status)}</span></span>
           <span className="cc-meta">{owner(incident)}</span>
           <span><button type="button" className="cc-secondary" aria-label={fillTemplate(copy.open, { caseNumber: incident.caseNumber })} onClick={() => setSelected(incident.id)}>{copy.view}</button></span>

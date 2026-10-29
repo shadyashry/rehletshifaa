@@ -243,7 +243,7 @@ function Flags({ locale, copy, api, initialOpenOnly }: { locale: Locale; copy: C
       <ul className="cc-list">
         <li className="cc-list-head" aria-hidden><span>{t.case}</span><span>{t.consultant}</span><span>{t.facility}</span><span /></li>
         {data.map((flag) => <li key={flag.id}>
-          <span><strong dir="ltr">{flag.caseNumber}</strong><span className="cc-row-sub">{fillTemplate(t.raised, { date: day(flag.raisedAt) })}</span></span>
+          <span><strong dir="ltr" className="whitespace-nowrap">{flag.caseNumber}</strong><span className="cc-row-sub">{fillTemplate(t.raised, { date: day(flag.raisedAt) })}</span></span>
           <span><bdi>{flag.consultantName ?? "—"}</bdi></span>
           <span><bdi>{flag.facilityName ?? "—"}</bdi></span>
           <span>{flag.clearedAt ? <StatusBadge tone="success">{fillTemplate(t.cleared, { date: day(flag.clearedAt) })}</StatusBadge> : <StatusBadge tone="warning">{t.open}</StatusBadge>}</span>
@@ -461,7 +461,7 @@ function SampleCaseBlock({ locale, copy, item, day, review }: { locale: Locale; 
   const record = Object.keys(keys).filter((key) => Object.hasOwn(item.record, key)).map((key) => [keys[key], <bdi key={key} dir="ltr">{value(key, item.record[key])}</bdi>] as [string, ReactNode]);
   return <article aria-labelledby={`case-${item.caseId}`} style={{ borderTop: "1px solid var(--cc-line)", paddingTop: 16, marginTop: 16 }}>
     <div className="cc-section-head" style={{ alignItems: "center" }}>
-      <div><h3 id={`case-${item.caseId}`} style={{ margin: 0, fontSize: 16 }}><bdi dir="ltr">{item.caseNumber}</bdi></h3>
+      <div><h3 id={`case-${item.caseId}`} style={{ margin: 0, fontSize: 16 }}><bdi dir="ltr" className="whitespace-nowrap">{item.caseNumber}</bdi></h3>
         <p>{item.closedAt ? fillTemplate(t.closed, { date: day(item.closedAt) }) : null}{item.consultantName ? <> · <bdi>{item.consultantName}</bdi></> : null}{item.facilityName ? <> · <bdi>{item.facilityName}</bdi></> : null}</p></div>
       <StatusBadge tone={REVIEW_TONE[item.reviewStatus] ?? "neutral"}>{word(t.status, item.reviewStatus)}</StatusBadge>
     </div>

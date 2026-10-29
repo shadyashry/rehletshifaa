@@ -6,8 +6,28 @@ import { intlLocale, type Locale } from "@/lib/i18n";
 export type WorkCopy = Dictionary["portalWork"] & { careAreas: Record<string, string>; guardianConsent: string };
 type PluralForms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string };
 
-export const fillTemplate = (template: string, values: Record<string, string | number>) =>
-  template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
+/**
+ * UX X-1 (DESIGN.md "Numerals and isolation"): the placeholders that carry a left-to-right value are isolated wherever the
+ * template is filled, so an amount, a case number, a date or a rate keeps its order inside an Arabic sentence even where no
+ * markup can go (a title, an aria-label, a confirm question). A case number, a rate and an amount are left to right (LRI),
+ * as `Money` draws an amount in `<bdi dir="ltr">`; a date takes its direction from its first letter (FSI), since Intl writes
+ * Arabic month names.
+ * Only a right-to-left template is touched (an English sentence keeps its values as they are, so its text is unchanged);
+ * a value the caller already isolated is left as it is.
+ */
+const ISOLATES: Record<string, string> = { amount: "\u2066", date: "\u2068", caseNumber: "\u2066", rate: "\u2066" };
+const ISOLATED = /^[\u2066-\u2068][^\u2069]*\u2069$/;
+const RIGHT_TO_LEFT = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefc]/;
+const isolateValue = (key: string, value: string) =>
+  Object.hasOwn(ISOLATES, key) && value && !ISOLATED.test(value) ? `${ISOLATES[key]}${value}\u2069` : value;
+
+export const fillTemplate = (template: string, values: Record<string, string | number>) => {
+  const isolate = RIGHT_TO_LEFT.test(template);
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => {
+    const value = String(values[key] ?? "");
+    return isolate ? isolateValue(key, value) : value;
+  });
+};
 
 /** P1-7: an erased person's profile keeps the literal name "Erased" (backend `PatientProfile.ERASED_NAME`); staff screens word it in their language. */
 export const ERASED_NAME = "Erased";

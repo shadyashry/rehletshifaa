@@ -70,13 +70,13 @@ export function CareSystemsGrid({ systems, ledByLabel }: { systems: readonly Gri
                     // eslint-disable-next-line @next/next/no-img-element -- small, fixed-size approved portrait
                     <img key={person.slug} src={person.portrait.src} alt="" className="h-9 w-9 rounded-full object-cover" />
                   ) : (
-                    <span key={person.slug} className="care-grid-face grid h-9 w-9 place-items-center rounded-full text-[0.6875rem] font-semibold tracking-[0.03em]">
+                    <span key={person.slug} className="care-grid-face grid h-9 w-9 place-items-center rounded-full text-[0.75rem] font-semibold tracking-[0.03em]">
                       {person.initials}
                     </span>
                   ),
                 )}
                 {system.people.length > SHOWN_FACES ? (
-                  <span className="grid h-9 w-9 place-items-center rounded-full bg-surface-pearl text-[0.6875rem] font-semibold text-ink-600">
+                  <span className="grid h-9 w-9 place-items-center rounded-full bg-surface-pearl text-[0.75rem] font-semibold text-ink-600">
                     +{system.people.length - SHOWN_FACES}
                   </span>
                 ) : null}

@@ -3,19 +3,19 @@
 import { useCallback, useEffect, useId, useMemo, useState, type FocusEvent, type ReactNode } from "react";
 import { Check, X } from "lucide-react";
 
-import { intlLocale, type Locale } from "@/lib/i18n";
+import { formatCount, intlLocale, type Locale } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { fillTemplate } from "@/lib/portal-labels";
 import { useWorkCopy, type LocalizedWorkCopy } from "@/components/portal/portal-copy";
 import { StatusBadge, type StatusTone } from "@/components/portal/StatusBadge";
 import { LetterBlock } from "@/components/portal/GoingHomeStory";
 import { CaseStamp } from "@/components/brand/CaseStamp";
-import { ActForm, DocumentPicker, DoneAct, Fact, LaterAct, Money, Summary, Task as PanelTask, TimeField, instant, localInput, pick, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
+import { ActForm, AmountInput, DocumentPicker, DoneAct, Fact, LaterAct, Money, Summary, Task as PanelTask, TimeField, instant, localInput, pick, readAmount, submit, text, type PanelDocument } from "@/components/portal/panel-parts";
 import type { DischargePackItem, DischargeView, Mutate } from "@/components/portal/portal-model";
 
 type Copy = LocalizedWorkCopy["discharge"];
 /** The refusal, clock hint and cancel wording the recording forms share with the hospital file (UX 5-2). */
-type FormCopy = { refused: string; retry: string; timeHint: string; cancel: string };
+type FormCopy = { refused: string; retry: string; timeHint: string; cancel: string; amountInvalid: string };
 export type DischargeRole = "operations" | "coordinator" | "doctor";
 
 /** Current actions and work types whose work is done in this panel, so "do it" lands on its next form (P1-17). */
@@ -49,7 +49,7 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
   const work = useWorkCopy();
   const t = work.discharge;
   const forms: FormCopy = useMemo(() => ({ refused: work.admission.forms.refused, retry: work.admission.forms.refusedRetry, timeHint: work.admission.forms.timeHint,
-    cancel: work.admission.cancel }), [work]);
+    cancel: work.admission.cancel, amountInvalid: work.admission.forms.amountInvalid }), [work]);
   const id = useId();
   const [view, setView] = useState<DischargeView | null | undefined>(undefined);
   const dateTime = useMemo(() => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeStyle: "short" }), [locale]);
@@ -226,6 +226,8 @@ function OperationsHome({ t, forms, view, caseId, status, next, documents, busy,
   act: (path: string, body?: unknown) => Promise<boolean>; when: (iso?: string | null) => string; egp: (amount?: number | null) => string; packAndLetter: ReactNode;
 }) {
   const a = t.acts;
+  const id = useId();
+  const { locale } = useWorkCopy();
   const discharged = status === "DISCHARGED" || status === "FOLLOW_UP";
   const invoiceOpen = RECORDABLE.has(status) && !view.reconciliationSettled;
   const returnOpen = DISCHARGE_STAGES.has(status) && !view.departedAt;
@@ -240,12 +242,13 @@ function OperationsHome({ t, forms, view, caseId, status, next, documents, busy,
 
   const invoiceForm = (
     <ActForm key={invoice?.id ?? "new"} className="grid gap-3 sm:grid-cols-2" refused={forms.refused} retry={forms.retry} action={data => act(`/operations/cases/${caseId}/discharge/final-invoice`, {
-      documentId: data.get("documentId"), invoiceNumber: String(data.get("invoiceNumber") ?? "").trim(), amountEgp: Number(data.get("amountEgp")),
+      documentId: data.get("documentId"), invoiceNumber: String(data.get("invoiceNumber") ?? "").trim(), amountEgp: readAmount(data.get("amountEgp")),
       issuedAt: instant(data.get("issuedAt")), replaces: invoice?.id ?? null })}>
       <DocumentPicker name="documentId" label={t.invoice.document} empty={t.invoice.chooseDocument} documents={documents} required/>
       <label className="block text-sm font-semibold">{t.invoice.number}<input className="field" name="invoiceNumber" maxLength={80} required autoComplete="off" spellCheck={false} dir="ltr" defaultValue={invoice?.reference ?? ""}/></label>
-      <label className="block text-sm font-semibold">{t.invoice.amountEgp}<input className="field" name="amountEgp" type="number" inputMode="decimal" min="0" step="0.01" required dir="ltr"
-                                                                  defaultValue={invoice?.amountEgp ?? undefined}/></label>
+      {/* UX X-1: a text field read by readAmount, so an Arabic keypad's digits count (a number field drops them). */}
+      <div><label htmlFor={`${id}-invoice-amount`} className="block text-sm font-semibold">{t.invoice.amountEgp}</label>
+        <AmountInput id={`${id}-invoice-amount`} name="amountEgp" invalid={forms.amountInvalid} accepts="zero" defaultValue={invoice?.amountEgp ?? undefined}/></div>
       <TimeField label={t.invoice.issuedAt} name="issuedAt" hint={forms.timeHint} defaultValue={localInput(invoice?.effectiveAt ?? invoice?.recordedAt)}/>
       {!documents.some(d => d.status === "CLEAN") && <p className="text-[0.8125rem] text-ink-600 sm:col-span-2">{t.packForm.noDocuments}</p>}
       <div className="sm:col-span-2"><button className={next === "invoice" ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.invoice.record}</button></div>
@@ -279,7 +282,7 @@ function OperationsHome({ t, forms, view, caseId, status, next, documents, busy,
 
       {/* THE PACK AND THE LETTER — the Consultant's, read here as two lines. */}
       <ul role="list" className="mt-3 space-y-1 text-[0.875rem] text-ink-700">
-        <li>{fillTemplate(a.pack, { done: String(recorded), total: String(owed.length) })}
+        <li>{fillTemplate(a.pack, { done: formatCount(recorded, locale), total: formatCount(owed.length, locale) })}
           {fitToFly?.validUntil && <> · {fillTemplate(a.fitToFly, { when: isolate(when(fitToFly.validUntil)) })}</>}</li>
         <li>{view.handoverLetter ? fillTemplate(a.letter, { when: isolate(when(view.handoverLetter.generatedAt)) }) : a.noLetter}</li>
       </ul>

@@ -13,7 +13,7 @@ import { useControlCenterEntry } from "@/components/platform-control-center/Cont
 import { apiFetchAs } from "@/lib/api";
 import { formatCalendarDate } from "@/lib/dates";
 import type { Dictionary } from "@/lib/dictionary";
-import { intlLocale, type Locale } from "@/lib/i18n";
+import { intlLocale, latinDigits, type Locale } from "@/lib/i18n";
 import { formatMoney, parseAmount } from "@/lib/money";
 import { fillTemplate, tabKeyTarget } from "@/lib/portal-labels";
 import {
@@ -271,7 +271,7 @@ function Availability({ copy, clinic, base, run }: { copy: ClinicCopy; clinic: C
       </label>
       <div>
         <label htmlFor={`${id}-hours`} className="block text-sm font-bold">{t.reviewHours}</label>
-        <input id={`${id}-hours`} className={`field mt-1.5 tabular-nums ${invalid ? "field-error" : ""}`} inputMode="numeric" dir="ltr" value={hours} onChange={e => setHours(e.target.value)}
+        <input id={`${id}-hours`} className={`field mt-1.5 tabular-nums ${invalid ? "field-error" : ""}`} inputMode="numeric" dir="ltr" value={hours} onChange={e => setHours(latinDigits(e.target.value))}
           aria-invalid={invalid || undefined} aria-describedby={`${id}-hint${invalid ? ` ${id}-error` : ""}`}/>
         <p id={`${id}-hint`} className="mt-1 text-[0.8125rem] text-ink-500">{t.reviewHoursHint}</p>
         {invalid && <p id={`${id}-error`} className="error-text mt-1">{t.reviewHoursInvalid}</p>}

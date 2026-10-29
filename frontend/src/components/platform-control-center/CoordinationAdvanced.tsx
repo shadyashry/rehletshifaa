@@ -105,7 +105,7 @@ function DecisionHistory(ctx: CoordinationContext) {
       <ol className="cc-stepper">
         {rows.map((d) => <li className="cc-step" key={d.id}>
           <div className="cc-step-head">
-            <h3>{kind(d)} · <bdi dir="ltr">{d.caseNumber}</bdi></h3>
+            <h3>{kind(d)} · <bdi dir="ltr" className="whitespace-nowrap">{d.caseNumber}</bdi></h3>
           </div>
           <p className="cc-meta"><time dateTime={d.evaluatedAt}>{when(d.evaluatedAt, locale)}</time>{d.actorName ? <> · {t.by} <bdi>{d.actorName}</bdi></> : null}</p>
           <p>{t.from}: {name(d.previousOwnerName, d.previousOwner)} → {t.to}: {name(d.selectedOwnerName, d.selectedOwner)}{d.team ? <> ({<bdi>{teamName(d.team)}</bdi>})</> : null}</p>
@@ -141,7 +141,7 @@ function LiveRoutingQueue(ctx: CoordinationContext) {
     <ErrorNotice error={error} locale={locale} action="load" onRetry={() => void load()} />
     {rows === null ? (!error && <p role="status">{t.loading}</p>) : !rows.length ? <EmptyState title={t.liveQueueEmpty} /> : (
       <ul className="cc-cards">{rows.map((q) => <li className="cc-card" key={q.taskId}>
-        <h3><bdi dir="ltr">{q.caseNumber}</bdi></h3>
+        <h3><bdi dir="ltr" className="whitespace-nowrap">{q.caseNumber}</bdi></h3>
         <p className="cc-meta">{q.team ? <bdi>{teamName(q.team)}</bdi> : null}{q.reason ? <> · {pathLabel(q.reason, locale)}</> : null}</p>
         <p className="cc-meta">{t.waitingSince}: {when(q.queuedAt, locale)} · {t.deadline}: {when(q.dueAt, locale)}</p>
         {can("ROUTING_ASSIGN") && <div className="cc-step-actions"><button type="button" className="cc-secondary" onClick={() => { setNotice(""); setAssigning(q); }}>{t.assign}</button></div>}
