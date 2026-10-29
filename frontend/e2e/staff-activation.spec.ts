@@ -27,7 +27,7 @@ async function invitedCoordinator(page: Page, activation: { status: number; body
 test("an invited coordinator becomes ACTIVE on first sign-in and lands in their workspace", async ({ page }) => {
   const { writes } = await invitedCoordinator(page, { status: 200, body: { lifecycle: "ACTIVE" } });
   await page.goto("/en/portal");
-  await expect(page.getByRole("heading", { level: 1, name: "Coordinator" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "My cases" })).toBeVisible(); // a coordinator opens on their own cases
   expect(writes.filter((w) => w.path === "/me/activation")).toHaveLength(1);
   await expect(page.getByRole("heading", { name: "Finish setting up your account" })).toHaveCount(0);
 });
