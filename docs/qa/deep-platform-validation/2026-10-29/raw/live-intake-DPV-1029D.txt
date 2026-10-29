@@ -1,0 +1,13 @@
+PASS UC-01/neg-consent {"status":400,"code":"VALIDATION_FAILED","rid":"cfdcb84587339bd14d4a94445c186ae9"}
+PASS UC-01/neg-phone {"status":400,"code":"VALIDATION_FAILED"}
+PASS UC-01/create {"status":201,"caseNumber":"RS-2026-000009","ms":598,"rid":"619fa937d60198dda16a127f03ed01dc"}
+PASS UC-01/upload-clean {"presign":201,"put":200,"confirm":200,"code":"CLEAN","ms":1932}
+PASS SEC-13/oversize {"presign":400,"code":"INVALID_FILE_SIZE"}
+PASS SEC-13/type {"presign":400,"code":"UNSUPPORTED_FILE_TYPE"}
+PASS SEC-13/mime-spoof {"presign":201,"put":200,"confirm":422,"code":"DOCUMENT_INSPECTION_FAILED","ms":998}
+FAIL SEC-13/infected {"presign":201,"put":200,"confirm":200,"code":"CLEAN","ms":933}
+PASS UC-01/wrong-grant {"status":404,"code":"CASE_NOT_FOUND"}
+FAIL UC-01/submit {"status":409,"ms":395,"rid":"1540bdf8dd38d289b1deccf1b1d46dee"}
+PASS UC-01/duplicate-submit {"status":409,"code":"DOCUMENTS_NOT_READY"}
+FAIL UC-01/confirmation-delivered {}
+PASS SEC-5/no-enumeration {"match":202,"nonMatch":202,"msMatch":931,"msNonMatch":520}

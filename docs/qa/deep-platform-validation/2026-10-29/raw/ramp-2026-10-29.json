@@ -1,0 +1,4 @@
+{"concurrency":1,"requests":4672,"rps":234,"errors":0,"p50":4,"p95":7,"p99":9}
+{"concurrency":4,"requests":20636,"rps":1032,"errors":0,"p50":4,"p95":6,"p99":9}
+{"concurrency":8,"requests":25810,"rps":1291,"errors":0,"p50":6,"p95":9,"p99":13}
+{"concurrency":16,"requests":28954,"rps":1448,"errors":0,"p50":10,"p95":16,"p99":22}

@@ -47,6 +47,7 @@ frontend; 30 min smoke checks and the role-portal smoke; the rest is margin.
 | Date | Where | Restored | Restore time | Result |
 |---|---|---|---|---|
 | 2026-10-15 | Local scratch stack (Docker Desktop, Windows 11), set from the dev stack | 136 tables / 798 rows (V96, migrated to V98), realm (7 bound + 3 custom flows), bucket (0 objects; 3 in a synthetic rerun) | **135 s** (realm import 71 s, mostly Keycloak start; backend start 40 s) | PASS: counts and checksums equal, health UP, Flyway V98, `/api/v1/me` 401/200, object version recovery |
+| 2026-10-29 | Local scratch stack (Docker Desktop, Windows 11), set from the dev stack at `1b1307f5` (deep validation run) | 157 tables / 920 rows (V109), realm (7 bound + 3 custom flows, `staff-identity-admin` re-keyed), bucket (11 objects, versioned) | **94 s** (realm import 44 s; backend start 25 s) | PASS: counts and checksums equal, health UP, Flyway V109, `/api/v1/me` 401/200, object version recovery |
 
 The local drill restores a database dump, the realm export and a bucket snapshot into a scratch Compose stack and
 runs the smoke checks; it does not time a managed-host PITR restore or a region failover, which the first

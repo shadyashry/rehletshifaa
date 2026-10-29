@@ -1,0 +1,165 @@
+{
+ "run": "DPV-1029F",
+ "caseNumber": "RS-2026-000011",
+ "startedAt": "2026-10-29T14:40:08.356Z",
+ "results": [
+  {
+   "id": "UC-01/neg-consent",
+   "outcome": "PASS",
+   "status": 400,
+   "code": "VALIDATION_FAILED",
+   "rid": "4124be725b24bcc3d237e64cfe248674"
+  },
+  {
+   "id": "UC-01/neg-phone",
+   "outcome": "PASS",
+   "status": 400,
+   "code": "VALIDATION_FAILED"
+  },
+  {
+   "id": "UC-01/create",
+   "outcome": "PASS",
+   "status": 201,
+   "caseNumber": "RS-2026-000011",
+   "ms": 458,
+   "rid": "37afa2748ead3960bee7c55200f15d62"
+  },
+  {
+   "id": "UC-01/upload-clean",
+   "outcome": "PASS",
+   "presign": 201,
+   "put": 200,
+   "confirm": 200,
+   "code": "CLEAN",
+   "ms": 832
+  },
+  {
+   "id": "SEC-13/oversize",
+   "outcome": "PASS",
+   "presign": 400,
+   "code": "INVALID_FILE_SIZE"
+  },
+  {
+   "id": "SEC-13/type",
+   "outcome": "PASS",
+   "presign": 400,
+   "code": "UNSUPPORTED_FILE_TYPE"
+  },
+  {
+   "id": "SEC-13/mime-spoof",
+   "outcome": "PASS",
+   "presign": 201,
+   "put": 200,
+   "confirm": 422,
+   "code": "DOCUMENT_INSPECTION_FAILED",
+   "ms": 865
+  },
+  {
+   "id": "SEC-13/infected",
+   "outcome": "FAIL",
+   "presign": 201,
+   "put": 200,
+   "confirm": 200,
+   "code": "CLEAN",
+   "ms": 921
+  },
+  {
+   "id": "UC-01/wrong-grant",
+   "outcome": "PASS",
+   "status": 404,
+   "code": "CASE_NOT_FOUND"
+  },
+  {
+   "id": "UC-01/submit",
+   "outcome": "PASS",
+   "status": 200,
+   "caseStatus": "RECEIVED",
+   "ms": 607,
+   "rid": "9a9bc87ce34fd8c2eb9eba4db9ef6330"
+  },
+  {
+   "id": "UC-01/duplicate-submit",
+   "outcome": "PASS",
+   "status": 404,
+   "code": "CASE_NOT_FOUND"
+  },
+  {
+   "id": "UC-01/confirmation-delivered",
+   "outcome": "PASS",
+   "lagMs": 2441,
+   "to": [
+    "coordinator@local.test"
+   ]
+  },
+  {
+   "id": "SEC-4/no-grant",
+   "outcome": "PASS",
+   "status": 401,
+   "code": "VERIFICATION_REQUIRED"
+  },
+  {
+   "id": "UC-02/summary",
+   "outcome": "PASS",
+   "status": 200,
+   "keys": [
+    "caseNumber",
+    "purpose",
+    "channel",
+    "destinationHint"
+   ]
+  },
+  {
+   "id": "UC-02/request-otp",
+   "outcome": "PASS",
+   "status": 200,
+   "hint": "***8356"
+  },
+  {
+   "id": "UC-02/otp-delivered",
+   "outcome": "PASS",
+   "lagMs": 749
+  },
+  {
+   "id": "SEC-1/lockout",
+   "outcome": "PASS",
+   "wrongStatuses": [
+    400,
+    400,
+    400,
+    400,
+    400
+   ],
+   "correctAfterLock": 400,
+   "code": "VERIFICATION_INVALID"
+  },
+  {
+   "id": "UC-02/verify",
+   "outcome": "PASS",
+   "status": 200
+  },
+  {
+   "id": "UC-02/view",
+   "outcome": "PASS",
+   "status": 200,
+   "ms": 518
+  },
+  {
+   "id": "SEC-10/no-internal-money",
+   "outcome": "PASS"
+  },
+  {
+   "id": "SEC-11/otp-replay",
+   "outcome": "PASS",
+   "status": 400,
+   "code": "VERIFICATION_INVALID"
+  },
+  {
+   "id": "SEC-5/no-enumeration",
+   "outcome": "PASS",
+   "match": 202,
+   "nonMatch": 202,
+   "msMatch": 571,
+   "msNonMatch": 501
+  }
+ ]
+}

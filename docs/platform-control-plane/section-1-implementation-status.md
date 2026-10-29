@@ -1525,3 +1525,14 @@ waits for a travel-fee collection ledger. A nonzero minimum coordination fee rem
   remains historical rather than a fresh claim. If fresh deployment evidence is requested, use the canonical tunnel
   overlay and exercise the distinct holder/admin/manager identities without enabling Journey admission merely for
   demonstration. The current next action is the "Next exact action" after the CL2+CL3 review note above.
+
+### Deep platform validation handoff (2026-10-29, Claude)
+
+Run evidence: `docs/qa/deep-platform-validation/2026-10-29/` (resume from `checkpoint.md`). Authority-relevant
+changes: new port `authority.application.IntakeTeams` (implemented by `coordination.application.CoordinationIntakeTeams`)
+limits an unclaimed case's queue row, intake preview and documents to coordinators on a team serving its care area
+(UC-03 B, UC-20); the `CASE_UNCLAIMED` scope itself and claim eligibility are unchanged. `ReplyCoverService.current`
+now detects the manager view from platform-scope grants only (a `SELF` grant matches any platform resource in
+`Authority.inScope`; no other probe relies on it). Commits `61f2539f`, `1bd6a1e9`, `1b1307f5` (not pushed); backend
+1013 tests green, PostgreSQL mapping PASS at V109. Live staff journeys remain unrun pending an owner decision on QA
+identities (seeded staff accounts carry tester-enrolled authenticators).

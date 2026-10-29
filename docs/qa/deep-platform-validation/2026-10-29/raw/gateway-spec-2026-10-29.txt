@@ -1,0 +1,9 @@
+[1/8] [chromium] › e2e\gateway.spec.ts:25:5 › two clients never share a bucket, and a normal page open never sees 429
+[2/8] [chromium] › e2e\gateway.spec.ts:34:5 › CORS preflights are answered but never spend the client's budget
+[3/8] [chromium] › e2e\gateway.spec.ts:47:5 › health probes do not count against ordinary API quota
+[4/8] [chromium] › e2e\gateway.spec.ts:53:5 › a client hammering reads is still throttled
+[5/8] [chromium] › e2e\gateway.spec.ts:59:5 › writes have their own, smaller budget
+[6/8] [chromium] › e2e\gateway.spec.ts:67:5 › public secure-link routes are the tightest, and a patient flow fits inside them
+[7/8] [chromium] › e2e\gateway.spec.ts:74:5 › every response carries a correlation id and an incoming one is kept
+[8/8] [chromium] › e2e\gateway.spec.ts:81:5 › only the gateway's contract is exposed
+  8 passed (32.0s)
