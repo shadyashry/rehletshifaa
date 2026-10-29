@@ -14,6 +14,11 @@ Severity order: safety/privacy, unauthorized access, data loss, incorrect money,
 | D-07 | Critical | Frontend dependency (Next.js) | FIXED (16.3.3 → 16.4.2); gates re-run | `pnpm audit --prod`: critical 3 → 0 |
 | D-08 | High | Blocked patient journey (UC-01) | FIXED, red/green; **found live** | `DocumentSubmissionReadinessTest` |
 | D-09 | Medium | Money (dev seed: 0 EGP services offered) | FIXED (`73f09570`); **found live** on the QA stack | live `operations-gate-live` (deposit raised); dev DB: 0 active zero-priced services after restart |
+| D-10 | High | Approved gap: staff cannot file case paperwork (blocks admission/discharge) | FIXED backend (`4d1d5fc6`); UI open | `StaffDocumentUploadTest`; live post-arrival journey |
+| D-11 | High | Availability: backend write budget per IP blocks a normal multi-role journey (AR-06) | OPEN — owner decision (per-principal budgets / launch workload) | live: 429 on the 6th role's upload; QA stack runs with a raised per-address budget |
+| D-12 | High | Blocked patient journey: patients can never confirm a step-up decision | FIXED, red/green (`4d1d5fc6`); **found live** | `AuthorityIntegrationTest.aPatientsDecisionNeedsAFreshSignInNotASecondFactor`, `RolePolicyTest`; live withdrawal 200 |
+| D-13 | High | Money: an in-time patient cancellation cannot be refunded (Finance has no access) | FIXED (next commit); **found live** | `RefundObligationServiceTest`; live refund of 4,025 EGP, deposit REFUNDED |
+| D-14 | Low | A refund replay after the full refund answers 403, not the idempotent 200 receipts give | OPEN (no duplicate recorded) | live refund test |
 
 ## D-01 — Deposit receipt replay discloses another case's deposit (High)
 
@@ -107,6 +112,51 @@ Severity order: safety/privacy, unauthorized access, data loss, incorrect money,
 - **Review item (not a decision taken):** the backend still accepts a hand-entered 0 EGP estimate line and a 0 EGP
   proposal total (`@DecimalMin("0.00")`); whether a released proposal may total 0 is a business rule to confirm
   (DPV-REV-2).
+
+## D-10 — Staff could not add case documents (High, approved functionality gap) — found on the live journey
+
+- **Requirement:** `docs/post-deposit-solution-architecture.md` §471 ("typed pickers for Operations (bills, letters) and
+  Consultants (pack)"), §508–509 (Operations "letter upload … balance receipt upload, bills"; Consultant "discharge-pack
+  checklist with typed uploads").
+- **Actual:** the only upload endpoints were the patient's (My Care, secure link, intake). Every evidence row (letter,
+  receipt, invoice, pack) must point at a clean case document, so admission and discharge could not be recorded unless the
+  patient happened to upload the hospital's paperwork.
+- **Fix (backend):** `CASE_DOCUMENT_ADD` (owner coordinator, Operations and Consultant on the case),
+  `POST /api/v1/work/cases/{id}/documents/presign|confirm` on the same inspected pipeline; an ended case takes no new
+  paperwork; an upload is confirmed by its uploader. Independently reviewed (no blocking findings).
+- **Open:** the staff upload controls in the Operations and Consultant panels (UI; UX pipeline, en/ar copy). Reviewer notes
+  kept open: staff files carry no "source" marker where patient-supplied evidence is expected (guardian/consent evidence);
+  check whether hospital invoices should appear in the patient's document list.
+
+## D-11 — Per-IP write budget blocks a normal journey (High, availability; AR-06 with live evidence)
+
+- **Live:** on the QA stack all roles act from one address (as staff behind an office NAT). The backend's 30 writes/min
+  per IP refused the Operations upload mid-journey (`429 RATE_LIMIT_EXCEEDED`); the gateway's 60/min per IP is the next limit.
+  The dev `.env` already carries a UAT override for the same reason.
+- **Not changed:** rate budgets are a security control at two layers; keying authenticated writes per principal (and
+  anonymous per IP) is the proposed fix, for the owner to approve with the launch workload.
+
+## D-12 — Patients could not confirm any step-up decision (High, blocked journey) — found live
+
+- **Live:** a just-signed-in patient (`amr ["pwd"]`, `acr 1`) → `POST /patient/cases/{id}/withdraw` →
+  `401 REAUTHENTICATION_REQUIRED "Use multi-factor authentication"`. `PATIENT_DECIDE` (withdraw, change-order and in-portal
+  proposal decisions) required a second factor that patients are never asked to set up (owner decision D1). The tests
+  hid it: their fixtures sign patients in at `acr 2`.
+- **Fix:** step-up demands the second factor only when the grant used belongs to a role that signs in with one; patients
+  and representatives confirm with a fresh sign-in (20 min). A `RolePolicyTest` keeps step-up permissions from being shared
+  between password-only and second-factor roles. Reviewed: no staff power is confirmable without MFA.
+- **Owner note (from the review):** for patients a stolen password plus a fresh sign-in now authorizes their decisions —
+  the consequence of D1, stated explicitly.
+
+## D-13 — An in-time patient cancellation could not be refunded (High, money) — found live
+
+- **Live:** after the patient's withdrawal with a paid deposit, Finance's refund → `403 OUT_OF_SCOPE (CASE_DEPOSIT_READ)`.
+  Refund work (which is also Finance's access to the case after an exit) opened only for guaranteed exits; the paid deposit
+  is no longer "open"; Finance is not assigned on catalogue-priced cases. `PATIENT_CANCELLED` refunds, which the policy
+  entitles before the cutoff (or with no confirmed appointment), were therefore impossible.
+- **Fix:** `RefundObligationService.openForExit` opens the refund work for a patient's withdrawal or no-show that beat the
+  cutoff; the cutoff rule has one home (`RefundPolicyService.patientCancelledInTime`). Live: refund 4,025 EGP recorded once,
+  deposit `REFUNDED`, the over-amount attempt refused.
 
 ## Open (not fixed this run)
 

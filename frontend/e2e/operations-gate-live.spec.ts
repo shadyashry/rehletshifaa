@@ -1,7 +1,9 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 
 import { API, OIDC_AUTHORITY } from "./env";
-import { STEP_UP_USERS, preparePasskey, requestStepUp, submitKeycloakSignIn } from "./live-auth";
+import { STEP_UP_USERS, completeKeycloakSteps, preparePasskey, requestStepUp, submitKeycloakSignIn } from "./live-auth";
 
 /**
  * The gate into TRAVEL_COORDINATION, proven over HTTP through the real path
@@ -94,8 +96,18 @@ type Workspace = { caseSummary: { status: string; version: number }; timeline: {
   clinicalReviews: { id: string; status: string }[]; proposal?: { versionId: string; status: string }; gates?: { financeRequired: boolean } | null;
   deposit?: { id: string; status: string; totalEgp: number; transfer?: { status: string } | null } | null; actions: { currentAction: { code: string; workType?: string | null } } };
 
+type Gate = NonNullable<typeof arrived> & { deposit: { id: string; totalEgp: number } };
+
 test("operations may draft before the gate, cannot advance the journey, and the gate opens exactly once", async ({ browser, request }) => {
   test.setTimeout(420000);
+  arrived = await gateJourney(browser, request, true);
+});
+
+/**
+ * The case through intake, review, proposal, acknowledgement, activation and the deposit into TRAVEL_COORDINATION; with
+ * {@code arrive} the patient then arrives (ARRIVAL_CONFIRMED). Asserts the gate on the way.
+ */
+async function gateJourney(browser: Browser, request: APIRequestContext, arrive: boolean): Promise<Gate> {
   anonymous = request;
   const stamp = Date.now();
   const email = `ops-gate-${stamp}@local.test`;
@@ -252,6 +264,198 @@ test("operations may draft before the gate, cannot advance the journey, and the 
   await call(finance, "POST", `/finance/cases/${caseId}/deposits/${deposit.id}/payments`, receipt, 200);
   expect(await settled()).toEqual({ transitions: 1, travelWork: 1, settledNotices: 1 });
 
+  const gate: Gate = { caseId, coordinator, doctor, operations, finance, email, whatsapp, stamp, service, password, workspace, deposit };
+  if (!arrive) return gate;
   await call(operations, "PUT", `/operations/cases/${caseId}/travel`, arrival, 200);
   expect((await workspace()).caseSummary.status, "the arrival that was refused before the gate is accepted after it").toBe("ARRIVAL_CONFIRMED");
+  return gate;
+}
+
+/** A patient's own sign-in (password only, as patients sign in) and their bearer session. */
+async function patientSession(browser: Browser, email: string, password: string): Promise<Session> {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto("/en/portal");
+  await page.getByRole("button", { name: /Sign in securely/ }).click();
+  await page.waitForURL(url => url.toString().startsWith(OIDC_AUTHORITY), { timeout: 30000 });
+  await page.locator("#username").fill(email);
+  await page.locator("#password").fill(password);
+  await page.locator("#kc-login").click();
+  await page.waitForURL(/\/en\/portal/, { timeout: 30000 });
+  const token = await page.evaluate(key => (JSON.parse(sessionStorage.getItem(key) ?? "{}") as { access_token?: string }).access_token ?? "",
+    `oidc.user:${OIDC_AUTHORITY}:rehletshifaa-web`);
+  expect(token, "a token for the patient").toBeTruthy();
+  await page.close();
+  return { request: context.request, subject: "", token };
+}
+
+test("a patient withdraws before travel is confirmed; Finance refunds the deposit in full, once", async ({ browser, request }) => {
+  test.setTimeout(420000);
+  const { caseId, finance, email, password, workspace, deposit, stamp } = await gateJourney(browser, request, false);
+  // D-12: the patient decides with a fresh password sign-in (no second factor is asked of patients).
+  const patient = await patientSession(browser, email, password);
+  await call(patient, "POST", `/patient/cases/${caseId}/withdraw`, { note: "I have decided not to travel." }, 200);
+  let ws = await workspace();
+  expect(ws.caseSummary.status).toBe("CANCELLED");
+  // A second withdrawal changes nothing.
+  expect((await call(patient, "POST", `/patient/cases/${caseId}/withdraw`, { note: "again" })).status).toBe(409);
+
+  const refund = { amountEgp: deposit.totalEgp, reasonCode: "PATIENT_CANCELLED", reason: "Withdrew before travel was confirmed", idempotencyKey: `refund-${stamp}` };
+  const tooMuch = await call<{ code: string }>(finance, "POST", `/finance/cases/${caseId}/deposits/${deposit.id}/refunds`, { ...refund, amountEgp: deposit.totalEgp + 1, idempotencyKey: `over-${stamp}` });
+  expect(tooMuch.status, "never more than was received").toBeGreaterThanOrEqual(400);
+  await call(finance, "POST", `/finance/cases/${caseId}/deposits/${deposit.id}/refunds`, refund, 200);
+  // A replay records nothing: once the full refund closes Finance's refund work it is refused (403) rather than answered (D-14, low).
+  expect([200, 403]).toContain((await call(finance, "POST", `/finance/cases/${caseId}/deposits/${deposit.id}/refunds`, refund)).status);
+  ws = await workspace();
+  expect(ws.deposit?.status).toBe("REFUNDED");
+  const ledger = (await call<{ events: { eventType: string }[] }>(finance, "GET", `/finance/cases/${caseId}/deposit`, undefined)).body;
+  if (ledger?.events) expect(ledger.events.filter(e => e.eventType === "REFUND_RECORDED"), "one refund in the ledger").toHaveLength(1);
 });
+
+// ---------- after arrival: final quote, admission, treatment, discharge, settlement, follow-up ----------
+
+let arrived: { caseId: string; coordinator: Session; doctor: Session; operations: Session; finance: Session; email: string; whatsapp: string;
+  stamp: number; service: { id: string | null; serviceName: string; priceEgp: number }; password: string; workspace: () => Promise<Workspace> } | null = null;
+
+const PDF = Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+
+/** D-10: the case team files paperwork as a case document (presign, put, confirm: inspected like the patient's). */
+async function staffDocument(s: Session, caseId: string, name: string): Promise<string> {
+  const presign = (await call<{ documentId: string; uploadUrl: string; requiredHeaders: Record<string, string> }>(s, "POST", `/work/cases/${caseId}/documents/presign`,
+    { originalFileName: name, contentType: "application/pdf", sizeBytes: PDF.length }, 201)).body;
+  const headers = Object.fromEntries(Object.entries(presign.requiredHeaders).filter(([k]) => !["host", "content-length"].includes(k.toLowerCase())));
+  const put = await s.request.fetch(presign.uploadUrl, { method: "PUT", headers, data: PDF });
+  expect(put.status(), `${name} reaches object storage`).toBe(200);
+  expect((await call<{ status: string }>(s, "POST", `/work/cases/${caseId}/documents/confirm`, { documentId: presign.documentId }, 200)).body.status).toBe("CLEAN");
+  return presign.documentId;
+}
+
+/** An invited QA identity (no password in the repo) sets its password through "Forgot your password?" and Mailpit, once. */
+async function activateInvited(browser: Browser, request: APIRequestContext, user: string): Promise<string> {
+  const saved = join(__dirname, "..", ".e2e", "mfa", `${user}.password`);
+  if (existsSync(saved)) return readFileSync(saved, "utf8").trim();
+  const password = `Qa-${Date.now()}-Aa1!`;
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto("/en/portal");
+  await page.getByRole("button", { name: /Sign in securely/ }).click();
+  await page.waitForURL(url => url.toString().startsWith(OIDC_AUTHORITY), { timeout: 30000 });
+  await page.locator('a[href*="reset-credentials"]').click();
+  await page.locator("#username").fill(user);
+  const since = Date.now() - 5000;
+  await page.locator('#kc-reset-password-form [type="submit"]').first().click();
+  const link = await latestMail(request, "Reset your RehletShifaa password", since, `${user}@local.test`, /(https?:\/\/[^\s"<>]+login-actions\/action-token[^\s"<>]*)/);
+  await page.goto(link.replace(/&amp;/g, "&"));
+  // A staff account enrols its authenticator first, then sets the password (the reset link carries both steps).
+  await completeKeycloakSteps(page, user, password);
+  await context.close();
+  mkdirSync(dirname(saved), { recursive: true });
+  writeFileSync(saved, password);
+  return password;
+}
+
+type Evidence = { id: string; kind: string; superseded?: boolean };
+type Admission = { voucher?: { patientPaysAtFacilityEgp: number; feeBalanceEgp: number } | null; evidence: Evidence[] };
+const latestEvidence = (view: { evidence: Evidence[] }, kind: string) => view.evidence.filter(e => e.kind === kind && !e.superseded).at(-1)!.id;
+
+test("after arrival: the final quote, the admission, treatment, discharge, settlement and follow-up", async ({ browser, request }) => {
+  test.setTimeout(600000);
+  test.skip(!arrived, "runs after the gate scenario");
+  anonymous = request;
+  const { caseId, coordinator, doctor, operations, finance, stamp, service, whatsapp, email, workspace } = arrived!;
+  const status = async () => (await workspace()).caseSummary.status;
+
+  // --- A facility, from Consultant Operations (an invited QA identity, activated through the reset email) ---
+  PASSWORDS["consultant-operations-manager"] = await activateInvited(browser, request, "consultant-operations-manager");
+  const com = await signIn(browser, "consultant-operations-manager");
+  await call(com, "POST", "/me/activation", undefined);
+  const facility = (await call<{ id: string; status: string }>(com, "POST", "/admin/facilities", { name: `QA Heart Hospital ${stamp}`, city: "Cairo", kind: "HOSPITAL",
+    settlementTerms: "NET_30", settlementNotes: null, contactName: "Admissions desk", contactEmail: "admissions@hospital.test", contactPhone: null }, 200)).body;
+  if (facility.status !== "ACTIVE") await call(com, "PUT", `/admin/facilities/${facility.id}/status`, { status: "ACTIVE" }, 200);
+
+  // --- The Consultant examines the patient; the coordinator issues the final quote at the same price ---
+  const finalReview = (await call<{ id: string }>(doctor, "POST", `/doctor/cases/${caseId}/final-assessment`, { recommendedTreatment: "Scope confirmed on examination",
+    risksAndLimitations: "Standard risks", costEstimates: [{ serviceDescription: service.serviceName, estimatedCost: service.priceEgp, currency: "EGP", catalogServiceId: service.id }] }, 200)).body.id;
+  const quote = (await call<{ versionId: string }>(coordinator, "POST", `/coordinator/cases/${caseId}/final-quotes`, { clinicalReviewId: finalReview, currency: "EGP",
+    scopeChangeReason: null, excludedServices: "None", paymentTerms: "The balance is paid at the hospital", refundTerms: "As in the deposit terms", disclaimers: "Final quote",
+    validUntil: null, coordinatorNotes: null }, 200)).body.versionId;
+  const quoteReleasedAt = Date.now() - 5000;
+  await call(coordinator, "POST", `/coordinator/cases/${caseId}/final-quotes/${quote}/release`, undefined, 200);
+
+  // --- Operations reserves the hospital and files its letter; Finance checks it (before the patient accepts, as in practice) ---
+  await call(operations, "POST", `/operations/cases/${caseId}/admission`, { facilityId: facility.id, plannedAdmissionAt: new Date(Date.now() + 2 * 86400000).toISOString() }, 200);
+  const letterDoc = await staffDocument(operations, caseId, "admission-letter.pdf");
+  const lettered = (await call<Admission>(operations, "POST", `/operations/cases/${caseId}/admission/letter`, { documentId: letterDoc, quotedPackageEgp: service.priceEgp, reference: `PF-${stamp}` }, 200)).body;
+  await call(finance, "POST", `/finance/cases/${caseId}/admission/letter/decision`, { evidenceId: latestEvidence(lettered, "FACILITY_ADMISSION_LETTER"), decision: "ACCEPT", note: null }, 200);
+
+  // --- The patient accepts the final quote through the secure link and a one-time code ---
+  const quoteToken = await latestMail(request, "Your final quote is ready", quoteReleasedAt, SIMULATOR_INBOX, new RegExp(`Destination: ${whatsapp.replace("+", "\\+")}[\\s\\S]*?/proposal/([0-9a-f]{64})`));
+  const codeAt = Date.now() - 5000;
+  await call(null, "POST", `/public/proposals/${quoteToken}/request-access`, { channel: "EMAIL" }, 200);
+  const code = await latestMail(request, "Your RehletShifaa verification code", codeAt, email, /verification code is (\d{6})/);
+  const grant = (await call<{ grant: string }>(null, "POST", `/public/proposals/${quoteToken}/verify`, { code }, 200)).body.grant;
+  await call(null, "POST", `/public/proposals/${quoteToken}/decision`, { grant, decision: "ACCEPTED", comment: null, acknowledgementAccepted: true }, 200);
+
+  // --- Consent, the hospital balance (countersigned by Finance), the fee balance, the admission number ---
+  await call(doctor, "POST", `/doctor/cases/${caseId}/consent`, { exactText: "Explained in person; I consent to the procedure.", language: "en", policyVersion: "v1",
+    relatedProposalVersionId: null, evidenceDocumentId: null, evidenceReference: `Hospital consent #${stamp}` }, 200);
+  let admission = (await call<Admission>(operations, "GET", `/operations/cases/${caseId}/admission`, undefined, 200)).body;
+  expect(admission.voucher, "the voucher is issued once the letter is checked and the final quote accepted").toBeTruthy();
+  const due = admission.voucher!.patientPaysAtFacilityEgp;
+  if (due > 0) {
+    const receiptDoc = await staffDocument(operations, caseId, "cashier-receipt.pdf");
+    admission = (await call<Admission>(operations, "POST", `/operations/cases/${caseId}/admission/balance`, { receiptNumber: `RCPT-${stamp}`, amountEgp: due,
+      paidAt: new Date(Date.now() - 600000).toISOString(), method: "CARD", documentId: receiptDoc, paidCurrency: "EGP", paidAmount: due }, 200)).body;
+    await call(finance, "POST", `/finance/cases/${caseId}/evidence/${latestEvidence(admission, "BALANCE_EVIDENCED")}/countersign`, undefined, 200);
+  }
+  if (admission.voucher!.feeBalanceEgp > 0)
+    await call(finance, "POST", `/finance/cases/${caseId}/admission/fee-balance`, { reference: `FEE-${stamp}`, amountEgp: admission.voucher!.feeBalanceEgp, receivedAt: new Date().toISOString() }, 200);
+  expect(await status(), "consent, the quote and the money are in").toBe("ADMISSION_READY");
+  await call(operations, "POST", `/operations/cases/${caseId}/admission/number`, { admissionNumber: `ADM-${stamp}` }, 200);
+  expect(await status()).toBe("TREATMENT_IN_PROGRESS");
+
+  // --- Treatment milestones, the discharge pack, the follow-up plan and the hospital's final invoice ---
+  const at = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60000).toISOString();
+  const operativeNote = await staffDocument(doctor, caseId, "operative-note.pdf");
+  await call(doctor, "POST", `/doctor/cases/${caseId}/milestones`, { kind: "PROCEDURE_STARTED", occurredAt: at(60) }, 200);
+  await call(doctor, "POST", `/doctor/cases/${caseId}/milestones`, { kind: "PROCEDURE_COMPLETED", occurredAt: at(30), documentId: operativeNote,
+    operativeNoteReference: `OP-${stamp}`, implants: "Drug-eluting stent x1" }, 200);
+  await call(doctor, "POST", `/doctor/cases/${caseId}/milestones`, { kind: "DISCHARGE_PLANNED", occurredAt: at(1),
+    plannedDischargeOn: new Date(Date.now() + 86400000).toISOString().slice(0, 10) }, 200);
+  const pack = (kind: string, extra: Record<string, unknown>) => staffDocument(doctor, caseId, `${kind.toLowerCase()}.pdf`)
+    .then(documentId => call(doctor, "POST", `/doctor/cases/${caseId}/discharge/pack`, { kind, documentId, ...extra }, 200));
+  await pack("DISCHARGE_SUMMARY", { diagnosis: "Single-vessel coronary artery disease", procedures: "Angioplasty with one stent", pendingResults: "Lipid panel",
+    warningSigns: "Chest pain, shortness of breath or bleeding at the wrist" });
+  await pack("MEDICATION_LIST", { medications: [{ name: "Clopidogrel", dose: "75 mg", frequency: "once a day", duration: "12 months" }] });
+  await pack("IMPLANT_RECORD", { implants: [{ description: "Drug-eluting coronary stent 3.0 x 18 mm", manufacturer: "Example Medical", reference: "LOT-4411" }] });
+  await call(doctor, "POST", `/doctor/cases/${caseId}/follow-ups`, { practitionerId: null, dueAt: new Date(Date.now() + 14 * 86400000).toISOString(), mode: "VIDEO",
+    requiredTests: "ECG", instructions: "Rest for a week" }, 200);
+  const invoiceDoc = await staffDocument(operations, caseId, "final-invoice.pdf");
+  await call(operations, "POST", `/operations/cases/${caseId}/discharge/final-invoice`, { documentId: invoiceDoc, invoiceNumber: `INV-${stamp}`, amountEgp: service.priceEgp,
+    issuedAt: at(10), replaces: null }, 200);
+  expect(await status(), "the pack, the plan and the final invoice discharge the patient").toBe("DISCHARGED");
+
+  // --- Going home: a ground return, then the departure ---
+  await call(operations, "POST", `/operations/cases/${caseId}/discharge/return`, { mode: "GROUND", departureAt: new Date(Date.now() + 3600000).toISOString(), reference: `CAR-${stamp}` }, 200);
+  await call(operations, "POST", `/operations/cases/${caseId}/discharge/departure`, { departedAt: new Date().toISOString() }, 200);
+
+  // --- Finance reconciles the hospital's invoice against what was authorised ---
+  await call(finance, "POST", `/finance/cases/${caseId}/reconciliation`, undefined, 200);
+  const reconciled = (await call<{ status: string }>(finance, "POST", `/finance/cases/${caseId}/reconciliation/submit`, { lines: [{ description: service.serviceName,
+    invoiceEgp: service.priceEgp, source: "PACKAGE", matchedId: null, code: null }], paidAtFacilityEgp: due, note: null }, 200)).body;
+  expect(reconciled.status).toBeTruthy();
+
+  // --- Follow-up: the plan's contact is booked; a check-in is refused before its day (the window is days long, so the rest is
+  // time-gated: the scheduled steps are covered by FollowUpServiceTest with a moved clock) ---
+  const followUp = (await call<{ contacts: { id: string; status: string }[]; checkIns?: { point: string; status: string }[] }>(
+    coordinator, "GET", `/coordinator/cases/${caseId}/follow-up`, undefined, 200)).body;
+  expect(followUp.contacts.length, "the follow-up plan became a contact").toBeGreaterThan(0);
+  const checkIn = followUp.checkIns?.find(c => c.status !== "DONE");
+  if (checkIn) {
+    const early = await call<{ code: string }>(coordinator, "POST", `/coordinator/cases/${caseId}/follow-up/check-ins/${checkIn.point}`, { outcome: "REACHED", note: "Recovering well" });
+    expect(early.status, "a check-in before its day is refused").toBe(409);
+    expect(early.body.code).toBe("CHECK_IN_NOT_DUE");
+  }
+  expect(["DISCHARGED", "FOLLOW_UP"]).toContain(await status());
+});
+

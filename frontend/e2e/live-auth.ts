@@ -136,6 +136,16 @@ export async function submitKeycloakSignIn(page: Page, user: string, password: s
     await page.locator("#username").fill(user);
     await page.locator("#password").fill(password);
     await page.locator("#kc-login").click();
+    await completeKeycloakSteps(page, user);
+  });
+}
+
+/**
+ * Answers what Keycloak asks next — enrol the authenticator app, its code, a passkey, or (with {@code newPassword}, after a
+ * reset or an account-setup link) the new password — until the browser has left Keycloak or nothing more is asked.
+ */
+export async function completeKeycloakSteps(page: Page, user: string, newPassword?: string) {
+  {
     const keycloak = new URL(OIDC_AUTHORITY).origin;
     for (let attempt = 0; attempt < 6 && new URL(page.url()).origin === keycloak; attempt++) {
       await page.waitForLoadState("domcontentloaded");
@@ -144,13 +154,23 @@ export async function submitKeycloakSignIn(page: Page, user: string, password: s
       const otp = page.locator("#otp");
       const passkey = page.locator("#authenticateWebAuthnButton");
       const registerPasskey = page.locator("#registerWebAuthn");
+      const passwordNew = page.locator("#password-new");
+      const infoNext = page.locator("#kc-info-next");
       await Promise.race([
         manual.waitFor({ timeout: 10_000 }), otp.waitFor({ timeout: 10_000 }),
         passkey.waitFor({ timeout: 10_000 }), registerPasskey.waitFor({ timeout: 10_000 }),
+        passwordNew.waitFor({ timeout: 10_000 }), infoNext.waitFor({ timeout: 10_000 }),
         page.waitForURL(url => url.origin !== keycloak, { timeout: 10_000 }),
       ]).catch(() => undefined);
       if (new URL(page.url()).origin !== keycloak) break;
-      if (await registerPasskey.isVisible()) {
+      if (newPassword && await passwordNew.isVisible()) {
+        await passwordNew.fill(newPassword);
+        await page.locator("#password-confirm").fill(newPassword);
+        await page.locator("input[type=submit], button[type=submit]").first().click();
+      } else if (await infoNext.isVisible()) {
+        if (!newPassword) break; // an information page ends a sign-in; after a reset it leads on to the next step
+        await infoNext.click();
+      } else if (await registerPasskey.isVisible()) {
         await registerPasskey.click();
         await page.waitForURL(url => !url.toString().includes("required-action") || url.origin !== keycloak, { timeout: 15_000 }).catch(() => undefined);
       } else if (await passkey.isVisible()) {
@@ -174,5 +194,5 @@ export async function submitKeycloakSignIn(page: Page, user: string, password: s
         await page.locator("#kc-login").click();
       }
     }
-  });
+  }
 }

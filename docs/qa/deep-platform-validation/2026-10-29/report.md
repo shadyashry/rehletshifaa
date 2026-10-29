@@ -18,7 +18,17 @@ issue, and four of its refinements were applied. Still open: performance hypothe
 rate-limit sizing (AR-06), single-actor erasure (AR-14), and maintainability notes (AR-11..AR-13). See
 `architecture-review.md`.
 
-### 2. Functional completeness — **NOT PROVEN** (main journey now proven live to the travel gate)
+### 2. Functional completeness — **NOT PROVEN** (main journey proven live end to end; variants and owner gates open)
+
+**Update 2 (journey extended):** on the QA stack the live spec now runs the **whole patient journey** with distinct
+real identities — intake → … → travel gate → final assessment and final quote → hospital letter checked by Finance →
+patient accepts by secure link + OTP → voucher → consent → hospital balance countersigned → admission number →
+treatment milestones → discharge pack → final invoice (DISCHARGED) → return and departure → reconciliation → follow-up
+contact (`FOLLOW_UP`); and the **withdrawal + full refund** variant. All 3 live tests pass (2.1 min). Getting there found
+four more defects, three fixed: D-10 (staff could not file paperwork — approved gap), D-12 (patients could never confirm
+a step-up decision), D-13 (an in-time patient cancellation could not be refunded); D-11 (per-IP write budget) needs your
+decision. Not live yet: two-team routing, coordinator departure, change orders, complications, emergency admission,
+follow-up closure (time-gated), WhatsApp (UC-15), and the staff upload UI (D-10 UI half).
 
 **Update (owner chose dedicated QA identities):** an isolated QA stack (`docker-compose.qa.yml`, project
 `rehletshifaa-qa`, fresh realm, no tester impact) now runs the live staff journeys. `operations-gate-live` passes end
@@ -68,8 +78,8 @@ critical Next.js advisories were removed (D-07). See `production-readiness.md`.
 | NOT TESTED | 2 | DPV-REV-1 (uploads into closed cases), DPV-REV-2 (0 EGP proposal total): decisions |
 | DEFERRED BY DECISION | 0 | (Journey admission stays off; Practice Manager consent and booking not in scope) |
 
-Defects: 9 found (D-01..D-09). By severity: 1 critical, 4 high, 4 medium. All fixed and retested. D-06, D-08 and D-09
-were also verified live.
+Defects: 14 found (D-01..D-14). By severity: 1 critical, 8 high, 4 medium, 1 low. Fixed and retested: 12 (D-10 backend
+only). Open: D-11 (owner decision), D-14 (low). D-06, D-08, D-09, D-10, D-12 and D-13 were found or verified live.
 
 ## Tests actually run (final code unless noted)
 
@@ -106,6 +116,8 @@ were also verified live.
 - `1bd6a1e9` `frontend/package.json`, `pnpm-lock.yaml`: Next 16.4.2.
 - `1b1307f5` `DocumentSubmissionReadiness` and new `DocumentSubmissionReadinessTest` (D-08).
 - `73f09570` `LocalDemoDataSeeder` (D-09); `2ae37ebe` `docker-compose.qa.yml`, `frontend/e2e/live-auth.ts`, live specs.
+- `4d1d5fc6` D-10 (`StaffDocumentService`, `StaffDocumentController`, `CASE_DOCUMENT_ADD`) and D-12 (`Authority.decide`);
+  D-13 (`RefundObligationService`, `RefundPolicyService`, `CaseExitService`) and the extended live spec in the next commit.
 - Evidence: this folder, `docs/deployment.md` (drill row).
 
 ## Prioritized remaining actions
