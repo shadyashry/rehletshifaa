@@ -260,9 +260,9 @@ describe("MyCare", () => {
     renderWithWork(<MyCare locale="ar" caseSummary={base} actions={wait("WAIT_PAYMENT_CHECK")} patientProposal={accepted} proposal={proposal}
                    deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500, transfer: { reference: "FT123456", status: "SUBMITTED" } }} documents={[]} unreadMessages={0} cases={[base]}
                    view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={onOpenProposal} messagesPanel={null}/>, "ar");
-    expect(screen.getByRole("heading", { name: "نتحقق من دفعتك" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "نتحققّ من دفعتك" })).toBeTruthy();
     expect(screen.getByText("لا يلزم منك أي إجراء الآن.")).toBeTruthy();
-    expect(screen.getByText("قيد التحقق")).toBeTruthy();
+    expect(screen.getByText("قيد التحققّ")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /الاطلاع على عرض السعر/ })).toHaveLength(1);
     expect(screen.getByRole("button", { name: /مراسلة/ })).toBeTruthy();
   });

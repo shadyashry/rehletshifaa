@@ -202,7 +202,7 @@ test("Arabic is right-to-left with the same single-action discipline", async ({ 
   await page.goto("/ar/portal");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByRole("heading", { level: 1, name: "رعايتي" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "نتحقق من دفعتك" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "نتحققّ من دفعتك" })).toBeVisible();
   await expect(page.getByText("لا يلزم منك أي إجراء الآن.")).toBeVisible();
   await expect(page.getByRole("button", { name: /الاطلاع على عرض السعر/ })).toHaveCount(1);
   await noOverflow(page);

@@ -793,7 +793,7 @@ function TransferActs({deposit,transfer,onConfirmed}:{deposit:DepositView;transf
     action={data=>mutate(`/finance/cases/${caseId}/deposits/${deposit.id}/payments`,{amountEgp:readAmount(data.get("amount"))||0,idempotencyKey:paymentKey(transfer.id)}).then(result=>{if(result){key.current=null;if(readAmount(data.get("amount"))>=(deposit.balanceEgp??0))onConfirmed();}return !!result;})}>
     {/* UX X-1: a text field read by readAmount, so an Arabic keypad's digits count (a number field drops them). */}
     <div><label htmlFor={amountId} className="block text-sm font-semibold">{tx.amount}</label>
-     <AmountInput id={amountId} name="amount" invalid={tx.amountInvalid} className="mt-1 block w-44" max={deposit.balanceEgp??undefined} defaultValue={deposit.balanceEgp??undefined}/></div>
+     <AmountInput id={amountId} name="amount" invalid={deposit.balanceEgp!=null?fillTemplate(tx.amountInvalidMax,{amount:money(deposit.balanceEgp,"EGP",locale)}):tx.amountInvalid} className="mt-1 block w-44" max={deposit.balanceEgp??undefined} defaultValue={deposit.balanceEgp??undefined}/></div>
     <button className="btn-primary" disabled={busy}>{tx.confirm}</button>
    </ActForm>
   </div>

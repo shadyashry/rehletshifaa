@@ -32,6 +32,12 @@ synthetic cases (never real patient data), and the Keycloak pages; `messages/ar.
 - [ ] **Exchange rate.** «سعر الصرف», the figure as one left-to-right run `1 USD = 50.25 EGP` the same way round as English.
 - [ ] **Address.** Imperatives for actions; neutral phrasing where a relative or a woman may be reading; no «يرجى» beside
       imperatives. Is the masculine imperative acceptable as the UI convention, or should key patient screens be neutral throughout?
+- [ ] **Adjectives about the reader (X-3).** «لست متأكدًا»، «مستعدًا»، «أنت جاهز»، «قادراً»، «إبقائي مسجّلًا» were rewritten as
+      impersonal or verbal-noun phrasing («لم يتضح لك…»، «اعتُمد دخولك…»، «إبقاء تسجيل الدخول…»). Natural, or stilted?
+- [ ] **The patient in staff labels (X-3).** Stage labels no longer assume a male patient («تم الخروج من المستشفى» for «خرج»);
+      «المريض» stays the generic noun. Keep, or prefer «المريض/المريضة» on staff screens?
+- [ ] **Shadda on doubled verbs (X-3).** «تحقّق»، «تعذّر»، «تحدّث» written with shadda everywhere the patient and portal read (as
+      «منسّق»). Keep, or drop the shadda on all three (plain MSA spelling)? The Control Center is not yet aligned.
 
 ### Reading pass (each page in Arabic, on a phone)
 
@@ -360,6 +366,131 @@ Filled per slice (key · before · after). X-0 changed no message string; X-1 ch
 | X-2 | en.json | `portalWork.myCare.payment.referenceWhat` | After you transfer, your bank gives you a reference number for the transaction. Enter it here so our finance team can find your payment and confirm it. | After you transfer, your bank gives you a reference number for the transaction. Enter it here so our Finance team can find your payment and confirm it. |
 | X-2 | en.json | `secureLink.activation.nextPayHow` | You pay it in My Care, by bank transfer or through an agent, and then enter the reference your bank or agent gives you. Your coordinator starts arranging your care once our finance team confirms it. | You pay it in My Care, by bank transfer or through an agent, and then enter the reference your bank or agent gives you. Your coordinator starts arranging your care once our Finance team confirms it. |
 | X-2 | en.json | `secureLink.journey.explain.deposit.body` | If you have not paid it yet, sign in to My Care to pay it by bank transfer or through an agent, and enter the reference you are given. If you already sent the reference, our finance team is checking it. | If you have not paid it yet, sign in to My Care to pay it by bank transfer or through an agent, and enter the reference you are given. If you already sent the reference, our Finance team is checking it. |
+| X-3 | ar.json | `nav.careAreasMenu.notSureTitle` | لست متأكدًا أي مجال يناسبك؟ | لم يتضح لك أي مجال يناسبك؟ |
+| X-3 | ar.json | `common.whatsapp` | تحدث مع منسّق | تحدّث مع منسّق |
+| X-3 | ar.json | `home.coordinatorIntro.body` | منسّق واحد يتحدث العربية والإنجليزية يرافق حالتك من أول رسالة حتى المتابعة، ويمكنك التواصل معه عبر واتساب. | منسّق واحد يتحدّث العربية والإنجليزية يرافق حالتك من أول رسالة حتى المتابعة، ويمكنك التواصل معه عبر واتساب. |
+| X-3 | ar.json | `home.howReady` | متى ما كنت مستعدًا. | في الوقت الذي يناسبك. |
+| X-3 | ar.json | `cardiology.finalTitle` | لست متأكداً أين تندرج حالتك؟ | لم يتضح لك أين تندرج حالتك؟ |
+| X-3 | ar.json | `consultants.people[0].position` | يحتاج إلى التحقق | يحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[0].experience` | تحتاج إلى التحقق | تحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[0].qualifications` | تحتاج إلى التحقق | تحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[0].memberships` | تحتاج إلى التحقق | تحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[1].position` | يحتاج إلى التحقق | يحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[1].experience` | تحتاج إلى التحقق | تحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[1].qualifications` | تحتاج إلى التحقق | تحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[1].memberships` | تحتاج إلى التحقق | تحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[2].position` | يحتاج إلى التحقق | يحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[2].experience` | تحتاج إلى التحقق | تحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[2].qualifications` | تحتاج إلى التحقق | تحتاج إلى التحققّ |
+| X-3 | ar.json | `consultants.people[2].memberships` | تحتاج إلى التحقق | تحتاج إلى التحققّ |
+| X-3 | ar.json | `how.stages[1].what` | ينظّم منسّقك المعلومات ويتحقق مما إذا كان هناك شيء مهم ناقص. | ينظّم منسّقك المعلومات ويتحققّ مما إذا كان هناك شيء مهم ناقص. |
+| X-3 | ar.json | `form.flow.emailHint` | للتواصل معك الآن فقط، ولا يصبح بريد الدخول إلا بعد التحقق منه. | للتواصل معك الآن فقط، ولا يصبح بريد الدخول إلا بعد التحققّ منه. |
+| X-3 | ar.json | `form.nextSteps.whatsapp` | تفضّل أن تتحدث أولًا؟ | تفضّل أن تتحدّث أولًا؟ |
+| X-3 | ar.json | `form.errors.name` | يرجى إدخال الاسم الأول. | أدخل الاسم الأول. |
+| X-3 | ar.json | `form.errors.familyName` | يرجى إدخال اسم العائلة، أو تأكيد أن الاسم القانوني مفرد. | أدخل اسم العائلة، أو أكّد أن الاسم القانوني مفرد. |
+| X-3 | ar.json | `form.errors.representative` | يرجى تحديد مقدّم الطلب وصلة قرابته بالمريض. | حدّد مقدّم الطلب وصلة قرابته بالمريض. |
+| X-3 | ar.json | `form.errors.phone` | يرجى إدخال رقم واتساب صحيح. | أدخل رقم واتساب صحيحًا. |
+| X-3 | ar.json | `form.errors.email` | يرجى إدخال بريد إلكتروني صحيح. | أدخل بريدًا إلكترونيًا صحيحًا. |
+| X-3 | ar.json | `form.errors.server` | تعذر إرسال حالتك الآن. حاول مرة أخرى أو تواصل معنا عبر واتساب. | تعذّر إرسال حالتك الآن. حاول مرة أخرى أو تواصل معنا عبر واتساب. |
+| X-3 | ar.json | `form.errors.forOthersLimit` | أرسلت عدة حالات لأشخاص آخرين مؤخرًا. يُرجى المحاولة لاحقًا، أو مراسلة منسّقك. | أرسلت عدة حالات لأشخاص آخرين مؤخرًا. حاول مرة أخرى لاحقًا، أو راسل منسّقك. |
+| X-3 | ar.json | `form.category.help` | لست متأكدًا؟ اتركه، وسيوجّه منسّقك حالتك إلى التخصص المناسب. | لم يتضح لك التخصص؟ اتركه، وسيوجّه منسّقك حالتك إلى التخصص المناسب. |
+| X-3 | ar.json | `careAreasPage.router.eyebrow` | لست متأكدًا أين تندرج حالتك؟ | لم يتضح لك أين تندرج حالتك؟ |
+| X-3 | ar.json | `rheumatology.finalTitle` | لست متأكدًا أين تندرج حالتك؟ | لم يتضح لك أين تندرج حالتك؟ |
+| X-3 | ar.json | `orthopedics.finalTitle` | لست متأكدًا أين تندرج حالتك؟ | لم يتضح لك أين تندرج حالتك؟ |
+| X-3 | ar.json | `consultantsPage.router.eyebrow` | لست متأكدًا من تختار؟ | لم يتضح لك أي استشاري يناسبك؟ |
+| X-3 | ar.json | `portalProposal.declineConsequence` | سيُبلَّغ منسّقك بذلك. يمكنك التحدث مع منسّقك قبل اتخاذ القرار. | سيُبلَّغ منسّقك بذلك. يمكنك التحدّث مع منسّقك قبل اتخاذ القرار. |
+| X-3 | ar.json | `portalProposal.assisted.requestFailed` | لم يُرسَل طلبك. يُرجى التحقّق من الاتصال والمحاولة مرة أخرى. | لم يُرسَل طلبك. تحقّق من الاتصال وحاول مرة أخرى. |
+| X-3 | ar.json | `portalWork.replyCover.intro` | أثناء غيابك يردّ زميل واحد على مرضاك، وتبقى قادراً على قراءة كل المحادثات. | أثناء غيابك يردّ زميل واحد على مرضاك، ويبقى بإمكانك قراءة كل المحادثات. |
+| X-3 | ar.json | `portalWork.caseView.logistics.stage.ARRIVAL_CONFIRMED` | تم الوصول، ولم يدخل المستشفى بعد | تم الوصول، ولم يتم الدخول إلى المستشفى بعد |
+| X-3 | ar.json | `portalWork.caseView.logistics.stage.ADMISSION_READY` | تم الوصول، وجاهز للدخول إلى المستشفى | تم الوصول، والدخول إلى المستشفى معتمد |
+| X-3 | ar.json | `portalWork.caseView.logistics.stage.DISCHARGED` | خرج من المستشفى | تم الخروج من المستشفى |
+| X-3 | ar.json | `portalWork.caseView.logistics.stage.FOLLOW_UP` | خرج من المستشفى، في مرحلة المتابعة | تم الخروج من المستشفى، في مرحلة المتابعة |
+| X-3 | ar.json | `portalWork.caseView.delivery.resendHint` | يُلغي الرابط ورمز التحقق السابقين ويُرسل رابطًا آمنًا جديدًا. لا يُنشئ عرض سعر جديدًا ولا يغيّر وضع الحالة. | يُلغي الرابط ورمز التحققّ السابقين ويُرسل رابطًا آمنًا جديدًا. لا يُنشئ عرض سعر جديدًا ولا يغيّر وضع الحالة. |
+| X-3 | ar.json | `portalWork.safety.guardianReview.states.EVIDENCE_UNVERIFIED` | مستند بانتظار تحققك | مستند بانتظار تحققّك |
+| X-3 | ar.json | `portalWork.safety.guardianReview.states.VERIFIED` | تم التحقق | تم التحققّ |
+| X-3 | ar.json | `portalWork.safety.guardianReview.verify` | تحقق | تحققّ |
+| X-3 | ar.json | `portalWork.safety.guardianReview.verifiedOn` | تم التحقق في {date} | تم التحققّ في {date} |
+| X-3 | ar.json | `portalWork.empty.noOperations` | لا يوجد بعد أحد في فريق العمليات يمكن تعيينه. يُرجى الطلب من مدير الفريق إضافة عضو. | لا يوجد بعد أحد في فريق العمليات يمكن تعيينه. اطلب من مدير الفريق إضافة عضو. |
+| X-3 | ar.json | `portalWork.empty.noFinance` | لا يوجد بعد أحد في الفريق المالي يمكن تعيينه. يُرجى الطلب من مدير الفريق إضافة عضو. | لا يوجد بعد أحد في الفريق المالي يمكن تعيينه. اطلب من مدير الفريق إضافة عضو. |
+| X-3 | ar.json | `portalWork.empty.teamUnavailable` | تعذّر تحميل قائمة الفريق. يُرجى إعادة تحميل الصفحة للمحاولة مرة أخرى. | تعذّر تحميل قائمة الفريق. أعد تحميل الصفحة للمحاولة مرة أخرى. |
+| X-3 | ar.json | `portalWork.confirm.refundBody` | يسجّل هذا مبلغًا أُعيد إلى المريض من دفعة التنسيق هذه. يُرجى التحقق من المبلغ قبل المتابعة. | يسجّل هذا مبلغًا أُعيد إلى المريض من دفعة التنسيق هذه. تحقّق من المبلغ قبل المتابعة. |
+| X-3 | ar.json | `portalWork.confirm.opinionBody` | بإرسال الرأي ينتهي الوصول إلى هذه الحالة، لذا يُرجى مراجعته قبل الإرسال. | بإرسال الرأي ينتهي الوصول إلى هذه الحالة، فراجعه قبل الإرسال. |
+| X-3 | ar.json | `portalWork.accessUnavailable.message` | تعذّر التحقق من صلاحياتك، لذلك لا يمكن عرض مساحة عملك. لم يتغيّر شيء. | تعذّر التحققّ من صلاحياتك، لذلك لا يمكن عرض مساحة عملك. لم يتغيّر شيء. |
+| X-3 | ar.json | `portalWork.currentAction.work.DEPOSIT_RECORD` | التحقق من التحويل | التحققّ من التحويل |
+| X-3 | ar.json | `portalWork.currentAction.states.RELEASE_PROPOSAL.body` | تحقق من متطلبات الإصدار ثم أرسل الرابط الآمن. | تحققّ من متطلبات الإصدار ثم أرسل الرابط الآمن. |
+| X-3 | ar.json | `portalWork.currentAction.readiness.GUARDIAN_EVIDENCE_UNVERIFIED.title` | مستند الوصي بانتظار تحققك | مستند الوصي بانتظار تحققّك |
+| X-3 | ar.json | `portalWork.currentAction.readiness.GUARDIAN_EVIDENCE_UNVERIFIED.body` | افتح «العمر والوصي» في الحالة واطّلع على المستند، ثم تحقق منه أو ارفضه. | افتح «العمر والوصي» في الحالة واطّلع على المستند، ثم تحققّ منه أو ارفضه. |
+| X-3 | ar.json | `portalWork.currentAction.readiness.DEPOSIT_UNPAID.body` | يدفع المريض بتحويل بنكي ويُدخل الرقم المرجعي للعملية في صفحة حالته، ثم يتحقق منه الفريق المالي. | يدفع المريض بتحويل بنكي ويُدخل الرقم المرجعي للعملية في صفحة حالته، ثم يتحققّ منه الفريق المالي. |
+| X-3 | ar.json | `portalWork.queue.createdFrom` | أُنشئت من | أُنشئت منذ |
+| X-3 | ar.json | `portalWork.queue.createdTo` | أُنشئت إلى | أُنشئت حتى |
+| X-3 | ar.json | `portalWork.queue.updatedFrom` | حُدّثت من | حُدّثت منذ |
+| X-3 | ar.json | `portalWork.queue.updatedTo` | حُدّثت إلى | حُدّثت حتى |
+| X-3 | ar.json | `portalWork.queue.requestFailed` | لم يُرسَل الطلب. لم يتغيّر شيء؛ يُرجى المحاولة مرة أخرى. | لم يُرسَل الطلب. لم يتغيّر شيء؛ حاول مرة أخرى. |
+| X-3 | ar.json | `portalWork.myCare.step.replyBy` | يُرجى الرد قبل | الرد مطلوب قبل |
+| X-3 | ar.json | `portalWork.myCare.steps.VERIFY_IDENTITY.title` | التحقق من الهوية | التحققّ من الهوية |
+| X-3 | ar.json | `portalWork.myCare.steps.VERIFY_IDENTITY.body` | لأن دعم السفر جزء من رعايتك، نحتاج إلى التحقق من هويتك قبل تأكيد الترتيبات. نُخزّن الحد الأدنى فقط ومشفّرًا. | لأن دعم السفر جزء من رعايتك، نحتاج إلى التحققّ من هويتك قبل تأكيد الترتيبات. نُخزّن الحد الأدنى فقط ومشفّرًا. |
+| X-3 | ar.json | `portalWork.myCare.steps.WAIT_CASE_RECEIVED.next` | سيتحقق المنسّق مما أرسلته ويخبرك إن كان ينقص شيء. | سيتحققّ المنسّق مما أرسلته ويخبرك إن كان ينقص شيء. |
+| X-3 | ar.json | `portalWork.myCare.steps.WAIT_PAYMENT_CHECK.title` | نتحقق من دفعتك | نتحققّ من دفعتك |
+| X-3 | ar.json | `portalWork.myCare.steps.PAY_BALANCE.next` | يراجع فريقنا المالي الإيصال، ثم تصبح جاهزًا للدخول. | يراجع فريقنا المالي الإيصال، ثم يُعتمد دخولك إلى المستشفى. |
+| X-3 | ar.json | `portalWork.myCare.steps.WAIT_BALANCE_CHECK.next` | بعد المراجعة تصبح جاهزًا للدخول. | بعد المراجعة يُعتمد دخولك إلى المستشفى. |
+| X-3 | ar.json | `portalWork.myCare.steps.CLEARED_FOR_ADMISSION.title` | أنت جاهز للدخول إلى المستشفى | اعتُمد دخولك إلى المستشفى |
+| X-3 | ar.json | `portalWork.myCare.deposit.track.steps[1]` | يتحقق الفريق المالي منه | يتحققّ الفريق المالي منه |
+| X-3 | ar.json | `portalWork.myCare.deposit.status.CHECKING` | قيد التحقق | قيد التحققّ |
+| X-3 | ar.json | `portalWork.myCare.admission.clearedOn` | أنت جاهز للدخول إلى المستشفى في {date}. | اعتُمد دخولك إلى المستشفى في {date}. |
+| X-3 | ar.json | `portalWork.depositTransfer.amountInvalidMax` (new) | — | أدخل المبلغ المستلَم بالأرقام، أكبر من صفر ولا يزيد على الرصيد المتبقي {amount}. |
+| X-3 | ar.json | `portalWork.workTitles.DEPOSIT_RECORD` | التحقق من التحويل | التحققّ من التحويل |
+| X-3 | ar.json | `portalWork.waitingReason.reasons.TRANSFER_TO_VERIFY` | وصل الرقم المرجعي للتحويل — بانتظار تحقق الفريق المالي | وصل الرقم المرجعي للتحويل — بانتظار تحققّ الفريق المالي |
+| X-3 | ar.json | `portalWork.caseMessages.attachments.UNSUPPORTED_TYPE` | لا يُحفظ هذا النوع من المرفقات. يُرجى إرسال الملفات بصيغة PDF أو JPG أو PNG. | لا يُحفظ هذا النوع من المرفقات. أرسل الملفات بصيغة PDF أو JPG أو PNG. |
+| X-3 | ar.json | `portalWork.caseMessages.attachments.TOO_LARGE` | الملف أكبر من الحجم المسموح به ولم يُحفظ. يُرجى إرسال ملف أصغر. | الملف أكبر من الحجم المسموح به ولم يُحفظ. أرسل ملفًا أصغر. |
+| X-3 | ar.json | `portalWork.caseMessages.attachments.EXPIRED` | تعذّر استلام هذا المرفق. يُرجى إرساله مرة أخرى. | تعذّر استلام هذا المرفق. أرسله مرة أخرى. |
+| X-3 | ar.json | `portalWork.caseMessages.attachments.UNAVAILABLE` | تعذّر استلام هذا المرفق. يُرجى إرساله مرة أخرى. | تعذّر استلام هذا المرفق. أرسله مرة أخرى. |
+| X-3 | ar.json | `portalWork.workCopy.items.INTAKE_MESSAGE.context` | كتب لك مجدداً شخص تتحدث معه عبر واتساب. ردّ من صفحة المحادثات. | كتب لك مجدداً شخص تتحدّث معه عبر واتساب. ردّ من صفحة المحادثات. |
+| X-3 | ar.json | `portalWork.workCopy.items.PROPOSAL_TERMS_CALL.context` | طلب المريض مراجعة شروط عرض السعر معه بالعربية وتسجيل قراره. | طُلب منك مراجعة شروط عرض السعر بالعربية مع المريض، وتسجيل القرار. |
+| X-3 | ar.json | `portalWork.workCopy.items.DEPOSIT_VERIFY_TRANSFER.title` | التحقق من التحويل | التحققّ من التحويل |
+| X-3 | ar.json | `portalWork.workCopy.items.DEPOSIT_TRANSFER_REPORTED.context` | يتحقق الفريق المالي من تحويل دفعة التنسيق. | يتحققّ الفريق المالي من تحويل دفعة التنسيق. |
+| X-3 | ar.json | `portalWork.workCopy.items.RELEASE_PROPOSAL.context` | تحقق من متطلبات الإصدار ثم أرسل الرابط الآمن. | تحققّ من متطلبات الإصدار ثم أرسل الرابط الآمن. |
+| X-3 | ar.json | `portalWork.travelPlan.confirmedHint` | يتطلب التأكيد موعد وصول مخططًا. يُتحقق أولًا من هوية المريض وموافقاته ودفعة التنسيق. | يتطلب التأكيد موعد وصول مخططًا. يُتحققّ أولًا من هوية المريض وموافقاته ودفعة التنسيق. |
+| X-3 | ar.json | `portalWork.admission.forms.paidAmountInvalid` (new) | — | اكتب المبلغ المدفوع بتلك العملة بالأرقام وأكبر من صفر، مثل 4,000. |
+| X-3 | ar.json | `portalWork.admission.finance.feeDerivation` | رسوم المنصة {fee} − ما غطّته دفعة التنسيق من الرسوم {applied} = {balance} | رسوم المنصة {fee}، غطّت منها دفعة التنسيق {applied}، فيبقى {balance}. |
+| X-3 | ar.json | `portalWork.discharge.blockers.TREATMENT_CHECKLIST_INCOMPLETE` | قائمة تحقق العلاج غير مكتملة | قائمة تحققّ العلاج غير مكتملة |
+| X-3 | ar.json | `portalWork.discharge.invoice.amountInvalid` (new) | — | اكتب الإجمالي بالأرقام، صفرًا أو أكثر، مثل 195,500. |
+| X-3 | ar.json | `portalWork.retention.classes.ACCESS_SECRET` | الروابط والرموز وتحققات الدخول | الروابط والرموز وتحققّات الدخول |
+| X-3 | ar.json | `portalWork.retention.identityOperations.RESET_MFA` | إعادة تعيين خطوة التحقق الثانية | إعادة تعيين خطوة التحققّ الثانية |
+| X-3 | ar.json | `portalWork.retention.errors.CASE_NOT_FOUND` | لا توجد حالة بهذا الرقم. تحقق منه وحاول مجددًا. | لا توجد حالة بهذا الرقم. تحققّ منه وحاول مجددًا. |
+| X-3 | ar.json | `secureLink.status.loading` | جارٍ التحقق من الرابط الآمن… | جارٍ التحققّ من الرابط الآمن… |
+| X-3 | ar.json | `secureLink.status.send` | إرسال رمز التحقق | إرسال رمز التحققّ |
+| X-3 | ar.json | `secureLink.status.code` | رمز التحقق | رمز التحققّ |
+| X-3 | ar.json | `secureLink.status.verify` | تحقق وتابع | تحققّ وتابع |
+| X-3 | ar.json | `secureLink.status.verifying` | جارٍ التحقق… | جارٍ التحققّ… |
+| X-3 | ar.json | `secureLink.status.private` | لا تظهر معلوماتك الطبية إلا بعد التحقق من جهة الاتصال. | لا تظهر معلوماتك الطبية إلا بعد التحققّ من جهة الاتصال. |
+| X-3 | ar.json | `secureLink.status.error` | تعذر إكمال الطلب. يرجى المحاولة مرة أخرى. | تعذّر إكمال الطلب. حاول مرة أخرى. |
+| X-3 | ar.json | `secureLink.status.missing` | يرجى تقديم هذه المعلومة. | أضف هذه المعلومة. |
+| X-3 | ar.json | `secureLink.status.missingFile` | يرجى رفع المستند المطلوب. | ارفع المستند المطلوب. |
+| X-3 | ar.json | `secureLink.status.proposalUnavailable` | لم يعد عرض السعر هذا متاحًا للمراجعة. يرجى التحديث للاطلاع على آخر حالة. | لم يعد عرض السعر هذا متاحًا للمراجعة. حدّث الصفحة للاطلاع على آخر حالة. |
+| X-3 | ar.json | `secureLink.status.tooManyCodes` | طُلبت عدة رموز لهذا الرابط خلال الساعة الماضية. يرجى المحاولة بعد ساعة. | طُلبت عدة رموز لهذا الرابط خلال الساعة الماضية. حاول مرة أخرى بعد ساعة. |
+| X-3 | ar.json | `secureLink.status.noteMissing` | يرجى كتابة رسالتك قبل الإرسال. | اكتب رسالتك قبل الإرسال. |
+| X-3 | ar.json | `secureLink.proposal.verifying` | جارٍ التحقق… | جارٍ التحققّ… |
+| X-3 | ar.json | `secureLink.proposal.error` | تعذر إكمال الطلب. | تعذّر إكمال الطلب. |
+| X-3 | ar.json | `secureLink.proposal.tooMany` | طلبات كثيرة جدًا. يُرجى المحاولة لاحقًا. | طلبات كثيرة جدًا. حاول مرة أخرى لاحقًا. |
+| X-3 | ar.json | `secureLink.proposal.ackRequired` | يرجى تأكيد فهمك قبل المتابعة. | أكّد فهمك قبل المتابعة. |
+| X-3 | ar.json | `secureLink.activation.verifyTitle` | لنتأكد أنه أنت | لنتحققّ من هويتك |
+| X-3 | ar.json | `secureLink.activation.verifying` | جارٍ التحقق… | جارٍ التحققّ… |
+| X-3 | ar.json | `secureLink.activation.formIntro` | أدخلنا مسبقًا ما شاركته معنا. يرجى مراجعته وإكمال الناقص فقط. | أدخلنا مسبقًا ما شاركته معنا. راجعه وأكمل الناقص فقط. |
+| X-3 | ar.json | `secureLink.activation.accountEmailHelp` | ستستخدم هذا البريد لتسجيل الدخول. سنتحقق منه قبل أن يصبح حسابك. | ستستخدم هذا البريد لتسجيل الدخول. سنتحققّ منه قبل أن يصبح حسابك. |
+| X-3 | ar.json | `secureLink.activation.steps[0]` | التحقق | التحققّ |
+| X-3 | ar.json | `secureLink.activation.invalid` | هذا الرابط غير صالح أو انتهت صلاحيته. يرجى طلب رابط جديد من منسّقك. | هذا الرابط غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا من منسّقك. |
+| X-3 | ar.json | `secureLink.activation.error` | حدث خطأ ما. يرجى المحاولة مرة أخرى. | تعذّر إكمال هذه الخطوة. حاول مرة أخرى، وإن تكرّر ذلك فراسل منسّقك. |
+| X-3 | ar.json | `secureLink.activation.tooMany` | محاولات كثيرة. يرجى المحاولة بعد قليل. | محاولات كثيرة. حاول مرة أخرى بعد قليل. |
+| X-3 | ar.json | `secureLink.activation.errConsents` | يرجى قبول جميع الموافقات المطلوبة للمتابعة. | اقبل جميع الموافقات المطلوبة للمتابعة. |
+| X-3 | ar.json | `secureLink.journey.explain.received.next` | سيتحقق المنسّق مما أرسلته ويخبرك إن كان ينقص شيء. | سيتحققّ المنسّق مما أرسلته ويخبرك إن كان ينقص شيء. |
+| X-3 | ar.json | `secureLink.journey.explain.deposit.body` | إن لم تدفعها بعد، سجّل الدخول إلى «رعايتي» لتدفعها بتحويل بنكي أو عبر وكيل، وأدخل الرقم المرجعي الذي تحصل عليه. وإن كنت أرسلت الرقم المرجعي، فإن الفريق المالي يتحقق منه. | إن لم تدفعها بعد، سجّل الدخول إلى «رعايتي» لتدفعها بتحويل بنكي أو عبر وكيل، وأدخل الرقم المرجعي الذي تحصل عليه. وإن كنت أرسلت الرقم المرجعي، فإن الفريق المالي يتحققّ منه. |
+| X-3 | en.json | `portalWork.depositTransfer.amountInvalidMax` (new) | — | Enter the amount received in figures, above zero and no more than the balance of {amount}. |
+| X-3 | en.json | `portalWork.admission.forms.paidAmountInvalid` (new) | — | Enter the amount paid in that currency in figures, above zero, for example 4,000. |
+| X-3 | en.json | `portalWork.discharge.invoice.amountInvalid` (new) | — | Enter the total in figures, zero or more, for example 195,500. |
+| X-3 | en.json | `secureLink.activation.error` | Something went wrong. Please try again. | This step could not be completed. Try again, and if it keeps happening, message your coordinator. |
+| X-3 | messages_ar.properties (login) | `rememberMe` | إبقائي مسجّلًا على هذا الجهاز | إبقاء تسجيل الدخول على هذا الجهاز |
+| X-3 | messages_ar.properties (login) | `doContactCoordinator` | تحدث مع منسّق | تحدّث مع منسّق |
+| X-3 | messages_ar.properties (login) | `differentUserAuthenticated` | أنت مسجّل الدخول بالفعل إلى رحلة شفاء باسم ⁨{0}⁩ في هذا المتصفح. سجّل الخروج أولًا، ثم افتح هذا الرابط مجددًا. | في هذا المتصفح جلسة رحلة شفاء مفتوحة باسم ⁨{0}⁩. سجّل الخروج أولًا، ثم افتح هذا الرابط مجددًا. |
 
 ### X-2 notes for the reviewer (one term per concept)
 
@@ -383,3 +514,25 @@ Filled per slice (key · before · after). X-0 changed no message string; X-1 ch
 - Not in this pass: the backend's own Arabic (WhatsApp templates in `NotificationOutboxProcessor`, status and readiness labels in
   `PublicCaseAccessService`/`CustomerReadinessService`/`CaseActionService`, the activation consent text in
   `PatientActivationService`) still says «وديعة التنسيق», «فريق المالية», «العرض», «المقترح», «منسق» (backlog "Area X").
+
+### X-3 notes for the reviewer (register, the native rows, close)
+
+- **Register.** Every «يرجى/يُرجى» (31 in `ar.json`, 0 in Keycloak) became the imperative its neighbours use («أدخل…», «حاول مرة
+  أخرى»، «راجعه وأكمل الناقص»); a label before a date became a noun («الرد مطلوب قبل»). English keeps its "Please" (not changed).
+  Proof: 0 «يرجى/يُرجى/الرجاء/نرجو» in `ar.json` and both bundles; 0 rendered on /ar, /ar/how-it-works, /ar/send-my-case, /ar/track-case.
+- **Neutral where cheap.** Masculine adjectives about the reader → impersonal phrasing (public «لست متأكدًا» ×7 sites, «متى ما كنت
+  مستعدًا»; My Care «أنت جاهز/تصبح جاهزًا» ×4; activation «لنتأكد أنه أنت»; staff «تبقى قادراً»; Keycloak `rememberMe`,
+  `differentUserAuthenticated`). Not changed: masculine imperatives and present verbs (the UI convention, see the Address decision);
+  the consent `REPRESENTATIVE_AUTHORIZATION` («مفوّض») and `form.errors.representative` («قرابته») — consent text is versioned and
+  legal, the second is the generic form.
+- **Backlog rows.** 429/465/588 register: done as above, masculine imperative carried here. 454: `PROPOSAL_TERMS_CALL.context` no
+  longer says «معه… قراره». 434: date filters «أُنشئت/حُدّثت منذ/حتى» (were «من/إلى», which read as a source, not a lower bound).
+  731: `feeDerivation` is now prose («رسوم المنصة {fee}، غطّت منها دفعة التنسيق {applied}، فيبقى {balance}.»); the English keeps the
+  equation. X-1's reused field messages: three keys of their own (`discharge.invoice.amountInvalid` zero allowed,
+  `admission.forms.paidAmountInvalid` no EGP example, `depositTransfer.amountInvalidMax` names the balance), en + ar.
+  Carried to this gate unchanged: 393, 506, 576 (legal), 779, 783, 797 (Keycloak wording), the staff voucher's «ج.م.», Latin initials.
+- **Shadda.** The closing critique found «تحقق/تحقّق» (54/15) and «تعذر/تعذّر» (2/42) on the same screens; 92 sites in `ar.json`,
+  Keycloak and the patient/portal components now carry the shadda (decision above). The Control Center keeps the plain spelling
+  until its convergence (backlog "Area X").
+- **Activation error.** `secureLink.activation.error` now says what to do if it repeats («…وإن تكرّر ذلك فراسل منسّقك»); the English
+  was changed to match.

@@ -15,7 +15,7 @@ import type { DischargePackItem, DischargeView, Mutate } from "@/components/port
 
 type Copy = LocalizedWorkCopy["discharge"];
 /** The refusal, clock hint and cancel wording the recording forms share with the hospital file (UX 5-2). */
-type FormCopy = { refused: string; retry: string; timeHint: string; cancel: string; amountInvalid: string };
+type FormCopy = { refused: string; retry: string; timeHint: string; cancel: string };
 export type DischargeRole = "operations" | "coordinator" | "doctor";
 
 /** Current actions and work types whose work is done in this panel, so "do it" lands on its next form (P1-17). */
@@ -49,7 +49,7 @@ export function DischargePanel({ locale, role, caseId, caseStatus, currentCode, 
   const work = useWorkCopy();
   const t = work.discharge;
   const forms: FormCopy = useMemo(() => ({ refused: work.admission.forms.refused, retry: work.admission.forms.refusedRetry, timeHint: work.admission.forms.timeHint,
-    cancel: work.admission.cancel, amountInvalid: work.admission.forms.amountInvalid }), [work]);
+    cancel: work.admission.cancel }), [work]);
   const id = useId();
   const [view, setView] = useState<DischargeView | null | undefined>(undefined);
   const dateTime = useMemo(() => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium", timeStyle: "short" }), [locale]);
@@ -248,7 +248,7 @@ function OperationsHome({ t, forms, view, caseId, status, next, documents, busy,
       <label className="block text-sm font-semibold">{t.invoice.number}<input className="field" name="invoiceNumber" maxLength={80} required autoComplete="off" spellCheck={false} dir="ltr" defaultValue={invoice?.reference ?? ""}/></label>
       {/* UX X-1: a text field read by readAmount, so an Arabic keypad's digits count (a number field drops them). */}
       <div><label htmlFor={`${id}-invoice-amount`} className="block text-sm font-semibold">{t.invoice.amountEgp}</label>
-        <AmountInput id={`${id}-invoice-amount`} name="amountEgp" invalid={forms.amountInvalid} accepts="zero" defaultValue={invoice?.amountEgp ?? undefined}/></div>
+        <AmountInput id={`${id}-invoice-amount`} name="amountEgp" invalid={t.invoice.amountInvalid} accepts="zero" defaultValue={invoice?.amountEgp ?? undefined}/></div>
       <TimeField label={t.invoice.issuedAt} name="issuedAt" hint={forms.timeHint} defaultValue={localInput(invoice?.effectiveAt ?? invoice?.recordedAt)}/>
       {!documents.some(d => d.status === "CLEAN") && <p className="text-[0.8125rem] text-ink-600 sm:col-span-2">{t.packForm.noDocuments}</p>}
       <div className="sm:col-span-2"><button className={next === "invoice" ? "btn-primary" : "btn-secondary"} disabled={busy}>{t.invoice.record}</button></div>

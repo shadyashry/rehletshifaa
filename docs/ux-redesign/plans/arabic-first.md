@@ -1,6 +1,6 @@
 # Shape plan — Area X: Arabic first, across the file
 
-Status: **plan, 2026-10-29**, written without an owner gate under the owner's standing instruction (2026-10-15: "always
+Status: **done, 2026-10-29** (X-0..X-3; closing critique 32/40; the native + legal gate stays open). Planned the same day, written without an owner gate under the owner's standing instruction (2026-10-15: "always
 continue each next implementation on new session without asking me till the end"); assumptions are marked **[A]**.
 Scope: `PLAN.md` row X — the Arabic type scale and the numeral rule in `DESIGN.md` (ex P2-21) with `theme-petrol.css`
 aligned to them; an Arabic-first copy pass over `messages/ar.json` (and `en.json` where terms must match) and the Keycloak

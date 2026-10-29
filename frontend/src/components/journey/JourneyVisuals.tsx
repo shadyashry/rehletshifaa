@@ -43,7 +43,7 @@ export function CaseVisual({ v }: { v: How["caseVisual"] }) {
         {v.inputs.map((label, i) => {
           const Icon = icons[i] ?? FileText;
           return (
-            <li key={label} className="flex flex-col items-center gap-1 rounded-[10px] border border-dashed border-brand-300 bg-surface-elevated/70 px-1 py-2 text-center text-[0.7rem] font-semibold leading-4 text-ink-600">
+            <li key={label} className="flex flex-col items-center gap-1 rounded-[10px] border border-dashed border-brand-300 bg-surface-elevated/70 px-1 py-2 text-center text-[0.7rem] font-semibold leading-4 text-ink-600 rtl:text-[0.75rem]">
               <Icon size={15} strokeWidth={1.7} className="text-brand-600" />
               {label}
             </li>
@@ -178,7 +178,7 @@ export function CoordinationMap({ v }: { v: How["plan"] }) {
           return (
             <li key={label} className="flex flex-col items-center">
               <span className="hidden lg:block"><Stem tone="warm" h="h-3" /></span>
-              <span className="flex w-full flex-col items-center gap-1 rounded-[10px] border border-dashed border-accent-warm bg-surface-elevated px-1 py-1.5 text-center text-[0.75rem] font-semibold leading-4 text-sand-700 lg:text-[0.74rem] xl:text-[0.78rem]">
+              <span className="flex w-full flex-col items-center gap-1 rounded-[10px] border border-dashed border-accent-warm bg-surface-elevated px-1 py-1.5 text-center text-[0.75rem] font-semibold leading-4 text-sand-700 xl:text-[0.78rem]">
                 <Icon size={15} strokeWidth={1.7} />
                 {label}
               </span>

@@ -32,7 +32,7 @@ describe("CaseMessages — WhatsApp messages", () => {
     ]}/>, "ar");
 
     expect(screen.getByText("عبر واتساب")).toBeTruthy();
-    expect(screen.getByText("تعذّر استلام هذا المرفق. يُرجى إرساله مرة أخرى.")).toBeTruthy();
+    expect(screen.getByText("تعذّر استلام هذا المرفق. أرسله مرة أخرى.")).toBeTruthy();
   });
 
   it("lets only the patient's current voice reply, and says who covers", () => {

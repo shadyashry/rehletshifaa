@@ -121,7 +121,7 @@ for (const locale of ["en", "ar"] as const) {
     const form = panel.getByRole("group", { name: ar ? "تسجيل قرار المريض" : "Record the patient's decision" });
     await expect(form).toBeVisible();
     // Worded from the work item's code in the page's language, never the backend's English on an Arabic page.
-    await expect(panel).toContainText(ar ? "طلب المريض مراجعة شروط عرض السعر معه بالعربية" : "The patient asked you to go through the proposal’s terms with them in Arabic");
+    await expect(panel).toContainText(ar ? "طُلب منك مراجعة شروط عرض السعر بالعربية مع المريض" : "The patient asked you to go through the proposal’s terms with them in Arabic");
     // Offered once: not again in More actions while it is the current action.
     await page.getByRole("button", { name: ar ? "المزيد" : "More" }).click();
     await expect(page.getByRole("dialog").getByRole("button", { name: ar ? /تسجيل قرار المريض/ : /Record the patient's decision/ })).toHaveCount(0);

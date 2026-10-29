@@ -178,8 +178,8 @@ describe("CurrentActionPanel", () => {
     expect(onFocusAction).toHaveBeenCalled();
     cleanup();
     renderWithWork(<CurrentActionPanel locale="ar" role="finance" action={action}/>, "ar");
-    expect(screen.getByRole("heading", { name: "التحقق من التحويل" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /التحقق من التحويل/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "التحققّ من التحويل" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /التحققّ من التحويل/ })).toBeTruthy();
   });
 
   // P1-15: Operations' admission steps and Finance's admission work read in the team's words, in English and Arabic.

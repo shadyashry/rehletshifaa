@@ -15,7 +15,7 @@ type Identity = { status: string; rejectionReason?: string | null } | null;
 export function PatientIdentityStep({ locale, caseId, identity, busy, mutate }: { locale: Locale; caseId: string; identity: Identity; busy: boolean; mutate: Mutate }) {
   const ar = locale === "ar";
   const t = ar
-    ? { legalName: "الاسم القانوني الكامل (كما في الهوية)", dob: "تاريخ الميلاد", nationality: "الجنسية", docType: "نوع المستند", passport: "جواز سفر", nationalId: "بطاقة هوية وطنية", issuingCountry: "بلد الإصدار", docRef: "رقم المستند", submit: "إرسال للتحقق", pending: "تم الإرسال — بانتظار المراجعة.", review: "قيد المراجعة من فريقنا.", rejected: "لم يتم التحقق. يُرجى إعادة الإرسال.", required: "مطلوب" }
+    ? { legalName: "الاسم القانوني الكامل (كما في الهوية)", dob: "تاريخ الميلاد", nationality: "الجنسية", docType: "نوع المستند", passport: "جواز سفر", nationalId: "بطاقة هوية وطنية", issuingCountry: "بلد الإصدار", docRef: "رقم المستند", submit: "إرسال للتحققّ", pending: "تم الإرسال — بانتظار المراجعة.", review: "قيد المراجعة من فريقنا.", rejected: "لم يتم التحققّ. يُرجى إعادة الإرسال.", required: "مطلوب" }
     : { legalName: "Full legal name (as on your ID)", dob: "Date of birth", nationality: "Nationality", docType: "Document type", passport: "Passport", nationalId: "National ID", issuingCountry: "Issuing country", docRef: "Document number", submit: "Submit for verification", pending: "Submitted — awaiting review.", review: "Under review by our team.", rejected: "Not verified. Please resubmit.", required: "required" };
   const [form, setForm] = useState({ legalName: "", dateOfBirth: "", nationality: "", documentType: "PASSPORT", issuingCountry: "", documentReference: "" });
   const status = identity?.status;

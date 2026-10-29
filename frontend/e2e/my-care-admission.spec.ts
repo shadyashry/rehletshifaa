@@ -34,6 +34,6 @@ test("confirm arrival: one action, confirmed, then sent", async ({ page }) => {
 test("cleared for admission says when, in Arabic", async ({ page }) => {
   await setupPatient(page, "deposit-paid", { admission: { code: "CLEARED_FOR_ADMISSION", view: { ...view, balanceState: "PAID", cleared: true } } });
   await page.goto("/ar/portal");
-  await expect(page.getByRole("heading", { name: "أنت جاهز للدخول إلى المستشفى" })).toBeVisible();
-  await expect(page.getByText(/أنت جاهز للدخول إلى المستشفى في/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "اعتُمد دخولك إلى المستشفى" })).toBeVisible();
+  await expect(page.getByText(/اعتُمد دخولك إلى المستشفى في/)).toBeVisible();
 });

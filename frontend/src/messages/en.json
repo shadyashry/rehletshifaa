@@ -2964,6 +2964,7 @@
       "confirmedLast": "Last reference confirmed.",
       "amount": "Amount received (EGP)",
       "amountInvalid": "Enter the amount received in figures, above zero and no more than the balance, for example 12,500.",
+      "amountInvalidMax": "Enter the amount received in figures, above zero and no more than the balance of {amount}.",
       "confirm": "Confirm payment received",
       "rejectReason": "Why it can't be confirmed (shown to the patient)",
       "reject": "Return to the patient",
@@ -3829,6 +3830,7 @@
         "egpOnly": "Egyptian pounds only",
         "paidCurrency": "Paid in currency (optional)",
         "paidAmount": "Amount paid in that currency (optional)",
+        "paidAmountInvalid": "Enter the amount paid in that currency in figures, above zero, for example 4,000.",
         "pnr": "Set the point of no return",
         "pnrAt": "No refund for travel after",
         "pnrHint": "Travel costs are not refunded after this time. Finance then approves it.",
@@ -4343,6 +4345,7 @@
         "chooseDocument": "Choose a document",
         "number": "Invoice number",
         "amountEgp": "Total (EGP)",
+        "amountInvalid": "Enter the total in figures, zero or more, for example 195,500.",
         "issuedAt": "Issued at",
         "record": "Record the invoice"
       },
@@ -5735,7 +5738,7 @@
         "Secure account"
       ],
       "invalid": "This link is invalid or has expired. Please ask your coordinator for a new one.",
-      "error": "Something went wrong. Please try again.",
+      "error": "This step could not be completed. Try again, and if it keeps happening, message your coordinator.",
       "tooMany": "Too many attempts. Please try again in a little while.",
       "sessionExpired": "Your secure session timed out. Send a new code to continue — nothing you entered was lost.",
       "errGiven": "Enter the given name(s).",

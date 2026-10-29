@@ -2331,6 +2331,47 @@ base; after the review fixes the proposal specs again 42/42. Specs updated for t
 
 **Next:** X-3 register, the backlog's native rows, close (plan row; re-critique ≥ 32/40).
 
+### X-3 register, the backlog's native rows, close (2026-10-29, worktree `affectionate-zhukovsky-5602ef`, branch `claude/affectionate-zhukovsky-5602ef` from X-2 @ `6f700eab`)
+
+**Delivered.**
+- Register (`ar.json`, spliced textually; Keycloak `messages_ar.properties`): all 31 «يرجى/يُرجى» became imperatives matching their
+  neighbours (form errors, attachments, secure links, activation, staff empty states); «يُرجى الرد قبل» became the label «الرد مطلوب قبل».
+  Adjectives about the reader made neutral where cheap: «لست متأكدًا…» (7 sites) → «لم يتضح لك…», «متى ما كنت مستعدًا» → «في الوقت الذي
+  يناسبك», My Care «أنت جاهز/تصبح جاهزًا» → «اعتُمد دخولك إلى المستشفى» (4), «لنتأكد أنه أنت» → «لنتحقق من هويتك», staff «تبقى قادراً»,
+  staff stage labels without a male patient («تم الخروج من المستشفى»), Keycloak `rememberMe` and `differentUserAuthenticated`.
+- Backlog native rows: 429/465/588 (register) done, the masculine imperative carried to the reviewer as a decision; 454
+  (`PROPOSAL_TERMS_CALL.context`); 434 date filters «أُنشئت/حُدّثت منذ/حتى»; 731 fee derivation as Arabic prose; X-1's reused field
+  messages → three keys of their own in en + ar (`discharge.invoice.amountInvalid`, zero allowed; `admission.forms.paidAmountInvalid`;
+  `depositTransfer.amountInvalidMax` naming the balance) wired in `DischargePanel`, `AdmissionPanel`, `StaffCaseView`. 393/506/576
+  (legal), 779/783/797 (Keycloak wording) stay at the gate.
+- From the closing critique: shadda unified on «تحقّق/تعذّر/تحدّث» (92 sites: `ar.json`, Keycloak, patient and portal components and
+  their tests; the Control Center waits for its convergence); `secureLink.activation.error` says what to do when it repeats (en
+  matched); the how-it-works diagram's 11.2px Arabic labels to the 12px picture floor (`JourneyVisuals`).
+- Reviewer doc `native-arabic-review.md`: three new decisions (reader adjectives, the patient in staff labels, shadda), 125 X-3 rows
+  (key, before, after) and "X-3 notes for the reviewer". No native or legal sign-off claimed.
+
+**Closing re-critique** (dual-agent, `.impeccable/critique/2026-10-29T08-40-27Z__frontend-src-messages-ar-json.md`): **32/40** (from 26;
+A scored 31 before its shadda/activation/stage-label findings were fixed). P1 left: legal sign-off of the deposit term. Detector:
+portal 0, home 0, app 1 advisory (`bounce-easing`). Browser: no overflow at 390/1440, 0 Arabic-Indic digits, 0 «يرجى» rendered,
+Arabic keypad digits read in track-case.
+
+**Reviews** (four, read-only). RB and composition: a string-prop change only, nothing to raise. WG: every new refusal names the fix;
+pre-existing case-form focus/label gaps deferred. Impeccable: the critique above. No HIGH open.
+
+**Verify.** `node scripts/arabic-terms.mjs` green after every copy change; `tsc` clean; eslint on touched files 0 errors (1
+pre-existing warning); vitest 811/812 (the known `StaffOperationalUi` W-44); Playwright (a11y en + ar, keycloak-theme, my-care-admission,
+arabic-proposal-decision, activation-flow, my-care, portal-reliability, track-case, status-proposal, public-batch-3, staff-activation)
+114 passed, 15 skipped, 2 failed: `public-batch-3` "nothing waits for a scroll" (as on the base) and `staff-activation` (expects an h1
+"Coordinator", the workspace opens on "My cases"; stale, no X-3 string involved; backlog). After the diagram change a11y +
+public-batch-3 + staff-activation again: 42 passed, the same 2 failed. Specs updated for the new words: `my-care-admission`,
+`arabic-proposal-decision`, shadda in `activation-flow`, `my-care`, `portal-reliability`; unit tests `CaseMessages`,
+`ProfileActivation`, `CaseBlockers`, `MyCare`, `StaffOperationalUi`. PNGs restored.
+
+**Deferred** (backlog "Area X"): the Arabic-scale sweep of ~20 off-ladder call sites, case-form focus and labels, the Control Center's
+shadda, the stale staff-activation spec; the backend Arabic glossary pass (MEDIUM, its own session).
+
+**Area X closed** (X-0..X-3, critique 26 → 32/40). The launch gate stays open: `native-arabic-review.md` (native + legal).
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

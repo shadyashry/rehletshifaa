@@ -53,7 +53,7 @@ function ownerLabel(b: BlockerView, ar: boolean) {
 
 /** QA W-22: where the payment stands — queued behind readiness, the patient's to pay, Finance checking the reference, or a balance due. */
 function depositDetail(deposit: Deposit, owner: BlockerView["owner"], money: (n?: number) => string | null, ar: boolean) {
-  if (owner === "STAFF") return ar ? "وصل الرقم المرجعي للتحويل · يتحقق منه الفريق المالي" : "Transfer reference received · Finance is checking it";
+  if (owner === "STAFF") return ar ? "وصل الرقم المرجعي للتحويل · يتحققّ منه الفريق المالي" : "Transfer reference received · Finance is checking it";
   const partial = deposit.status === "PARTIALLY_PAID";
   const status = partial ? (ar ? "مدفوعة جزئيًا" : "Partially paid") : (ar ? "مطلوبة" : "Requested");
   const amount = money(partial ? deposit.balanceDisplay : deposit.totalDisplay);

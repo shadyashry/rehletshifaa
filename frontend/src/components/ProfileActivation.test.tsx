@@ -286,7 +286,7 @@ describe("ProfileActivation", () => {
   it("renders the Arabic journey for RTL locales", async () => {
     vi.stubGlobal("fetch", stub({ "000": () => json(summary) }));
     render(<ProfileActivation locale="ar" token="tok-000" copy={ar.secureLink.activation} />);
-    expect(await screen.findByRole("heading", { name: /لنتأكد أنه أنت/ })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /لنتحققّ من هويتك/ })).toBeTruthy();
   });
 });
 

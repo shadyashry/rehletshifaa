@@ -332,7 +332,7 @@ function OperationsFile({ t, locale, view, caseId, caseStatus, next, documents, 
           {/* A currency needs its amount: the two are recorded together. */}
           {/* UX X-1: a text field read by readAmount, so an Arabic keypad's digits count (a number field drops them). */}
           <div><label htmlFor={`${id}-paid`} className="block text-sm font-semibold">{t.forms.paidAmount}</label>
-            <AmountInput id={`${id}-paid`} name="paidAmount" invalid={t.forms.amountInvalid} required={!!paidIn}/></div>
+            <AmountInput id={`${id}-paid`} name="paidAmount" invalid={t.forms.paidAmountInvalid} required={!!paidIn}/></div>
           <DocumentPicker name="documentId" label={t.forms.receiptDocument} empty={t.forms.none} documents={documents}/>
         </div>
       </details>

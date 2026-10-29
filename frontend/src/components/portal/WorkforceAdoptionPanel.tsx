@@ -38,7 +38,7 @@ export function WorkforceAdoptionPanel({ locale, token, onAccepted }: { locale: 
   };
   return <section className="card max-w-2xl p-6 sm:p-8" aria-labelledby="workforce-adoption-title">
     <h2 id="workforce-adoption-title" className="title">{ar ? "اقبل دعوة العمل" : "Accept your workforce invitation"}</h2>
-    <p className="mt-2 text-sm leading-6 text-ink-600">{ar ? "تحققت المنصة من البريد لدى مزود الهوية. يؤكد القبول ربط هذه الهوية؛ ولا تصبح الصلاحيات فعالة قبل التفعيل والتحقق بخطوتين." : "The platform resolved the verified email at the identity provider. Acceptance links this identity; authority remains inactive until activation and two-step verification succeed."}</p>
+    <p className="mt-2 text-sm leading-6 text-ink-600">{ar ? "تحققّت المنصة من البريد لدى مزود الهوية. يؤكد القبول ربط هذه الهوية؛ ولا تصبح الصلاحيات فعالة قبل التفعيل والتحققّ بخطوتين." : "The platform resolved the verified email at the identity provider. Acceptance links this identity; authority remains inactive until activation and two-step verification succeed."}</p>
     {error && <p role="alert" className="mt-4 text-sm text-alert-800">{error}</p>}
     {items === null && !error ? <p role="status" className="mt-4 text-sm">{ar ? "جارٍ التحميل…" : "Loading…"}</p> : null}
     {items?.map((item) => <div key={item.id} className="mt-5 rounded-lg border border-line p-4">
