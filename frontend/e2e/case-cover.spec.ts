@@ -23,7 +23,7 @@ for (const locale of ["en", "ar"] as const) {
     await expect(strip.getByText(ar ? "خطوتك" : "Your step", { exact: true })).toBeVisible();
     await expect(strip.getByRole("heading", { level: 3, name: ar ? "جهّز الحالة للاستشاري" : "Prepare the case for a Consultant" })).toBeVisible();
     await expect(strip.getByText(ar ? "ما تعرضه صفحة المريض" : "The patient's page")).toBeVisible();
-    await expect(strip.getByText(ar ? "منسقك يراجع حالتك" : "Your coordinator is reviewing your case")).toBeVisible();
+    await expect(strip.getByText(ar ? "منسّقك يراجع حالتك" : "Your coordinator is reviewing your case")).toBeVisible();
     await expect(strip.getByText(ar ? /^عادةً خلال/ : "Usually within 2 working days")).toBeVisible();
     // Said once: waiting on (no rail chip, no patient-voice line in the brief), and the case number (no breadcrumb copy).
     const visible = (text: string | RegExp, exact = false) => page.getByText(text, { exact }).filter({ visible: true });
@@ -56,7 +56,8 @@ for (const locale of ["en", "ar"] as const) {
   test(`the strip stays with you, moves focus to the step without hiding it, and opens the next item (${locale})`, async ({ page }) => {
     for (const width of [1440, 390]) {
       await openCase(page, locale, width, 640);
-      const line = page.getByRole("region", { name: `${ar ? "الحالة" : "Case"} RS-2026-000002`, exact: true });
+      // The case number is isolated for bidirectional text (U+2066 … U+2069) in Arabic.
+      const line = page.getByRole("region", { name: new RegExp(`^${ar ? "الحالة" : "Case"} ⁦?RS-2026-000002⁩?$`) });
       await expect(line).toHaveCount(0);
       await page.mouse.wheel(0, 2400);
       await expect(line).toBeVisible();

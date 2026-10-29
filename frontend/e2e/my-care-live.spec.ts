@@ -68,7 +68,7 @@ async function latestMail(request: APIRequestContext, subject: string, since: nu
   throw new Error(`No "${subject}" message for ${to} matching ${bodyMatch} arrived in Mailpit`);
 }
 
-type Workspace = { caseSummary: { status: string; coordinatorName?: string | null }; clinicalReviews: { id: string; status: string }[]; proposal?: { versionId: string }; deposit?: { id: string; status: string; totalEgp: number; currency: string; totalDisplay: number } | null;
+type Workspace = { caseSummary: { status: string; coordinatorName?: string | null }; clinicalReviews: { id: string; status: string }[]; proposal?: { versionId: string }; deposit?: { id: string; status: string; totalEgp: number; transfer?: { status: string } | null; currency: string; totalDisplay: number } | null;
   actions: { currentAction: { code: string; kind: string } } };
 
 test("activation → password → sign-in lands on My Care for the current case; the deposit then confirms in place", async ({ browser, request }) => {
@@ -150,26 +150,25 @@ test("activation → password → sign-in lands on My Care for the current case;
 
   // --- Landing: the care journey, not a dashboard ----------------------------------------------------------
   await expect(patient.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible();
-  await expect(patient.getByText(caseNumber)).toBeVisible();
-  await expect(patient.getByRole("heading", { name: "Deposit arrangements" })).toBeVisible({ timeout: 30000 });
-  await expect(patient.getByText("No action is required from you right now.")).toBeVisible();
+  await expect(patient.getByText(caseNumber).first()).toBeVisible();
   const ws = await workspace();
   const deposit = ws.deposit!;
   expect(deposit.status).toBe("REQUESTED");
   expect(deposit.currency).toBe("USD");
+  // DEP-3: the deposit is the patient's step — pay by bank transfer, then send the bank's reference; nothing in EGP.
   const depositBlock = patient.getByRole("region", { name: "Coordination deposit", exact: true });
-  await expect(depositBlock).toContainText("Arranging");
+  await expect(depositBlock).toBeVisible({ timeout: 30000 });
   await expect(depositBlock).toContainText(new Intl.NumberFormat("en", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(deposit.totalDisplay));
-  await expect(depositBlock.getByRole("button")).toHaveCount(0);
   await expect(patient.getByText(/EGP|E£/)).toHaveCount(0);
   await expect(patient.getByRole("region", { name: "Your coordinator" })).toContainText(ws.caseSummary.coordinatorName!);
-  await expect(patient.getByRole("button", { name: /^view proposal/i })).toHaveCount(1);
-  const buttons = await patient.getByRole("button").allTextContents();
-  expect(buttons.filter(text => /continue|pay|check status|refresh|go to case/i.test(text))).toEqual([]);
   await patient.screenshot({ path: "e2e/screenshots/my-care-live-landing-1440.png", fullPage: true });
+  await patient.getByRole("textbox", { name: /Transaction reference number/ }).fill(`FT${stamp}`);
+  await patient.getByRole("button", { name: "Send transfer reference" }).click();
+  await expect(depositBlock).toContainText("Being checked", { timeout: 30000 });
+  expect((await workspace()).deposit?.transfer?.status, "the reference reached Finance").toBe("SUBMITTED");
 
-  // --- Finance confirms the deposit: the page moves on by itself ------------------------------------------
-  await call(finance, "POST", `/finance/cases/${caseId}/deposits/${deposit.id}/payments`, { amountEgp: deposit.totalEgp, method: "BANK", providerReference: `landing-${stamp}`, idempotencyKey: `landing-${caseId}` }, 200);
+  // --- Finance confirms the deposit against the reference: the page moves on by itself -----------------------
+  await call(finance, "POST", `/finance/cases/${caseId}/deposits/${deposit.id}/payments`, { amountEgp: deposit.totalEgp, idempotencyKey: `landing-${caseId}` }, 200);
   await patient.reload();
   await expect(patient.getByRole("region", { name: "Coordination deposit", exact: true })).toContainText("Deposit received", { timeout: 30000 });
   await expect(patient.getByText(/Arranging|Deposit arrangements/)).toHaveCount(0);

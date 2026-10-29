@@ -12,7 +12,7 @@ const SERVER_WORDING = "Server wording in English (must not reach the patient)";
 
 async function openQuote(page: import("@playwright/test").Page) {
   await page.goto("/en/portal");
-  await page.getByRole("button", { name: "Review proposal" }).click();
+  await page.getByRole("button", { name: "Review final quote" }).click();
   return page.getByRole("dialog");
 }
 

@@ -126,6 +126,8 @@ export async function setupPatient(page: Page, scenario: Scenario, { viewer = "S
     if (path.includes("/api/v1/undefined/")) calls.roleless++;
   });
   if (finalQuote && workspace.proposal) Object.assign(workspace.proposal, { documentType: "FINAL_TREATMENT_QUOTE", scopeChangeReason: finalQuote.scopeChangeReason ?? null, acceptableFrom: finalQuote.acceptableFrom ?? null, fxReapprovalStatus: finalQuote.fxReapprovalStatus ?? null });
+  // The step label reads the patient proposal state, as the backend sends it for a final quote.
+  if (finalQuote && workspace.patientProposal) Object.assign(workspace.patientProposal, { documentType: "FINAL_TREATMENT_QUOTE" });
   await page.route("**/api/v1/**", async route => {
     const request = route.request(), api = new URL(request.url()).pathname.replace("/api/v1", "");
     const reply = (data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });

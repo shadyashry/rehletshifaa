@@ -134,7 +134,8 @@ test("coordinator: reads right-to-left in Arabic at desktop and phone widths", a
   await signIn(page, USERNAME, "ar");
   await openCase(page, CASE!, "ar");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  await expect(page.locator("#current-action").getByText("خطوتك", { exact: true })).toBeVisible();
+  // The strip names whose step it is: the viewer's ("خطوتك") or who it waits on ("بانتظار"), depending on the live case.
+  await expect(page.locator("#current-action").getByText(/^(خطوتك|بانتظار)$/).first()).toBeVisible();
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.waitForTimeout(250);

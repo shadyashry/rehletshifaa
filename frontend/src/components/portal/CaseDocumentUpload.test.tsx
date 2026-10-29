@@ -29,6 +29,16 @@ describe("CaseDocumentUpload", () => {
     expect(onUploaded).toHaveBeenCalledWith(expect.objectContaining({ documentId: "d7", fileName: "lab-results.png", status: "CLEAN" }));
   });
 
+  it("files the case team's paperwork through the work endpoint (D-10)", async () => {
+    vi.mocked(putWithProgress).mockResolvedValue(true);
+    const send = vi.fn((path: string) => path.endsWith("/presign") ? Promise.resolve(presigned) : Promise.resolve({ documentId: "d7", status: "CLEAN" }));
+    renderWithWork(<CaseDocumentUpload caseId="c1" send={send as unknown as Send} base="/work/cases/c1/documents"
+      ready="{name} passed the check and is now in this case's documents." onUploaded={vi.fn()}/>);
+    fireEvent.change(screen.getByLabelText("Choose a file"), { target: { files: [png()] } });
+    expect(await screen.findByText("lab-results.png passed the check and is now in this case's documents.")).toBeTruthy();
+    expect(send.mock.calls.map(([path]) => path)).toEqual(["/work/cases/c1/documents/presign", "/work/cases/c1/documents/confirm"]);
+  });
+
   it("shows how much of the file has gone while it uploads", async () => {
     let report: (fraction: number) => void = () => {};
     let done: (stored: boolean) => void = () => {};

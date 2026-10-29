@@ -29,8 +29,10 @@ const codeOf = (failure: unknown) => (failure as { code?: string } | null)?.code
  * stored file: "Check again" confirms the same upload rather than sending it twice, and the backend sweeper checks it later
  * if nobody does. Used by the guardian step (the new file becomes the evidence) and the Documents tab.
  */
-export function CaseDocumentUpload({ caseId, send, lead, ready, onUploaded }: {
+export function CaseDocumentUpload({ caseId, send, lead, ready, onUploaded, base: endpoint }: {
   caseId: string; send: Send; lead?: string | null;
+  /** Where the presign and confirm go: the patient's own (default) or the case team's (`/work/cases/{id}/documents`, D-10). */
+  base?: string;
   /** What a clean upload led to, with `{name}`; by default "… is now in your documents". */
   ready?: string;
   onUploaded: (doc: CaseDocument) => void;
@@ -39,7 +41,7 @@ export function CaseDocumentUpload({ caseId, send, lead, ready, onUploaded }: {
   const id = useId();
   const [state, setState] = useState<UploadState>({ phase: "idle" });
   const working = state.phase === "sending" || state.phase === "checking";
-  const base = `/patient/cases/${caseId}/documents`;
+  const base = endpoint ?? `/patient/cases/${caseId}/documents`;
 
   async function check(pending: Pending) {
     setState({ phase: "checking", name: pending.name });

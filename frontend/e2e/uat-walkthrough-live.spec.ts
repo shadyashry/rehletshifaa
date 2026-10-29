@@ -159,7 +159,7 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   const cancel = await call<{ code: string }>(coordinator, "POST", `/coordinator/cases/${caseId}/transition`, { targetStatus: "CANCELLED", reason: "no", expectedVersion: ws.caseSummary.version });
   expect(cancel.status).toBe(409);
   await coordinator.page.goto(`/en/portal?case=${caseId}`);
-  await expect(coordinator.page.getByText(/Actions are locked until the clinical recommendation is ready/)).toBeVisible();
+  await expect(coordinator.page.getByText(/locked until the (clinical|Consultant's) recommendation is ready/).first()).toBeVisible();
   // Scoped to this case's journey: the case list beside it can hold other synthetic cases waiting on a consultant.
   await expect(coordinator.page.getByLabel("Journey").getByText("Waiting on: the Consultant")).toBeVisible();
   await idle(coordinator.page);

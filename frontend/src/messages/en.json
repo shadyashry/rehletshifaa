@@ -1224,6 +1224,10 @@
       "intakeSummary": "Intake summary",
       "noClinical": "No clinical information yet.",
       "noDocuments": "No documents uploaded yet.",
+      "addDocument": {
+        "lead": "Add the hospital's letter, a receipt, an invoice or discharge paperwork to this case.",
+        "ready": "{name} passed the check and is now in this case's documents."
+      },
       "view": "View",
       "assignedConsultant": "the assigned Consultant",
       "pendingUntil": "{name} · offer open until {date}",

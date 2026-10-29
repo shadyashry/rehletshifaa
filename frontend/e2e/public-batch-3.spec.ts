@@ -97,6 +97,10 @@ test("the intake does not ask about a travel package before any proposal exists"
 test("nothing on the home page waits for a scroll to become visible", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/en");
+  // The hero's promises fade in once on load (time-based); let those finish. A scroll-driven animation never finishes on its own,
+  // so anything still below full opacity after this is waiting for a scroll.
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter(a => a.timeline instanceof DocumentTimeline && a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished)));
   // Without scrolling: every list item further down the page is already fully opaque.
   const hidden = await page.locator("main").evaluate((main) =>
     Array.from(main.querySelectorAll<HTMLElement>("li, h2")).filter((el) => el.getBoundingClientRect().top > window.innerHeight)

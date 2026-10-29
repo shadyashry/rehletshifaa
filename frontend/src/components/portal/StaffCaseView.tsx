@@ -48,6 +48,9 @@ const DeclineAssignmentDialog=dynamic(()=>import("@/components/portal/DeclineAss
 const TransferOwnership=dynamic(()=>import("@/components/portal/TransferOwnership").then(m=>m.TransferOwnership));
 const GuardianReview=dynamic(()=>import("@/components/portal/GuardianReview").then(m=>m.GuardianReview));
 const ReopenCase=dynamic(()=>import("@/components/portal/ReopenCase").then(m=>m.ReopenCase));
+const CaseDocumentUpload=dynamic(()=>import("@/components/portal/CaseDocumentUpload").then(m=>m.CaseDocumentUpload));
+/** A case that has ended takes no new paperwork (the backend refuses it too: CASE_ENDED). */
+const ENDED=new Set(["DECLINED","EXPIRED","CLINICALLY_NOT_SUITABLE","CLOSED","CANCELLED"]);
 const RecordPatientResponse=dynamic(()=>import("@/components/portal/RecordPatientResponse").then(m=>m.RecordPatientResponse));
 
 export type CaseViewProps={locale:Locale;t:typeof copy.en;proposalCopy:ProposalCopy;role:RoleKey;value:Workspace;documents:CaseDocument[];doctors:VerifiedDoctor[];categories:CareCategory[];/** `null`: the team list could not be loaded (not the same as a team with nobody in it). */staff:StaffMember[]|null;catalog:CatalogService[];fxRates:FxRate[];/** P0-5: active facilities with their approved packages, for the travel/treatment pickers and the consultant's package lines. */facilities?:DirectoryFacility[];canRebalance:boolean;loadAssignmentHistory?:(caseId:string)=>Promise<AssignmentHistoryEntry[]>;loadIntakeHistory?:(caseId:string)=>Promise<ConversationDetail>;load:<T>(path:string)=>Promise<T>;/** A call with a method and body (the portal api); the patient side uploads with it. */send?:<T>(path:string,init:RequestInit)=>Promise<T>;/** Reloads the open case's documents (after a patient upload). */reloadDocuments?:(caseId:string)=>Promise<void>;downloadDoc:(id:string)=>void;viewDoc:(id:string)=>void;mySubject?:string;sendProposal:(caseId:string,body:unknown)=>void;busy:boolean;back:()=>void;mutate:Mutate;careView?:CareView;onCareView?:(view:CareView)=>void;otherCases?:CaseView[];openCaseById?:(id:string)=>void;consultantsHref?:string|null;/** P1-13: holds CASE_REOPEN on the platform (a Care Coordination Manager); a Consultant's own case is checked by the backend. */canReopen?:boolean;
@@ -86,7 +89,7 @@ type CaseOverlay="journey"|"messages"|"reply"|"more"|"transfer"|"requestInfo"|"p
  * A staff member's case page: the current action first, the case's work and evidence below, utilities in drawers.
  * Patients never load this module (`PatientCaseView` renders My Care instead).
  */
-export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref,canReopen=false,workItems=[],backLabel,openCaseById}:CaseViewProps){
+export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctors,categories,staff,catalog,fxRates,facilities=[],canRebalance,loadAssignmentHistory,loadIntakeHistory,load,send,reloadDocuments,downloadDoc,viewDoc,mySubject,sendProposal,busy,back,mutate,consultantsHref,canReopen=false,workItems=[],backLabel,openCaseById}:CaseViewProps){
  const work=useWorkCopy();const cover=work.caseCover;const cv=work.caseView;
  const c=value.caseSummary;
  const workspace=useMemo<CaseWorkspace>(()=>({locale,t,role,c,busy,mutate,price:proposalCopy.price,fxRates,catalog,facilities,mySubject}),[locale,t,role,c,busy,mutate,proposalCopy.price,fxRates,catalog,facilities,mySubject]);
@@ -116,6 +119,11 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
   const consultantOnCase=doctorAssignment&&doctorPhase?assignedDoctorName:null;
  // P1-15: the reservation, the voucher, the balance and its evidence, for every staff role on the case from travel coordination to treatment.
  const admissionRole=(["operations","finance","coordinator","doctor"] as string[]).includes(role)?role as AdmissionRole:null;
+ // D-10: the case team files the hospital's and the Consultant's paperwork here (Operations, the Consultant, the owning coordinator),
+ // as the Admission, Treatment and Discharge panels ask; an ended case takes no new documents.
+ const canAddDocuments=!!send&&!value.preview&&(role==="operations"||role==="doctor"||(isCoordinator&&owned))&&!ENDED.has(c.status);
+ const addDocument=canAddDocuments?<CaseDocumentUpload key={`staff-upload-${c.id}`} caseId={c.id} send={send!} base={`/work/cases/${c.id}/documents`}
+   lead={cv.addDocument.lead} ready={cv.addDocument.ready} onUploaded={()=>void reloadDocuments?.(c.id)}/>:null;
  const admissionShown=!!admissionRole&&ADMISSION_STAGES.has(c.status)&&!value.preview;
  // UX 5-0/5-1: Operations' travel plan, while the backend offers it (ACCEPTED, TRAVEL_COORDINATION). Once a reservation can exist it
  // is an act of the hospital file (the admission panel), in its place between the letter and the receipt; before that, its own
@@ -405,7 +413,7 @@ export function StaffCaseView({locale,t,proposalCopy,role,value,documents,doctor
        {!intakePanel&&!clinicalPanel&&!decisionSheet&&!doctorReviewComplete&&<p className="text-sm text-ink-500">{cv.noClinical}</p>}
       </div>
 
-      {tab==="documents"&&(documentsPanel??<p className="text-sm text-ink-500">{cv.noDocuments}</p>)}
+      {tab==="documents"&&<>{addDocument}{documentsPanel??<p className="text-sm text-ink-500">{cv.noDocuments}</p>}</>}
 
       {tab==="activity"&&<><CaseActivity tasks={value.tasks} timeline={value.timeline} onViewJourney={()=>setOverlay("journey")}/>{isCoordinator&&loadAssignmentHistory&&<div className="mt-5"><AssignmentHistory key={c.id} locale={locale} caseId={c.id} load={loadAssignmentHistory}/></div>}</>}
      </div>
