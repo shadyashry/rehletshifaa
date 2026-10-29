@@ -94,7 +94,7 @@ public class CustomerReadinessService {
 
         List<BlockingItem> blocking = new ArrayList<>();
         if (!accountActivated) blocking.add(new BlockingItem("ACCOUNT_NOT_ACTIVATED", "Activate your profile", "فعّل ملفك"));
-        if (!contactVerified) blocking.add(new BlockingItem("CONTACT_NOT_VERIFIED", "Verify a contact channel", "تأكيد وسيلة تواصل"));
+        if (!contactVerified) blocking.add(new BlockingItem("CONTACT_NOT_VERIFIED", "Verify a contact channel", "أكّد وسيلة تواصل"));
         if (identityRequired && !identityVerified) blocking.add(new BlockingItem("IDENTITY_NOT_VERIFIED", "Complete identity verification", "أكمل التحقق من الهوية"));
         if (minorWithoutGuardian) blocking.add(new BlockingItem("MINOR_REQUIRES_GUARDIAN", "A parent or legal guardian must act for this patient", "يجب أن يتصرف أحد الوالدين أو الوصي القانوني نيابة عن المريض"));
         else if (guardianSubject && !repValid) blocking.add(switch (guardian) {
@@ -104,8 +104,8 @@ public class CustomerReadinessService {
         });
         else if (!repValid) blocking.add(new BlockingItem("REPRESENTATIVE_AUTH_MISSING", "Representative authorization required", "مطلوب تفويض ممثّل ساري"));
         if (!consentsDone) blocking.add(new BlockingItem("CONSENTS_INCOMPLETE", "Complete required consents", "أكمل الموافقات المطلوبة"));
-        if (depositRequired && !depositSatisfied) blocking.add(new BlockingItem("DEPOSIT_UNPAID", "Pay or waive the coordination deposit", "سداد وديعة التنسيق أو إعفاؤها"));
-        if (ob == null) blocking.add(new BlockingItem("ONBOARDING_NOT_STARTED", "Ask your coordinator to start onboarding from your acknowledged estimate", "اطلب من المنسق بدء التسجيل من التقدير الذي وافقت عليه"));
+        if (depositRequired && !depositSatisfied) blocking.add(new BlockingItem("DEPOSIT_UNPAID", "Pay or waive the coordination deposit", "سداد دفعة التنسيق أو الإعفاء منها"));
+        if (ob == null) blocking.add(new BlockingItem("ONBOARDING_NOT_STARTED", "Ask your coordinator to start onboarding from your acknowledged estimate", "اطلب من منسّقك بدء التسجيل من التقدير الذي أقررت به"));
         else if (!onboardingCompleted) blocking.add(new BlockingItem("ONBOARDING_INCOMPLETE", "Review and submit your onboarding", "راجِع وأرسل بيانات التسجيل"));
         boolean ready = blocking.isEmpty();
 

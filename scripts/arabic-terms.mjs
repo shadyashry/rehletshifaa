@@ -125,6 +125,39 @@ for (const file of sources(join(root, "frontend/src"), [])) {
   });
 }
 
+// The backend's own Arabic (WhatsApp and email templates, status and readiness labels, consent text) follows every row,
+// bare «العرض» included: in Java the Arabic is only ever patient or staff text. One register too: no «يرجى» (X-3).
+const register = /يُ?رجى|الرجاء|نرجو/u;
+for (const [k, v] of strings) {
+  if (register.test(v)) {
+    failures++;
+    console.log(`  «يرجى» in ${k}: ${v}`);
+  }
+}
+const javaVariants = [...rows.flatMap((row) => row.variants), register];
+function javaSources(dir, out) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) javaSources(path, out);
+    else if (entry.name.endsWith(".java")) out.push(path);
+  }
+  return out;
+}
+let javaLines = 0;
+for (const file of javaSources(join(root, "backend/src/main/java"), [])) {
+  readFileSync(file, "utf8").split(/\r?\n/).forEach((line, i) => {
+    if (!/[ء-ي]/u.test(line)) return;
+    javaLines++;
+    for (const variant of javaVariants) {
+      if (variant.test(line)) {
+        failures++;
+        console.log(`  REPLACED VARIANT «${variant.source}» in ${relative(root, file)}:${i + 1}`);
+      }
+    }
+  });
+}
+console.log(`backend: ${javaLines} Java lines with Arabic checked`);
+
 if (failures) {
   console.log(`\n${failures} string(s) use a replaced variant.`);
   process.exit(1);

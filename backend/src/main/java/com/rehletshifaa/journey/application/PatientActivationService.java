@@ -310,9 +310,9 @@ public class PatientActivationService {
                     : "I consent to RehletShifaa processing my personal and health data to coordinate my care.";
             case "CROSS_BORDER_CARE" -> ar ? "أوافق على نقل بياناتي ومشاركتها عبر الحدود لأغراض تنسيق العلاج."
                     : "I consent to my data being transferred across borders for the purpose of coordinating treatment.";
-            // The exact checkbox wording the activation page shows beside the displayed deposit terms. The Arabic
-            // label is unchanged pending the native Arabic review; the terms themselves are shown in English.
-            case "DEPOSIT_CANCELLATION_TERMS" -> ar ? "قرأت وأقبل شروط وديعة التنسيق والإلغاء والاسترداد."
+            // The exact checkbox wording the activation page shows beside the displayed deposit terms (ProfileActivation's
+            // DEPOSIT_CONSENT; area X glossary «دفعة التنسيق»). The terms themselves, and their version, are unchanged.
+            case "DEPOSIT_CANCELLATION_TERMS" -> ar ? "قرأت وأقبل شروط دفعة التنسيق والإلغاء والاسترداد."
                     : "I have read the coordination deposit, refund and cancellation terms shown above and accept them.";
             case "MEDICAL_INFORMATION_SHARING" -> ar ? "أوافق على مشاركة معلوماتي الطبية مع الاستشاريين ومقدمي الرعاية المعنيين."
                     : "I consent to sharing my medical information with the treating consultants and providers.";

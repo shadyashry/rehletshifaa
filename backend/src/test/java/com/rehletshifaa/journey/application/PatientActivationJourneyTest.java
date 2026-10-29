@@ -282,7 +282,7 @@ class PatientActivationJourneyTest {
         var deposit = jdbc.queryForMap("SELECT policy_version,exact_text FROM consent_records WHERE case_id=? AND consent_type='DEPOSIT_CANCELLATION_TERMS'", ctx.caseId);
         assertThat(deposit.get("policy_version")).isEqualTo(PaymentService.DEPOSIT_TERMS_VERSION);
         assertThat(List.of("I have read the coordination deposit, refund and cancellation terms shown above and accept them.",
-                "قرأت وأقبل شروط وديعة التنسيق والإلغاء والاسترداد.")).contains((String) deposit.get("exact_text"));
+                "قرأت وأقبل شروط دفعة التنسيق والإلغاء والاسترداد.")).contains((String) deposit.get("exact_text"));
         // Only the deposit-terms consent changed wording; the others keep their version.
         assertThat(jdbc.queryForList("SELECT DISTINCT policy_version FROM consent_records WHERE case_id=? AND consent_type<>'DEPOSIT_CANCELLATION_TERMS'", String.class, ctx.caseId))
                 .isNotEmpty().doesNotContain(PaymentService.DEPOSIT_TERMS_VERSION);

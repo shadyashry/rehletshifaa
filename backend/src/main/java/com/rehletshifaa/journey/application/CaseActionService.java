@@ -479,7 +479,7 @@ public class CaseActionService {
         // DEP-3: the patient pays and enters the transfer reference (theirs to do once every other step is done); while Finance
         // checks a reference it is ours.
         if (r.depositRequired() && !r.depositSatisfied())
-            out.add(new BlockerView("DEPOSIT_UNPAID", "Coordination deposit", "وديعة التنسيق",
+            out.add(new BlockerView("DEPOSIT_UNPAID", "Coordination deposit", "دفعة التنسيق",
                     patientOwed ? "LATER" : payment.transferPending(caseId) ? "STAFF" : "PATIENT", true));
         return out;
     }

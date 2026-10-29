@@ -491,6 +491,32 @@ Filled per slice (key · before · after). X-0 changed no message string; X-1 ch
 | X-3 | messages_ar.properties (login) | `rememberMe` | إبقائي مسجّلًا على هذا الجهاز | إبقاء تسجيل الدخول على هذا الجهاز |
 | X-3 | messages_ar.properties (login) | `doContactCoordinator` | تحدث مع منسّق | تحدّث مع منسّق |
 | X-3 | messages_ar.properties (login) | `differentUserAuthenticated` | أنت مسجّل الدخول بالفعل إلى رحلة شفاء باسم ⁨{0}⁩ في هذا المتصفح. سجّل الخروج أولًا، ثم افتح هذا الرابط مجددًا. | في هذا المتصفح جلسة رحلة شفاء مفتوحة باسم ⁨{0}⁩. سجّل الخروج أولًا، ثم افتح هذا الرابط مجددًا. |
+| X-B | `NotificationOutboxProcessor` | `proposal-ready` subject | مقترح علاجك جاهز | تقديرك المبدئي جاهز |
+| X-B | `NotificationOutboxProcessor` | `proposal-ready` body | مقترح علاجك جاهز للمراجعة بأمان: %s — … | تقديرك المبدئي لعلاجك جاهز للمراجعة بأمان: %s — … |
+| X-B | `NotificationOutboxProcessor` | `onboarding-activation` body | …إكمال ملفك، ووديعة التنسيق، والدخول… | …إكمال ملفك، ودفعة التنسيق، والدخول… |
+| X-B | `NotificationOutboxProcessor` | `deposit-settled-patient` body | استلمنا وديعة التنسيق. يبدأ منسّقك… | استلمنا دفعة التنسيق. يبدأ منسّقك… |
+| X-B | `NotificationOutboxProcessor` | `deposit-payment-due` subject | حان موعد سداد وديعة التنسيق | حان موعد سداد دفعة التنسيق |
+| X-B | `NotificationOutboxProcessor` | `deposit-payment-due` body | اكتمل ملفك. ادفع وديعة التنسيق بتحويل بنكي… | اكتمل ملفك. ادفع دفعة التنسيق بتحويل بنكي… |
+| X-B | `NotificationOutboxProcessor` | `deposit-payment-reminder` subject | تذكير: وديعة التنسيق | تذكير: دفعة التنسيق |
+| X-B | `NotificationOutboxProcessor` | `deposit-payment-reminder` body | لم يصلنا بعد الرقم المرجعي لتحويل وديعة التنسيق. … | لم يصلنا بعد الرقم المرجعي لتحويل دفعة التنسيق. … |
+| X-B | `NotificationOutboxProcessor` | `deposit-transfer-rejected` body | لم يتمكن فريق المالية من تأكيد الرقم المرجعي… | لم يتمكن الفريق المالي من تأكيد الرقم المرجعي… |
+| X-B | `NotificationOutboxProcessor` | `deposit-balance-due` subject | جزء من وديعتك ما زال مستحقًا | جزء من دفعة التنسيق ما زال مستحقًا |
+| X-B | `NotificationOutboxProcessor` | `deposit-balance-due` body | استلمنا جزءًا من وديعة التنسيق. … | استلمنا جزءًا من دفعة التنسيق. … |
+| X-B | `NotificationOutboxProcessor` | `admission-voucher-facility` (hospital email) | رصيد الوديعة الذي تسدّده رحلة شفاء للمنشأة (جنيه مصري) | رصيد دفعة التنسيق الذي تسدّده رحلة شفاء للمنشأة (جنيه مصري) |
+| X-B | `NotificationOutboxProcessor` | `admission-voucher-facility` (hospital email) | يُرجى إدخال المريض بموجب هذه القسيمة وإرسال إيصال الخزينة… | أدخِلوا المريض بموجب هذه القسيمة وأرسِلوا إيصال الخزينة… (plural: the hospital is addressed as «خزينتكم») |
+| X-B | `NotificationOutboxProcessor` | `proposal-decision-recorded` ACCEPTED | قبول العرض النهائي | قبول عرض السعر النهائي |
+| X-B | `NotificationOutboxProcessor` | `proposal-decision-recorded` DECLINED / default | رفض المقترح / قرار بشأن المقترح | رفض عرض السعر / قرار بشأن عرض السعر |
+| X-B | `NotificationOutboxProcessor` | `proposal-decision-recorded` subject | سُجّل قرارك بشأن مقترح رحلة شفاء | سُجّل قرارك في حالتك لدى رحلة شفاء (covers either document, so names neither) |
+| X-B | `NotificationOutboxProcessor` | `proposal-decision-recorded` body | سُجّل قرارك بشأن مقترح رحلة شفاء (…) … يُرجى التواصل مع منسّقك. | سجّل منسّقك قرارك في حالتك لدى رحلة شفاء (…) … فتواصل مع منسّقك. (says who recorded it, as the English does) |
+| X-B | `PublicCaseAccessService` | status `PROPOSAL_PREPARATION` | جارٍ إعداد عرضك | جارٍ إعداد تقديرك المبدئي |
+| X-B | `PublicCaseAccessService` | status `DECLINED` | تم رفض العرض من المريض | رفض المريض عرض السعر |
+| X-B | `PublicCaseAccessService` | status `EXPIRED` | انتهت صلاحية العرض | انتهت صلاحية عرض السعر |
+| X-B | `PublicCaseAccessService` | status `CLINICALLY_NOT_SUITABLE` | سيتواصل معك منسق حالتك | سيتواصل معك منسّق حالتك |
+| X-B | `CustomerReadinessService` | `CONTACT_NOT_VERIFIED` | تأكيد وسيلة تواصل | أكّد وسيلة تواصل (imperative, as its neighbours) |
+| X-B | `CustomerReadinessService` | `DEPOSIT_UNPAID` | سداد وديعة التنسيق أو إعفاؤها | سداد دفعة التنسيق أو الإعفاء منها |
+| X-B | `CustomerReadinessService` | `ONBOARDING_NOT_STARTED` | اطلب من المنسق بدء التسجيل من التقدير الذي وافقت عليه | اطلب من منسّقك بدء التسجيل من التقدير الذي أقررت به (acknowledged, as in `onboarding-activation`) |
+| X-B | `CaseActionService` | blocker `DEPOSIT_UNPAID` | وديعة التنسيق | دفعة التنسيق |
+| X-B | `PatientActivationService` | consent `DEPOSIT_CANCELLATION_TERMS` (recorded `exact_text`) | قرأت وأقبل شروط وديعة التنسيق والإلغاء والاسترداد. | قرأت وأقبل شروط دفعة التنسيق والإلغاء والاسترداد. (the words the page has shown since X-2; policy version unchanged) |
 
 ### X-2 notes for the reviewer (one term per concept)
 
@@ -536,3 +562,28 @@ Filled per slice (key · before · after). X-0 changed no message string; X-1 ch
   until its convergence (backlog "Area X").
 - **Activation error.** `secureLink.activation.error` now says what to do if it repeats («…وإن تكرّر ذلك فراسل منسّقك»); the English
   was changed to match.
+
+### X-B notes for the reviewer (the backend's own Arabic)
+
+- **Scope.** Every Arabic line in `backend/src/main/java` (67: WhatsApp/email templates in `NotificationOutboxProcessor` and
+  `IntakeConversationService`, status labels in `PublicCaseAccessService`, readiness and blocker labels in `CustomerReadinessService`
+  and `CaseActionService`, consent text in `PatientActivationService` and `IntakeLifecycleService`, the handover letter). 26 rows above;
+  the rest already followed the glossary and had no «يرجى».
+- **Estimate or quote.** `proposal-ready` opens the preliminary estimate, so «تقديرك المبدئي»; `PROPOSAL_PREPARATION` likewise. Declined
+  and expired follow the site («عرض السعر», as `myCare` DECLINED and `cases.pastStatus`). The decision-recorded message covers either
+  document, so its subject names neither.
+- **Consent (legal).** Only `DEPOSIT_CANCELLATION_TERMS` carried a replaced term. Its recorded `exact_text` is meant to be the checkbox
+  the page shows, and the page (`ProfileActivation` `DEPOSIT_CONSENT`) has said «دفعة التنسيق» since X-2, so the record was storing words
+  the patient did not see; it now stores the shown words. Its policy version (`deposit-terms-2026-09-25`) names the terms document,
+  which did not change, so it was not bumped. **For legal:** the other six activation consents record backend wording that differs
+  from what the page shows (for example `PRIVACY_DATA_PROCESSING` recorded «أوافق على معالجة رحلة شفاء لبياناتي…», shown «أوافق على أن
+  تعالج رحلة شفاء بياناتي…»; `REPRESENTATIVE_AUTHORIZATION` «أقر بتفويض الممثل…» vs «أؤكد أنني مفوّض…»; the English pairs differ too).
+  No glossary term is involved, so they were not touched: making record and page one text is a consent-wording decision with a
+  version bump (backlog "Area X"). `GUARDIAN_AUTHORIZATION` stays the placeholder (`guardian-v0-placeholder`); the intake consent in
+  `IntakeLifecycleService` is unchanged.
+- **Guard.** `scripts/arabic-terms.mjs` now checks every Arabic line of the backend Java against all glossary rows (bare «العرض»
+  included) and «يرجى/الرجاء/نرجو», and checks «يرجى» in `ar.json` and the Keycloak bundles. Run against the previous backend it flags
+  all 10 changed lines.
+- **WhatsApp templates at Meta.** A message sent as an approved Meta template carries the Arabic body registered at Meta; the words
+  here are the session/email text and the template parameters (`proposal-decision-recorded` passes «what» as one). Any registered
+  Arabic template body must be re-submitted with the same terms before launch.

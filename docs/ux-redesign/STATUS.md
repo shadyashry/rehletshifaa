@@ -2372,6 +2372,24 @@ shadda, the stale staff-activation spec; the backend Arabic glossary pass (MEDIU
 
 **Area X closed** (X-0..X-3, critique 26 → 32/40). The launch gate stays open: `native-arabic-review.md` (native + legal).
 
+### X-B the backend's own Arabic (2026-10-29, worktree `quirky-murdock-013210`, branch `claude/quirky-murdock-013210` from X-3 @ `252589ef`)
+
+**Delivered.** The area X glossary and register applied to the backend's Arabic: WhatsApp/email templates
+(`NotificationOutboxProcessor`: the deposit as «دفعة التنسيق» in six templates, «الفريق المالي», «تقديرك المبدئي» for `proposal-ready`,
+«عرض السعر النهائي» and a document-neutral decision-recorded message, the hospital voucher's «يُرجى» as «أدخِلوا… وأرسِلوا»), patient
+status labels (`PublicCaseAccessService`), readiness and blocker labels (`CustomerReadinessService`, `CaseActionService`), and the
+deposit-terms consent's recorded text, which now matches the checkbox the page has shown since X-2 (policy version unchanged: the
+terms did not change). 26 rows (class/key, before, after) and "X-B notes" in `native-arabic-review.md`. `scripts/arabic-terms.mjs`
+checks `backend/src/main/java` against every row and the register, and the register in `ar.json`/Keycloak. No native or legal
+sign-off claimed.
+
+**Verify.** `node scripts/arabic-terms.mjs` green (67 backend lines; run on the previous backend it flags all 10 changed lines);
+focused Maven (NotificationOutboxProcessor, PatientActivationJourney, CoordinatorCaseActions, AssistedProposalDecision,
+MetaWhatsAppChannel) 107/107; full `mvn -o -q test` green (1001 tests, 0 failures, 0 errors). `PatientActivationJourneyTest` updated for the consent text.
+
+**Deferred** (backlog "Area X"): the other six consents' recorded vs shown wording (legal), «يرجى» in four frontend files, re-submitting
+registered Meta Arabic templates.
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The
