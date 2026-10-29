@@ -66,7 +66,8 @@ public class ReplyCoverService implements HandoverCheck {
         authority.authorize(Permission.REPLY_COVER_MANAGE, Resource.ofSubject(me));
         Instant now = micros(clock.instant());
         List<ReplyCover> rows;
-        if (authority.allowed(Permission.REPLY_COVER_MANAGE, Resource.platform())) rows = covers.findCurrent(now);
+        // The platform-scope grant (a manager), not any grant: a coordinator's own-cover (SELF) grant also passes a platform check.
+        if (authority.held(Principal.current()).platformPermissions().contains(Permission.REPLY_COVER_MANAGE)) rows = covers.findCurrent(now);
         else {
             Set<String> people = new HashSet<>(workforce.supervised(me, FUNCTION));
             people.add(me);

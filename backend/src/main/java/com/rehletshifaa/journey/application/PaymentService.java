@@ -159,8 +159,12 @@ public class PaymentService {
         var actor = authority.authorize(Permission.PAYMENT_RECORD);
         // The ledger key is namespaced to the deposit server-side, so a client key can never collide with another deposit's.
         String key = "receipt:" + depositId + ":" + request.idempotencyKey();
-        // A double submit by the person who confirmed answers as the deposit stands, even once it is settled.
-        if (paymentEvents.existsByIdempotencyKeyAndDepositIdAndActorSubject(key, depositId, actor.subject())) return depositForCase(caseId);
+        // A double submit by the person who confirmed answers as the deposit stands, even once it is settled — and only for the
+        // deposit's own case, so a replayed key never reads another case's deposit.
+        if (paymentEvents.existsByIdempotencyKeyAndDepositIdAndActorSubject(key, depositId, actor.subject())) {
+            requireDeposit(caseId, depositId);
+            return depositForCase(caseId);
+        }
         Resource onCase = Resource.ofCase(caseId);
         if (!authority.allowed(Permission.CASE_READ, onCase)) authority.require(Permission.CASE_DEPOSIT_READ, onCase);
         cases.lockById(caseId);

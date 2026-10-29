@@ -22,7 +22,10 @@ public class ClamAvDocumentInspector implements DocumentInspectionPort {
     private static final Logger log=LoggerFactory.getLogger(ClamAvDocumentInspector.class);
     private final String host; private final int port; private final int timeout; private final MeterRegistry metrics;
     public ClamAvDocumentInspector(@Value("${app.storage.clamav.host}")String host,@Value("${app.storage.clamav.port:3310}")int port,@Value("${app.storage.clamav.timeout-milliseconds:10000}")int timeout,MeterRegistry metrics){this.host=host;this.port=port;this.timeout=timeout;this.metrics=metrics;}
-    @Override public InspectionResult inspect(byte[] content,String ignored){
+    @Override public InspectionResult inspect(byte[] content,String type){
+        // D-06 (SEC-13): the bytes must be the declared type before the scanner is asked whether they are malware.
+        InspectionResult declared=SignatureDocumentInspector.declaredType(content,type);
+        if(!declared.clean())return record(declared,null);
         String response;
         try(Socket socket=new Socket()){socket.connect(new InetSocketAddress(host,port),timeout);socket.setSoTimeout(timeout);OutputStream out=socket.getOutputStream();out.write("zINSTREAM\0".getBytes(StandardCharsets.US_ASCII));int offset=0;while(offset<content.length){int length=Math.min(8192,content.length-offset);out.write(ByteBuffer.allocate(4).putInt(length).array());out.write(content,offset,length);offset+=length;}out.write(new byte[4]);out.flush();response=new String(socket.getInputStream().readNBytes(2048),StandardCharsets.UTF_8).replace("\0","").trim();}
         catch(IOException e){return record(InspectionResult.unavailable("SCANNER_UNAVAILABLE"),e.getClass().getSimpleName());}

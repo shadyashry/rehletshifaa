@@ -389,6 +389,8 @@ class UatDefectCorrectionsTest {
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND owner_subject IS NOT NULL", created.caseId())).isZero();
         assertThat(count("SELECT count(*) FROM case_tasks WHERE case_id=? AND task_type='COORDINATION_ROUTING'", created.caseId())).isEqualTo(1);
         authenticate("coordinator-subject", Role.COORDINATOR);
+        // D-04: the team queue is the serving team's (a team with no care areas serves every area).
+        com.rehletshifaa.coordination.CoordinationTestData.servingTeamMember(jdbc, "coordinator-subject", "");
         assertThat(journey.coordinatorQueue()).extracting(CaseView::id).contains(created.caseId());
         assertThat(journey.coordinatorQueue().stream().filter(c -> c.id().equals(created.caseId())).findFirst().orElseThrow().coordinatorSubject()).isNull();
     }

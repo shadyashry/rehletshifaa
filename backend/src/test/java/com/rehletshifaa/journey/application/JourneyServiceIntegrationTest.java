@@ -193,6 +193,9 @@ class JourneyServiceIntegrationTest {
         // #20: replaying the same idempotency key records no second payment.
         assertThat(payment.recordReceipt(created.caseId(),deposit.id(),new RecordReceiptRequest(due,"idem-1")).status()).isEqualTo("PAID");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_events WHERE deposit_id=? AND event_type='PAYMENT_RECORDED'",Integer.class,deposit.id())).isEqualTo(1);
+        // Deep validation D-01: a replayed key never answers for another case than the deposit's own.
+        assertThatThrownBy(()->payment.recordReceipt(UUID.randomUUID(),deposit.id(),new RecordReceiptRequest(due,"idem-1")))
+                .isInstanceOf(com.rehletshifaa.shared.api.ApiException.class);
     }
 
     @Test void depositLedgerTracksPartialPaymentsAndRefundsAtTheQuotedRateAndPoliciesListDefaultFirst(){

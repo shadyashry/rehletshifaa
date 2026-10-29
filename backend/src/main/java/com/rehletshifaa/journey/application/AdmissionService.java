@@ -319,6 +319,7 @@ public class AdmissionService {
         AdmissionVoucher voucher = readiness.currentVoucher(caseId)
                 .orElseThrow(() -> new ApiException(409, "VOUCHER_NOT_ISSUED", "No admission voucher is issued for this case"));
         BigDecimal due = voucher.split().patientPaysAtFacilityEgp();
+        if (alreadyRecorded(caseId, Kind.BALANCE_EVIDENCED, request.receiptNumber(), request.amountEgp(), request.paidAt())) return view(caseId, admission);
         if (ledger.claimed(caseId, Kind.BALANCE_EVIDENCED).add(request.amountEgp()).compareTo(due) > 0)
             throw new ApiException(409, "AMOUNT_EXCEEDS_BALANCE", "The receipts would exceed what the patient pays at the hospital (EGP " + due.toPlainString() + ")");
         if (request.paidAt().isAfter(clock.instant().plusSeconds(300))) throw new ApiException(400, "PAID_IN_FUTURE", "The receipt date cannot be in the future");
@@ -360,6 +361,8 @@ public class AdmissionService {
         AdmissionVoucher voucher = readiness.currentVoucher(caseId)
                 .orElseThrow(() -> new ApiException(409, "VOUCHER_NOT_ISSUED", "No admission voucher is issued for this case"));
         BigDecimal due = voucher.split().feeBalanceEgp();
+        if (alreadyRecorded(caseId, Kind.FEE_BALANCE_RECEIVED, request.reference(), request.amountEgp(), request.receivedAt()))
+            return view(caseId, admissions.findByCaseId(caseId).orElse(null));
         if (ledger.claimed(caseId, Kind.FEE_BALANCE_RECEIVED).add(request.amountEgp()).compareTo(due) > 0)
             throw new ApiException(409, "AMOUNT_EXCEEDS_BALANCE", "The amount exceeds the platform fee balance (EGP " + due.toPlainString() + ")");
         ledger.record(caseId, new Fact(Kind.FEE_BALANCE_RECEIVED, null, request.reference().trim(), request.amountEgp(), request.receivedAt(), null),
@@ -513,6 +516,24 @@ public class AdmissionService {
         if (readiness.feeBalanceOwed(caseId, voucher).signum() > 0) return "DUE";
         BigDecimal awaitingCountersign = ledger.claimed(caseId, Kind.BALANCE_EVIDENCED).subtract(ledger.total(caseId, Kind.BALANCE_EVIDENCED));
         return awaitingCountersign.compareTo(readiness.balanceOwed(caseId, voucher)) >= 0 ? "CHECKING" : "DUE";
+    }
+
+    /**
+     * A receipt already live on the ledger under the same number (a cashier's receipt, a transfer reference; compared trimmed
+     * and case-insensitively) is a resubmit only when its amount and payment time match too: then nothing is recorded, so a
+     * retry never counts one payment twice. Any other receipt under that number is refused, never silently dropped — two
+     * real instalments need their own numbers.
+     */
+    private boolean alreadyRecorded(UUID caseId, Kind kind, String reference, BigDecimal amountEgp, Instant paidAt) {
+        String number = reference.trim();
+        var same = ledger.live(caseId, kind).stream().filter(e -> e.getReference() != null && number.equalsIgnoreCase(e.getReference().trim())).findFirst();
+        if (same.isEmpty()) return false;
+        CaseEvidence row = same.get();
+        boolean resubmit = row.getAmountEgp().compareTo(amountEgp) == 0 && row.getEffectiveAt() != null
+                && row.getEffectiveAt().truncatedTo(java.time.temporal.ChronoUnit.MILLIS).equals(paidAt.truncatedTo(java.time.temporal.ChronoUnit.MILLIS));
+        if (!resubmit)
+            throw new ApiException(409, "RECEIPT_ALREADY_RECORDED", "A receipt with this number is already recorded; give each payment its own receipt number");
+        return true;
     }
 
     private AdmissionView view(UUID caseId, FacilityAdmission admission) {

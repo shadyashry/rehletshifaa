@@ -69,4 +69,6 @@ public class CaseService {
     @Transactional public SubmitCaseResponse submitPublic(UUID id,String grant){intakeGrants.require(id,grant);var response=submit(id);intakeGrants.consume(id,grant);return response;}
     @Transactional(readOnly=true) public MedicalCase findDraft(UUID id) { MedicalCase medicalCase = cases.findById(id).orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found")); if (medicalCase.getStatus() != com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT || medicalCase.getPurgedAt() != null) throw new ApiException(409, "CASE_NOT_DRAFT", "Case cannot be changed in its current state"); return medicalCase; }
     @Transactional(readOnly=true) public MedicalCase findById(UUID id){return cases.findById(id).orElseThrow(()->new ApiException(404,"CASE_NOT_FOUND","Case was not found"));}
+    /** Holds the case's row lock for the rest of the caller's transaction, so per-case limits are checked and used by one writer at a time. */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY) public void lock(UUID id){cases.lockById(id).orElseThrow(()->new ApiException(404,"CASE_NOT_FOUND","Case was not found"));}
 }

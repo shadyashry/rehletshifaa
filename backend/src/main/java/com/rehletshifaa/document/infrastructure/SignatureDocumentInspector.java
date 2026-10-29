@@ -16,8 +16,13 @@ public class SignatureDocumentInspector implements DocumentInspectionPort {
         if(content==null||content.length==0)return new InspectionResult(false,"EMPTY_FILE");
         String ascii=new String(content,StandardCharsets.ISO_8859_1);
         if(ascii.contains("EICAR-STANDARD-ANTIVIRUS-TEST-FILE"))return new InspectionResult(false,"MALWARE_SIGNATURE");
-        boolean signature=switch(type){case "application/pdf"->startsWith(content,PDF);case "image/png"->startsWith(content,PNG);case "image/jpeg"->startsWith(content,JPG);default->false;};
+        return declaredType(content,type);
+    }
+    /** The bytes start as the declared type does. Every scanning mode applies it: a malware scan says nothing about the type. */
+    static InspectionResult declaredType(byte[] content,String type){
+        if(content==null||content.length==0)return new InspectionResult(false,"EMPTY_FILE");
+        boolean signature=switch(type==null?"":type){case "application/pdf"->startsWith(content,PDF);case "image/png"->startsWith(content,PNG);case "image/jpeg"->startsWith(content,JPG);default->false;};
         return signature?new InspectionResult(true,"CLEAN"):new InspectionResult(false,"CONTENT_TYPE_MISMATCH");
     }
-    private boolean startsWith(byte[] content,byte[] expected){return content.length>=expected.length&&Arrays.equals(Arrays.copyOf(content,expected.length),expected);}
+    private static boolean startsWith(byte[] content,byte[] expected){return content.length>=expected.length&&Arrays.equals(Arrays.copyOf(content,expected.length),expected);}
 }

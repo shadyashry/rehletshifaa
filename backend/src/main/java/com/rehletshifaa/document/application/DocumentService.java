@@ -28,7 +28,7 @@ public class DocumentService {
         var medicalCase=cases.findById(caseId); if(medicalCase.getStatus()==com.rehletshifaa.casemanagement.domain.CaseStatus.DRAFT)throw new ApiException(409,"CASE_NOT_SUBMITTED","Additional documents require a submitted case");
         return presignForCase(medicalCase,caseId,request,uploader);
     }
-    private PresignResponse presignForCase(com.rehletshifaa.casemanagement.domain.MedicalCase medicalCase,UUID caseId,PresignRequest request,String uploader){validate(request.contentType(), request.sizeBytes()); validateQuota(caseId,request.sizeBytes());
+    private PresignResponse presignForCase(com.rehletshifaa.casemanagement.domain.MedicalCase medicalCase,UUID caseId,PresignRequest request,String uploader){validate(request.contentType(), request.sizeBytes()); cases.lock(caseId); validateQuota(caseId,request.sizeBytes());
         UUID documentId=UUID.randomUUID(); String extension=extensionFor(request.contentType()); LocalDate date=LocalDate.now(clock);
         String objectKey="medical/%d/%02d/%s".formatted(date.getYear(), date.getMonthValue(), UUID.randomUUID());
         String safeName=documentId+extension; String original=sanitizeFileName(request.originalFileName());
@@ -101,6 +101,9 @@ public class DocumentService {
         var result = inspector.inspect(content, type);
         if (result.retryable()) throw new DocumentScanUnavailableException(result.reasonCode());
         if (!result.clean()) return new ChannelFile(null, "REJECTED");
+        // Checked again under the case lock (taken after the scan, so no lock is held while scanning): the limits hold for one writer at a time.
+        cases.lock(caseId);
+        try { validateQuota(caseId, content.length); } catch (ApiException e) { return new ChannelFile(null, "CASE_FILE_LIMIT"); }
         UUID documentId = UUID.randomUUID(); LocalDate date = LocalDate.now(clock);
         String objectKey = "medical/%d/%02d/%s".formatted(date.getYear(), date.getMonthValue(), UUID.randomUUID());
         String original = sanitizeFileName(originalFileName == null || originalFileName.isBlank() ? "whatsapp" + extensionFor(type) : originalFileName);
@@ -135,6 +138,7 @@ public class DocumentService {
      * The per-case limits still apply: a file over them stays with the conversation only (null).
      */
     @Transactional public UUID adoptStaged(UUID caseId, String objectKey, String contentType, long sizeBytes, String fileName) {
+        cases.lock(caseId);
         try { validateQuota(caseId, sizeBytes); } catch (ApiException e) { return null; }
         UUID documentId = UUID.randomUUID();
         var document = new MedicalDocument(documentId, cases.findById(caseId), objectKey, sanitizeFileName(fileName), documentId + extensionFor(contentType),

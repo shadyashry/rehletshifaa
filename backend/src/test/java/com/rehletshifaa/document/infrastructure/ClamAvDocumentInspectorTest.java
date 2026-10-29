@@ -37,6 +37,15 @@ class ClamAvDocumentInspectorTest {
         }
     }
 
+    /**
+     * Deep validation D-06 (SEC-13): the scanner only says "no malware"; the bytes must still be what the upload declared. A PDF
+     * declared as a PNG is refused before any scan, so a clean verdict never stands in for the file-signature check.
+     */
+    @Test void aFileWhoseBytesAreNotTheDeclaredTypeIsRefusedBeforeTheScan() {
+        var result = new ClamAvDocumentInspector("127.0.0.1", 1, 200, new SimpleMeterRegistry()).inspect(PDF, "image/png");
+        assertThat(result).isEqualTo(new InspectionResult(false, "CONTENT_TYPE_MISMATCH", false));
+    }
+
     @Test void exactOkIsClean() throws Exception {
         assertThat(scanWith("stream: OK")).isEqualTo(new InspectionResult(true, "CLEAN", false));
     }

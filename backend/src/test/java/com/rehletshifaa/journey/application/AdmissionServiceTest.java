@@ -167,7 +167,17 @@ class AdmissionServiceTest extends AdmissionFixture {
         asOps();
         assertThatThrownBy(() -> admissions.recordBalance(c.caseId, receipt("97750.01")))
                 .isInstanceOf(ApiException.class).extracting("code").isEqualTo("AMOUNT_EXCEEDS_BALANCE");
-        UUID first = latest(admissions.recordBalance(c.caseId, receipt("50000.00")), "BALANCE_EVIDENCED");
+        BalanceReceiptRequest half = receipt("50000.00");
+        UUID first = latest(admissions.recordBalance(c.caseId, half), "BALANCE_EVIDENCED");
+        // Deep validation D-02: a resubmitted cashier receipt (same number, amount and time) is the same receipt, never a
+        // second payment; the same number with another amount or time is refused rather than silently dropped.
+        assertThat(latest(admissions.recordBalance(c.caseId, half), "BALANCE_EVIDENCED")).isEqualTo(first);
+        assertThatThrownBy(() -> admissions.recordBalance(c.caseId, new BalanceReceiptRequest(" rcpt-50000.00 ", new BigDecimal("40000.00"),
+                half.paidAt(), "CARD", null, "EGP", new BigDecimal("40000.00"))))
+                .isInstanceOf(ApiException.class).extracting("code").isEqualTo("RECEIPT_ALREADY_RECORDED");
+        assertThatThrownBy(() -> admissions.recordBalance(c.caseId, new BalanceReceiptRequest("RCPT-50000.00", half.amountEgp(),
+                half.paidAt().plusSeconds(3600), "CARD", null, "EGP", half.amountEgp())))
+                .isInstanceOf(ApiException.class).extracting("code").isEqualTo("RECEIPT_ALREADY_RECORDED");
         UUID second = latest(admissions.recordBalance(c.caseId, receipt("47750.00")), "BALANCE_EVIDENCED");
         assertThatThrownBy(() -> admissions.recordBalance(c.caseId, receipt("1.00")))
                 .as("recorded receipts count against the balance before Finance signs them").isInstanceOf(ApiException.class).extracting("code").isEqualTo("AMOUNT_EXCEEDS_BALANCE");
@@ -255,7 +265,12 @@ class AdmissionServiceTest extends AdmissionFixture {
         assertThat(readiness.admissionBlockers(c.caseId)).containsExactly(AdmissionReadiness.FEE_BALANCE_DUE);
         assertThatThrownBy(() -> admissions.recordFeeBalance(c.caseId, new FeeBalanceRequest("FT-1", new BigDecimal("5000.01"), Instant.now())))
                 .isInstanceOf(ApiException.class).extracting("code").isEqualTo("AMOUNT_EXCEEDS_BALANCE");
-        admissions.recordFeeBalance(c.caseId, new FeeBalanceRequest("FT-2", new BigDecimal("5000.00"), Instant.now()));
+        FeeBalanceRequest firstHalf = new FeeBalanceRequest("FT-2", new BigDecimal("2500.00"), Instant.now());
+        admissions.recordFeeBalance(c.caseId, firstHalf);
+        // Deep validation D-02: a retried submit of the same transfer records nothing new.
+        admissions.recordFeeBalance(c.caseId, firstHalf);
+        assertThat(readiness.admissionBlockers(c.caseId)).containsExactly(AdmissionReadiness.FEE_BALANCE_DUE);
+        admissions.recordFeeBalance(c.caseId, new FeeBalanceRequest("FT-3", new BigDecimal("2500.00"), Instant.now()));
         assertThat(caseStatus(c.caseId)).isEqualTo("ADMISSION_READY");
     }
 

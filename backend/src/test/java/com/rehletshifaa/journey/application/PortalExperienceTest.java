@@ -47,6 +47,11 @@ class PortalExperienceTest {
     @Test void previewIsReadOnlyLimitedToUnclaimedIntakeAndAudited(){
         workforce().person("coordinator-a","COORDINATOR").person("coordinator-b","COORDINATOR");
         UUID id=intake();auth("coordinator-a",Role.COORDINATOR);
+        // D-04: only a member of a team serving the case previews it; coordinator-b (no team) is refused.
+        eligible("coordinator-a");
+        auth("coordinator-b",Role.COORDINATOR);
+        assertThatThrownBy(()->journey.intakePreview(id)).isInstanceOf(ApiException.class).extracting("code").isEqualTo("OUT_OF_SCOPE");
+        auth("coordinator-a",Role.COORDINATOR);
         var preview=journey.intakePreview(id);
         assertThat(preview.caseSummary().patientName()).isEqualTo("Private Patient");
         assertThat(preview.caseSummary().coordinatorSubject()).isNull();
@@ -55,7 +60,6 @@ class PortalExperienceTest {
         assertThatThrownBy(()->journey.workspace(id)).isInstanceOf(ApiException.class);
         assertThatThrownBy(()->journey.assertCanRead(id)).isInstanceOf(ApiException.class);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE case_id=? AND event_type='CASE_INTAKE_PREVIEWED'",Integer.class,id)).isEqualTo(1);
-        eligible("coordinator-a");
         journey.claimCoordinatorCase(id,null);
         assertThat(journey.workspace(id).intakeSummary()).isEqualTo("Needs cardiac review");
         auth("coordinator-b",Role.COORDINATOR);

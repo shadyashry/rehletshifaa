@@ -172,4 +172,16 @@ class ReplyCoverIntegrationTest {
         covers.create(coverNow(OWNER, COVER));
         assertThat(covers.current()).anyMatch(c -> c.ownerSubject().equals(OWNER) && c.active());
     }
+
+    /** Deep validation D-03: a coordinator's own-cover grant is not the manager's platform view of every team's covers. */
+    @Test void aColleagueNeverListsCoversOutsideTheirOwnAndTheirTeams() {
+        as(OWNER, Role.COORDINATOR);
+        covers.create(coverNow(null, COVER));
+        em.flush();
+
+        as(OTHER, Role.COORDINATOR);
+        assertThat(covers.current()).noneMatch(c -> c.ownerSubject().equals(OWNER));
+        as(LEAD, Role.COORDINATOR);
+        assertThat(covers.current()).anyMatch(c -> c.ownerSubject().equals(OWNER));
+    }
 }

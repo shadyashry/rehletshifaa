@@ -128,6 +128,9 @@ public class CoordinationRepository {
     }
 
     // ---- Cases ----
+    /** The case's care area, if it has one. */
+    public Optional<String> careArea(UUID id) { return cases.findRoutingFacts(id).map(f -> f.getCareCategory()); }
+
     public CaseFacts facts(UUID id) {
         var c = cases.findRoutingFacts(id).orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
         return new CaseFacts(id, consultantOf(id), c.getCareCategory(), c.getPreferredLanguage(), owner(id), revision(id), c.getStatus().name(),

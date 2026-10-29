@@ -50,6 +50,22 @@ public final class CoordinationTestData {
         }
     }
 
+    /**
+     * A member of an active care-coordination team serving {@code careAreas} (comma-separated; empty serves every area), with
+     * no capacity and no policy: enough to see and read the team's queued cases (D-04), not to be routed or to claim.
+     */
+    public static UUID servingTeamMember(JdbcTemplate jdbc, String subject, String careAreas) {
+        UUID team = UUID.randomUUID();
+        Instant from = Instant.now().minusSeconds(3600);
+        jdbc.update("INSERT INTO workforce_teams(id,function_key,name,status,created_by,created_at,updated_at,revision) "
+                + "VALUES(?,'CARE_COORDINATION',?,'ACTIVE','TEST',?,?,0)", team, "Serving team " + team, from, from);
+        jdbc.update("INSERT INTO workforce_team_memberships(id,team_id,subject,effective_from,status,created_by,reason,revision) "
+                + "VALUES(?,?,?,?,'ACTIVE','TEST','Serving team fixture',0)", UUID.randomUUID(), team, subject, from);
+        jdbc.update("INSERT INTO coordination_team_profiles(team_id,care_areas,languages,updated_by,updated_at,revision) VALUES(?,?,'en','TEST',?,0)",
+                team, careAreas, from);
+        return team;
+    }
+
     /** A submission may already have been auto-routed when a policy was effective before it arrived. */
     public static boolean hasActiveCoordinator(JdbcTemplate jdbc, UUID caseId, String subject) {
         Long count = jdbc.queryForObject("SELECT COUNT(*) FROM case_assignments WHERE case_id=? AND assignee_role='COORDINATOR' "

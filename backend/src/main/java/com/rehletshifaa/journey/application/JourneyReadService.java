@@ -52,6 +52,7 @@ public class JourneyReadService {
     private final CareCategoryCatalog careCategories;
     private final WorkforceDirectory workforceDirectory;
     private final AuditTrail auditTrail;
+    private final com.rehletshifaa.authority.application.IntakeTeams intakeTeams;
 
     public JourneyReadService(
             JourneyCaseQueryService caseQueries,
@@ -68,7 +69,9 @@ public class JourneyReadService {
             ConsultantEligibilityService consultants,
             CareCategoryCatalog careCategories,
             WorkforceDirectory workforceDirectory,
-            AuditTrail auditTrail) {
+            AuditTrail auditTrail,
+            com.rehletshifaa.authority.application.IntakeTeams intakeTeams) {
+        this.intakeTeams = intakeTeams;
         this.caseQueries = caseQueries;
         this.workspaces = workspaces;
         this.practitioners = practitioners;
@@ -113,14 +116,25 @@ public class JourneyReadService {
         visible.add(actor.subject());
         visible.addAll(portalExperience.reports(actor.subject()));
         visible.addAll(replyCovers.ownersCoveredBy(actor.subject()));
+        // D-04: an unclaimed case is listed to the coordinators of the teams serving it; a manager sees the whole queue.
+        boolean wholeQueue = wholeQueue();
+        var served = wholeQueue ? null : intakeTeams.servedBy(actor.subject()); // once per request, not per row
         return caseQueries.coordinatorQueue(visible).stream()
+                .filter(view -> view.coordinatorSubject() != null || wholeQueue || served.serves(view.careCategory()))
                 .map(view -> view.coordinatorSubject() == null ? routingSummary(view) : view)
                 .toList();
+    }
+
+    private boolean wholeQueue() {
+        return authority.held(com.rehletshifaa.authority.application.Principal.current()).platformPermissions().contains(Permission.ROUTING_ASSIGN);
     }
 
     @Transactional
     public IntakePreview intakePreview(UUID caseId) {
         var actor = authority.authorize(Permission.COORDINATION_QUEUE);
+        // D-04: decided before the lock and in one neutral answer, so another team learns nothing about the case's state.
+        if (!wholeQueue() && !intakeTeams.servesCase(caseId, actor.subject()))
+            throw new ApiException(403, "OUT_OF_SCOPE", "This case is not available to you");
         cases.lockById(caseId)
                 .orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
         CaseView view = caseQueries.caseView(caseId);
@@ -255,7 +269,9 @@ public class JourneyReadService {
     }
 
     public void assertCanReadDocument(UUID caseId) {
-        if (authority.allowed(Permission.CASE_INTAKE, Resource.ofCase(caseId))) {
+        // D-04: an unclaimed case's documents are open to the coordinators of the teams serving it (UC-03 B, UC-20).
+        if (authority.allowed(Permission.CASE_INTAKE, Resource.ofCase(caseId))
+                && intakeTeams.servesCase(caseId, com.rehletshifaa.authority.application.Principal.current().subject())) {
             return;
         }
         authority.authorize(Permission.CASE_READ, Resource.ofCase(caseId));
