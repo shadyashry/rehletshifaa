@@ -174,20 +174,32 @@ export function AmountInput({ id, name, invalid, defaultValue, describedBy, acce
   max?: number; required?: boolean; className?: string; onValue?: (value: number) => void;
 }) {
   const { locale } = useWorkCopy();
+  // UX X: a refusal is also said beside the field (aria-invalid + a linked message), not only in the browser's submit bubble.
+  // It shows once the field is left or a submit is refused, and clears as soon as the value fits.
+  const [refused, setRefused] = useState(false);
   const fits = (value: number) => inRange(value, accepts) && (max == null || value <= max);
   const check = (field: HTMLInputElement) => {
     const value = readAmount(field.value, accepts === "signed");
     field.setCustomValidity(field.value.trim() && !fits(value) ? invalid : "");
+    if (field.validity.valid) setRefused(false);
     return value;
   };
+  const errorId = `${id}-error`;
   return (
-    <input id={id} className={`field tabular-nums ${className ?? ""}`} name={name} type="text" inputMode="decimal" required={required} dir="ltr" autoComplete="off" spellCheck={false}
-           defaultValue={defaultValue != null ? groupAmount(defaultValue, locale) : undefined} aria-describedby={describedBy}
-           onChange={event => { const value = check(event.currentTarget); onValue?.(value); }}
-           onBlur={event => {
-             const value = check(event.currentTarget);
-             if (fits(value)) event.currentTarget.value = `${value < 0 ? "-" : ""}${groupAmount(Math.abs(value), locale)}`;
-           }}/>
+    <>
+      <input id={id} className={`field tabular-nums ${refused ? "field-error" : ""} ${className ?? ""}`} name={name} type="text" inputMode="decimal" required={required} dir="ltr" autoComplete="off" spellCheck={false}
+             defaultValue={defaultValue != null ? groupAmount(defaultValue, locale) : undefined}
+             aria-invalid={refused || undefined} aria-describedby={[describedBy, refused ? errorId : null].filter(Boolean).join(" ") || undefined}
+             onChange={event => { const value = check(event.currentTarget); onValue?.(value); }}
+             onInvalid={() => setRefused(true)}
+             onBlur={event => {
+               const field = event.currentTarget;
+               const value = check(field);
+               if (field.value.trim() && !field.validity.valid) setRefused(true);
+               if (fits(value)) field.value = `${value < 0 ? "-" : ""}${groupAmount(Math.abs(value), locale)}`;
+             }}/>
+      {refused && <p id={errorId} className="error-text mt-1">{invalid}</p>}
+    </>
   );
 }
 

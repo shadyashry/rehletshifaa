@@ -413,7 +413,8 @@ function MilestoneForm({ t, documents, busy, primary, onRecord }: { t: Copy; doc
 
 type Line = { key: number; kind: string; description: string; quantity: string };
 /** UX X-1: a quantity above zero with up to two decimals, typed in a text field (a number field drops an Arabic keypad's digits). */
-const QUANTITY = "(?!0+(\\.0+)?$)[0-9]+(\\.[0-9]{1,2})?";
+const QUANTITY = /^(?!0+(\.0+)?$)[0-9]+(\.[0-9]{1,2})?$/;
+const quantityFits = (quantity: string) => QUANTITY.test(quantity.trim());
 type OrderBody = { reason: string; lines: { kind: string; description: string; quantity: number }[] };
 
 /** The Consultant's change order (1–20 lines); the emergency variant asks for a confirmation before it is recorded. */
@@ -426,6 +427,11 @@ function ChangeOrderForm({ t, hint, submitLabel, confirm, busy, onSubmit }: {
   const [reason, setReason] = useState("");
   const [lines, setLines] = useState<Line[]>(() => [fresh(0)]);
   const [confirming, setConfirming] = useState(false);
+  const [refused, setRefused] = useState<ReadonlySet<number>>(() => new Set());
+  const refuse = (key: number, on: boolean) => setRefused(keys => {
+    if (keys.has(key) === on) return keys;
+    const next = new Set(keys); if (on) next.add(key); else next.delete(key); return next;
+  });
   const update = (key: number, patch: Partial<Line>) => setLines(rows => rows.map(row => row.key === key ? { ...row, ...patch } : row));
   const body = (): OrderBody => ({ reason: reason.trim(), lines: lines.map(l => ({ kind: l.kind, description: l.description.trim(), quantity: readAmount(l.quantity) })) });
   const send = async () => { if (await onSubmit(body())) { setReason(""); setLines([fresh(0)]); } };
@@ -451,10 +457,17 @@ function ChangeOrderForm({ t, hint, submitLabel, confirm, busy, onSubmit }: {
                 <label className="block text-[0.8125rem] font-semibold">{f.description}
                   <input className="field" required maxLength={500} autoComplete="off" value={line.description} onChange={event => update(line.key, { description: event.target.value })}/>
                 </label>
-                <label className="block text-[0.8125rem] font-semibold">{f.quantity}
-                  <input className="field tabular-nums" type="text" inputMode="decimal" pattern={QUANTITY} required dir="ltr" autoComplete="off" value={line.quantity}
-                         onChange={event => update(line.key, { quantity: latinDigits(event.target.value).replace(/٫/g, ".") })}/>
-                </label>
+                <div>
+                  <label htmlFor={`${id}-qty-${line.key}`} className="block text-[0.8125rem] font-semibold">{f.quantity}</label>
+                  {/* UX X: the refusal in our words, beside the field (the browser's pattern message is in its own language). */}
+                  <input id={`${id}-qty-${line.key}`} className={`field tabular-nums ${refused.has(line.key) ? "field-error" : ""}`} type="text" inputMode="decimal" required dir="ltr" autoComplete="off" value={line.quantity}
+                         aria-invalid={refused.has(line.key) || undefined} aria-describedby={refused.has(line.key) ? `${id}-qty-${line.key}-error` : undefined}
+                         ref={field => { field?.setCustomValidity(quantityFits(line.quantity) ? "" : f.quantityInvalid); }}
+                         onInvalid={() => refuse(line.key, true)}
+                         onBlur={() => refuse(line.key, !quantityFits(line.quantity))}
+                         onChange={event => { const quantity = latinDigits(event.target.value).replace(/٫/g, "."); update(line.key, { quantity }); if (quantityFits(quantity)) refuse(line.key, false); }}/>
+                  {refused.has(line.key) && <p id={`${id}-qty-${line.key}-error`} className="error-text mt-1">{f.quantityInvalid}</p>}
+                </div>
                 {lines.length > 1 && <button type="button" className="btn-secondary" onClick={() => setLines(rows => rows.filter(row => row.key !== line.key))}>
                   <X size={16} aria-hidden/><span className="sr-only">{fillTemplate(f.removeLine, { n })}</span></button>}
               </li>

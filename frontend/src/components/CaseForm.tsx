@@ -126,10 +126,20 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
   function nextStep() {
     if (step === 1 && !contactValid) {
       setTouched(current => ({ ...current, givenName: true, familyName: true, representativeName: true, representativeRelationship: true, ageBand: true, country: true, whatsappNumber: true, email: true }));
+      focusFirstError();
       return;
     }
     setStep(current => Math.min(3, current + 1));
     window.requestAnimationFrame(() => document.getElementById("case-form-heading")?.focus());
+  }
+
+  /** A refused step or submit moves focus to the first field that says what to fix (WCAG 3.3.1), not to stay on the button. */
+  function focusFirstError() {
+    window.requestAnimationFrame(() => {
+      const marked = document.getElementById("case-form-heading")?.closest("form")?.querySelector<HTMLElement>('[aria-invalid="true"]');
+      const field = marked?.matches("input, select, textarea") ? marked : marked?.querySelector<HTMLElement>("input, select, textarea");
+      field?.focus();
+    });
   }
 
   function previousStep() {
@@ -198,7 +208,7 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
     if (!result.success) for (const issue of result.error.issues) nextErrors[issue.path[0] as FieldKey] = issue.message;
     if (!country) nextErrors.country = t.selectCountryFirst;
     if (!filesAreValid(files)) nextErrors.files = d.form.errors.file;
-    if (Object.keys(nextErrors).length || !result.success) { setErrors(nextErrors); return; }
+    if (Object.keys(nextErrors).length || !result.success) { setErrors(nextErrors); focusFirstError(); return; }
     setBusy(true);
     try {
       // Reuse the draft from a previous attempt. Creating a case also creates the patient record, so
@@ -241,7 +251,7 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
     if (!user) return;
     const personValid = valid.ageBand && (!someoneElse || (valid.givenName && valid.familyName && valid.country && valid.representativeRelationship));
     setTouched({ consent: true, files: true, ageBand: true, ...(someoneElse ? { givenName: true, familyName: true, country: true, representativeRelationship: true } : {}) }); setErrors({});
-    if (!personValid || !values.consent || !filesAreValid(files)) { setErrors({ ...(values.consent ? {} : { consent: d.form.errors.consent }), ...(filesAreValid(files) ? {} : { files: d.form.errors.file }) }); return; }
+    if (!personValid || !values.consent || !filesAreValid(files)) { setErrors({ ...(values.consent ? {} : { consent: d.form.errors.consent }), ...(filesAreValid(files) ? {} : { files: d.form.errors.file }) }); focusFirstError(); return; }
     const body = JSON.stringify({
       conditionDescription: describedCase(values.conditionDescription.trim()), careArea: careArea || null, consent: true, caseFor: values.caseFor, ageBand: values.ageBand,
       someoneElse: someoneElse ? { givenName: values.givenName.trim(), familyName: values.familyName.trim() || null, singleLegalName: values.singleLegalName, country: country?.name ?? "", relationship: values.representativeRelationship } : null,
@@ -358,7 +368,7 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
   /** P1-13 (A-05): one required question; a child's case is then followed by a parent or legal guardian. */
   function ageBandField() {
     const error = fieldError("ageBand");
-    return <fieldset className="mt-6 min-w-0 border-0 p-0" aria-describedby={`${ageId}-help`}>
+    return <fieldset role="radiogroup" className="mt-6 min-w-0 border-0 p-0" aria-invalid={error ? true : undefined} aria-describedby={`${ageId}-help`}>
       <legend className="flex items-center gap-2 text-sm font-bold text-ink-800">{someoneElse ? t.ageTitle : t.ageTitleSelf}<span className="font-bold text-alert-700"><span aria-hidden className="text-base leading-none">*</span><span className="sr-only"> {t.requiredMark}</span></span></legend>
       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {AGE_BANDS.map(band => {
@@ -430,7 +440,7 @@ export function CaseForm({ locale, d, withEmergency = true }: { locale: Locale; 
           <div className="mt-4 grid gap-6 sm:grid-cols-2">
             <Field label={d.form.phone} required requiredMark={t.requiredMark} valid={valid.whatsappNumber} error={fieldError("whatsappNumber")} hint={d.form.phoneHint}>
               <div className={`flex items-stretch overflow-hidden rounded-[0.55rem] border ${fieldError("whatsappNumber") ? "border-alert-700" : "border-[var(--field-border)] focus-within:border-brand-600 focus-within:shadow-[0_0_0_3px_var(--color-brand-100)]"}`} dir="ltr">
-                <input className="min-w-0 flex-1 bg-white px-3 py-2.5 text-ink-900 outline-none" inputMode="tel" autoComplete="tel-national" placeholder={dialCountry ? "100 000 0000" : d.form.dialCodeChoose} aria-label={t.localNumber} value={phoneLocal} onChange={e => { begin(); setPhoneLocal(latinDigits(e.target.value).replace(/[^\d\s()-]/g, "")); }} onBlur={() => touch("whatsappNumber")} />
+                <input className="min-w-0 flex-1 bg-white px-3 py-2.5 text-ink-900 outline-none" inputMode="tel" autoComplete="tel-national" placeholder={dialCountry ? "100 000 0000" : d.form.dialCodeChoose} aria-label={t.localNumber} aria-invalid={fieldError("whatsappNumber") ? true : undefined} value={phoneLocal} onChange={e => { begin(); setPhoneLocal(latinDigits(e.target.value).replace(/[^\d\s()-]/g, "")); }} onBlur={() => touch("whatsappNumber")} />
                 {/* The visible prefix is drawn; a transparent native select over it does the choosing, so keyboards,
                     screen readers and phone pickers all get the platform control. It comes after the number in the DOM
                     (shown first with `order-first`) so the field label still targets the number input. */}

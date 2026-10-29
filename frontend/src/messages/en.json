@@ -4139,6 +4139,7 @@
         "kind": "Kind",
         "description": "Description",
         "quantity": "Quantity",
+        "quantityInvalid": "Enter a quantity above zero in digits, with up to two decimals, like 1 or 2.5.",
         "addLine": "Add a line",
         "removeLine": "Remove line {n}",
         "send": "Send to Finance",
