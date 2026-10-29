@@ -112,8 +112,12 @@ test("Send my case asks the patient's age once, and it cannot be skipped", async
   await noSideScroll(page);
   await shot(page, "send-my-case-age-ar-390");
   await page.goto("/en/send-my-case");
-  await page.getByRole("radio", { name: /someone else/i }).check({ force: true });
-  await expect(page.getByRole("radiogroup", { name: /The patient's age/ })).toBeVisible();
+  // The same hydration race as above, on the second page load.
+  await expect(async () => {
+    // The input is visually hidden inside its card; the visible label is what a person clicks.
+    await page.getByText("I'm helping a family member or someone in my care").click();
+    await expect(page.getByRole("radiogroup", { name: /The patient's age/ })).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await page.getByText("12 to 17", { exact: true }).click();
   await expect(page.getByRole("radio", { name: "12 to 17" })).toBeChecked();
   await shot(page, "send-my-case-age-en-390");

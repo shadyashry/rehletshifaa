@@ -73,7 +73,16 @@ the HTTP/cache path does not limit capacity; it says nothing about authenticated
 One laptop, all services co-located: public pages and public API are fast at the origin; the tunnel dominates
 user-visible latency. No capacity statement for production can be made from this run, and no approved workload exists.
 
-## Hypotheses from the code review (not yet measured)
+## Code-review hypotheses: fixed by construction (2026-10-30), not load-measured
 
-AR-07 (scan inside the DB transaction), AR-08 (eligibility N+1 under the global routing lock), AR-09 (effective roles
-recomputed per request), AR-10 (preview row lock). See `architecture-review.md`.
+Each was removed in code rather than measured, because the fix is cheaper than a load rig and needs no workload numbers:
+
+| Item | Before | After | Proof |
+|---|---|---|---|
+| AR-07 scan inside the confirm transaction | every in-flight scan holds a pooled connection for up to the 10 s scanner timeout; 10 slow scans exhaust the default pool of 10 | at most 4 scans at once (`CLAMAV_MAX_CONCURRENT_SCANS`); a scan finding no slot within 2 s is the retryable `SCANNER_BUSY` non-verdict and the sweeper rescans it | `ClamAvDocumentInspectorTest` (slot taken by a stalled scan → busy, the stalled one still completes) |
+| AR-08 eligibility under the global routing lock | 3 queries per coordinator + 3 (3N+3) inside the lock | 6 queries whatever N | coordination suite + PostgreSQL 17 proof (`PostgresJpaMappingTest`) |
+| AR-09 effective roles per request | guard 8 + decision 8 + actor 8 queries on an authorized call | guard 8 + decision 8 (actor reuses the decision's set); a request-wide memo is unsafe (activation changes roles mid-request) | `AuthorityIntegrationTest`, full suite |
+| AR-10 preview row lock | `SELECT … FOR UPDATE` on the case for a read | plain existence read; the claim re-checks under the lock | `PortalExperienceTest`, `UnclaimedIntakeTeamScopeTest` |
+
+Still not measured: pool wait time, outbox lag and routing latency under concurrent staff load (needs an approved
+workload; see "Not measured").

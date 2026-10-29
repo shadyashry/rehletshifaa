@@ -151,10 +151,23 @@ public class CoordinationRepository {
                 .orElseThrow(() -> new IllegalStateException("Case " + caseId + " has no active primary coordinator"));
     }
     public long workload(String subject, UUID excludedCase) {
-        return assignments.countOpenPrimaryCasesExcept(subject, excludedCase);
+        return workloads(List.of(subject), excludedCase).getOrDefault(subject, 0L);
     }
     public Instant lastAutomatic(String subject) {
-        return assignments.findAutomaticAssignmentTimes(subject, Limit.of(1)).stream().findFirst().orElse(null);
+        return lastAutomatic(List.of(subject)).get(subject);
+    }
+    /** Open primary caseload per coordinator, other than {@code excludedCase}; one query for every candidate (AR-08). */
+    public Map<String, Long> workloads(Collection<String> subjects, UUID excludedCase) {
+        if (subjects.isEmpty()) return Map.of();
+        Map<String, Long> result = new HashMap<>();
+        assignments.countOpenPrimaryCasesExcept(subjects, excludedCase).forEach(r -> result.put(r.getSubject(), r.getTotal()));
+        return result;
+    }
+    public Map<String, Instant> lastAutomatic(Collection<String> subjects) {
+        if (subjects.isEmpty()) return Map.of();
+        Map<String, Instant> result = new HashMap<>();
+        assignments.lastAutomaticAssignments(subjects).forEach(r -> result.put(r.getSubject(), r.getLatest()));
+        return result;
     }
     public boolean queued(UUID caseId) {
         return tasks.isQueuedForRouting(caseId);

@@ -5,6 +5,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/rehletshifaa}
     username: ${DB_USERNAME:rehletshifaa}
     password: ${DB_PASSWORD:rehletshifaa}
+    hikari:
+      # Fault drill 2026-10-30: with the default 30 s a database outage held every request until the gateway's 504;
+      # 5 s still covers an ordinary pool wait and then answers the retryable 503 (GlobalExceptionHandler).
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MILLISECONDS:5000}
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -177,6 +181,7 @@ app:
       host: ${CLAMAV_HOST:localhost}
       port: ${CLAMAV_PORT:3310}
       timeout-milliseconds: ${CLAMAV_TIMEOUT_MILLISECONDS:10000}
+      max-concurrent-scans: ${CLAMAV_MAX_CONCURRENT_SCANS:4}
   mail:
     mode: ${MAIL_MODE:noop}
     coordinator: ${COORDINATOR_EMAIL:coordinator@example.com}

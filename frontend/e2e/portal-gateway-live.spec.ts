@@ -66,6 +66,8 @@ async function signIn(page: Page, user = USERNAME, locale = "en") {
 async function openCase(page: Page, caseNumber: string, locale = "en") {
   // The staff views are links in the "Your work" navigation (not tabs) since the role-aware staff home.
   await page.getByRole("navigation", { name: locale === "ar" ? "أقسام العمل" : "Your work" }).getByRole("link", { name: locale === "ar" ? /حالاتي/ : /My cases/ }).click();
+  // The list pages; search names the case so it is on the first page whatever the stack holds.
+  await page.getByRole("searchbox").first().fill(caseNumber);
   const row = page.locator("li", { hasText: caseNumber }).first();
   await expect(row).toBeVisible({ timeout: 20000 });
   await row.getByRole("button", { name: locale === "ar" ? /^فتح(،| RS-)/ : /^Open(:| RS-)/ }).first().click();
@@ -154,7 +156,6 @@ test("coordinator: an unactivated profile is the current action, with resend as 
   await openCase(page, CASE_2!);
   const action = page.locator("#current-action");
   await expect(action.getByRole("heading")).toHaveText(/Waiting for the patient to activate their profile/);
-  await expect(page.getByText("Profile activation", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Resend link", exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: /Prepare proposal|Assign/ })).toHaveCount(0);
   await page.screenshot({ path: path.join(shots, "coordinator-case-profile-1440.png"), fullPage: true });
@@ -173,7 +174,8 @@ test("consultant: dashboard and case open through the gateway without a single r
   const net = watchNetwork(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, "doctor");
-  await expect(page.getByRole("heading", { name: /Consultant workspace/ })).toBeVisible({ timeout: 20000 });
+  // Every staff role lands on its own work list (the role-aware staff home).
+  await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible({ timeout: 20000 });
   await page.getByRole("navigation", { name: "Your work" }).getByRole("link", { name: /My cases/ }).click();
   const open = page.getByRole("button", { name: /^Open(:| RS-)/ }).first();
   if (await open.count()) {

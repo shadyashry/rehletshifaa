@@ -39,8 +39,27 @@ Verdict scale per gate: **MET** (fresh evidence), **PARTIAL** (code/config ready
 | Check | Evidence | Result |
 |---|---|---|
 | Restore drill to disposable resources | Local drill PASS, 94 s, V109 (below) | MET locally; production PITR NOT MET |
-| Dependency outage drills (Redis, Keycloak, DB, MinIO/ClamAV, SMTP) | Not run this session on an isolated stack | NOT VERIFIED |
+| Dependency outage drills (Redis, Keycloak, DB, MinIO/ClamAV, SMTP) | Run 2026-10-30 on the isolated QA stack (`raw/fault-drill.mjs`, results below); two defects found and fixed (D-16, D-17), re-drilled | MET locally (single host); production failover not verifiable here |
 | Scheduler leadership | 22/25 jobs `@LeasedJob`, 3 row-leased processors (code review) | MET (code) |
+
+## Fault drills (2026-10-30, isolated QA stack)
+
+`raw/fault-drill.mjs` stops one dependency of the `rehletshifaa-qa` project, probes health, the sign-in boundary (a bad
+token), Keycloak discovery and a full public intake (create, upload with scan, submit), starts it again and repeats the
+probes. Raw output: `raw/fault-drill-2026-10-30.txt`, re-drill after the fixes `raw/fault-drill-2026-10-30-after-fix.txt`.
+
+| Dependency down | What the patient and staff get | Recovery | Verdict |
+|---|---|---|---|
+| Redis | Intake create/upload/submit all succeed; the backend write budget falls back to a per-instance counter (`RequestRateLimiter.countLocally`), the gateway budget is in nginx; overall health `DOWN`, readiness (DB only) unaffected | 13 s, nothing lost | PASS (with several backend instances the fallback budget is per instance) |
+| Keycloak | Public intake works; a bad token still 401 (JWKS cached); submit took 5.1 s then 200 (cause not isolated, likely the existing-account lookup timeout); sign-in impossible until it returns | starts in ~30 s | PASS |
+| ClamAV | Confirm `503 DOCUMENT_SCAN_UNAVAILABLE`, the upload stays pending (never clean), submit `409 DOCUMENTS_NOT_READY`; new uploads work after recovery | 43 s (signature load) | PASS |
+| MinIO | Before: confirm `500 INTERNAL_ERROR` (D-16). After the fix: `503 STORAGE_UNAVAILABLE`, upload pending, submit refused | 7–13 s | PASS after D-16 |
+| SMTP (Mailpit) | Every request succeeds; overall health `DOWN` (mail indicator), readiness unaffected; outbox: all 112 notifications of the window `DELIVERED`, none failed | 3 s; queued mail sent after | PASS |
+| PostgreSQL | Before: health and intake hung 30 s, client got the gateway's 504 (D-17). After: `503 SERVICE_UNAVAILABLE` (`Retry-After: 5`) in 5.0 s | 6–7 s, nothing lost | PASS after D-17 |
+
+Production's container health check uses `/actuator/health/readiness` (readiness state + database), so a Redis or SMTP
+outage does not take the backend out of service. Not drilled: network partitions, slow (not stopped) dependencies, disk
+full, and multi-node failover (single host here).
 
 ## Restore drill (this run)
 

@@ -64,7 +64,7 @@ async function freshCode(user: string, secret: string) {
  * live specs use Chrome's virtual authenticator for them; its credential (private key and signature counter) is kept beside
  * the TOTP secret and saved again after every sign-in, so later runs sign in with the same passkey.
  */
-export const PASSKEY_USERS = new Set(["finance"]);
+export const PASSKEY_USERS = new Set(["finance", "credential-admin"]);
 
 export async function attachPasskey(page: Page, user: string) {
   const cdp = await page.context().newCDPSession(page);

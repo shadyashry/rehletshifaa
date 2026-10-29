@@ -198,12 +198,24 @@ public interface CaseAssignmentRepository extends BaseRepository<CaseAssignment,
                 and a.caseId <> :excluded""")
     long countOpenPrimaryCasesExcept(@Param("subject") String subject, @Param("excluded") UUID excluded);
 
-    /** When the routing engine last made the subject a case's coordinator, latest first (use with {@code Limit.of(1)}). */
+    interface SubjectCount { String getSubject(); long getTotal(); }
+    interface SubjectTime { String getSubject(); Instant getLatest(); }
+
+    /** {@link #countOpenPrimaryCasesExcept} for many coordinators in one query (AR-08); a subject with none is absent. */
     @Query("""
-            select a.assignedAt from CaseAssignment a
-            where a.assigneeSubject = :subject and a.assigneeRole = 'COORDINATOR' and a.assignedBy = 'ROUTING_ENGINE'
-            order by a.assignedAt desc""")
-    java.util.List<Instant> findAutomaticAssignmentTimes(@Param("subject") String subject, org.springframework.data.domain.Limit limit);
+            select a.assigneeSubject as subject, count(distinct a.caseId) as total from CaseAssignment a join MedicalCase c on c.id = a.caseId
+            where a.assigneeSubject in :subjects and a.assigneeRole = 'COORDINATOR' and a.assignmentType = 'PRIMARY' and a.status = 'ACTIVE'
+                and c.status not in (com.rehletshifaa.casemanagement.domain.CaseStatus.CLOSED, com.rehletshifaa.casemanagement.domain.CaseStatus.CANCELLED)
+                and a.caseId <> :excluded
+            group by a.assigneeSubject""")
+    java.util.List<SubjectCount> countOpenPrimaryCasesExcept(@Param("subjects") java.util.Collection<String> subjects, @Param("excluded") UUID excluded);
+
+    /** The latest automatic assignment of each coordinator, in one query (AR-08); a subject never routed to is absent. */
+    @Query("""
+            select a.assigneeSubject as subject, max(a.assignedAt) as latest from CaseAssignment a
+            where a.assigneeSubject in :subjects and a.assigneeRole = 'COORDINATOR' and a.assignedBy = 'ROUTING_ENGINE'
+            group by a.assigneeSubject""")
+    java.util.List<SubjectTime> lastAutomaticAssignments(@Param("subjects") java.util.Collection<String> subjects);
 
     /** Everyone actively assigned to the case in the role. */
     @Query("select a.assigneeSubject from CaseAssignment a where a.caseId = :caseId and a.assigneeRole = :role and a.status = 'ACTIVE'")

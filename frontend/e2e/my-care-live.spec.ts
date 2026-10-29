@@ -156,15 +156,20 @@ test("activation → password → sign-in lands on My Care for the current case;
   expect(deposit.status).toBe("REQUESTED");
   expect(deposit.currency).toBe("USD");
   // DEP-3: the deposit is the patient's step — pay by bank transfer, then send the bank's reference; nothing in EGP.
-  const depositBlock = patient.getByRole("region", { name: "Coordination deposit", exact: true });
+  // The deposit is the current step's page (My Care shows the payment step in place of the deposit facts).
+  const depositBlock = patient.getByRole("region", { name: "Pay your coordination deposit", exact: true });
   await expect(depositBlock).toBeVisible({ timeout: 30000 });
-  await expect(depositBlock).toContainText(new Intl.NumberFormat("en", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(deposit.totalDisplay));
+  // lib/money.ts: whole amounts without decimals, any other at the currency's precision.
+  const cents = Number.isInteger(deposit.totalDisplay) ? 0 : 2;
+  await expect(depositBlock).toContainText(new Intl.NumberFormat("en", { style: "currency", currency: "USD", minimumFractionDigits: cents, maximumFractionDigits: cents }).format(deposit.totalDisplay));
   await expect(patient.getByText(/EGP|E£/)).toHaveCount(0);
   await expect(patient.getByRole("region", { name: "Your coordinator" })).toContainText(ws.caseSummary.coordinatorName!);
   await patient.screenshot({ path: "e2e/screenshots/my-care-live-landing-1440.png", fullPage: true });
   await patient.getByRole("textbox", { name: /Transaction reference number/ }).fill(`FT${stamp}`);
   await patient.getByRole("button", { name: "Send transfer reference" }).click();
-  await expect(depositBlock).toContainText("Being checked", { timeout: 30000 });
+  // Sent: the step becomes "We're checking your payment" and the deposit facts return with their status.
+  await expect(patient.getByRole("heading", { name: "We're checking your payment" })).toBeVisible({ timeout: 30000 });
+  await expect(patient.getByRole("region", { name: "Coordination deposit", exact: true })).toContainText("Being checked");
   expect((await workspace()).deposit?.transfer?.status, "the reference reached Finance").toBe("SUBMITTED");
 
   // --- Finance confirms the deposit against the reference: the page moves on by itself -----------------------

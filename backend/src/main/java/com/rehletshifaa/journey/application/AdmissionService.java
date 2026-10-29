@@ -440,7 +440,7 @@ public class AdmissionService {
 
     /**
      * The Consultant admits before the balance is evidenced (D-C emergency path): the reason is kept encrypted, Finance reviews
-     * it after ({@code EMERGENCY_ADMISSION_REVIEW}, HIGH, survives the case's exit). It never stands in for the final quote or the
+     * it after ({@code EMERGENCY_ADMISSION_REVIEW}, due in two working days and raised to HIGH as that nears, survives the case's exit). It never stands in for the final quote or the
      * procedure consent (the consent has its own emergency override).
      */
     @Transactional

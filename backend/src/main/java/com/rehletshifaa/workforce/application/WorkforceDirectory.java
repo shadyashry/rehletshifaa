@@ -48,6 +48,12 @@ public class WorkforceDirectory {
                 .map(h -> new Member(h.getSubject(), crypto.decrypt(h.getDisplayNameEncrypted()), h.getRoleKey())).toList();
     }
 
+    /** Subjects who hold any of the roles now, in one query (no names decrypted). */
+    public Set<String> holderSubjects(String... roles) {
+        return assignments.findActiveHolders(List.of(roles), micros(clock.instant())).stream()
+                .map(WorkforceRoleAssignmentRepository.RoleHolder::getSubject).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
     public boolean holds(String subject, String... roles) {
         return assignments.holdsAny(subject, List.of(roles), micros(clock.instant()));
     }

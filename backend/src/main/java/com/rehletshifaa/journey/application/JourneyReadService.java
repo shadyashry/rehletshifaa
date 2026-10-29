@@ -135,8 +135,8 @@ public class JourneyReadService {
         // D-04: decided before the lock and in one neutral answer, so another team learns nothing about the case's state.
         if (!wholeQueue() && !intakeTeams.servesCase(caseId, actor.subject()))
             throw new ApiException(403, "OUT_OF_SCOPE", "This case is not available to you");
-        cases.lockById(caseId)
-                .orElseThrow(() -> new ApiException(404, "CASE_NOT_FOUND", "Case was not found"));
+        // AR-10: a preview only reads; the claim re-checks status and owner under the case lock.
+        if (!cases.existsById(caseId)) throw new ApiException(404, "CASE_NOT_FOUND", "Case was not found");
         CaseView view = caseQueries.caseView(caseId);
         if (!"RECEIVED".equals(view.status()) || view.coordinatorSubject() != null) {
             throw new ApiException(

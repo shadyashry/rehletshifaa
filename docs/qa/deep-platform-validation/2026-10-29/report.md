@@ -1,151 +1,140 @@
-# Deep platform validation — report (run 2026-10-29)
+# Deep platform validation — report (run 2026-10-29 / 2026-10-30)
 
-Scope: `docs/prompts/claude-deep-platform-validation.md`, run on `feat/review-p0` from `92a2a900`. Final revision
-`1b1307f5`. The live stack was rebuilt with the canonical tunnel overlay and runs images built from it (backend
-14:37Z, frontend 14:23Z with Next 16.4.2). Flyway V109. This is the **first slice** of a multi-session validation;
-`checkpoint.md` is the resume point.
+Scope: `docs/prompts/claude-deep-platform-validation.md`, run on `feat/review-p0` from `92a2a900`. Final slice
+2026-10-30 ("fix all open points"): every code-closable item is fixed; what remains needs an owner, counsel, an external
+party or production hosting. Live staff journeys ran on the isolated QA stack (`docker-compose.qa.yml`, project
+`rehletshifaa-qa`, fresh realm, dedicated identities). Flyway V109. `checkpoint.md` is the resume point.
 
 ## Three verdicts
 
-### 1. Code quality and architecture — **GOOD; security/money findings fixed, remaining risks recorded**
+### 1. Code quality and architecture — **GOOD; every code finding fixed or decided**
 
 Layering, the single authorization core, "tokens carry no authority" and the JPA/no-native-SQL rule are enforced by
-`ArchitectureRulesTest` (22 rules), not by convention. Deny-by-default, database-sourced roles on every request,
-staff MFA at sign-in, step-up, append-only money ledgers with maker/checker, leased schedulers, HMAC-verified webhooks
-and a transactional outbox are in place. The review recorded 16 items (AR-01..AR-16). The eight with security,
-privacy, money or journey impact were fixed with regression tests. An independent read-only review found no blocking
-issue, and four of its refinements were applied. Still open: performance hypotheses (AR-07..AR-10), staff
-rate-limit sizing (AR-06), single-actor erasure (AR-14), and maintainability notes (AR-11..AR-13). See
+`ArchitectureRulesTest`, not by convention. Deny-by-default, database-sourced roles on every request, staff MFA at
+sign-in, step-up, append-only money ledgers with maker/checker, leased schedulers, HMAC-verified webhooks and a
+transactional outbox are in place. Of the 16 review items (AR-01..AR-16), all with security, privacy, money or journey
+impact are fixed with regression tests. AR-07, AR-08 and AR-10 are now also fixed: a scan bulkhead, batched
+eligibility, and no row lock on the preview. AR-12 and AR-13 are fixed. AR-09 is partly fixed: a request-wide role memo
+was rejected as unsafe, because activation changes roles mid-request. Left open: AR-06 sizing, which needs a launch
+workload; AR-11, an optional facade removal; and AR-14, a second approver for erasure (owner decision). See
 `architecture-review.md`.
 
-### 2. Functional completeness — **NOT PROVEN** (main journey proven live end to end; variants and owner gates open)
+### 2. Functional completeness — **PROVEN for the built scope; owner-gated items open**
 
-**Update 2 (journey extended):** on the QA stack the live spec now runs the **whole patient journey** with distinct
-real identities — intake → … → travel gate → final assessment and final quote → hospital letter checked by Finance →
-patient accepts by secure link + OTP → voucher → consent → hospital balance countersigned → admission number →
-treatment milestones → discharge pack → final invoice (DISCHARGED) → return and departure → reconciliation → follow-up
-contact (`FOLLOW_UP`); and the **withdrawal + full refund** variant. All 3 live tests pass (2.1 min). Getting there found
-four more defects, three fixed: D-10 (staff could not file paperwork — approved gap), D-12 (patients could never confirm
-a step-up decision), D-13 (an in-time patient cancellation could not be refunded); D-11 (per-IP write budgets) was then fixed per
-your decision: signed-in writes spend the user's budget (`a262a138`). Not live yet: two-team routing, coordinator departure, change orders, complications, emergency admission,
-follow-up closure (time-gated), WhatsApp (UC-15), and the staff upload UI (D-10 UI half).
+The live spec runs the whole patient journey on real services with distinct real identities. The flow, step by step:
 
-**Update (owner chose dedicated QA identities):** an isolated QA stack (`docker-compose.qa.yml`, project
-`rehletshifaa-qa`, fresh realm, no tester impact) now runs the live staff journeys. `operations-gate-live` passes end
-to end at `2ae37ebe`: public intake → coordinator → consultant review with step-up → proposal → Operations step →
-release → patient OTP acknowledgement → profile activation → Keycloak account setup → patient transfer reference →
-Finance receipt confirmed with a **passkey** (acr 3) → `TRAVEL_COORDINATION` exactly once. `portal-gateway-live` 5/6
-through the real gateway with no 429s; `my-care-live` and `uat-walkthrough-live` proven to the patient landing and the
-consultant assignment, then stop on UI text the redesign changed. The run found D-09 (0 EGP demo services).
-Not yet live: arrival → final quote → admission → treatment → discharge → follow-up, the two-team and departure
-variants, refunds/cancellations, WhatsApp (UC-15).
+1. Intake, coordinator, and Consultant with step-up.
+2. Proposal, patient OTP acknowledgement, activation, and the DEP-3 transfer reference.
+3. Finance confirms with a passkey, then the travel gate.
+4. Arrival, final assessment and quote, the hospital letter checked by Finance, patient acceptance, voucher, consent.
+5. Balance countersigned, admission number, treatment, discharge, final invoice, return, reconciliation, follow-up.
 
-Original slice-1 finding, kept for the record:
+It also runs these variants:
+- withdrawal with a full refund, once
+- change order (Consultant proposes, Finance prices, patient accepts)
+- complication milestone and patient concern, with incidents assigned, reviewed and resolved
+- emergency admission in place of the hospital balance, with Finance's review on a service level
+- two coordination teams: isolation, and a manager move with a reason
+- coordinator departure: their case is routed again, and restoring access does not move it back
 
-All 42 matrix rows have implementation and automated coverage. Only the public intake, secure-link status, upload
-security and gateway paths were proven against the real boundaries (gateway, backend, PostgreSQL, MinIO, ClamAV,
-outbox, Mailpit). Staff journeys UC-03..UC-20 did **not** run live. The seeded `coordinator` and `doctor` accounts
-have authenticators enrolled by someone else since the tester reset. Enrolling authenticators on the other shared
-seeded accounts would lock testers out, so it was not done. Two defects were **found live** and fixed: D-06 (upload
-type spoofing) and D-08 (blocked submission). The production-rendered browser suite has 11 failing specs, all
-stale against today's area-X copy pass or a Windows file lock. No critical/high failure remains open in safety,
-privacy, authority or money. The main patient journey past intake is still unverified live.
+All five `operations-gate-live` tests pass, as do `portal-gateway-live` (6/6), `gateway.spec` (9/9), `my-care-live` and
+`uat-walkthrough-live`. The staff upload control (D-10 UI) passes in en/ar at 390 and 1440 px. Found and fixed while
+proving this: D-15 (the seeded routing policy could never be followed).
 
-### 3. Production readiness — **NOT READY**
+Not live:
+- WhatsApp (UC-15): needs the Meta test setup.
+- Follow-up closure: time-gated; covered by `FollowUpServiceTest`.
+- Care-area routing by a new policy: a policy cannot be replaced mid-interval. This follows frozen decision §15 and is
+  an owner decision (DPV-REV-3).
+- Two product decisions: DPV-REV-1 (uploads into closed cases) and DPV-REV-2 (a 0 EGP proposal total).
+
+### 3. Production readiness — **NOT READY (code side ready; external gates open)**
+
+The fault drills now pass on the QA stack. Each of Redis, Keycloak, ClamAV, MinIO, SMTP and PostgreSQL was stopped:
+- No data was lost.
+- Every failure answered a retryable code.
+- Every service recovered in under 45 s.
+
+The drills found two availability defects, fixed and re-drilled: D-16 (an unreachable store answered 500) and D-17 (a
+database outage held requests 30 s).
 
 Code cannot close these Priority 0 gates:
-- approved Arabic/legal terms (0.1–0.3)
+- approved Arabic and legal terms (0.1–0.3)
 - real bank details (0.4)
-- `PII_INDEX_KEY` in production (0.5, enforced at start)
+- `PII_INDEX_KEY` in production (0.5; enforced at start)
 - Meta template approval (0.6)
 - facility contact emails (0.7)
-- managed-host PITR drill (0.8; local drill PASS, 94 s)
-- Journey D1 decision (0.9)
-- PDPL/liability fund (0.10)
-- money-rule confirmation (0.11)
+- a managed-host PITR drill (0.8; the local drill passed in 94 s)
+- the Journey D1 decision (0.9)
+- PDPL and the liability fund (0.10)
+- confirmation of the money rule (0.11)
 
-Also missing: an external penetration test, a backend/container dependency scan, and an approved workload/SLO. The
-critical Next.js advisories were removed (D-07). See `production-readiness.md`.
+Also missing: an external penetration test, a backend and container dependency scan (no scanner available offline), an
+approved workload and SLO, and a decision on the Playwright 1.55.1 dev-tool advisory (it needs a browser download). See
+`production-readiness.md`.
 
-## Matrix counts (`requirements-matrix.csv`, 46 rows)
+## Matrix counts (`requirements-matrix.csv`, 50 rows)
 
 | Status | Count | Rows |
 |---|---|---|
-| PASS | 6 | UC-02, SEC-1, SEC-4, SEC-5, GW-1, DPV-LIVE-1 (cross-role journey to the travel gate) |
-| PARTIAL | 35 | automated coverage, real boundary not (fully) exercised — incl. UC-01, SEC-13 (live fixes verified; ClamAV positive detection not shown) |
-| FAIL | 1 | DPV-TEST-1 (11 stale browser specs) |
+| PASS | 15 | UC-02, UC-18, UC-20, SEC-1, SEC-4, SEC-5, GW-1, DPV-LIVE-1..7, DPV-TEST-1 |
+| PARTIAL | 31 | automated coverage; the real boundary is exercised only through the live journeys above or not at all (row by row in the CSV) |
 | BLOCKED | 2 | UC-15 (Meta test setup), P0 launch blockers |
-| NOT TESTED | 2 | DPV-REV-1 (uploads into closed cases), DPV-REV-2 (0 EGP proposal total): decisions |
-| DEFERRED BY DECISION | 0 | (Journey admission stays off; Practice Manager consent and booking not in scope) |
+| NOT TESTED | 2 | DPV-REV-1, DPV-REV-2 (decisions) |
 
-Defects: 14 found (D-01..D-14). By severity: 1 critical, 8 high, 4 medium, 1 low. Fixed and retested: 13 (D-10 backend
-only; D-11 per-user write budgets by owner decision). Open: D-14 (low). D-06, D-08, D-09, D-10, D-12 and D-13 were found or verified live.
+Defects: 17 found (D-01..D-17). By severity: 1 critical, 8 high, 7 medium, 1 low. All 17 are fixed and retested.
+D-06, D-08..D-10 and D-12..D-17 were found or verified live; D-16 and D-17 were found by the fault drills.
 
-## Tests actually run (final code unless noted)
+## Tests actually run (final code)
 
 | Gate | Result |
 |---|---|
-| Backend `mvn -o -q test` | **1013 tests, 0 failures, 0 errors, 3 gated skips** (baseline 1006) |
-| `PostgresJpaMappingTest` on disposable PostgreSQL 17 | PASS, V109 (after the D-01..D-06 changes; D-08 changes no mapping) |
-| Frontend `pnpm typecheck` | 0 errors |
-| Frontend Vitest | 100 files, 818 tests pass |
-| Frontend lint | 0 errors, 10 warnings (unchanged) |
-| `pnpm test:e2e` (production build, route-mocked) | 514: 443 passed, 53 env-gated skipped, 18 failed under CPU load; rerun of the failures alone: 7 passed, **11 failed** (stale copy/structure ×10, screenshot file lock ×1) |
-| `gateway.spec.ts` against the running gateway | 8/8 passed |
-| Live public journey `raw/live-intake.mjs` (real tunnel, gateway, MinIO, ClamAV, outbox, Mailpit) | final build run DPV-1029F: 21 PASS, 1 NOT TESTED (EICAR offset limitation) |
-| Live staff specs on the tunnel stack | not run: seeded staff accounts carry testers' authenticators |
-| Live staff specs on the isolated QA stack (`2ae37ebe`) | `operations-gate-live` **PASS** (twice); `portal-gateway-live` 5/6; `my-care-live` and `uat-walkthrough-live` PARTIAL (stale UI text after the proven steps); `portal-live` not run (its own sign-in cannot answer MFA); `mfa-live`, governance/restore gates not run (env-gated drills) |
-| Restore drill (disposable project) | PASS, 94 s |
-| `pnpm audit --prod` | critical 3 → 0 |
+| Backend `mvn -o -q test` | **1026 tests, 0 failures, 0 errors, 3 gated skips** (final code, after D-16/D-17; baseline 1006) |
+| `PostgresJpaMappingTest` on disposable PostgreSQL 17 | PASS (every repository query incl. the new batched eligibility queries) |
+| Frontend typecheck / lint | 0 errors / 0 errors, 10 warnings (unchanged) |
+| Frontend Vitest | 100 files, 819 tests pass |
+| Mocked browser specs formerly stale (case-cover, final-quote-holds, my-care-safety, public-batch-3, messages-conversations) | 34/34 pass |
+| New `staff-document-upload.spec.ts` (en/ar, 390/1440) | 4/4 pass; shots in `raw/shots/` |
+| Live, QA stack: `operations-gate-live` | 5/5 (gate; withdrawal + refund; after arrival with change order, complication, incidents; emergency admission; two teams + departure) |
+| Live, QA stack: `portal-gateway-live` + `gateway.spec` | 15/15 |
+| Live, QA stack: `my-care-live`, `uat-walkthrough-live` | 2/2 |
+| Fault drills (`raw/fault-drill.mjs`) | 6 dependencies; 2 defects found, fixed, re-drilled PASS |
+| Restore drill (disposable project, earlier slice) | PASS, 94 s |
 
-## Live journeys
+The full production-build `pnpm test:e2e` was not re-run end to end in this slice. Only the previously failing specs and
+the new spec were run. A Windows lock on tracked screenshot files can fail a run; this is environmental, and the runner
+note is in `checkpoint.md`.
 
-- Intake → upload (clean, oversize, wrong type, MIME-spoof) → submit → auto-routing to a coordinator (`INTAKE_REVIEW`)
-  → staff mail in Mailpit → status link → OTP (WhatsApp simulator → Mailpit) → lockout after 5 wrong codes → view →
-  OTP replay refused → neutral status-link recovery. Synthetic cases RS-2026-000002..000011 (manifest in `checkpoint.md`).
-- Where the journey stops: the coordinator's claim and consultant assignment (UC-03 step 2). Staff sign-in needs
-  the authenticator decision below.
+## Commits on `feat/review-p0` (not pushed)
 
-## Changed files (commits on `feat/review-p0`, not pushed)
+- `61f2539f` D-01..D-06; `1bd6a1e9` Next 16.4.2 (D-07); `1b1307f5` D-08; `73f09570` D-09; `2ae37ebe` QA stack and live specs.
+- `4d1d5fc6` D-10 backend, D-12; D-13 and the extended live spec; `a262a138` D-11 per-user write budgets.
+- `402942ef` D-14, AR-12, AR-13; `d4e3d9f5` D-10 UI, dependency advisories (zod, source-map-js), stale-spec cleanup.
+- Final slice (this commit): AR-07/08/09/10, D-15, D-16, D-17, the live variants, stale live assertions, the QA runner's
+  secret parking, the fault-drill script, and evidence.
 
-- `61f2539f` backend D-01..D-06:
-  - `PaymentService`, `AdmissionService`, `ReplyCoverService`, `JourneyReadService`
-  - new `authority/application/IntakeTeams`, new `coordination/application/CoordinationIntakeTeams`
-  - `CoordinationRepository`, `CaseService`, `DocumentService`, `ClamAvDocumentInspector`, `SignatureDocumentInspector`
-  - tests (incl. new `UnclaimedIntakeTeamScopeTest`)
-- `1bd6a1e9` `frontend/package.json`, `pnpm-lock.yaml`: Next 16.4.2.
-- `1b1307f5` `DocumentSubmissionReadiness` and new `DocumentSubmissionReadinessTest` (D-08).
-- `73f09570` `LocalDemoDataSeeder` (D-09); `2ae37ebe` `docker-compose.qa.yml`, `frontend/e2e/live-auth.ts`, live specs.
-- `4d1d5fc6` D-10 (`StaffDocumentService`, `StaffDocumentController`, `CASE_DOCUMENT_ADD`) and D-12 (`Authority.decide`);
-  D-13 (`RefundObligationService`, `RefundPolicyService`, `CaseExitService`) and the extended live spec in the next commit.
-- Evidence: this folder, `docs/deployment.md` (drill row).
+## Remaining actions (none closable in code)
 
-## Prioritized remaining actions
-
-1. On the QA stack: extend the live journey past the travel gate (arrival, final assessment/quote, admission, voucher,
-   treatment, discharge, follow-up) and run the two-team, departure, refund and cancellation variants. Start it with
-   `docker compose -p rehletshifaa-qa -f docker-compose.yml -f docker-compose.qa.yml up -d` (state kept); run specs with
-   `scripts/qa-live.sh <spec>` (`checkpoint.md`).
-2. UX session: update the 10 stale browser specs to today's area-X copy (`case-cover` ×2, `final-quote-holds` ×3,
-   `my-care-safety` ×4, `public-batch-3` ×1) and the stale live assertions (`my-care-live` deposit copy after DEP-3,
-   `uat-walkthrough-live` hand-off sentence, `portal-gateway-live` Arabic "خطوتك").
-3. Isolated-stack performance and fault drills: authenticated mixed-role load, Redis/Keycloak/DB/MinIO/ClamAV/SMTP
-   outages, outbox lag. They test AR-07..AR-10.
-4. Decisions:
-   - launch workload and the staff rate limit (AR-06)
-   - second approver for erasure (AR-14)
-   - uploads into closed cases (DPV-REV-1)
-5. Backend dependency and container image scanning, once a scanner is available. External penetration test.
-6. P0 owner/counsel/ops items in `production-readiness.md`.
+1. Owner decisions:
+   - DPV-REV-1 (uploads into closed cases)
+   - DPV-REV-2 (0 EGP proposal total)
+   - DPV-REV-3 (replacing a routing policy mid-interval)
+   - AR-14 (second approver for erasure)
+   - the launch workload behind AR-06
+2. External parties:
+   - P0 items 0.1–0.11 (`production-readiness.md`)
+   - Meta setup for UC-15
+   - penetration test
+   - dependency and container scanning
+3. Optional maintainability work: AR-11, removing the `JourneyService` facade.
+4. Your `.env` sets a UAT `RATE_LIMIT_REQUESTS` override, which per-user budgets (D-11) make unnecessary. It's your file,
+   so I left it untouched.
 
 ## Skills and tools used
 
-- `/code-review` (built-in skill, high effort, path-scoped).
-- `backend-design:security-reviewer` subagent for independent review.
-- Playwright 1.55 (repository config), Node 22 scripts for live API and performance runs.
-- Keycloak admin API, read-only, to check credential types.
+- `/code-review` (high), and the `backend-design:security-reviewer` subagent for independent review.
+- D-10 upload UI: reuses the patient's `CaseDocumentUpload` (no new visual pattern); checked visually in en/ar at 390 and
+  1440 px. A full Impeccable/web-design-guidelines review of it was not run in this slice.
+- Playwright 1.55 (live specs with a virtual WebAuthn authenticator and TOTP).
+- Node scripts for live API, performance and fault drills; Docker for the isolated QA stack and the PostgreSQL proof.
 - `pnpm audit`.
-
-Not applied this slice: UI/UX Pro Max, Impeccable and the Vercel guidelines. There were no UI changes, and visual,
-RTL and accessibility review of live pages needs staff sessions for most screens. The `e2e` agentic runner was not
-used (it needs an `ANTHROPIC_API_KEY` that is not configured here).

@@ -159,9 +159,12 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   const cancel = await call<{ code: string }>(coordinator, "POST", `/coordinator/cases/${caseId}/transition`, { targetStatus: "CANCELLED", reason: "no", expectedVersion: ws.caseSummary.version });
   expect(cancel.status).toBe(409);
   await coordinator.page.goto(`/en/portal?case=${caseId}`);
-  await expect(coordinator.page.getByText(/locked until the (clinical|Consultant's) recommendation is ready/).first()).toBeVisible();
-  // Scoped to this case's journey: the case list beside it can hold other synthetic cases waiting on a consultant.
-  await expect(coordinator.page.getByLabel("Journey").getByText("Waiting on: the Consultant")).toBeVisible();
+  // The proposal is not the coordinator's work until the recommendation is ready: no proposal panel or action shows.
+  await expect(coordinator.page.locator("#case-heading")).toBeVisible();
+  await expect(coordinator.page.getByRole("button", { name: /Prepare (the )?proposal|Release (the )?proposal/ })).toHaveCount(0);
+  // The case header states who holds the step ("Waiting on" with its value in one definition-list entry).
+  await expect(coordinator.page.locator("dl > div").filter({ has: coordinator.page.getByText("Waiting on", { exact: true }) })
+    .getByText("the Consultant", { exact: true })).toBeVisible();
   await idle(coordinator.page);
   await coordinator.page.screenshot({ path: shots("overview-consultant-phase-1440"), fullPage: true });
   await coordinator.page.getByRole("button", { name: /^More$/ }).click();
@@ -177,9 +180,9 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   await doctor.page.getByRole("tab", { name: /Clinical/ }).click();
   const recommendation = doctor.page.getByRole("textbox", { name: "Clinical recommendation" });
   await expect(recommendation).toHaveAttribute("aria-required", "true");
-  await expect(doctor.page.getByText("(* Required before submitting)")).toBeVisible();
   await doctor.page.getByRole("button", { name: "Submit recommendation" }).click();
-  await expect(doctor.page.getByRole("alert").filter({ hasText: "Record your clinical recommendation before submitting." })).toBeVisible();
+  await expect(doctor.page.getByRole("alert").filter({ hasText: "Record your clinical recommendation first." })).toBeVisible();
+  await expect(recommendation).toHaveAttribute("aria-invalid", "true");
   await expect(recommendation).toBeFocused();
   await idle(doctor.page);
   await doctor.page.screenshot({ path: shots("clinical-recommendation-required-1440"), fullPage: true });
@@ -282,7 +285,7 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   await settle();
   expect((await mailTo(request, email, proposalOpenedAt)).filter(m => /verification code/i.test(m.Subject)), "no second one-time code was sent").toHaveLength(0);
 
-  // --- 6. The patient acknowledges: the coordinator gets exactly the deposit work, nothing else ----------
+  // --- 6. The patient acknowledges: the next step is the patient's own (DEP-3: activate, then pay and send the reference) --
   const decidedAt = Date.now() - 5000;
   await statusPage.getByRole("checkbox").first().check();
   await statusPage.getByRole("button", { name: /Acknowledge & continue/ }).first().click(); // the sticky bar may carry a second copy while the block is off screen
@@ -290,14 +293,12 @@ test("new case → coordinator → consultant (USD) → proposal → Check Case 
   ws = await workspace();
   expect(ws.caseSummary.status).toBe("ACCEPTED");
   expect(ws.patientProposal).toMatchObject({ state: "ACCEPTED", action: "VIEW_PROPOSAL", versionId });
-  const depositTask = ws.tasks.find(t => t.type === "DEPOSIT_ARRANGEMENT");
-  expect(depositTask?.status).toBe("OPEN");
-  const depositMail = await expectMail(request, COORDINATOR_MAILBOX, decidedAt, new RegExp(`Coordinator action for case ${caseNumber}: Patient acknowledged the estimate`));
-  expect(depositMail.To.map(t => t.Address)).toEqual([COORDINATOR_MAILBOX]);
-  expect(depositMail.Text).toContain("coordination deposit");
+  // No deposit work for the coordinator any more: the deposit is the patient's step and Finance's check.
+  expect(ws.tasks.filter(t => t.status === "OPEN").map(t => t.type), "no staff work opens on the acknowledgement").toEqual([]);
+  expect(ws.actions.waitingOn).toBe("PATIENT");
   await settle();
   const coordinatorSinceDecision = (await mailForCase(COORDINATOR_MAILBOX, decidedAt));
-  expect(coordinatorSinceDecision, "one coordinator email for one piece of work").toHaveLength(1);
+  expect(coordinatorSinceDecision, "no coordinator email: nothing on the acknowledgement is theirs to do").toHaveLength(0);
   expect((await mailForCase(TEAM_MAILBOX, decidedAt)).filter(m => /deposit/i.test(m.Subject)), "an owned case never falls back to the team mailbox").toHaveLength(0);
   expect((await mailForCase(COORDINATOR_MAILBOX, releasedAt)).filter(m => /Deposit received/.test(m.Subject)), "no 'deposit received' wording before any deposit").toHaveLength(0);
 

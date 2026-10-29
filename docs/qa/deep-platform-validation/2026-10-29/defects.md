@@ -14,11 +14,14 @@ Severity order: safety/privacy, unauthorized access, data loss, incorrect money,
 | D-07 | Critical | Frontend dependency (Next.js) | FIXED (16.3.3 → 16.4.2); gates re-run | `pnpm audit --prod`: critical 3 → 0 |
 | D-08 | High | Blocked patient journey (UC-01) | FIXED, red/green; **found live** | `DocumentSubmissionReadinessTest` |
 | D-09 | Medium | Money (dev seed: 0 EGP services offered) | FIXED (`73f09570`); **found live** on the QA stack | live `operations-gate-live` (deposit raised); dev DB: 0 active zero-priced services after restart |
-| D-10 | High | Approved gap: staff cannot file case paperwork (blocks admission/discharge) | FIXED backend (`4d1d5fc6`); UI open | `StaffDocumentUploadTest`; live post-arrival journey |
+| D-10 | High | Approved gap: staff cannot file case paperwork (blocks admission/discharge) | FIXED: backend `4d1d5fc6`, UI `d4e3d9f5` | `StaffDocumentUploadTest`; live post-arrival journey |
 | D-11 | High | Availability: write budgets per IP block a normal multi-role journey (AR-06) | FIXED (`a262a138`, owner decision 2026-10-29: per user) | `RateLimitFilterTest`; gateway.spec per-user test (9/9 on QA and dev gateways); 3 live journeys pass at the default budget |
 | D-12 | High | Blocked patient journey: patients can never confirm a step-up decision | FIXED, red/green (`4d1d5fc6`); **found live** | `AuthorityIntegrationTest.aPatientsDecisionNeedsAFreshSignInNotASecondFactor`, `RolePolicyTest`; live withdrawal 200 |
 | D-13 | High | Money: an in-time patient cancellation cannot be refunded (Finance has no access) | FIXED (next commit); **found live** | `RefundObligationServiceTest`; live refund of 4,025 EGP, deposit REFUNDED |
-| D-14 | Low | A refund replay after the full refund answers 403, not the idempotent 200 receipts give | OPEN (no duplicate recorded) | live refund test |
+| D-14 | Low | A refund replay after the full refund answers 403, not the idempotent 200 receipts give | FIXED (`402942ef`): the recorder's replay is answered before the access check | `RefundRecordingTest.theRecordersReplayAnswersEvenAfterTheRefundClosedTheirAccess` |
+| D-15 | Medium | Coordination (dev/QA seed): the seeded routing policy has no end, so no policy can ever follow it and no care-area routing can be set | FIXED (seed gives a 90-day interval); **found live** | seed change; existing dev/QA databases keep the open-ended row (seeded only on an empty table) |
+| D-16 | Medium | Availability: an unreachable document store answered 500 `INTERNAL_ERROR`, not the retryable 503 | FIXED, red/green; **found by the fault drill**, verified live | `S3StorageAdapterTest` |
+| D-17 | Medium | Availability: a database outage held every request 30 s (pool wait) until the gateway answered 504 | FIXED: 5 s pool wait, then the existing retryable 503; **found by the fault drill**, verified live | `raw/fault-drill-2026-10-30-after-fix.txt` (create → 503 in 5.0 s) |
 
 ## D-01 — Deposit receipt replay discloses another case's deposit (High)
 
@@ -124,8 +127,9 @@ Severity order: safety/privacy, unauthorized access, data loss, incorrect money,
 - **Fix (backend):** `CASE_DOCUMENT_ADD` (owner coordinator, Operations and Consultant on the case),
   `POST /api/v1/work/cases/{id}/documents/presign|confirm` on the same inspected pipeline; an ended case takes no new
   paperwork; an upload is confirmed by its uploader. Independently reviewed (no blocking findings).
-- **Open:** the staff upload controls in the Operations and Consultant panels (UI; UX pipeline, en/ar copy). Reviewer notes
-  kept open: staff files carry no "source" marker where patient-supplied evidence is expected (guardian/consent evidence);
+- **Fix (UI, `d4e3d9f5`):** the case's Documents tab offers the upload to whoever may add (`CaseDocumentUpload` with the work
+  endpoint; en/ar copy `portalWork.caseView.addDocument`); `CaseDocumentUpload.test.tsx`, mocked browser check
+  `e2e/staff-document-upload.spec.ts` (en/ar, 390/1440, shots in `raw/shots/`). Reviewer notes kept open: staff files carry no "source" marker where patient-supplied evidence is expected (guardian/consent evidence);
   check whether hospital invoices should appear in the patient's document list.
 
 ## D-11 — Per-IP write budget blocks a normal journey (High, availability; AR-06 with live evidence)
@@ -161,7 +165,38 @@ Severity order: safety/privacy, unauthorized access, data loss, incorrect money,
   cutoff; the cutoff rule has one home (`RefundPolicyService.patientCancelledInTime`). Live: refund 4,025 EGP recorded once,
   deposit `REFUNDED`, the over-amount attempt refused.
 
+## D-15 — The seeded routing policy could never be followed (Medium, dev/QA seed) — found live
+
+- **Requirement:** technical-decisions §15: immutable policy versions with explicit, non-overlapping effective intervals;
+  `CoordinationConfigurationService.savePolicy` requires a finite end on every version it publishes.
+- **Actual:** `LocalDemoDataSeeder` wrote version 1 with no end. Every later version overlaps an open-ended interval, so on a
+  seeded stack no manager could ever publish care-area teams or new weights (found while setting Team B for orthopedics).
+- **Fix:** the seed publishes a 90-day interval, as the service would. Databases seeded before keep the open-ended row
+  (the seeder only writes to an empty table); a tester reset clears it.
+
+## D-16 — An unreachable document store answered 500 (Medium, availability) — found by the fault drill
+
+- **Actual:** with MinIO stopped, a confirm answered `500 INTERNAL_ERROR`. `S3StorageAdapter` mapped only `S3Exception` (an error
+  the store returns); a store that cannot be reached throws the SDK's `SdkClientException`, which nothing caught. The pending
+  sweeper would hit the same exception on every stale upload.
+- **Fix:** every storage call maps `SdkClientException` to the retryable `503 STORAGE_UNAVAILABLE` (the 412 → 409 rule for a
+  sealed object is kept). Red/green `S3StorageAdapterTest`; live re-drill: confirm `503 STORAGE_UNAVAILABLE`, the document stays
+  pending, submit refused with `DOCUMENTS_NOT_READY`, and everything works again 13 s after the store returns.
+
+## D-17 — A database outage held every request for 30 s (Medium, availability) — found by the fault drill
+
+- **Actual:** with PostgreSQL stopped, `/actuator/health` and a public intake both hung 30 s (HikariCP's default connection
+  timeout) and the client got the gateway's `504`; threads pile up for the whole outage.
+- **Fix:** `spring.datasource.hikari.connection-timeout` = `DB_CONNECTION_TIMEOUT_MILLISECONDS` (default 5000); the existing
+  `GlobalExceptionHandler.databaseUnavailable` then answers `503 SERVICE_UNAVAILABLE` with `Retry-After: 5`. Live re-drill:
+  health `503 DOWN` in 5.0 s, create `503` in 5.0 s, recovery 7 s after the database returns.
+
 ## Open (not fixed this run)
 
-- AR-06 rate limit per IP for staff writes (needs launch workload), AR-07..AR-13 (see `architecture-review.md`).
+- AR-06 capacity numbers need the launch workload (functional fix D-11 done). AR-09 is partly fixed (request-wide memo
+  rejected, see `architecture-review.md`); AR-11 (facade removal) is optional maintainability work.
+- DPV-REV-3 (owner decision): a routing policy cannot be replaced mid-interval. Within the frozen §15 rule a manager can only
+  publish the next interval after the current one ends, so a team that stops serving an area mid-interval needs the manual
+  REASSIGN command per case. Options: allow closing the current interval early from a future instant (a new audited
+  version), or keep intervals short.
 - DPV-REV-1: uploads accepted into closed/cancelled cases (`presignAdditional` refuses only drafts) — needs a decision.

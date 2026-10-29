@@ -100,11 +100,14 @@ public class Authority {
     /** As {@link #require} but returns the authorized actor with the granting role and all effective roles. */
     public Actor authorize(Permission permission, Resource resource) {
         Principal principal = Principal.current();
-        Decision decision = decide(principal, permission, resource);
+        Instant now = clock.instant();
+        // AR-09: the actor carries the roles this decision was made on, read once.
+        Set<Role> effective = roles.roles(principal.subject(), now);
+        Decision decision = decide(principal, permission, resource, true, effective, now);
         if (!decision.granted())
             throw new ApiException(SIGN_IN_AGAIN.contains(decision.code()) ? 401 : 403, decision.code(), decision.reason());
         auditSupervisoryRead(principal, permission, resource, decision);
-        return new Actor(principal.subject(), principal.authenticatedAt(), decision.role(), roles.roles(principal.subject(), clock.instant()));
+        return new Actor(principal.subject(), principal.authenticatedAt(), decision.role(), effective);
     }
 
     public Actor authorize(Permission permission) { return authorize(permission, Resource.platform()); }
@@ -135,7 +138,10 @@ public class Authority {
 
     private Decision decide(Principal principal, Permission permission, Resource resource, boolean stepUp) {
         Instant now = clock.instant();
-        Set<Role> effective = roles.roles(principal.subject(), now);
+        return decide(principal, permission, resource, stepUp, roles.roles(principal.subject(), now), now);
+    }
+
+    private Decision decide(Principal principal, Permission permission, Resource resource, boolean stepUp, Set<Role> effective, Instant now) {
         List<Grant> candidates = RolePolicy.grantsFor(permission).stream().filter(g -> effective.contains(g.role())).toList();
         if (candidates.isEmpty())
             return new Decision(false, permission, null, null, "PERMISSION_NOT_HELD",

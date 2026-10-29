@@ -141,8 +141,9 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
             String configuration="""
                     {"capacityWeight":80,"languageWeight":20,"requireOnDuty":true,"mandatoryLanguage":true,
                      "careAreaTeams":{},"defaultTeam":"%s","fallbackTeam":null,"queueHours":24}""".formatted(COORDINATION_TEAM);
-            jdbc.sql("INSERT INTO coordination_policy_versions(id,version_number,effective_from,configuration,created_by,created_at) VALUES(?,1,?,?,'local-demo-seeder',?)")
-                .params(UUID.randomUUID(),timestamp(now),configuration,timestamp(now)).update();
+            // Every published policy has a finite end (CoordinationConfigurationService.savePolicy); an open end could never be followed by the next interval.
+            jdbc.sql("INSERT INTO coordination_policy_versions(id,version_number,effective_from,effective_to,configuration,created_by,created_at) VALUES(?,1,?,?,?,'local-demo-seeder',?)")
+                .params(UUID.randomUUID(),timestamp(now),timestamp(now.plus(java.time.Duration.ofDays(90))),configuration,timestamp(now)).update();
         }
     }
     private void seedTeamRelation(UUID team,String subject,Instant now,boolean lead){
