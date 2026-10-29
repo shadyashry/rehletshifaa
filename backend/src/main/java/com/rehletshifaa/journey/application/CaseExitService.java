@@ -181,7 +181,7 @@ public class CaseExitService {
                         || a.getStatus() == com.rehletshifaa.journey.domain.FacilityAdmission.Status.CONFIRMED)
                 .ifPresent(a -> { a.cancel(actorSubject, now); admissions.saveAndFlush(a); });
         work.closeOpenWork(caseId, "The case left its journey (" + target + (reason == null ? "" : ": " + reason.name()) + ")");
-        refundObligations.openForGuaranteedExit(caseId, reason);
+        refundObligations.openForExit(caseId, reason, now);
         work.refreshWaitingOn(caseId, StaffWorkService.stageDefault(target), null);
         work.changed(caseId);
         if ("CLOSED".equals(target)) events.publishEvent(new CaseEvents.CaseClosed(caseId));

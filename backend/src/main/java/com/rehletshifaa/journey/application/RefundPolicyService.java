@@ -54,12 +54,20 @@ public class RefundPolicyService {
                 throw new ApiException(409, "FULL_REFUND_REQUIRED", "This reason requires a full refund of the remaining amount paid");
             return;
         }
-        int cutoff = deposit.getPolicyId() == null ? 10 : policies.findRow(deposit.getPolicyId())
+        if (!patientCancelledInTime(caseId, deposit.getPolicyId(), cancellation.getRecordedAt()))
+            throw new ApiException(409, "REFUND_CUTOFF_PASSED", "The patient cancellation refund deadline has passed");
+    }
+
+    /**
+     * The patient's cancellation (or no-show) recorded at {@code cancelledAt} is before the deposit policy's cutoff ahead of the
+     * first confirmed appointment; with no confirmed appointment on record it always is (missing evidence never denies it).
+     */
+    public boolean patientCancelledInTime(UUID caseId, UUID policyId, java.time.Instant cancelledAt) {
+        int cutoff = policyId == null ? 10 : policies.findRow(policyId)
                 .map(p -> p.getRefundCutoffDays() == null ? 10 : p.getRefundCutoffDays()).orElse(10);
         var appointment = evidence.latest(caseId, CaseEvidence.Kind.FIRST_CONFIRMED_APPOINTMENT);
-        if (appointment.isEmpty()) return;
+        if (appointment.isEmpty()) return true;
         LocalDate date = appointment.get().getEffectiveAt().atZone(CAIRO).toLocalDate();
-        if (!cancellation.getRecordedAt().isBefore(date.minusDays(cutoff).atStartOfDay(CAIRO).toInstant()))
-            throw new ApiException(409, "REFUND_CUTOFF_PASSED", "The patient cancellation refund deadline has passed");
+        return cancelledAt.isBefore(date.minusDays(cutoff).atStartOfDay(CAIRO).toInstant());
     }
 }
