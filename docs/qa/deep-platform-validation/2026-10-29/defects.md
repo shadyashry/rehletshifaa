@@ -15,7 +15,7 @@ Severity order: safety/privacy, unauthorized access, data loss, incorrect money,
 | D-08 | High | Blocked patient journey (UC-01) | FIXED, red/green; **found live** | `DocumentSubmissionReadinessTest` |
 | D-09 | Medium | Money (dev seed: 0 EGP services offered) | FIXED (`73f09570`); **found live** on the QA stack | live `operations-gate-live` (deposit raised); dev DB: 0 active zero-priced services after restart |
 | D-10 | High | Approved gap: staff cannot file case paperwork (blocks admission/discharge) | FIXED backend (`4d1d5fc6`); UI open | `StaffDocumentUploadTest`; live post-arrival journey |
-| D-11 | High | Availability: backend write budget per IP blocks a normal multi-role journey (AR-06) | OPEN — owner decision (per-principal budgets / launch workload) | live: 429 on the 6th role's upload; QA stack runs with a raised per-address budget |
+| D-11 | High | Availability: write budgets per IP block a normal multi-role journey (AR-06) | FIXED (`a262a138`, owner decision 2026-10-29: per user) | `RateLimitFilterTest`; gateway.spec per-user test (9/9 on QA and dev gateways); 3 live journeys pass at the default budget |
 | D-12 | High | Blocked patient journey: patients can never confirm a step-up decision | FIXED, red/green (`4d1d5fc6`); **found live** | `AuthorityIntegrationTest.aPatientsDecisionNeedsAFreshSignInNotASecondFactor`, `RolePolicyTest`; live withdrawal 200 |
 | D-13 | High | Money: an in-time patient cancellation cannot be refunded (Finance has no access) | FIXED (next commit); **found live** | `RefundObligationServiceTest`; live refund of 4,025 EGP, deposit REFUNDED |
 | D-14 | Low | A refund replay after the full refund answers 403, not the idempotent 200 receipts give | OPEN (no duplicate recorded) | live refund test |
@@ -133,8 +133,11 @@ Severity order: safety/privacy, unauthorized access, data loss, incorrect money,
 - **Live:** on the QA stack all roles act from one address (as staff behind an office NAT). The backend's 30 writes/min
   per IP refused the Operations upload mid-journey (`429 RATE_LIMIT_EXCEEDED`); the gateway's 60/min per IP is the next limit.
   The dev `.env` already carries a UAT override for the same reason.
-- **Not changed:** rate budgets are a security control at two layers; keying authenticated writes per principal (and
-  anonymous per IP) is the proposed fix, for the owner to approve with the launch workload.
+- **Fix (owner decision 2026-10-29, same numbers):** the backend limiter runs inside the security chain after the bearer
+  token is verified and counts a signed-in write against the verified user (anonymous: the address); the gateway picks the
+  write bucket from the token's subject via `write-budget.js` (njs), else the address. Residual: the gateway cannot verify
+  tokens, so made-up tokens buy buckets for requests the backend then refuses unauthenticated (reads, public routes and the
+  per-address connection limit are unchanged). The UAT `RATE_LIMIT_REQUESTS` override in `.env` is no longer needed.
 
 ## D-12 — Patients could not confirm any step-up decision (High, blocked journey) — found live
 

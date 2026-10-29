@@ -54,7 +54,7 @@ Tester impact: the auto-routed synthetic cases appear in the seeded coordinator'
    `activateInvited` from `operations-gate-live.spec.ts`), coordinator departure, change orders, complication → incident,
    emergency admission; then follow-up closure with a moved clock (backend test only).
 2. D-10 UI: staff upload controls in the Admission/Discharge panels (UX pipeline, en/ar).
-3. D-11 decision with the owner (per-principal write budgets, launch workload), then load/fault drills on the QA stack.
+3. Load/fault drills on the QA stack (D-11 is fixed: per-user write budgets; the `.env` UAT override can be dropped).
 4. Hand the stale browser specs to the UX session (list in `report.md`).
 
 ## Blockers

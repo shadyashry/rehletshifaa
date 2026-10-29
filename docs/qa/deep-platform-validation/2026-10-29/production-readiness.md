@@ -29,7 +29,7 @@ Verdict scale per gate: **MET** (fresh evidence), **PARTIAL** (code/config ready
 | Gateway: real-client identity, budgets, correlation id, closed contract | `gateway.spec.ts` 8/8 against the running gateway | MET (live) |
 | Upload pipeline: type, size, signature, malware | Live on `1b1307f5`: size/type refused; MIME-spoofed file refused (D-06 fixed); a refused file no longer blocks submission (D-08 fixed). ClamAV positive detection not shown live | PARTIAL |
 | Secrets not in source | `.env` holds tunnel/observability secrets only; Keycloak bootstrap admin is a dev value in `docker-compose.yml` | MET for prod path (`deploy/oracle` requires env); dev values are dev-only |
-| Rate limit sized for staff behind one NAT | Backend 30 writes/min per IP (AR-06); `.env` UAT override present | NOT MET for an office-NAT launch; needs workload figure |
+| Rate limit sized for staff behind one NAT | Per-user write budgets at backend and gateway (D-11, `a262a138`); live journeys with all roles on one address pass at the default 30/min | MET (functional); capacity numbers still need the launch workload |
 | Dependency / container scan | Frontend `pnpm audit --prod`: 3 critical fixed by Next 16.4.2 (D-07), 3 high remain (Playwright, source-map-js, zod). Backend: no offline scanner (OWASP dependency-check/Trivy absent, Maven offline); container images not scanned | PARTIAL (frontend) / NOT VERIFIED (backend, images) |
 | Dev tunnel availability | 2 TLS connection resets in ~300 tunnel requests today; origin answered every request | Dev-only observation; production edge not chosen |
 | External penetration test | Not performed | NOT MET |

@@ -26,8 +26,8 @@ patient accepts by secure link + OTP → voucher → consent → hospital balanc
 treatment milestones → discharge pack → final invoice (DISCHARGED) → return and departure → reconciliation → follow-up
 contact (`FOLLOW_UP`); and the **withdrawal + full refund** variant. All 3 live tests pass (2.1 min). Getting there found
 four more defects, three fixed: D-10 (staff could not file paperwork — approved gap), D-12 (patients could never confirm
-a step-up decision), D-13 (an in-time patient cancellation could not be refunded); D-11 (per-IP write budget) needs your
-decision. Not live yet: two-team routing, coordinator departure, change orders, complications, emergency admission,
+a step-up decision), D-13 (an in-time patient cancellation could not be refunded); D-11 (per-IP write budgets) was then fixed per
+your decision: signed-in writes spend the user's budget (`a262a138`). Not live yet: two-team routing, coordinator departure, change orders, complications, emergency admission,
 follow-up closure (time-gated), WhatsApp (UC-15), and the staff upload UI (D-10 UI half).
 
 **Update (owner chose dedicated QA identities):** an isolated QA stack (`docker-compose.qa.yml`, project
@@ -78,8 +78,8 @@ critical Next.js advisories were removed (D-07). See `production-readiness.md`.
 | NOT TESTED | 2 | DPV-REV-1 (uploads into closed cases), DPV-REV-2 (0 EGP proposal total): decisions |
 | DEFERRED BY DECISION | 0 | (Journey admission stays off; Practice Manager consent and booking not in scope) |
 
-Defects: 14 found (D-01..D-14). By severity: 1 critical, 8 high, 4 medium, 1 low. Fixed and retested: 12 (D-10 backend
-only). Open: D-11 (owner decision), D-14 (low). D-06, D-08, D-09, D-10, D-12 and D-13 were found or verified live.
+Defects: 14 found (D-01..D-14). By severity: 1 critical, 8 high, 4 medium, 1 low. Fixed and retested: 13 (D-10 backend
+only; D-11 per-user write budgets by owner decision). Open: D-14 (low). D-06, D-08, D-09, D-10, D-12 and D-13 were found or verified live.
 
 ## Tests actually run (final code unless noted)
 
