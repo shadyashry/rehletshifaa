@@ -201,9 +201,12 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
         jdbc.sql("INSERT INTO affiliation_declarations(id,practitioner_id,declared_by,declared_at,valid_until,attestation_version,review_status,version) SELECT ?,p.id,'local-demo-seeder',?,?,?,'PENDING',0 FROM practitioner_profiles p WHERE p.external_subject=? AND NOT EXISTS(SELECT 1 FROM affiliation_declarations d WHERE d.practitioner_id=p.id AND d.superseded_at IS NULL AND d.valid_until>?)")
             .params(UUID.randomUUID(),timestamp(now),timestamp(now.plus(java.time.Duration.ofDays(365))),com.rehletshifaa.clinic.application.ConsultantAffiliationService.ATTESTATION_VERSION,subject,timestamp(now)).update();
         // Derive the consultant's price list from their care-area template so the doctor
-        // portal shows the approved multi-select out of the box (idempotent by service_code).
+        // portal shows the approved multi-select out of the box (idempotent by service_code). As in production
+        // (PricingCatalogService.copyTemplateToCatalog), a service without price evidence is listed inactive at 0, never
+        // offered at 0 EGP (deep validation D-09: a 0 EGP estimate became an accepted proposal with no deposit).
+        jdbc.sql("UPDATE consultant_service_catalog SET active=FALSE WHERE created_by='local-demo-seeder' AND active AND price_egp<=0").update();
         jdbc.sql("INSERT INTO consultant_service_catalog(id,practitioner_id,service_code,service_name,category,price_egp,active,created_by,created_at,updated_at,version) "
-                +"SELECT gen_random_uuid(),p.id,i.service_code,i.service_name,i.category,COALESCE(i.suggested_price_egp,0),TRUE,'local-demo-seeder',?,?,0 "
+                +"SELECT gen_random_uuid(),p.id,i.service_code,i.service_name,i.category,COALESCE(i.suggested_price_egp,0),COALESCE(i.suggested_price_egp,0)>0,'local-demo-seeder',?,?,0 "
                 +"FROM practitioner_profiles p JOIN service_templates t ON t.care_category=p.care_category AND t.active JOIN service_template_items i ON i.template_id=t.id "
                 +"WHERE p.external_subject=? AND NOT EXISTS(SELECT 1 FROM consultant_service_catalog c WHERE c.practitioner_id=p.id AND c.service_code=i.service_code)")
             .params(timestamp(now),timestamp(now),subject).update();
