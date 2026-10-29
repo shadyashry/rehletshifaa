@@ -13,6 +13,7 @@ Severity order: safety/privacy, unauthorized access, data loss, incorrect money,
 | D-06 | High | Upload security (SEC-13) | FIXED, red/green; **found live** | `ClamAvDocumentInspectorTest.aFileWhoseBytesAreNotTheDeclaredTypeIsRefusedBeforeTheScan` |
 | D-07 | Critical | Frontend dependency (Next.js) | FIXED (16.3.3 → 16.4.2); gates re-run | `pnpm audit --prod`: critical 3 → 0 |
 | D-08 | High | Blocked patient journey (UC-01) | FIXED, red/green; **found live** | `DocumentSubmissionReadinessTest` |
+| D-09 | Medium | Money (dev seed: 0 EGP services offered) | FIXED (`73f09570`); **found live** on the QA stack | live `operations-gate-live` (deposit raised); dev DB: 0 active zero-priced services after restart |
 
 ## D-01 — Deposit receipt replay discloses another case's deposit (High)
 
@@ -93,6 +94,19 @@ Severity order: safety/privacy, unauthorized access, data loss, incorrect money,
   refusals more frequent (e.g. a PNG screenshot saved as `.jpg`), so this would have hit real patients.
 - **Fix:** only `PENDING` and `QUARANTINED` (no verdict yet) block submission.
 - **Live retest:** pending the next backend rebuild.
+
+## D-09 — Dev seed offers services with no price evidence as active at 0 EGP (Medium, money; dev/UAT only)
+
+- **Found:** isolated QA stack, `operations-gate-live`: the consultant's first catalogue service (`CARD-COMPLEX-PCI`,
+  price evidence open per V107) was active at 0.00; the estimate, proposal and acknowledgement went through at 0 EGP
+  and no deposit was raised (the 15% policy of 0 is 0).
+- **Root cause:** `LocalDemoDataSeeder.makeEligible` inserted every template item active with `COALESCE(price,0)`.
+  Production (`PricingCatalogService.copyTemplateToCatalog`) already lists unpriced items inactive.
+- **Fix:** the seeder lists them inactive and deactivates the zero-priced rows it created before (local profile only).
+  Dev after rebuild: 0 active zero-priced services, 78 priced.
+- **Review item (not a decision taken):** the backend still accepts a hand-entered 0 EGP estimate line and a 0 EGP
+  proposal total (`@DecimalMin("0.00")`); whether a released proposal may total 0 is a business rule to confirm
+  (DPV-REV-2).
 
 ## Open (not fixed this run)
 

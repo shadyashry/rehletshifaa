@@ -37,19 +37,24 @@ boundary. Evidence files in this folder: `requirements-matrix.csv`, `architectur
 
 Tester impact: the auto-routed synthetic cases appear in the seeded coordinator's work list (name starts with `Dpv`).
 
+## Isolated QA stack (live staff journeys)
+
+- Start: `docker compose -p rehletshifaa-qa -f docker-compose.yml -f docker-compose.qa.yml up -d` (volumes kept; stopped
+  at the end of this run). URLs: web http://localhost:13000, API via gateway http://localhost:18081, Keycloak
+  http://localhost:18180, Mailpit http://localhost:18025. Throw away with `down -v`.
+- Identities: the realm's seeded accounts, freshly imported. Their authenticator secrets and Finance's virtual passkey
+  are in `frontend/.e2e/mfa-qa/` (git-ignored); the runner moves them to `.e2e/mfa` for a run and back afterwards.
+- Runner (session scratchpad `qa-live.sh`): exports the seeded passwords from the realm file without printing them,
+  sets `PLAYWRIGHT_*` to the QA URLs and `MAILPIT_URL=http://localhost:18025`, runs `npx playwright test --workers=1`.
+- QA data: RS-2026-000001..000010 on the QA stack (synthetic, "Playwright Ops Gate").
+
 ## Next exact action
 
-1. Get the owner's answer on live staff identities (see Blockers), then run, serially, with `raw/` scripts' env pattern
-   (`live.sh` in the session scratchpad reads the seeded passwords from the realm file without printing them):
-   `operations-gate-live`, `uat-walkthrough-live`, `my-care-live`, `portal-gateway-live` (needs an acknowledged case),
-   then an intake → follow-up journey with distinct actors; update UC-03..UC-20 rows.
-2. Hand the 10 stale browser specs to the UX session (list in `report.md`).
-3. Isolated-stack load/fault drills (AR-07..AR-10, dependency outages).
+1. Extend the live journey on the QA stack past the travel gate (arrival → follow-up/closure) and run the
+   two-team, departure, refund/cancellation variants; update the UC rows with the evidence.
+2. Hand the stale specs to the UX session (list in `report.md`).
+3. Isolated-stack load and fault drills (AR-07..AR-10; Redis, Keycloak, DB, MinIO/ClamAV, SMTP outages).
 
 ## Blockers
 
-- **Live staff journeys:** the seeded `coordinator` and `doctor` accounts already have an authenticator enrolled by
-  someone else since the reset (Keycloak admin API, read-only check: `otp` credential present). The live specs cannot
-  answer it, and enrolling authenticators on the other shared seeded accounts would lock testers out of them.
-  Needs the owner: provide `COORDINATOR_TOTP_SECRET` / `DOCTOR_TOTP_SECRET`, or approve dedicated QA identities.
-- UC-15 needs the Meta WhatsApp test setup; UC-14/UC-19 need invited accounts activated (passkey for `credential-admin`).
+- None for live staff journeys (resolved by the QA stack). UC-15 still needs the Meta WhatsApp test setup.

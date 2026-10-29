@@ -18,7 +18,19 @@ issue, and four of its refinements were applied. Still open: performance hypothe
 rate-limit sizing (AR-06), single-actor erasure (AR-14), and maintainability notes (AR-11..AR-13). See
 `architecture-review.md`.
 
-### 2. Functional completeness — **NOT PROVEN**
+### 2. Functional completeness — **NOT PROVEN** (main journey now proven live to the travel gate)
+
+**Update (owner chose dedicated QA identities):** an isolated QA stack (`docker-compose.qa.yml`, project
+`rehletshifaa-qa`, fresh realm, no tester impact) now runs the live staff journeys. `operations-gate-live` passes end
+to end at `2ae37ebe`: public intake → coordinator → consultant review with step-up → proposal → Operations step →
+release → patient OTP acknowledgement → profile activation → Keycloak account setup → patient transfer reference →
+Finance receipt confirmed with a **passkey** (acr 3) → `TRAVEL_COORDINATION` exactly once. `portal-gateway-live` 5/6
+through the real gateway with no 429s; `my-care-live` and `uat-walkthrough-live` proven to the patient landing and the
+consultant assignment, then stop on UI text the redesign changed. The run found D-09 (0 EGP demo services).
+Not yet live: arrival → final quote → admission → treatment → discharge → follow-up, the two-team and departure
+variants, refunds/cancellations, WhatsApp (UC-15).
+
+Original slice-1 finding, kept for the record:
 
 All 42 matrix rows have implementation and automated coverage. Only the public intake, secure-link status, upload
 security and gateway paths were proven against the real boundaries (gateway, backend, PostgreSQL, MinIO, ClamAV,
@@ -45,19 +57,19 @@ Code cannot close these Priority 0 gates:
 Also missing: an external penetration test, a backend/container dependency scan, and an approved workload/SLO. The
 critical Next.js advisories were removed (D-07). See `production-readiness.md`.
 
-## Matrix counts (`requirements-matrix.csv`, 42 rows)
+## Matrix counts (`requirements-matrix.csv`, 46 rows)
 
 | Status | Count | Rows |
 |---|---|---|
-| PASS | 5 | UC-02, SEC-1, SEC-4, SEC-5, GW-1 |
-| PARTIAL | 33 | automated coverage, real boundary not (fully) exercised — incl. UC-01, SEC-13 (live fixes verified; ClamAV positive detection not shown) |
+| PASS | 6 | UC-02, SEC-1, SEC-4, SEC-5, GW-1, DPV-LIVE-1 (cross-role journey to the travel gate) |
+| PARTIAL | 35 | automated coverage, real boundary not (fully) exercised — incl. UC-01, SEC-13 (live fixes verified; ClamAV positive detection not shown) |
 | FAIL | 1 | DPV-TEST-1 (11 stale browser specs) |
 | BLOCKED | 2 | UC-15 (Meta test setup), P0 launch blockers |
-| NOT TESTED | 1 | DPV-REV-1 (uploads into closed cases: decision) |
+| NOT TESTED | 2 | DPV-REV-1 (uploads into closed cases), DPV-REV-2 (0 EGP proposal total): decisions |
 | DEFERRED BY DECISION | 0 | (Journey admission stays off; Practice Manager consent and booking not in scope) |
 
-Defects: 8 found (D-01..D-08). By severity: 1 critical, 4 high, 3 medium. All fixed and retested. D-06 and D-08
-were also retested live.
+Defects: 9 found (D-01..D-09). By severity: 1 critical, 4 high, 4 medium. All fixed and retested. D-06, D-08 and D-09
+were also verified live.
 
 ## Tests actually run (final code unless noted)
 
@@ -71,7 +83,8 @@ were also retested live.
 | `pnpm test:e2e` (production build, route-mocked) | 514: 443 passed, 53 env-gated skipped, 18 failed under CPU load; rerun of the failures alone: 7 passed, **11 failed** (stale copy/structure ×10, screenshot file lock ×1) |
 | `gateway.spec.ts` against the running gateway | 8/8 passed |
 | Live public journey `raw/live-intake.mjs` (real tunnel, gateway, MinIO, ClamAV, outbox, Mailpit) | final build run DPV-1029F: 21 PASS, 1 NOT TESTED (EICAR offset limitation) |
-| Live staff specs (`portal-live`, `operations-gate-live`, `uat-walkthrough-live`, `my-care-live`, `portal-gateway-live`, `mfa-live`, governance/restore gates) | **not run**: `portal-live` stopped at Keycloak's authenticator challenge; the rest need the same identities or env gates (`*_LIVE`) |
+| Live staff specs on the tunnel stack | not run: seeded staff accounts carry testers' authenticators |
+| Live staff specs on the isolated QA stack (`2ae37ebe`) | `operations-gate-live` **PASS** (twice); `portal-gateway-live` 5/6; `my-care-live` and `uat-walkthrough-live` PARTIAL (stale UI text after the proven steps); `portal-live` not run (its own sign-in cannot answer MFA); `mfa-live`, governance/restore gates not run (env-gated drills) |
 | Restore drill (disposable project) | PASS, 94 s |
 | `pnpm audit --prod` | critical 3 → 0 |
 
@@ -92,19 +105,18 @@ were also retested live.
   - tests (incl. new `UnclaimedIntakeTeamScopeTest`)
 - `1bd6a1e9` `frontend/package.json`, `pnpm-lock.yaml`: Next 16.4.2.
 - `1b1307f5` `DocumentSubmissionReadiness` and new `DocumentSubmissionReadinessTest` (D-08).
+- `73f09570` `LocalDemoDataSeeder` (D-09); `2ae37ebe` `docker-compose.qa.yml`, `frontend/e2e/live-auth.ts`, live specs.
 - Evidence: this folder, `docs/deployment.md` (drill row).
 
 ## Prioritized remaining actions
 
-1. **Owner:** choose how automated live staff journeys sign in:
-   - (a) share the `coordinator`/`doctor` TOTP secrets as `COORDINATOR_TOTP_SECRET`/`DOCTOR_TOTP_SECRET` env vars and
-     allow enrolment on `operations`/`finance`; or
-   - (b) approve dedicated QA identities.
-
-   Then run `operations-gate-live`, `uat-walkthrough-live`, `my-care-live`, `portal-gateway-live` and the
-   intake → follow-up journey with distinct actors.
+1. On the QA stack: extend the live journey past the travel gate (arrival, final assessment/quote, admission, voucher,
+   treatment, discharge, follow-up) and run the two-team, departure, refund and cancellation variants. Start it with
+   `docker compose -p rehletshifaa-qa -f docker-compose.yml -f docker-compose.qa.yml up -d` (state kept); run specs with
+   the session's `qa-live.sh` pattern (`checkpoint.md`).
 2. UX session: update the 10 stale browser specs to today's area-X copy (`case-cover` ×2, `final-quote-holds` ×3,
-   `my-care-safety` ×4, `public-batch-3` ×1).
+   `my-care-safety` ×4, `public-batch-3` ×1) and the stale live assertions (`my-care-live` deposit copy after DEP-3,
+   `uat-walkthrough-live` hand-off sentence, `portal-gateway-live` Arabic "خطوتك").
 3. Isolated-stack performance and fault drills: authenticated mixed-role load, Redis/Keycloak/DB/MinIO/ClamAV/SMTP
    outages, outbox lag. They test AR-07..AR-10.
 4. Decisions:
