@@ -1,0 +1,68 @@
+# Isolated QA stack: a second, disposable copy of the platform for live journeys, load and fault drills that must not
+# touch the shared tunnel environment (its testers, accounts, routing and data).
+#
+#   docker compose -p rehletshifaa-qa -f docker-compose.yml -f docker-compose.qa.yml up -d --build
+#   docker compose -p rehletshifaa-qa -f docker-compose.yml -f docker-compose.qa.yml down -v   # throw it away
+#
+# Own project, network and volumes (`rehletshifaa-qa_*`); no tunnel; loopback ports offset by 10000 so it runs beside the
+# dev stack: web 13000, gateway 18081 (the browser's API), backend 18080, Keycloak 18180, MinIO 19100/19101,
+# Mailpit 18025, PostgreSQL 15433. A fresh realm import gives the seeded QA identities with no enrolled authenticator.
+# Browser API traffic goes through the gateway, as on the tunnel. Never point it at the dev volumes.
+services:
+  postgres:
+    ports: !override ["127.0.0.1:15433:5432"]
+  keycloak:
+    command: ["start-dev", "--import-realm", "--hostname", "http://localhost:18180"]
+    environment:
+      APP_ORIGIN: http://localhost:13000
+    ports: !override ["127.0.0.1:18180:8080"]
+  keycloak-sync:
+    # The base sync, then the QA web origin on the web client (the realm file lists localhost:3000 and the tunnel only).
+    command:
+      - >-
+        for attempt in $$(seq 1 60); do
+        /opt/keycloak/bin/kcadm.sh config credentials --config /tmp/kcadm.config --server http://keycloak:8080 --realm master
+        --user "$$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null 2>&1 && break;
+        [ "$$attempt" = 60 ] && { echo "keycloak-sync: Keycloak did not come up" >&2; exit 1; };
+        sleep 5; done &&
+        /opt/keycloak/bin/kcadm.sh create partialImport --config /tmp/kcadm.config -r rehletshifaa
+        -s ifResourceExists=SKIP -f /opt/sync/realm-rehletshifaa.json -o | head -c 300; echo;
+        bash /opt/sync/sync-authentication.sh &&
+        web=$$(/opt/keycloak/bin/kcadm.sh get clients --config /tmp/kcadm.config -r rehletshifaa -q clientId=rehletshifaa-web --fields id --format csv --noquotes) &&
+        /opt/keycloak/bin/kcadm.sh update clients/$$web --config /tmp/kcadm.config -r rehletshifaa
+        -s 'redirectUris=["http://localhost:13000/*"]' -s 'webOrigins=["http://localhost:13000"]'
+        -s 'attributes."post.logout.redirect.uris"=http://localhost:13000/*' && echo "keycloak-sync: QA web origin set"
+  minio:
+    environment:
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:13000
+    ports: !override ["127.0.0.1:19100:9000", "127.0.0.1:19101:9001"]
+  clamav:
+    ports: !reset []
+  redis:
+    ports: !reset []
+  mailpit:
+    ports: !override ["127.0.0.1:18025:8025"]
+  backend:
+    environment:
+      OIDC_ISSUER_URI: http://localhost:18180/realms/rehletshifaa
+      S3_PUBLIC_ENDPOINT: http://localhost:19100
+      FRONTEND_ALLOWED_ORIGINS: http://localhost:13000
+      RATE_LIMIT_TRUST_PROXY: "true"
+      APP_PUBLIC_BASE_URL: http://localhost:18081
+      APP_WEB_BASE_URL: http://localhost:13000
+    ports: !override ["127.0.0.1:18080:8080"]
+  api-gateway:
+    ports: !override ["127.0.0.1:18081:80"]
+  frontend:
+    build:
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:18081
+        NEXT_PUBLIC_SITE_URL: http://localhost:13000
+        NEXT_PUBLIC_STORAGE_ORIGIN: http://localhost:19100
+        NEXT_PUBLIC_OIDC_AUTHORITY: http://localhost:18180/realms/rehletshifaa
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:18081
+      NEXT_PUBLIC_SITE_URL: http://localhost:13000
+      NEXT_PUBLIC_STORAGE_ORIGIN: http://localhost:19100
+      NEXT_PUBLIC_OIDC_AUTHORITY: http://localhost:18180/realms/rehletshifaa
+    ports: !override ["127.0.0.1:13000:3000"]

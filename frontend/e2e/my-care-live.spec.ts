@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 
 import { API, OIDC_AUTHORITY } from "./env";
-import { STEP_UP_USERS, requestStepUp, submitKeycloakSignIn } from "./live-auth";
+import { STEP_UP_USERS, preparePasskey, requestStepUp, submitKeycloakSignIn } from "./live-auth";
 
 /**
  * Post-activation landing over the real stack: a synthetic patient acknowledges their estimate through the
@@ -25,6 +25,8 @@ type Session = { request: APIRequestContext; subject: string; token: string };
 async function signIn(browser: Browser, user: string): Promise<Session> {
   const context = await browser.newContext();
   const page = await context.newPage();
+  // Finance confirms money with a passkey: registered once, then attached to this sign-in.
+  const passkey = await preparePasskey(browser, page, user, PASSWORDS[user]!);
   // A consultant's clinical decision and Finance settling a deposit are step-up actions: sign in at LoA 2.
   if (STEP_UP_USERS.has(user)) await requestStepUp(page);
   await page.goto("/en/portal");
@@ -32,6 +34,7 @@ async function signIn(browser: Browser, user: string): Promise<Session> {
   await page.waitForURL(/\/realms\/rehletshifaa\/protocol\/openid-connect\/auth/, { timeout: 30000 });
   await submitKeycloakSignIn(page, user, PASSWORDS[user]!);
   await page.waitForURL(/\/en\/portal/, { timeout: 30000 });
+  await passkey?.save(); // the signature counter moved
   const stored = await page.evaluate(key => sessionStorage.getItem(key), `oidc.user:${OIDC_AUTHORITY}:rehletshifaa-web`);
   const token = stored ? (JSON.parse(stored) as { access_token?: string }).access_token : undefined;
   expect(token, `a token for ${user}`).toBeTruthy();
@@ -129,13 +132,14 @@ test("activation → password → sign-in lands on My Care for the current case;
   const patient: Page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await patient.goto(setupLink.replace(/&amp;/g, "&"));
   // Keycloak confirms the action first ("One last step to secure your account"), then asks for the password.
-  await patient.getByRole("link", { name: /Continue/ }).click();
+  // The login theme names this button after the step it starts; its id is stable.
+  await patient.locator("#kc-info-next").click();
   const password = `Landing-${stamp}-Aa1!`;
   await patient.locator("#password-new").fill(password);
   await patient.locator("#password-confirm").fill(password);
   await patient.locator("input[type=submit], button[type=submit]").first().click();
   await expect(patient.getByText(/Your account is ready/).first()).toBeVisible({ timeout: 30000 });
-  await patient.getByRole("link", { name: /Continue to my case/ }).click();
+  await patient.locator("#kc-info-next").click();
 
   // The one sign-in after setup: the case context travels through it untouched.
   await patient.waitForURL(/\/realms\/rehletshifaa\/protocol\/openid-connect\/auth/, { timeout: 30000 });

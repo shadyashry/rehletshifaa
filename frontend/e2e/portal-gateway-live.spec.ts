@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
 import { API } from "./env";
-import { STEP_UP_USERS, requestStepUp, submitKeycloakSignIn } from "./live-auth";
+import { STEP_UP_USERS, preparePasskey, requestStepUp, submitKeycloakSignIn } from "./live-auth";
 
 /**
  * Representative portal journeys against the real stack, through the real path:
@@ -52,12 +52,15 @@ function expectCleanNetwork(net: Network) {
 }
 
 async function signIn(page: Page, user = USERNAME, locale = "en") {
+  // Finance confirms money with a passkey: registered once, then attached to this sign-in.
+  const passkey = await preparePasskey(page.context().browser()!, page, user, PASSWORDS[user] ?? PASSWORD!);
   if (STEP_UP_USERS.has(user)) await requestStepUp(page);
   await page.goto(`/${locale}/portal`);
   await page.getByRole("button", { name: /Sign in securely|تسجيل الدخول/ }).click();
   await page.waitForURL(/\/realms\/rehletshifaa\/protocol\/openid-connect\/auth/, { timeout: 30000 });
   await submitKeycloakSignIn(page, user, PASSWORDS[user] ?? PASSWORD!);
   await page.waitForURL(new RegExp(`/${locale}/portal`), { timeout: 30000 });
+  await passkey?.save(); // the signature counter moved
 }
 
 async function openCase(page: Page, caseNumber: string, locale = "en") {

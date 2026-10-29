@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 
 import { API, OIDC_AUTHORITY } from "./env";
-import { STEP_UP_USERS, requestStepUp, submitKeycloakSignIn } from "./live-auth";
+import { STEP_UP_USERS, preparePasskey, requestStepUp, submitKeycloakSignIn } from "./live-auth";
 
 /**
  * The gate into TRAVEL_COORDINATION, proven over HTTP through the real path
@@ -41,6 +41,8 @@ type Session = { request: APIRequestContext; subject: string; token: string };
 async function signIn(browser: Browser, user: string): Promise<Session> {
   const context = await browser.newContext();
   const page = await context.newPage();
+  // Finance confirms money with a passkey: registered once, then attached to this sign-in.
+  const passkey = await preparePasskey(browser, page, user, PASSWORDS[user]!);
   // A consultant's clinical decision and Finance settling a deposit are step-up actions: sign in at LoA 2.
   if (STEP_UP_USERS.has(user)) await requestStepUp(page);
   await page.goto("/en/portal");
@@ -48,6 +50,7 @@ async function signIn(browser: Browser, user: string): Promise<Session> {
   await page.waitForURL(/\/realms\/rehletshifaa\/protocol\/openid-connect\/auth/, { timeout: 30000 });
   await submitKeycloakSignIn(page, user, PASSWORDS[user]!);
   await page.waitForURL(/\/en\/portal/, { timeout: 30000 });
+  await passkey?.save(); // the signature counter moved
   const stored = await page.evaluate(key => sessionStorage.getItem(key), `oidc.user:${OIDC_AUTHORITY}:rehletshifaa-web`);
   const token = stored ? (JSON.parse(stored) as { access_token?: string }).access_token : undefined;
   expect(token, `a token for ${user}`).toBeTruthy();
@@ -89,7 +92,7 @@ async function latestMail(request: APIRequestContext, subject: string, since: nu
 
 type Workspace = { caseSummary: { status: string; version: number }; timeline: { status: string }[]; tasks: { type: string; status: string }[];
   clinicalReviews: { id: string; status: string }[]; proposal?: { versionId: string; status: string }; gates?: { financeRequired: boolean } | null;
-  deposit?: { id: string; status: string; totalEgp: number } | null; actions: { currentAction: { code: string; workType?: string | null } } };
+  deposit?: { id: string; status: string; totalEgp: number; transfer?: { status: string } | null } | null; actions: { currentAction: { code: string; workType?: string | null } } };
 
 test("operations may draft before the gate, cannot advance the journey, and the gate opens exactly once", async ({ browser, request }) => {
   test.setTimeout(420000);
@@ -128,7 +131,7 @@ test("operations may draft before the gate, cannot advance the journey, and the 
   await call(doctor, "POST", `/doctor/cases/${caseId}/assignments/${doctorAssignment.body.id}`, { accept: true }, 200);
 
   // Catalogue-priced when the consultant has a price list (no Finance step); otherwise manual pricing with Finance approval.
-  const catalog = (await call<{ id: string; serviceName: string; priceEgp: number; active: boolean }[]>(doctor, "GET", "/doctor/catalog", undefined, 200)).body.filter(s => s.active);
+  const catalog = (await call<{ id: string; serviceName: string; priceEgp: number; active: boolean }[]>(doctor, "GET", "/doctor/catalog", undefined, 200)).body.filter(s => s.active && s.priceEgp > 0);
   const service = catalog[0] ?? { id: null, serviceName: "Diagnostic cardiology consultation", priceEgp: 3500 };
   await call(doctor, "POST", `/doctor/cases/${caseId}/review-decision`, {
     decision: "ACCEPT", recommendedTreatment: "Diagnostic consultation and imaging.", risksAndLimitations: "Standard procedural risks.",
@@ -206,24 +209,32 @@ test("operations may draft before the gate, cannot advance the journey, and the 
   const setupLink = await latestMail(request, "Finish setting up your RehletShifaa account", setupAt, email, /(https?:\/\/[^\s"<>]+login-actions\/action-token[^\s"<>]*)/);
   const patient: Page = await browser.newPage();
   await patient.goto(setupLink.replace(/&amp;/g, "&"));
-  await patient.getByRole("link", { name: /Continue/ }).click();
+  // The login theme names this button after the step it starts; its id is stable.
+  await patient.locator("#kc-info-next").click();
   const password = `OpsGate-${stamp}-Aa1!`;
   await patient.locator("#password-new").fill(password);
   await patient.locator("#password-confirm").fill(password);
   await patient.locator("input[type=submit], button[type=submit]").first().click();
   await expect(patient.getByText(/Your account is ready/).first()).toBeVisible({ timeout: 30000 });
-  await patient.getByRole("link", { name: /Continue to my case/ }).click();
+  await patient.locator("#kc-info-next").click();
   await patient.waitForURL(/\/realms\/rehletshifaa\/protocol\/openid-connect\/auth/, { timeout: 30000 });
   await patient.locator("#username").fill(email);
   await patient.locator("#password").fill(password);
   await patient.locator("#kc-login").click();
   await patient.waitForURL(new RegExp(`/en/portal\\?case=${caseId}`), { timeout: 30000 });
   await expect(patient.getByRole("heading", { level: 1, name: "My Care" })).toBeVisible({ timeout: 30000 });
-  await patient.close();
-
   ws = await workspace();
   expect(ws.caseSummary.status, "the profile alone does not open the gate").toBe("ACCEPTED");
-  expect(ws.actions.currentAction.workType).toBe("DEPOSIT_ARRANGEMENT");
+  // DEP-3: the patient enters the bank-transfer reference from My Care; Finance confirms the money against it.
+  const patientToken = await patient.evaluate(key => (JSON.parse(sessionStorage.getItem(key) ?? "{}") as { access_token?: string }).access_token ?? "",
+    `oidc.user:${OIDC_AUTHORITY}:rehletshifaa-web`);
+  expect(patientToken, "a token for the patient").toBeTruthy();
+  const patientSession: Session = { request: patient.context().request, subject: "", token: patientToken };
+  await call(patientSession, "POST", `/patient/cases/${caseId}/deposit/transfer-reference`, { reference: `FT-${stamp}`, method: "BANK_TRANSFER" }, 200);
+  await patient.close();
+  ws = await workspace();
+  expect(ws.caseSummary.status, "a reported transfer is not money received").toBe("ACCEPTED");
+  expect(ws.deposit?.transfer?.status).toBe("SUBMITTED");
 
   const deposit = ws.deposit!;
   const receipt = { amountEgp: deposit.totalEgp, method: "BANK", providerReference: `e2e-${stamp}`, idempotencyKey: `ops-gate-${caseId}` };
