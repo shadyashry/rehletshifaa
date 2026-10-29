@@ -157,7 +157,7 @@ export const coordCopy = {
     ruleContinuity: "الإبقاء على المنسّق الحالي", ruleContinuityWhy: "الاستمرارية: تحتفظ الحالة بمنسّقها ما دام مؤهلًا.",
     rulePreferred: "المنسّق المفضّل لدى الطبيب", rulePreferredWhy: "يُحدَّد في تفضيلات الأطباء.",
     ruleTeams: "الفرق بهذا الترتيب", ruleTeamsWhy: "الفريق المفضّل لدى الطبيب، ثم الفرق أدناه، ثم الفريق الاحتياطي لكل فريق.",
-    ruleBest: "أفضل منسّق متاح", ruleBestWhy: "الأكثر سعة متبقية، مع ترجيح من يتحدث لغة المريض.",
+    ruleBest: "أفضل منسّق متاح", ruleBestWhy: "الأكثر سعة متبقية، مع ترجيح من يتحدّث لغة المريض.",
     ruleNobody: "لا يوجد مؤهل", ruleNobodyWhy: (h: number) => `تنتظر الحالة مدير التنسيق؛ المهلة ${h} ساعة. ينطبق على حالات التوجيه الفعلي فقط.`,
     providerTeam: "فريق الجهة", careAreaTeams: "فرق مجالات الرعاية", defaultTeam: "الفريق الافتراضي", policyFallback: "فريق الملاذ الأخير", notSet: "غير محدد",
     publish: "نشر إصدار جديد", publishTitle: "إصدار قواعد جديد", queueHours: "مهلة الحالات المنتظرة (ساعات)",
@@ -170,7 +170,7 @@ export const coordCopy = {
     previewClinician: "الطبيب", previewAnyClinician: "بلا طبيب محدد", previewCareArea: "مجال الرعاية", previewLanguage: "لغة المريض", previewAny: "غير محدد",
     whatIf: "ماذا لو…", whatIfHint: "جرّب منسّقًا أو فريقًا مفضّلًا غير محفوظ.", whatIfCoordinator: "المنسّق المفضّل", whatIfTeam: "الفريق المفضّل",
     runPreview: "معاينة التوصية", recommended: "الموصى به", noRecommendation: "لا يوجد مؤهل", why: "السبب", viaTeam: (t: string) => `عبر ${t}`,
-    otherCandidates: "منسّقون مؤهلون آخرون", notEligible: "غير مؤهلين", caseloadLabel: "عبء الحالات", languageMatch: "يتحدث لغة المريض", noLanguageMatch: "لغة مختلفة",
+    otherCandidates: "منسّقون مؤهلون آخرون", notEligible: "غير مؤهلين", caseloadLabel: "عبء الحالات", languageMatch: "يتحدّث لغة المريض", noLanguageMatch: "لغة مختلفة",
     previewRules: (v: number) => `قُيّم وفق إصدار القواعد ${v}.`,
     historyTitle: "سجل قرارات التوجيه", historyIntro: "كل قرارات التوجيه، الأحدث أولًا.",
     historyEmpty: "لم تُسجَّل قرارات توجيه بعد.",
@@ -188,7 +188,7 @@ export const coordCopy = {
 
     exclusions: {
       ACCESS_OR_MEMBERSHIP_DENIED: "لا صلاحية لاستقبال عمل التنسيق هنا", STAFF_DISABLED: "حساب المنسّق معطّل",
-      NO_ACTIVE_TEAM: "ليس في فريق نشط لهذا المجال", CARE_AREA_MISMATCH: "لا يغطي مجال الرعاية هذا", LANGUAGE_MISMATCH: "لا يتحدث لغة المريض",
+      NO_ACTIVE_TEAM: "ليس في فريق نشط لهذا المجال", CARE_AREA_MISMATCH: "لا يغطي مجال الرعاية هذا", LANGUAGE_MISMATCH: "لا يتحدّث لغة المريض",
       OFF_DUTY: "خارج الخدمة", AT_CAPACITY: "بلغ الحد الأقصى للحالات",
     } as Record<string, string>,
     paths: {

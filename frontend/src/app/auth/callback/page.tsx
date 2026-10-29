@@ -5,7 +5,7 @@ import { authManager, signInLocale } from "@/lib/auth-client";
 
 const copy = {
   en: { title: "Completing secure sign-in", wait: "Please wait…", failed: "Sign-in could not be completed. Please return to the portal and try again.", back: "Return to the portal" },
-  ar: { title: "جارٍ إكمال تسجيل الدخول الآمن", wait: "يرجى الانتظار…", failed: "تعذّر إكمال تسجيل الدخول. يرجى العودة إلى البوابة والمحاولة مرة أخرى.", back: "العودة إلى البوابة" },
+  ar: { title: "جارٍ إكمال تسجيل الدخول الآمن", wait: "انتظر قليلًا…", failed: "تعذّر إكمال تسجيل الدخول. ارجع إلى البوابة وحاول مرة أخرى.", back: "العودة إلى البوابة" },
 } as const;
 
 /**

@@ -40,7 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { key: "consultants", path: "/consultants", label: ["Consultants", "الاستشاريون"], summary: ["Every consultant, their credential approval and whether they can receive cases.", "كل الاستشاريين واعتمادهم وهل يمكنهم استقبال الحالات."], visible: (a) => a.can("CREDENTIAL_READ") },
   ] },
   { key: "reviews", label: ["Reviews & Safety", "المراجعات والسلامة"], icon: BadgeCheck, items: [
-    { key: "identity", path: "/identity-checks", label: ["Identity Checks", "التحقق من الهوية"], summary: ["Patient and representative identity evidence waiting for a decision.", "أدلة هوية المرضى والممثلين التي تنتظر قرارًا."], visible: (a) => a.can("PATIENT_IDENTITY_READ") },
+    { key: "identity", path: "/identity-checks", label: ["Identity Checks", "التحقّق من الهوية"], summary: ["Patient and representative identity evidence waiting for a decision.", "أدلة هوية المرضى والممثلين التي تنتظر قرارًا."], visible: (a) => a.can("PATIENT_IDENTITY_READ") },
     // P1-13 (A-06): managers work incidents here; Compliance reads them. The page's own words come from the message files.
     { key: "incidents", path: "/incidents", label: ["Incidents", "الحوادث"], summary: ["Complaints, disputes and clinical incidents raised on cases.", "الشكاوى والنزاعات والحوادث السريرية المسجّلة على الحالات."], visible: (a) => a.can("INCIDENT_READ") },
     // P1-19 (design §7): the hospital-agreement audit. Compliance reviews and samples; Consultant Operations read declarations and scorecards.
@@ -60,7 +60,7 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   // Journey design and publishing happen inside each journey (journey › version › design).
   { key: "journeys", label: ["Care Journeys", "رحلات الرعاية"], icon: Route, items: [
-    { key: "journeys", path: "/journeys", label: ["Journeys", "الرحلات"], summary: ["Design, check and publish care journey versions.", "صمّم إصدارات رحلات الرعاية وتحقق منها وانشرها."], visible: (a) => a.can("JOURNEY_READ") },
+    { key: "journeys", path: "/journeys", label: ["Journeys", "الرحلات"], summary: ["Design, check and publish care journey versions.", "صمّم إصدارات رحلات الرعاية وتحقّق منها وانشرها."], visible: (a) => a.can("JOURNEY_READ") },
   ] },
   { key: "workforce", label: ["Workforce", "فريق العمل"], icon: Users, items: [
     { key: "people", path: "/people", label: ["People", "الأشخاص"], summary: ["RehletShifaa staff: invitations, roles, lifecycle and offboarding.", "موظفو رحلة شفاء: الدعوات والأدوار ودورة العمل وإنهاء الخدمة."], visible: (a) => a.can("WORKFORCE_READ") },
@@ -70,9 +70,9 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { key: "access", label: ["Access & Governance", "الصلاحيات والحوكمة"], icon: ShieldCheck, items: [
     { key: "administrators", path: "/administrators", label: ["Administrators", "مسؤولو النظام"], summary: ["System administrator changes (two-person approval) and platform ownership.", "تغييرات مسؤولي النظام (بموافقة شخصين) وملكية المنصة."], visible: (a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner },
-    { key: "ownership", path: "/ownership", label: ["Platform Ownership", "ملكية المنصة"], summary: ["Who owns the platform, and handing ownership over with the incoming owner's acceptance and an independent check.", "من يملك المنصة، وتسليم الملكية بقبول المالك الجديد وتحقق مستقل."], visible: (a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner || !!a.me?.pendingActions.includes("ACCEPT_PLATFORM_OWNERSHIP") },
-    { key: "support", path: "/account-support", label: ["Account Support", "دعم الحسابات"], summary: ["Verify a caller, resend an invitation, send a password reset or request an MFA reset.", "تحقق من المتصل، وأعد إرسال الدعوة، وأرسل إعادة تعيين كلمة المرور أو اطلب إعادة تعيين التحقق."], visible: (a) => a.can("SUPPORT_ACCOUNT") },
-    { key: "recertification", path: "/recertification", label: ["Access Reviews", "مراجعات الصلاحيات"], summary: ["Periodic confirmation that every role is still needed; MFA reset approvals.", "تأكيد دوري لحاجة كل دور؛ والموافقة على إعادة تعيين التحقق."], visible: (a) => a.can("WORKFORCE_READ") },
+    { key: "ownership", path: "/ownership", label: ["Platform Ownership", "ملكية المنصة"], summary: ["Who owns the platform, and handing ownership over with the incoming owner's acceptance and an independent check.", "من يملك المنصة، وتسليم الملكية بقبول المالك الجديد وتحقّق مستقل."], visible: (a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner || !!a.me?.pendingActions.includes("ACCEPT_PLATFORM_OWNERSHIP") },
+    { key: "support", path: "/account-support", label: ["Account Support", "دعم الحسابات"], summary: ["Verify a caller, resend an invitation, send a password reset or request an MFA reset.", "تحقّق من المتصل، وأعد إرسال الدعوة، وأرسل إعادة تعيين كلمة المرور أو اطلب إعادة تعيين التحقّق."], visible: (a) => a.can("SUPPORT_ACCOUNT") },
+    { key: "recertification", path: "/recertification", label: ["Access Reviews", "مراجعات الصلاحيات"], summary: ["Periodic confirmation that every role is still needed; MFA reset approvals.", "تأكيد دوري لحاجة كل دور؛ والموافقة على إعادة تعيين التحقّق."], visible: (a) => a.can("WORKFORCE_READ") },
     { key: "serviceAccounts", path: "/service-accounts", label: ["Service Accounts", "حسابات الخدمة"], summary: ["Machine clients, their owners and credential rotation.", "العملاء الآليون ومالكوهم وتدوير بيانات الاعتماد."], visible: (a) => a.can("WORKFORCE_READ") },
     { key: "audit", path: "/audit", label: ["Audit", "سجل التدقيق"], summary: ["Every access, workforce and journey governance change.", "كل تغيير في الصلاحيات وفريق العمل وحوكمة الرحلات."], visible: (a) => a.can("AUDIT_READ") },
   ] },

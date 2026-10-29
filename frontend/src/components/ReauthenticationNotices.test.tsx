@@ -26,7 +26,7 @@ describe("PortalReauthenticationNotice", () => {
 
   it("without a kept change says to repeat it, in Arabic too", () => {
     render(<PortalReauthenticationNotice locale="ar" pending={null} busy={false} onResend={vi.fn()} onClose={vi.fn()} className=""/>);
-    expect(screen.getByRole("status").textContent).toContain("يرجى إجراؤه مرة أخرى");
+    expect(screen.getByRole("status").textContent).toContain("أجرِه مرة أخرى");
     expect(screen.queryByRole("button", { name: "أرسله الآن" })).toBeNull();
     expect(screen.getByRole("button", { name: "إغلاق" })).toBeTruthy();
   });

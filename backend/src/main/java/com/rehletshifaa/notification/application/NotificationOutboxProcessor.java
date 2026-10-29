@@ -71,7 +71,7 @@ case "case-status-link"->linked(data,"status","Your RehletShifaa case was receiv
     /** A coordinator's reply inside WhatsApp's 24-hour window: the text itself, sent as written. */
     private Template conversationText(Map<String,String> data){String body=data.get("body");if(body==null||body.isBlank())throw new IllegalArgumentException("Reply text missing");return new Template("",body,lang(data),List.of(),null);}
     /** A one-time code; the payload names no language, so a template channel uses its configured default. */
-    private static Template code(Map<String,String> data){String code=data.get("code");if(code==null||code.isBlank())throw new IllegalArgumentException("Code missing");String l=data.get("lang");String language="ar".equals(l)||"en".equals(l)?l:null;return "ar".equals(l)?new Template("رمز التحقق من رحلة شفاء","رمز التحقق الخاص بك هو "+code+". تنتهي صلاحيته خلال 15 دقيقة. لا تشاركه مع أي أحد.",language,List.of(code),null):new Template("Your RehletShifaa verification code","Your verification code is "+code+". It expires in 15 minutes. Do not share it with anyone.",language,List.of(code),null);}
+    private static Template code(Map<String,String> data){String code=data.get("code");if(code==null||code.isBlank())throw new IllegalArgumentException("Code missing");String l=data.get("lang");String language="ar".equals(l)||"en".equals(l)?l:null;return "ar".equals(l)?new Template("رمز التحقّق من رحلة شفاء","رمز التحقّق الخاص بك هو "+code+". تنتهي صلاحيته خلال 15 دقيقة. لا تشاركه مع أي أحد.",language,List.of(code),null):new Template("Your RehletShifaa verification code","Your verification code is "+code+". It expires in 15 minutes. Do not share it with anyone.",language,List.of(code),null);}
     /**
      * P1-15 (D-B): the admission voucher, emailed to the hospital's contact. The facts the hospital needs to admit and bill, in
      * English then Arabic; amounts in EGP. No clinical detail.
@@ -109,7 +109,7 @@ case "case-status-link"->linked(data,"status","Your RehletShifaa case was receiv
         if(ar){
             String what=switch(decision){case "ACKNOWLEDGED"->"الإقرار بالتقدير المبدئي";case "ACCEPTED"->"قبول عرض السعر النهائي";case "REVISION_REQUESTED"->"طلب تعديلات";case "DECLINED"->"رفض عرض السعر";default->"قرار بشأن عرض السعر";};
             String with=representative?"مع ممثّلك":"معك";
-            return new Template("سُجّل قرارك في حالتك لدى رحلة شفاء","سجّل منسّقك قرارك في حالتك لدى رحلة شفاء ("+what+") بعد التحدث "+with+" في "+date+". إن لم يكن هذا ما اتُّفق عليه، فتواصل مع منسّقك.","ar",List.of(what,with,date),null);
+            return new Template("سُجّل قرارك في حالتك لدى رحلة شفاء","سجّل منسّقك قرارك في حالتك لدى رحلة شفاء ("+what+") بعد التحدّث "+with+" في "+date+". إن لم يكن هذا ما اتُّفق عليه، فتواصل مع منسّقك.","ar",List.of(what,with,date),null);
         }
         String what=switch(decision){case "ACKNOWLEDGED"->"you acknowledged the preliminary estimate";case "ACCEPTED"->"you accepted the final quote";case "REVISION_REQUESTED"->"you asked for changes";case "DECLINED"->"you declined the proposal";default->"a decision on your proposal";};
         String with=representative?"your representative":"you";

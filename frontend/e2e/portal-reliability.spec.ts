@@ -39,7 +39,7 @@ for (const locale of ["en", "ar"] as const) {
 }
 
 /** A failed /me read leaves no known role. The portal says so and offers a retry instead of an empty page. */
-const accessAlert = (page: Page, ar: boolean) => page.getByRole("alert").filter({ hasText: ar ? /تعذّر التحققّ من صلاحياتك/ : /couldn't confirm your access/ });
+const accessAlert = (page: Page, ar: boolean) => page.getByRole("alert").filter({ hasText: ar ? /تعذّر التحقّق من صلاحياتك/ : /couldn't confirm your access/ });
 
 for (const locale of ["en", "ar"] as const) {
   test(`a failed access check says so and recovers on retry (${locale})`, async ({ page }) => {

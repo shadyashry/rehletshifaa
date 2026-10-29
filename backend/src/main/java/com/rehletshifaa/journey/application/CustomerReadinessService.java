@@ -95,12 +95,12 @@ public class CustomerReadinessService {
         List<BlockingItem> blocking = new ArrayList<>();
         if (!accountActivated) blocking.add(new BlockingItem("ACCOUNT_NOT_ACTIVATED", "Activate your profile", "فعّل ملفك"));
         if (!contactVerified) blocking.add(new BlockingItem("CONTACT_NOT_VERIFIED", "Verify a contact channel", "أكّد وسيلة تواصل"));
-        if (identityRequired && !identityVerified) blocking.add(new BlockingItem("IDENTITY_NOT_VERIFIED", "Complete identity verification", "أكمل التحقق من الهوية"));
+        if (identityRequired && !identityVerified) blocking.add(new BlockingItem("IDENTITY_NOT_VERIFIED", "Complete identity verification", "أكمل التحقّق من الهوية"));
         if (minorWithoutGuardian) blocking.add(new BlockingItem("MINOR_REQUIRES_GUARDIAN", "A parent or legal guardian must act for this patient", "يجب أن يتصرف أحد الوالدين أو الوصي القانوني نيابة عن المريض"));
         else if (guardianSubject && !repValid) blocking.add(switch (guardian) {
             case NONE -> new BlockingItem("GUARDIAN_AUTH_MISSING", "Guardian details required", "مطلوب إدخال بيانات الوصي");
             case EVIDENCE_MISSING -> new BlockingItem("GUARDIAN_EVIDENCE_MISSING", "Guardian evidence required", "مطلوب مستند يثبت صفة الوصي");
-            default -> new BlockingItem("GUARDIAN_EVIDENCE_UNVERIFIED", "Guardian evidence is being checked", "جارٍ التحقق من مستند الوصي");
+            default -> new BlockingItem("GUARDIAN_EVIDENCE_UNVERIFIED", "Guardian evidence is being checked", "جارٍ التحقّق من مستند الوصي");
         });
         else if (!repValid) blocking.add(new BlockingItem("REPRESENTATIVE_AUTH_MISSING", "Representative authorization required", "مطلوب تفويض ممثّل ساري"));
         if (!consentsDone) blocking.add(new BlockingItem("CONSENTS_INCOMPLETE", "Complete required consents", "أكمل الموافقات المطلوبة"));

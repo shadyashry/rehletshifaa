@@ -77,7 +77,7 @@ function Reviews({ api, locale }: { api: AdminApi; locale: Locale }) {
         setDialog(null); reload();
       }}>
       <p><bdi>{dialog.review.name}</bdi> · <bdi dir="ltr">{dialog.review.email}</bdi></p>
-      <p>{dialog.outcome === "RESOLVE" ? t(locale, "The identity directory is checked again. A matching existing identity needs holder acceptance; if no identity exists, account creation is queued. This decision does not activate workforce access.", "يتم التحقق من دليل الهوية مجدداً. تتطلب الهوية الحالية المطابقة قبول صاحبها؛ وإذا لم توجد هوية، يُدرج إنشاء الحساب في قائمة الانتظار. لا يفعّل هذا القرار صلاحيات الموظف.") : t(locale, "The invitation is rejected. The existing identity account is not changed.", "تُرفض الدعوة. لا يتغير حساب الهوية الحالي.")}</p>
+      <p>{dialog.outcome === "RESOLVE" ? t(locale, "The identity directory is checked again. A matching existing identity needs holder acceptance; if no identity exists, account creation is queued. This decision does not activate workforce access.", "يتم التحقّق من دليل الهوية مجدداً. تتطلب الهوية الحالية المطابقة قبول صاحبها؛ وإذا لم توجد هوية، يُدرج إنشاء الحساب في قائمة الانتظار. لا يفعّل هذا القرار صلاحيات الموظف.") : t(locale, "The invitation is rejected. The existing identity account is not changed.", "تُرفض الدعوة. لا يتغير حساب الهوية الحالي.")}</p>
     </ActionDialog>}
   </>;
 }

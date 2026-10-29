@@ -128,13 +128,27 @@ for (const file of sources(join(root, "frontend/src"), [])) {
 // The backend's own Arabic (WhatsApp and email templates, status and readiness labels, consent text) follows every row,
 // bare «العرض» included: in Java the Arabic is only ever patient or staff text. One register too: no «يرجى» (X-3).
 const register = /يُ?رجى|الرجاء|نرجو/u;
+// One spelling (X-3): «تحقّق/تعذّر/تحدّث» carry the shadda on the middle letter; «تحققّ» puts it on the last.
+const spelling = /تحقق|تعذر|تحدث|ققّ/u;
 for (const [k, v] of strings) {
-  if (register.test(v)) {
-    failures++;
-    console.log(`  «يرجى» in ${k}: ${v}`);
+  for (const rule of [register, spelling]) {
+    if (rule.test(v)) {
+      failures++;
+      console.log(`  «${rule.source}» in ${k}: ${v}`);
+    }
   }
 }
-const javaVariants = [...rows.flatMap((row) => row.variants), register];
+for (const file of sources(join(root, "frontend/src"), [])) {
+  readFileSync(file, "utf8").split(/\r?\n/).forEach((line, i) => {
+    for (const rule of [register, spelling]) {
+      if (rule.test(line)) {
+        failures++;
+        console.log(`  «${rule.source}» in ${relative(root, file)}:${i + 1}`);
+      }
+    }
+  });
+}
+const javaVariants = [...rows.flatMap((row) => row.variants), register, spelling];
 function javaSources(dir, out) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);

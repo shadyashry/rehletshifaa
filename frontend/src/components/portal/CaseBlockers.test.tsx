@@ -29,6 +29,6 @@ describe("CaseBlockers deposit line", () => {
 
   it("words Finance's check in Arabic", () => {
     render(<CaseBlockers locale="ar" blockers={[blocker("STAFF")]} deposit={{ ...deposit, transfer: { status: "SUBMITTED" } }}/>);
-    expect(screen.getByText("وصل الرقم المرجعي للتحويل · يتحققّ منه الفريق المالي")).toBeTruthy();
+    expect(screen.getByText("وصل الرقم المرجعي للتحويل · يتحقّق منه الفريق المالي")).toBeTruthy();
   });
 });

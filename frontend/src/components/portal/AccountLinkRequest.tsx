@@ -41,7 +41,7 @@ const copy = {
     doneRep: "تم ربطك كممثّل لهذا المريض.",
     doneDecline: "شكرًا لك — سيراجع المنسّق الحالة.",
     invalid: "هذا الرابط لم يعد صالحًا.",
-    wrongAccount: "يرجى تسجيل الدخول بالحساب الذي استلم هذه الرسالة.",
+    wrongAccount: "سجّل الدخول بالحساب الذي استلم هذه الرسالة.",
     close: "متابعة",
     relationships: { PARENT: "أحد الوالدين", CHILD: "ابن/ابنة", SPOUSE: "زوج/زوجة", SIBLING: "أخ/أخت", RELATIVE: "قريب", GUARDIAN: "وصي", OTHER: "أخرى" } as Record<Relationship, string>,
   },

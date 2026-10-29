@@ -18,7 +18,7 @@ export function IdentityChecks({ locale }: { locale: Locale }) {
   const access = useControlCenterAccess();
   const api = useAdminApi();
   const legacyApi = useCallback(<T,>(path: string, init?: RequestInit) => api<T>(path, { method: init?.method, raw: init?.body ?? undefined }), [api]);
-  const title = ar ? "التحقق من الهوية" : "Identity Checks";
+  const title = ar ? "التحقّق من الهوية" : "Identity Checks";
   const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="identity" title={title} intro={ar ? "راجع أدلة هوية المرضى والممثلين وسجّل القرار." : "Review patient and representative identity evidence and record a decision."}>{body}</ControlCenterShell>;
   if (authLoading || access.loading) return shell(<p role="status">{ar ? "جارٍ التحميل…" : "Loading…"}</p>);
   if (!user) return shell(signInButton(locale, () => void signIn()));

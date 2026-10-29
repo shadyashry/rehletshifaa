@@ -44,8 +44,8 @@ export function friendlyError(error: unknown, locale: Locale, action: "load" | "
   if (e?.status === 400 || e?.status === 422) return (detail || (ar ? "بعض المعلومات غير صحيحة. راجع الحقول وحاول مجددًا." : "Some information isn't valid. Check the fields and try again.")) + (ar ? " لم يُحفظ شيء." : " Nothing was saved.");
   if (e?.status === 429) return ar ? "طلبات كثيرة في وقت قصير. انتظر قليلًا ثم حاول مجددًا. لم يتغير شيء." : "Too many requests in a short time. Wait a moment, then try again. Nothing was changed.";
   if (action === "load") return e?.status === 503 ? (ar ? "الخدمة غير متاحة مؤقتًا. حاول بعد قليل." : "The service is temporarily unavailable. Try again shortly.") : (ar ? "تعذّر تحميل هذه المعلومات. حاول مجددًا." : "We couldn't load this information. Try again.");
-  if (e?.status === 503) return ar ? "الخدمة غير متاحة مؤقتًا، وقد لا يكون التغيير قد حُفظ. حدّث الصفحة للتحقق قبل المحاولة مجددًا." : "The service is temporarily unavailable, and your change may not have been saved. Refresh to check before trying again.";
-  return ar ? "تعذّر التأكد من حفظ هذا التغيير. حدّث الصفحة للتحقق قبل المحاولة مجددًا؛ ما كتبته ما زال في النموذج." : "We couldn't confirm this change was saved. Refresh to check before trying again; what you typed is still in the form.";
+  if (e?.status === 503) return ar ? "الخدمة غير متاحة مؤقتًا، وقد لا يكون التغيير قد حُفظ. حدّث الصفحة للتحقّق قبل المحاولة مجددًا." : "The service is temporarily unavailable, and your change may not have been saved. Refresh to check before trying again.";
+  return ar ? "تعذّر التأكد من حفظ هذا التغيير. حدّث الصفحة للتحقّق قبل المحاولة مجددًا؛ ما كتبته ما زال في النموذج." : "We couldn't confirm this change was saved. Refresh to check before trying again; what you typed is still in the form.";
 }
 export function ErrorNotice({ error, locale, action = "save", onRetry }: { error: unknown; locale: Locale; action?: "load" | "save"; onRetry?: () => void }) {
   if (!error) return null;

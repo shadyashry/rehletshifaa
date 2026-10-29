@@ -131,7 +131,7 @@ function CompleteOffboarding({ locale, api, person, onClose, onDone }: { locale:
   return <ActionDialog locale={locale} title={t(locale, "Complete offboarding?", "إكمال إنهاء الخدمة؟")} confirm={t(locale, "Complete offboarding", "إكمال إنهاء الخدمة")} danger onClose={onClose}
     onSubmit={async (reason) => { await api(`${STAFF}/${encodeURIComponent(person.subject)}/offboarding/complete`, json("POST", { revision: person.revision, reason })); onDone(); }}>
     <ErrorNotice error={error} locale={locale} action="load" />
-    {!data ? <p role="status">{t(locale, "Checking open work…", "جارٍ التحقق من العمل المفتوح…")}</p> : blocked ? <>
+    {!data ? <p role="status">{t(locale, "Checking open work…", "جارٍ التحقّق من العمل المفتوح…")}</p> : blocked ? <>
       <p>{t(locale, "Hand over this work first:", "سلّم هذا العمل أولًا:")}</p>
       <ul className="cc-checklist">{data.blockers.map((b) => <li key={b.code}>{b.detail} ({b.count})</li>)}</ul>
     </> : <p>{t(locale, "No open work remains. Every role, team place and reporting line ends now.", "لا يوجد عمل مفتوح. تنتهي الآن كل الأدوار والعضويات وخطوط الإشراف.")}</p>}

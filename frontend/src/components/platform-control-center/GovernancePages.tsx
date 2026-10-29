@@ -71,7 +71,7 @@ function Administrators({ locale, access, api, requesting, setRequesting }: { lo
     </Section>}
     {requesting && <ActionDialog locale={locale} title={t(locale, "Request a System Administrator appointment", "طلب تعيين مسؤول نظام")} confirm={t(locale, "Submit for approval", "إرسال للموافقة")} onClose={() => setRequesting(false)}
       onSubmit={async (reason) => { await api(`${ADMIN}/administrator-changes`, json("POST", { type: "APPOINT", subject: appoint.subject, effectiveFrom: toIso(appoint.from), effectiveTo: toIso(appoint.to), reason })); done(t(locale, "Request submitted for a second approval.", "أُرسل الطلب لموافقة ثانية.")); }}>
-      <Field label={t(locale, "Person", "الشخص")} hint={t(locale, "An active staff member enrolled in MFA.", "موظف نشط مسجّل في التحقق متعدد العوامل.")} required><select required value={appoint.subject} onChange={(e) => setAppoint({ ...appoint, subject: e.target.value })}><option value="">{t(locale, "Choose a person", "اختر شخصًا")}</option>{(staff.data?.people ?? []).filter((p) => p.lifecycle === "ACTIVE").map((p) => <option key={p.subject} value={p.subject}>{p.name ?? p.subject}</option>)}</select></Field>
+      <Field label={t(locale, "Person", "الشخص")} hint={t(locale, "An active staff member enrolled in MFA.", "موظف نشط مسجّل في التحقّق متعدد العوامل.")} required><select required value={appoint.subject} onChange={(e) => setAppoint({ ...appoint, subject: e.target.value })}><option value="">{t(locale, "Choose a person", "اختر شخصًا")}</option>{(staff.data?.people ?? []).filter((p) => p.lifecycle === "ACTIVE").map((p) => <option key={p.subject} value={p.subject}>{p.name ?? p.subject}</option>)}</select></Field>
       <Field label={t(locale, "From", "من")} required><input type="date" required dir="ltr" value={appoint.from} onChange={(e) => setAppoint({ ...appoint, from: e.target.value })} /></Field>
       <Field label={t(locale, "Until (optional)", "حتى (اختياري)")}><input type="date" dir="ltr" value={appoint.to} onChange={(e) => setAppoint({ ...appoint, to: e.target.value })} /></Field>
     </ActionDialog>}
@@ -89,7 +89,7 @@ function Administrators({ locale, access, api, requesting, setRequesting }: { lo
 const OWNER_TRANSFERS = `${ADMIN}/owner-transfers`;
 const TRANSFER_STATUS: Record<OwnerTransferStatus, { tone: "warning" | "success" | "neutral"; label: [string, string] }> = {
   PENDING_ACCEPTANCE: { tone: "warning", label: ["Waiting for the incoming owner", "بانتظار المالك الجديد"] },
-  PENDING_VERIFICATION: { tone: "warning", label: ["Waiting for independent verification", "بانتظار التحقق المستقل"] },
+  PENDING_VERIFICATION: { tone: "warning", label: ["Waiting for independent verification", "بانتظار التحقّق المستقل"] },
   COMPLETED: { tone: "success", label: ["Completed", "اكتمل"] },
   REJECTED: { tone: "neutral", label: ["Stopped", "أُوقف"] },
   EXPIRED: { tone: "neutral", label: ["Expired", "انتهت صلاحيته"] },
@@ -98,11 +98,11 @@ const pickPair = (pair: [string, string], locale: Locale) => (locale === "ar" ? 
 
 type TransferAction = "accept" | "decline" | "withdraw" | "verify" | "refuse";
 const TRANSFER_ACTIONS: Record<TransferAction, { label: [string, string]; title: [string, string]; path: string; danger?: boolean; done: [string, string] }> = {
-  accept: { label: ["Accept ownership", "قبول الملكية"], title: ["Accept platform ownership?", "قبول ملكية المنصة؟"], path: "accept", done: ["Accepted. An independent System Administrator now verifies the transfer.", "تم القبول. يتحقق الآن مسؤول نظام مستقل من التسليم."] },
+  accept: { label: ["Accept ownership", "قبول الملكية"], title: ["Accept platform ownership?", "قبول ملكية المنصة؟"], path: "accept", done: ["Accepted. An independent System Administrator now verifies the transfer.", "تم القبول. يتحقّق الآن مسؤول نظام مستقل من التسليم."] },
   decline: { label: ["Decline", "رفض"], title: ["Decline platform ownership?", "رفض ملكية المنصة؟"], path: "reject", danger: true, done: ["Declined. The current owner keeps ownership.", "تم الرفض. يحتفظ المالك الحالي بالملكية."] },
   withdraw: { label: ["Withdraw transfer", "سحب التسليم"], title: ["Withdraw this transfer?", "سحب هذا التسليم؟"], path: "reject", danger: true, done: ["Withdrawn. You remain the owner.", "تم السحب. تبقى أنت المالك."] },
-  verify: { label: ["Verify and complete", "التحقق وإتمام التسليم"], title: ["Verify and complete the transfer?", "التحقق من التسليم وإتمامه؟"], path: "verify", done: ["Verified. Ownership has moved to the incoming owner.", "تم التحقق. انتقلت الملكية إلى المالك الجديد."] },
-  refuse: { label: ["Refuse verification", "رفض التحقق"], title: ["Refuse to verify this transfer?", "رفض التحقق من هذا التسليم؟"], path: "reject", danger: true, done: ["Refused. The current owner keeps ownership.", "تم الرفض. يحتفظ المالك الحالي بالملكية."] },
+  verify: { label: ["Verify and complete", "التحقّق وإتمام التسليم"], title: ["Verify and complete the transfer?", "التحقّق من التسليم وإتمامه؟"], path: "verify", done: ["Verified. Ownership has moved to the incoming owner.", "تم التحقّق. انتقلت الملكية إلى المالك الجديد."] },
+  refuse: { label: ["Refuse verification", "رفض التحقّق"], title: ["Refuse to verify this transfer?", "رفض التحقّق من هذا التسليم؟"], path: "reject", danger: true, done: ["Refused. The current owner keeps ownership.", "تم الرفض. يحتفظ المالك الحالي بالملكية."] },
 };
 const availableActions = (x: OwnerTransfer): TransferAction[] => [
   ...(x.canAccept ? ["accept" as const] : []), ...(x.canDecline ? ["decline" as const] : []), ...(x.canWithdraw ? ["withdraw" as const] : []),
@@ -117,7 +117,7 @@ const availableActions = (x: OwnerTransfer): TransferAction[] => [
 export function OwnershipPage({ locale }: { locale: Locale }) {
   const [starting, setStarting] = useState(false);
   return <WorkforcePage locale={locale} active="ownership" title={t(locale, "Platform Ownership", "ملكية المنصة")}
-    intro={t(locale, "Ownership is a governance relationship, not an administrator role. A transfer needs three different people: the current owner starts it, the incoming owner accepts, and an independent System Administrator verifies.", "الملكية علاقة حوكمة وليست دور مسؤول. يحتاج التسليم إلى ثلاثة أشخاص مختلفين: يبدؤه المالك الحالي، ويقبله المالك الجديد، ويتحقق منه مسؤول نظام مستقل.")}
+    intro={t(locale, "Ownership is a governance relationship, not an administrator role. A transfer needs three different people: the current owner starts it, the incoming owner accepts, and an independent System Administrator verifies.", "الملكية علاقة حوكمة وليست دور مسؤول. يحتاج التسليم إلى ثلاثة أشخاص مختلفين: يبدؤه المالك الحالي، ويقبله المالك الجديد، ويتحقّق منه مسؤول نظام مستقل.")}
     allowed={(a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner || !!a.me?.pendingActions.includes("ACCEPT_PLATFORM_OWNERSHIP")}
     actions={(a) => a.me?.platformAccountOwner && <button type="button" onClick={() => setStarting(true)}>{t(locale, "Transfer ownership", "تسليم الملكية")}</button>}>
     {({ access, api }) => <OwnershipBody locale={locale} access={access} api={api} starting={starting} setStarting={setStarting} />}
@@ -151,13 +151,13 @@ function OwnershipBody({ locale, access, api, starting, setStarting }: { locale:
         <ol className="cc-journey-steps" aria-label={t(locale, "Transfer steps", "خطوات التسليم")}>
           {step(t(locale, "1. Started by the current owner", "1. بدأه المالك الحالي"), true)}
           {step(t(locale, "2. Accepted by the incoming owner", "2. قبله المالك الجديد"), x.status === "PENDING_VERIFICATION")}
-          {step(t(locale, "3. Verified by an independent System Administrator", "3. تحقق منه مسؤول نظام مستقل"), false)}
+          {step(t(locale, "3. Verified by an independent System Administrator", "3. تحقّق منه مسؤول نظام مستقل"), false)}
         </ol>
         {availableActions(x).length > 0
           ? <div className="cc-step-actions">{availableActions(x).map((a) =>
             <button key={a} type="button" className={"cc-small" + (TRANSFER_ACTIONS[a].danger ? " cc-secondary cc-danger-button" : "")} onClick={() => setDialog({ action: a, transfer: x })}>{pickPair(TRANSFER_ACTIONS[a].label, locale)}</button>)}</div>
           : x.status === "PENDING_VERIFICATION" && data.viewerIsAdministrator
-            ? <p className="cc-meta">{t(locale, "A System Administrator who is neither the current nor the incoming owner must verify.", "يجب أن يتحقق مسؤول نظام ليس المالك الحالي ولا الجديد.")}</p> : null}
+            ? <p className="cc-meta">{t(locale, "A System Administrator who is neither the current nor the incoming owner must verify.", "يجب أن يتحقّق مسؤول نظام ليس المالك الحالي ولا الجديد.")}</p> : null}
       </li>)}</ul>}
     </Section>
     {past.length > 0 && <Section id="history" title={t(locale, "Earlier transfers", "التسليمات السابقة")}>
@@ -169,7 +169,7 @@ function OwnershipBody({ locale, access, api, starting, setStarting }: { locale:
     </Section>}
     {starting && <ActionDialog locale={locale} title={t(locale, "Transfer platform ownership", "تسليم ملكية المنصة")} confirm={t(locale, "Start transfer", "بدء التسليم")} danger onClose={() => setStarting(false)}
       onSubmit={async (reason) => { await api(OWNER_TRANSFERS, json("POST", { incomingOwnerEmail: email.trim(), reason })); done(t(locale, "Transfer started. The incoming owner must accept within 72 hours.", "بدأ التسليم. يجب أن يقبله المالك الجديد خلال 72 ساعة.")); }}>
-      <p className="cc-meta">{t(locale, "The incoming owner needs a RehletShifaa account with a passkey and must not be a System Administrator. You stay the owner until an independent administrator verifies.", "يحتاج المالك الجديد إلى حساب في رحلة شفاء بمفتاح مرور، ويجب ألا يكون مسؤول نظام. تبقى المالك حتى يتحقق مسؤول مستقل.")}</p>
+      <p className="cc-meta">{t(locale, "The incoming owner needs a RehletShifaa account with a passkey and must not be a System Administrator. You stay the owner until an independent administrator verifies.", "يحتاج المالك الجديد إلى حساب في رحلة شفاء بمفتاح مرور، ويجب ألا يكون مسؤول نظام. تبقى المالك حتى يتحقّق مسؤول مستقل.")}</p>
       <Field label={t(locale, "Incoming owner's work email", "البريد المهني للمالك الجديد")} required>
         <input type="email" required dir="ltr" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
       </Field>
@@ -183,12 +183,12 @@ function OwnershipBody({ locale, access, api, starting, setStarting }: { locale:
 
 // ---------------- Account support ----------------
 
-const CHECKLIST_HINT: [string, string] = ["How you verified the caller (e.g. callback to the work number on file).", "كيف تحققت من المتصل (مثل الاتصال على رقم العمل المسجّل)."];
+const CHECKLIST_HINT: [string, string] = ["How you verified the caller (e.g. callback to the work number on file).", "كيف تحقّقت من المتصل (مثل الاتصال على رقم العمل المسجّل)."];
 
 /** Access › Account Support (SUPPORT_ACCOUNT): find an account, verify the caller, then act. Never shows case or clinical data. */
 export function AccountSupportPage({ locale }: { locale: Locale }) {
   return <WorkforcePage locale={locale} active="support" title={t(locale, "Account Support", "دعم الحسابات")}
-    intro={t(locale, "Find a staff account by email, verify the caller, then resend an invitation, send a password reset, or request an MFA reset for an administrator to approve.", "ابحث عن حساب موظف بالبريد، وتحقق من المتصل، ثم أعد إرسال الدعوة أو أرسل إعادة تعيين كلمة المرور أو اطلب إعادة تعيين التحقق ليوافق عليها مسؤول.")}
+    intro={t(locale, "Find a staff account by email, verify the caller, then resend an invitation, send a password reset, or request an MFA reset for an administrator to approve.", "ابحث عن حساب موظف بالبريد، وتحقّق من المتصل، ثم أعد إرسال الدعوة أو أرسل إعادة تعيين كلمة المرور أو اطلب إعادة تعيين التحقّق ليوافق عليها مسؤول.")}
     allowed={(a) => a.can("SUPPORT_ACCOUNT")}>
     {({ api }) => <AccountSupport locale={locale} api={api} />}
   </WorkforcePage>;
@@ -212,25 +212,25 @@ function AccountSupport({ locale, api }: { locale: Locale; api: AdminApi }) {
     <ErrorNotice error={error} locale={locale} action="load" />
     <SuccessNotice>{notice || null}</SuccessNotice>
     {account && badge && <Section id="account" title={account.name ?? t(locale, "Name not recorded", "اسم غير مسجّل")}>
-      <p><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge> {account.mfaEnrolled ? <StatusBadge tone="success">{t(locale, "MFA enrolled", "التحقق مفعّل")}</StatusBadge> : <StatusBadge tone="warning">{t(locale, "No MFA", "لا تحقق")}</StatusBadge>}</p>
+      <p><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge> {account.mfaEnrolled ? <StatusBadge tone="success">{t(locale, "MFA enrolled", "التحقّق مفعّل")}</StatusBadge> : <StatusBadge tone="warning">{t(locale, "No MFA", "لا تحقّق")}</StatusBadge>}</p>
       <p className="cc-meta">{t(locale, "Roles", "الأدوار")}: {account.roles.map((r) => platformRoleLabel(r, locale)).join(" · ") || "—"} · {t(locale, "Last sign-in", "آخر دخول")} {when(account.lastSignInAt, locale)}</p>
       <div className="cc-step-actions">
         {account.lifecycle === "INVITED" && <button type="button" className="cc-secondary cc-small" onClick={() => setAction("resend")}>{t(locale, "Resend invitation", "إعادة إرسال الدعوة")}</button>}
         {account.lifecycle === "ACTIVE" && <button type="button" className="cc-secondary cc-small" onClick={() => setAction("password")}>{t(locale, "Send password reset", "إرسال إعادة تعيين كلمة المرور")}</button>}
-        {account.lifecycle === "ACTIVE" && account.mfaEnrolled && <button type="button" className="cc-secondary cc-small" onClick={() => setAction("mfa")}>{t(locale, "Request MFA reset", "طلب إعادة تعيين التحقق")}</button>}
+        {account.lifecycle === "ACTIVE" && account.mfaEnrolled && <button type="button" className="cc-secondary cc-small" onClick={() => setAction("mfa")}>{t(locale, "Request MFA reset", "طلب إعادة تعيين التحقّق")}</button>}
       </div>
     </Section>}
     {account && action && <ActionDialog locale={locale} needsReason={action === "mfa"}
-      title={action === "resend" ? t(locale, "Resend the invitation?", "إعادة إرسال الدعوة؟") : action === "password" ? t(locale, "Send a password reset email?", "إرسال بريد إعادة تعيين كلمة المرور؟") : t(locale, "Request an MFA reset?", "طلب إعادة تعيين التحقق؟")}
+      title={action === "resend" ? t(locale, "Resend the invitation?", "إعادة إرسال الدعوة؟") : action === "password" ? t(locale, "Send a password reset email?", "إرسال بريد إعادة تعيين كلمة المرور؟") : t(locale, "Request an MFA reset?", "طلب إعادة تعيين التحقّق؟")}
       confirm={t(locale, "Continue", "متابعة")} onClose={() => setAction(null)}
       onSubmit={async (reason) => {
-        if (!checklist.trim()) throw new Error(t(locale, "Record how you verified the caller.", "سجّل كيف تحققت من المتصل."));
+        if (!checklist.trim()) throw new Error(t(locale, "Record how you verified the caller.", "سجّل كيف تحقّقت من المتصل."));
         const subject = encodeURIComponent(account.subject);
         if (action === "resend") { await api(`/support/accounts/${subject}/resend-invitation`, json("POST", { checklist })); done(t(locale, "Invitation resent.", "أُعيد إرسال الدعوة.")); }
         else if (action === "password") { await api(`/support/accounts/${subject}/password-reset`, json("POST", { checklist })); done(t(locale, "Password reset email sent.", "أُرسل بريد إعادة التعيين.")); }
         else { await api("/support/mfa-reset-requests", json("POST", { subject: account.subject, reason, checklist })); done(t(locale, "MFA reset requested; an administrator approves it.", "طُلبت إعادة التعيين؛ يوافق عليها مسؤول.")); }
       }}>
-      <Field label={t(locale, "Verification", "التحقق")} hint={t(locale, CHECKLIST_HINT[0], CHECKLIST_HINT[1])} required><textarea required maxLength={500} value={checklist} onChange={(e) => setChecklist(e.target.value)} /></Field>
+      <Field label={t(locale, "Verification", "التحقّق")} hint={t(locale, CHECKLIST_HINT[0], CHECKLIST_HINT[1])} required><textarea required maxLength={500} value={checklist} onChange={(e) => setChecklist(e.target.value)} /></Field>
     </ActionDialog>}
   </>;
 }
@@ -240,7 +240,7 @@ function AccountSupport({ locale, api }: { locale: Locale; api: AdminApi }) {
 /** Access › Access Reviews: recertification campaigns (WORKFORCE_READ to view; WORKFORCE_ADMINISTER to run) and MFA reset approvals. */
 export function AccessReviewsPage({ locale }: { locale: Locale }) {
   return <WorkforcePage locale={locale} active="recertification" title={t(locale, "Access Reviews", "مراجعات الصلاحيات")}
-    intro={t(locale, "Periodic confirmation that every role is still needed, and approval of MFA resets requested by Support.", "تأكيد دوري لحاجة كل دور، والموافقة على طلبات إعادة تعيين التحقق من الدعم.")}
+    intro={t(locale, "Periodic confirmation that every role is still needed, and approval of MFA resets requested by Support.", "تأكيد دوري لحاجة كل دور، والموافقة على طلبات إعادة تعيين التحقّق من الدعم.")}
     allowed={(a) => a.can("WORKFORCE_READ")}>
     {({ access, api }) => <AccessReviews locale={locale} access={access} api={api} />}
   </WorkforcePage>;
@@ -278,7 +278,7 @@ function AccessReviews({ locale, access, api }: { locale: Locale; access: Contro
         </>}</span>
       </li>)}</ul>
     </Section>}
-    {admin && <Section id="mfa" title={t(locale, "MFA reset requests", "طلبات إعادة تعيين التحقق")}>
+    {admin && <Section id="mfa" title={t(locale, "MFA reset requests", "طلبات إعادة تعيين التحقّق")}>
       <ErrorNotice error={resets.error} locale={locale} action="load" onRetry={resets.reload} />
       {!resets.data ? <p role="status">{t(locale, "Loading…", "جارٍ التحميل…")}</p> : !resets.data.filter((r) => r.status === "PENDING").length ? <EmptyState title={t(locale, "Nothing is waiting.", "لا يوجد ما ينتظر.")} /> : (
         <ul className="cc-cards">{resets.data.filter((r) => r.status === "PENDING").map((r) => <li className="cc-card" key={r.id}>
@@ -296,7 +296,7 @@ function AccessReviews({ locale, access, api }: { locale: Locale; access: Contro
     </ActionDialog>}
     {dialog?.kind === "item" && <ActionDialog locale={locale} danger={!dialog.certify} title={dialog.certify ? t(locale, "Confirm the role is still needed?", "تأكيد أن الدور ما زال مطلوبًا؟") : t(locale, "Revoke this role?", "سحب هذا الدور؟")} confirm={dialog.certify ? t(locale, "Confirm", "تأكيد") : t(locale, "Revoke", "سحب")} onClose={() => setDialog(null)}
       onSubmit={async (reason) => { await api(`${ADMIN}/recertification-items/${dialog.item.id}/decision`, json("POST", { revision: dialog.item.revision, certify: dialog.certify, reason })); done(t(locale, "Decision recorded.", "سُجّل القرار.")); }} />}
-    {dialog?.kind === "mfa" && <ActionDialog locale={locale} danger={!dialog.approve} title={dialog.approve ? t(locale, "Approve the MFA reset?", "الموافقة على إعادة تعيين التحقق؟") : t(locale, "Reject the MFA reset?", "رفض إعادة تعيين التحقق؟")} confirm={dialog.approve ? t(locale, "Approve", "موافقة") : t(locale, "Reject", "رفض")} onClose={() => setDialog(null)}
+    {dialog?.kind === "mfa" && <ActionDialog locale={locale} danger={!dialog.approve} title={dialog.approve ? t(locale, "Approve the MFA reset?", "الموافقة على إعادة تعيين التحقّق؟") : t(locale, "Reject the MFA reset?", "رفض إعادة تعيين التحقّق؟")} confirm={dialog.approve ? t(locale, "Approve", "موافقة") : t(locale, "Reject", "رفض")} onClose={() => setDialog(null)}
       onSubmit={async (reason) => { await api(`${ADMIN}/mfa-reset-requests/${dialog.reset.id}/decision`, json("POST", { revision: dialog.reset.revision, approve: dialog.approve, reason })); done(t(locale, "Decision recorded.", "سُجّل القرار.")); }} />}
   </>;
 }

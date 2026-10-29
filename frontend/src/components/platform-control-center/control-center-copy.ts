@@ -74,7 +74,7 @@ export const ccCopy = {
   ar: {
     title:"مركز التحكم بمقدمي الرعاية", intro:"إدارة مؤسسات مقدمي الرعاية والتهيئة والاعتماد والإعداد التشغيلي.",
     loading:"جارٍ التحميل…", denied:"ليس لديك وصول إلى هذه المساحة. تواصل مع مدير عمليات مقدمي الرعاية.",
-    error:"تعذر إكمال الطلب. حدّث الصفحة وحاول مجددًا.", retry:"تحديث", signin:"تسجيل الدخول الآمن", back:"العودة إلى مساحة العمل",
+    error:"تعذّر إكمال الطلب. حدّث الصفحة وحاول مجددًا.", retry:"تحديث", signin:"تسجيل الدخول الآمن", back:"العودة إلى مساحة العمل",
     nav:{providers:"المؤسسات", operations:"عمليات مقدمي الرعاية", access:"الوصول والحوكمة"},
     accessRoles:"الأدوار", accessPermissions:"الصلاحيات", accessEffective:"الوصول الفعلي", accessAudit:"سجل التدقيق",
     orgList:"مؤسسات مقدمي الرعاية", search:"البحث عن مؤسسة", empty:"لا توجد مؤسسات لعرضها.",
@@ -85,26 +85,26 @@ export const ccCopy = {
     activate:"تفعيل", deactivate:"إلغاء التفعيل", invitationStatus:"الدعوة", effectiveFrom:"ساري من", effectiveTo:"ساري حتى",
     readiness:"الجاهزية", readyForActivation:"جاهز للتفعيل", notReady:"غير جاهز بعد", blockers:"المتطلبات المتبقية",
     evaluatedAt:"تاريخ التقييم", clinicianType:"نوع الطبيب", jurisdiction:"الولاية القضائية", owner:"المالك",
-    checklist:{identityProvisioned:"تم تجهيز الهوية",organizationMembershipActive:"عضوية المؤسسة نشطة",providerProfileComplete:"ملف المؤسسة مكتمل",clinicianProfileComplete:"ملف الطبيب مكتمل",requiredCredentialsSubmitted:"تم تقديم الاعتمادات المطلوبة",requiredCredentialsVerified:"تم التحقق من الاعتمادات المطلوبة",mandatoryCredentialsUnexpired:"الاعتمادات الإلزامية سارية",requiredRelationshipsComplete:"العلاقات المطلوبة متوفرة",pricingSetupComplete:"تم إعداد الأسعار",availabilitySetupComplete:"تم إعداد التوافر",credentialReady:"مؤهل من حيث الاعتماد"},
+    checklist:{identityProvisioned:"تم تجهيز الهوية",organizationMembershipActive:"عضوية المؤسسة نشطة",providerProfileComplete:"ملف المؤسسة مكتمل",clinicianProfileComplete:"ملف الطبيب مكتمل",requiredCredentialsSubmitted:"تم تقديم الاعتمادات المطلوبة",requiredCredentialsVerified:"تم التحقّق من الاعتمادات المطلوبة",mandatoryCredentialsUnexpired:"الاعتمادات الإلزامية سارية",requiredRelationshipsComplete:"العلاقات المطلوبة متوفرة",pricingSetupComplete:"تم إعداد الأسعار",availabilitySetupComplete:"تم إعداد التوافر",credentialReady:"مؤهل من حيث الاعتماد"},
     close:"إغلاق", cancel:"إلغاء", save:"حفظ", refresh:"تحديث", noSelection:"اختر مؤسسة لعرض تفاصيلها.",
     breadcrumbHome:"مركز التحكم", breadcrumbProviders:"المؤسسات",
 
-    breadcrumbCredentials:"التحقق من الاعتمادات",
-    credentialQueue:"قائمة التحقق من الاعتمادات", credentialQueueEmpty:"لا توجد اعتمادات بانتظار المراجعة.",
+    breadcrumbCredentials:"التحقّق من الاعتمادات",
+    credentialQueue:"قائمة التحقّق من الاعتمادات", credentialQueueEmpty:"لا توجد اعتمادات بانتظار المراجعة.",
     filterOrg:"المؤسسة", filterType:"نوع الاعتماد", filterStatus:"الحالة", allOrgs:"كل المؤسسات", allTypes:"كل الأنواع", allStatuses:"كل الحالات",
     submitted:"تاريخ التقديم", expires:"تاريخ الانتهاء", clinician:"الطبيب", credentialType:"نوع الاعتماد", review:"مراجعة",
-    credentialStatus:{SUBMITTED:"تم التقديم",UNDER_REVIEW:"قيد المراجعة",VERIFIED:"تم التحقق",REJECTED:"مرفوض",MORE_INFORMATION_REQUIRED:"يلزم معلومات إضافية",SUSPENDED:"موقوف"},
+    credentialStatus:{SUBMITTED:"تم التقديم",UNDER_REVIEW:"قيد المراجعة",VERIFIED:"تم التحقّق",REJECTED:"مرفوض",MORE_INFORMATION_REQUIRED:"يلزم معلومات إضافية",SUSPENDED:"موقوف"},
     credentialReview:"مراجعة الاعتماد", breadcrumbReview:"مراجعة",
     evidence:"المستندات المقدمة", noEvidence:"لا توجد مستندات مرفقة.", viewDocument:"عرض المستند", openingDocument:"جارٍ تجهيز رابط آمن…",
     decisionReason:"سبب / أساس القرار", decisionReasonRequired:"السبب مطلوب لهذا القرار.",
-    startReview:"بدء المراجعة", verify:"تحقق", reject:"رفض", requestInformation:"طلب تصحيح / معلومات", suspend:"إيقاف", restore:"استعادة",
+    startReview:"بدء المراجعة", verify:"تحقّق", reject:"رفض", requestInformation:"طلب تصحيح / معلومات", suspend:"إيقاف", restore:"استعادة",
     selfVerificationBlocked:"أنت صاحب هذا الاعتماد. لا يمكنك مراجعة طلبك الخاص.",
     submitterReviewBlocked:"أنت من قدّم هذا الاعتماد. يجب أن يراجعه شخص مستقل.",
-    decisionHistory:"سجل القرارات", credentialDetailNotFound:"تعذر العثور على مراجعة الاعتماد هذه أو ليس لديك صلاحية الوصول إليها.",
+    decisionHistory:"سجل القرارات", credentialDetailNotFound:"تعذّر العثور على مراجعة الاعتماد هذه أو ليس لديك صلاحية الوصول إليها.",
 
-    onboardingWorkflow:"التهيئة الموجهة", stepComplete:"مكتمل", stepInProgress:"قيد التنفيذ", stepBlocked:"معلّق", stepNeedsAction:"يتطلب إجراء", stepVerified:"تم التحقق", stepReady:"جاهز",
+    onboardingWorkflow:"التهيئة الموجهة", stepComplete:"مكتمل", stepInProgress:"قيد التنفيذ", stepBlocked:"معلّق", stepNeedsAction:"يتطلب إجراء", stepVerified:"تم التحقّق", stepReady:"جاهز",
     stepOrgProfile:"ملف المؤسسة", stepOwner:"المالك / الاستشاري الرئيسي", stepClinicalTeam:"الفريق السريري", stepPracticeTeam:"فريق العيادة/الإدارة",
-    stepCredentials:"متطلبات الاعتماد والتحقق", stepOperational:"الإعداد التشغيلي", stepCommercial:"القبول التجاري/القانوني", stepActivation:"جاهزية التفعيل",
+    stepCredentials:"متطلبات الاعتماد والتحقّق", stepOperational:"الإعداد التشغيلي", stepCommercial:"القبول التجاري/القانوني", stepActivation:"جاهزية التفعيل",
     goToCredentialQueue:"مراجعة في قائمة الاعتمادات", goToClinicalTeam:"الانتقال إلى الفريق السريري", goToPracticeTeam:"الانتقال إلى فريق العيادة",
     activateProvider:"تفعيل مؤسسة مقدم الرعاية", activateProviderConfirm:"هل تريد تفعيل هذه المؤسسة الآن؟ هذا إجراء تجاري فعلي.",
     nOutstandingCredentials:(n:number,locale:string)=>locale==="ar"?`${n} من الاعتمادات بحاجة إلى مراجعة`:`${n} credential${n===1?"":"s"} need${n===1?"s":""} review`,
@@ -148,7 +148,7 @@ const orgStatusAr:Record<string,string>={DRAFT:"مسودة",ONBOARDING:"قيد �
 const memberStatusAr:Record<string,string>={PENDING:"بانتظار التفعيل",ACTIVE:"نشط",REVOKED:"ملغى"};
 const invitationAr:Record<string,string>={PENDING:"بانتظار القبول",ACTIVE:"مقبولة",FAILED:"فشلت"};
 const relationshipTypeAr:Record<string,string>={MANAGES:"يدير",ASSISTS:"يساعد",SUPERVISES:"يشرف على"};
-const onboardingAr:Record<string,string>={INVITED:"تمت الدعوة",PROFILE_INCOMPLETE:"الملف غير مكتمل",DOCUMENTS_SUBMITTED:"تم تقديم المستندات",UNDER_VERIFICATION:"قيد التحقق",MORE_INFORMATION_REQUIRED:"يلزم معلومات إضافية",VERIFIED:"تم التحقق",REJECTED:"مرفوض",OPERATIONAL_SETUP:"الإعداد التشغيلي",ACTIVE:"نشط",SUSPENDED:"موقوف",OFFBOARDED:"منتهٍ"};
+const onboardingAr:Record<string,string>={INVITED:"تمت الدعوة",PROFILE_INCOMPLETE:"الملف غير مكتمل",DOCUMENTS_SUBMITTED:"تم تقديم المستندات",UNDER_VERIFICATION:"قيد التحقّق",MORE_INFORMATION_REQUIRED:"يلزم معلومات إضافية",VERIFIED:"تم التحقّق",REJECTED:"مرفوض",OPERATIONAL_SETUP:"الإعداد التشغيلي",ACTIVE:"نشط",SUSPENDED:"موقوف",OFFBOARDED:"منتهٍ"};
 const roleAr:Record<string,string>={PROVIDER_OPERATIONS_MANAGER:"مدير عمليات مقدمي الرعاية",ORGANIZATION_OWNER:"مالك المؤسسة",PRACTICE_MANAGER:"مدير العيادة",CONSULTANT:"استشاري",ASSOCIATE_DOCTOR:"طبيب مشارك",CONSULTANT_ASSISTANT:"مساعد الاستشاري"};
 
 function pick(map:Record<string,string>,key:string,locale:Locale){return locale==="ar"?(map[key]??key.toLowerCase().replaceAll("_"," ")):key.charAt(0)+key.slice(1).toLowerCase().replaceAll("_"," ");}

@@ -86,7 +86,7 @@ export const STAFF_ROLES:string[]=["coordinator","doctor","operations","finance"
 
 export const terminalStatuses=new Set(["CLOSED","CANCELLED","DECLINED","CLINICALLY_NOT_SUITABLE"]);
 
-export function roleLabel(role:RoleKey,locale:Locale){const labels={en:{patient:"Patient",coordinator:"Coordinator",doctor:"Consultant workspace",operations:"Operations",finance:"Finance",admin:"Control Center",identity:"Identity checks"},ar:{patient:"المريض",coordinator:"منسّق الحالة",doctor:"مساحة عمل الاستشاري",operations:"العمليات",finance:"المالية",admin:"مركز التحكم",identity:"التحققّ من الهوية"}};return labels[locale][role];}
+export function roleLabel(role:RoleKey,locale:Locale){const labels={en:{patient:"Patient",coordinator:"Coordinator",doctor:"Consultant workspace",operations:"Operations",finance:"Finance",admin:"Control Center",identity:"Identity checks"},ar:{patient:"المريض",coordinator:"منسّق الحالة",doctor:"مساحة عمل الاستشاري",operations:"العمليات",finance:"المالية",admin:"مركز التحكم",identity:"التحقّق من الهوية"}};return labels[locale][role];}
 
 /** File sizes in the page's language and digits (Intl unit formatting: "1.2 MB" / "1.2 ميغابايت"). */
 export function formatBytes(bytes:number,locale:Locale){const units=["byte","kilobyte","megabyte","gigabyte"] as const;const i=bytes?Math.min(units.length-1,Math.floor(Math.log(bytes)/Math.log(1024))):0;

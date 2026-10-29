@@ -468,10 +468,10 @@ public class CaseActionService {
                 case "ONBOARDING_NOT_STARTED" -> out.add(new BlockerView(b.code(), "Onboarding not started", "لم يبدأ التسجيل", "STAFF", true));
                 case "CONTACT_NOT_VERIFIED" -> out.add(new BlockerView(b.code(), "Contact channel verification", "تأكيد وسيلة التواصل", "PATIENT", true));
                 // P1-13: the guardian provided evidence; the coordinator owes the check, and the case waits on it.
-                case "GUARDIAN_EVIDENCE_UNVERIFIED" -> out.add(new BlockerView(b.code(), "Guardian evidence check", "التحقق من مستند الوصي", "STAFF", true));
+                case "GUARDIAN_EVIDENCE_UNVERIFIED" -> out.add(new BlockerView(b.code(), "Guardian evidence check", "التحقّق من مستند الوصي", "STAFF", true));
                 case "IDENTITY_NOT_VERIFIED" -> out.add(queries.identityUnderReview(caseId)
                         ? new BlockerView(b.code(), "Identity review", "مراجعة الهوية", "STAFF", false)
-                        : new BlockerView(b.code(), "Identity verification", "التحقق من الهوية", "PATIENT", false));
+                        : new BlockerView(b.code(), "Identity verification", "التحقّق من الهوية", "PATIENT", false));
                 default -> { if (!profile || !PROFILE_CODES.contains(b.code())) out.add(new BlockerView(b.code(), b.labelEn(), b.labelAr(), "PATIENT", true)); }
             }
         }

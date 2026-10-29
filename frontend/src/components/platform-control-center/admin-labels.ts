@@ -21,7 +21,7 @@ const clinicianStatus: Record<string, Entry> = {
   DOCUMENTS_SUBMITTED: { en: "Credentials submitted", ar: "تم تقديم الاعتمادات", tone: "info" },
   UNDER_VERIFICATION: { en: "Credentials under review", ar: "الاعتمادات قيد المراجعة", tone: "info" },
   MORE_INFORMATION_REQUIRED: { en: "More information required", ar: "مطلوب مزيد من المعلومات", tone: "warning" },
-  VERIFIED: { en: "Credentials verified", ar: "تم التحقق من الاعتمادات", tone: "success" },
+  VERIFIED: { en: "Credentials verified", ar: "تم التحقّق من الاعتمادات", tone: "success" },
   REJECTED: { en: "Not approved", ar: "غير معتمد", tone: "danger" },
   OPERATIONAL_SETUP: { en: "Working setup in progress", ar: "إعداد العمل قيد التنفيذ", tone: "warning" },
   ACTIVE: { en: "Active", ar: "نشط", tone: "success" },
@@ -39,7 +39,7 @@ const orgStatus: Record<string, Entry> = {
 const credentialStatus: Record<string, Entry> = {
   SUBMITTED: { en: "Submitted", ar: "مُقدَّم", tone: "warning" },
   UNDER_REVIEW: { en: "Under review", ar: "قيد المراجعة", tone: "info" },
-  VERIFIED: { en: "Verified", ar: "تم التحقق", tone: "success" },
+  VERIFIED: { en: "Verified", ar: "تم التحقّق", tone: "success" },
   REJECTED: { en: "Rejected", ar: "مرفوض", tone: "danger" },
   MORE_INFORMATION_REQUIRED: { en: "More information required", ar: "مطلوب مزيد من المعلومات", tone: "warning" },
   SUSPENDED: { en: "Suspended", ar: "موقوف", tone: "danger" },

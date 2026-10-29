@@ -28,7 +28,7 @@ type Result = { source: Source; found?: Found; failed?: "recheck" | "error" };
 const SOURCES: Source[] = [
   { key: "consultants", group: "consultants", label: ["Consultants waiting for case approval", "استشاريون بانتظار اعتماد الحالات"], applies: (a) => a.can("CREDENTIAL_DECIDE"),
     find: async ({ api, locale }) => ({ count: (await api<{ credentialingStatus?: string }[]>("/admin/practitioners")).filter((p) => p.credentialingStatus === "UNDER_REVIEW").length, href: ccHref(locale, "/consultants") }) },
-  { key: "identity", group: "reviews", label: ["Identity checks waiting for a decision", "طلبات تحقق من الهوية بانتظار قرار"], applies: (a) => a.can("PATIENT_IDENTITY_REVIEW"),
+  { key: "identity", group: "reviews", label: ["Identity checks waiting for a decision", "طلبات تحقّق من الهوية بانتظار قرار"], applies: (a) => a.can("PATIENT_IDENTITY_REVIEW"),
     find: async ({ api, locale }) => ({ count: (await api<unknown[]>("/identity-review/queue")).length, href: ccHref(locale, "/identity-checks") }) },
   { key: "queue", group: "operations", label: ["Cases waiting for a coordinator", "حالات بانتظار منسّق"], applies: (a) => a.can("ROUTING_ASSIGN"),
     find: async ({ api, locale }) => ({ count: (await api<unknown[]>("/admin/coordination/queue")).length, href: ccHref(locale, "/coordination?tab=advanced") }) },
@@ -41,7 +41,7 @@ const SOURCES: Source[] = [
   { key: "ownership", group: "access", label: ["Platform ownership transfers waiting for you", "تسليمات ملكية المنصة بانتظارك"],
     applies: (a) => a.can("ACCESS_GOVERN") || !!a.me?.platformAccountOwner || !!a.me?.pendingActions.includes("ACCEPT_PLATFORM_OWNERSHIP"),
     find: async ({ api, locale }) => ({ count: (await api<{ transfers: { canAccept: boolean; canVerify: boolean }[] }>("/admin/platform-access/owner-transfers")).transfers.filter((x) => x.canAccept || x.canVerify).length, href: ccHref(locale, "/ownership") }) },
-  { key: "mfa", group: "access", label: ["MFA reset requests waiting for approval", "طلبات إعادة تعيين التحقق بانتظار الموافقة"], applies: (a) => a.can("WORKFORCE_ADMINISTER"),
+  { key: "mfa", group: "access", label: ["MFA reset requests waiting for approval", "طلبات إعادة تعيين التحقّق بانتظار الموافقة"], applies: (a) => a.can("WORKFORCE_ADMINISTER"),
     find: async ({ api, locale }) => ({ count: (await api<{ status: string }[]>("/admin/platform-access/mfa-reset-requests")).filter((r) => r.status === "PENDING").length, href: ccHref(locale, "/recertification") }) },
 ];
 
@@ -78,12 +78,12 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
   const title = ar ? "مركز التحكم" : "Control Center";
   const intro = ar ? "ما يحتاج إلى متابعتك في المجالات التي تديرها." : "What needs your attention in the areas you manage.";
   const shell = (body: React.ReactNode) => <ControlCenterShell locale={locale} active="overview" title={title} intro={intro} actions={actions}>{body}</ControlCenterShell>;
-  const checking = <ul className="cc-attention-skeleton" role="status" aria-label={ar ? "جارٍ التحقق من العمل المعلّق…" : "Checking for waiting work…"}><li /><li /></ul>;
+  const checking = <ul className="cc-attention-skeleton" role="status" aria-label={ar ? "جارٍ التحقّق من العمل المعلّق…" : "Checking for waiting work…"}><li /><li /></ul>;
 
   if (authLoading) return shell(checking);
   if (!user) return shell(<button onClick={() => void signIn()}>{ar ? "تسجيل الدخول الآمن" : "Sign in securely"}</button>);
   if (access.loading) return shell(checking);
-  if (access.failed) return shell(<div className="cc-notice cc-notice-error" role="alert">{ar ? "تعذّر التحقق من المجالات المتاحة لك. لم يتغيّر شيء." : "We couldn't check which areas you can use. Nothing has changed."} <button type="button" className="cc-link" onClick={access.retry}>{ar ? "إعادة المحاولة" : "Try again"}</button></div>);
+  if (access.failed) return shell(<div className="cc-notice cc-notice-error" role="alert">{ar ? "تعذّر التحقّق من المجالات المتاحة لك. لم يتغيّر شيء." : "We couldn't check which areas you can use. Nothing has changed."} <button type="button" className="cc-link" onClick={access.retry}>{ar ? "إعادة المحاولة" : "Try again"}</button></div>);
   const sections = openableSections(access);
   if (!sections.length) return shell(<EmptyState title={ar ? "لا توجد مجالات في مركز التحكم لحسابك" : "No Control Center areas are set up for your account"} body={ar ? "إذا كنت تحتاج إلى أحدها، اطلب الدور المناسب من مسؤول الصلاحيات." : "If you need one, ask your access administrator for the right role."} />);
   if (!sources.length) return shell(
@@ -107,7 +107,7 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
         <button type="button" className="cc-link" onClick={() => void requestReauthentication(signIn)}>{reauth.actionRead}</button>
       </div>}
       {failed.length > 0 && <div className="cc-notice cc-notice-error" role="alert">
-        {ar ? "تعذّر التحقق من: " : "Some waiting work couldn't be checked: "}{failed.map((r) => pick(r.source.label, locale)).join(ar ? "، " : ", ")}.{" "}
+        {ar ? "تعذّر التحقّق من: " : "Some waiting work couldn't be checked: "}{failed.map((r) => pick(r.source.label, locale)).join(ar ? "، " : ", ")}.{" "}
         <button type="button" className="cc-link" onClick={() => setAttempt((n) => n + 1)}>{ar ? "إعادة المحاولة" : "Try again"}</button>
       </div>}
       {waiting.length ? (
@@ -125,7 +125,7 @@ export function ControlCenterOverview({ locale }: { locale: Locale }) {
         </ul>
       ) : !failed.length ? (
         <EmptyState title={ar ? "لا يوجد ما ينتظرك." : "You're all caught up."} body={(ar ? "لا شيء ينتظر في: " : "Nothing is waiting in ") + checked.join(ar ? "، " : ", ") + "."} />
-      ) : checked.length ? <p className="cc-meta">{ar ? "لا شيء ينتظر في المجالات التي أمكن التحقق منها." : "Nothing is waiting in the areas that could be checked."}</p> : null}
+      ) : checked.length ? <p className="cc-meta">{ar ? "لا شيء ينتظر في المجالات التي أمكن التحقّق منها." : "Nothing is waiting in the areas that could be checked."}</p> : null}
     </section>
   );
 }

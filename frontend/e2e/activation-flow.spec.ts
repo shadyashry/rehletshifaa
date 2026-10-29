@@ -47,7 +47,7 @@ async function reachForm(page: Page, locale: "en" | "ar" = "en") {
   await page.goto(`/${locale}/activate/${TOKEN}`);
   await page.getByRole("button", { name: locale === "ar" ? /إرسال|الرمز/ : /send|code/i }).first().click();
   await page.getByRole("textbox").first().fill("123456");
-  await page.getByRole("button", { name: locale === "ar" ? /تحققّ|تأكيد|متابعة/ : /verify|continue/i }).first().click();
+  await page.getByRole("button", { name: locale === "ar" ? /تحقّق|تأكيد|متابعة/ : /verify|continue/i }).first().click();
   await expect(page.getByRole("heading", { name: locale === "ar" ? /ملفك|بياناتك/ : /profile|details/i }).first()).toBeVisible();
 }
 
