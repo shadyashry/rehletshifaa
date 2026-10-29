@@ -59,4 +59,19 @@ class RolePolicyTest {
     void workforceRolesAreExactlyTheCatalogue() {
         assertThat(Arrays.stream(Role.values()).filter(r -> r.kind() == Role.Kind.WORKFORCE)).hasSize(16);
     }
+
+    /**
+     * Deep validation D-12: a step-up decision granted to a role without a second factor (patients) confirms with a fresh
+     * sign-in only, so no step-up permission may be shared with a role that signs in with one (staff): a dual identity must
+     * never reach a staff power through the password-only confirmation.
+     */
+    @Test
+    void noStepUpPermissionIsSharedBetweenPasswordOnlyAndSecondFactorRoles() {
+        for (Permission permission : Permission.values()) {
+            if (!permission.stepUp()) continue;
+            var roles = RolePolicy.grantsFor(permission).stream().map(RolePolicy.Grant::role).toList();
+            boolean passwordOnly = roles.stream().anyMatch(r -> !r.secondFactorAtSignIn()), secondFactor = roles.stream().anyMatch(Role::secondFactorAtSignIn);
+            assertThat(passwordOnly && secondFactor).as(permission.name()).isFalse();
+        }
+    }
 }

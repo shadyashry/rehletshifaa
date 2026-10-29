@@ -152,7 +152,9 @@ public class Authority {
             if (!principal.authenticatedWithin(STEP_UP, now))
                 return new Decision(false, permission, matched.role(), matched.scope(), "REAUTHENTICATION_REQUIRED",
                         "Sign in again with multi-factor authentication to confirm this sensitive action");
-            if (!authenticationStrength.recentMfa(principal, STEP_UP, now))
+            // D1: a power held through a role that signs in without a second factor (a patient, a representative) confirms
+            // with the fresh sign-in alone; any staff power still needs the second factor (deep validation D-12).
+            if (matched.role().secondFactorAtSignIn() && !authenticationStrength.recentMfa(principal, STEP_UP, now))
                 return new Decision(false, permission, matched.role(), matched.scope(), "REAUTHENTICATION_REQUIRED",
                         "Use multi-factor authentication to confirm this sensitive action");
             if (effective.stream().anyMatch(Role::privileged) && !authenticationStrength.phishingResistant(principal))

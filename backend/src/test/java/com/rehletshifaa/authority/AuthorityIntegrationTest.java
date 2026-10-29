@@ -164,6 +164,20 @@ class AuthorityIntegrationTest {
                 .as("IAM-11: workforce identities hold no patient authority").isEqualTo("PERMISSION_NOT_HELD");
     }
 
+    /**
+     * Deep validation D-12: patients sign in with a password only (D1), so their sensitive decisions confirm with a fresh
+     * sign-in, not a second factor they were never asked to set up. Found live: a just-signed-in patient could not withdraw.
+     */
+    @Test
+    void aPatientsDecisionNeedsAFreshSignInNotASecondFactor() {
+        Principal fresh = new Principal("a-patient", clock.instant(), "1");
+        assertThat(authority.decide(fresh, Permission.PATIENT_DECIDE, Resource.ofCase(caseId)).granted()).isTrue();
+        Principal stale = new Principal("a-patient", clock.instant().minus(java.time.Duration.ofMinutes(30)), "1");
+        assertThat(authority.decide(stale, Permission.PATIENT_DECIDE, Resource.ofCase(caseId)).code()).isEqualTo("REAUTHENTICATION_REQUIRED");
+        // Staff step-up is unchanged: a fresh password-only session never confirms a staff decision.
+        assertThat(authority.decide(new Principal("a-owner", clock.instant(), "1"), Permission.PROPOSAL_DECISION_RECORD, Resource.ofCase(caseId)).granted()).isFalse();
+    }
+
     /** D1 / MFA-1 (owner, 2026-10-14): who signs in with which second factor. */
     @Test
     void staffSignInWithASecondFactorAndPrivilegedRolesWithAPasskey() {
