@@ -8,6 +8,8 @@ class DocumentServiceTest {
     @Test void rejectsOversizedUploads(){assertThatThrownBy(()->service.presign(UUID.randomUUID(),new PresignRequest("report.pdf","application/pdf",16L*1024*1024))).isInstanceOf(ApiException.class).hasMessageContaining("size");}
     /** Deep validation D-05: the per-case limits are counted under the case lock, so parallel presigns cannot all pass one count. */
     @Test void countsTheCaseLimitsOnlyUnderTheCaseLock(){service.presign(draft.getId(),new PresignRequest("report.pdf","application/pdf",100L));var order=inOrder(cases,documents);order.verify(cases).lock(draft.getId());order.verify(documents).countByMedicalCaseIdAndStatusNot(draft.getId(),DocumentStatus.REJECTED);}
+    /** AR-13: a right-to-left override would show "report‮fdp.exe" as "reportexe.pdf"; format characters are removed. */
+    @Test void stripsBidiOverridesFromNames(){assertThat(DocumentService.sanitizeFileName("report‮fdp.exe")).isEqualTo("reportfdp.exe");}
     @Test void stripsPathsFromOriginalNames(){assertThat(DocumentService.sanitizeFileName("../../private/report.pdf")).isEqualTo("report.pdf");}
 
     private MedicalDocument uploaded(){var document=new MedicalDocument(UUID.randomUUID(),draft,"medical/2026/08/key","report.pdf","x.pdf","application/pdf",8,Instant.now());when(documents.findByIdAndMedicalCaseId(document.getId(),draft.getId())).thenReturn(Optional.of(document));when(storage.verify("medical/2026/08/key")).thenReturn(new StoragePort.StoredObject("application/pdf",8));when(storage.read(eq("medical/2026/08/key"),anyLong())).thenReturn("%PDF-1.7".getBytes());return document;}

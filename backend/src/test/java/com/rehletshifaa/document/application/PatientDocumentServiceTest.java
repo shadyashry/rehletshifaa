@@ -8,7 +8,7 @@ class PatientDocumentServiceTest {
         when(authority.authorize(Permission.PATIENT_SELF_SERVICE)).thenReturn(new Actor("guardian",Instant.now(),Role.PATIENT_REPRESENTATIVE,Set.of(Role.PATIENT_REPRESENTATIVE)));
         when(storage.presign(anyString(),anyString(),anyLong())).thenReturn(new StoragePort.PresignedUpload("https://upload.invalid",Map.of(),300));
         var documentService=new DocumentService(documents,cases,mock(CaseIntakeGrantService.class),storage,inspector,clock,15*1024*1024,100*1024*1024,25,"application/pdf,image/jpeg,image/png");
-        service=new PatientDocumentService(authority,caseRepository,documentService,audit,clock);
+        service=new PatientDocumentService(authority,caseRepository,documentService,audit,clock,documents);
         submitted=new MedicalCase(UUID.randomUUID(),"RS-2026-000001",UUID.randomUUID(),"Kenya",null,"en",null,Instant.now());submitted.submit(Instant.now());
         when(cases.findById(submitted.getId())).thenReturn(submitted);
         when(caseRepository.findPatientIdAccessibleTo(eq(submitted.getId()),eq("guardian"),any())).thenReturn(Optional.of(submitted.getPatientId()));}
@@ -36,5 +36,12 @@ class PatientDocumentServiceTest {
         when(inspector.inspect(any(),eq("application/pdf"))).thenReturn(new DocumentInspectionPort.InspectionResult(true,"CLEAN"));
         assertThat(service.confirm(submitted.getId(),new ConfirmRequest(document.getId())).status()).isEqualTo("CLEAN");
         verify(audit).event("PATIENT_DOCUMENT_UPLOADED");
+    }
+    /** D-10 review: an upload is confirmed by the account that started it, not by someone else acting on the case. */
+    @Test void anotherAccountsUploadIsNotConfirmedHere(){
+        var other=new MedicalDocument(UUID.randomUUID(),submitted,"medical/2026/10/k","x.pdf","x.pdf","application/pdf",8,Instant.now()).uploadedBy("operations-subject");
+        when(documents.findByIdAndMedicalCaseId(other.getId(),submitted.getId())).thenReturn(Optional.of(other));
+        assertThatThrownBy(()->service.confirm(submitted.getId(),new ConfirmRequest(other.getId()))).isInstanceOfSatisfying(ApiException.class,e->assertThat(e.code()).isEqualTo("NOT_YOUR_UPLOAD"));
+        verifyNoInteractions(storage,inspector);
     }
 }

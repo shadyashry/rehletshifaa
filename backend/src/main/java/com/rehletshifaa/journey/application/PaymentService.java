@@ -193,12 +193,18 @@ public class PaymentService {
     @Transactional
     public DepositView recordRefund(UUID caseId, UUID depositId, RefundRequest request) {
         var actor = authority.authorize(Permission.PAYMENT_RECORD);
+        String key = "refund:" + depositId + ":" + request.idempotencyKey();
+        // D-14: like a receipt, a double submit by the person who recorded the refund answers as the deposit stands — even once
+        // the full refund has closed the refund work (and with it the access it gave) — and only for the deposit's own case.
+        if (paymentEvents.existsByIdempotencyKeyAndDepositIdAndActorSubject(key, depositId, actor.subject())) {
+            requireDeposit(caseId, depositId);
+            return depositForCase(caseId);
+        }
         // Like a receipt or a waiver: only on a case this person may see, or whose open deposit they may read.
         Resource onCase = Resource.ofCase(caseId);
         if (!authority.allowed(Permission.CASE_READ, onCase)) authority.require(Permission.CASE_DEPOSIT_READ, onCase);
         cases.lockById(caseId);
         DepositRepository.Quoted deposit = requireDeposit(caseId, depositId);
-        String key = "refund:" + depositId + ":" + request.idempotencyKey();
         if (paymentEvents.existsByIdempotencyKeyAndDepositId(key, depositId)) return depositForCase(caseId);
         BigDecimal netPaid = queries.totalsOf(depositId).netEgp();
         refundPolicy.requireEntitlement(caseId, deposit, request.reasonCode(), request.amountEgp(), netPaid);

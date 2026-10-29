@@ -102,7 +102,7 @@ public class GuardianService {
         PatientRepresentative rep;
         if (existing.isPresent()) { rep = existing.get(); rep.reGrantAsGuardian(g.relationship(), basis, g.scope(), now, g.expiresAt()); }
         else rep = representatives.saveAndFlush(PatientRepresentative.guardian(patientId, actor.subject(), g.relationship(), basis, g.scope(), now, g.expiresAt(), now));
-        if (g.evidenceDocumentId() != null) { requireUsableEvidence(caseId, g.evidenceDocumentId()); rep.attachEvidence(g.evidenceDocumentId()); }
+        if (g.evidenceDocumentId() != null) { requireUsableEvidence(caseId, g.evidenceDocumentId(), actor.subject()); rep.attachEvidence(g.evidenceDocumentId()); }
         representatives.saveAndFlush(rep);
         audit("GUARDIAN_DECLARED", actor.subject(), "PATIENT_REPRESENTATIVE", caseId, rep.getId(), basis.name());
     }
@@ -120,7 +120,7 @@ public class GuardianService {
         PatientRepresentative rep = representatives.findByPatientIdAndRepresentativeSubject(patientId, actor.subject())
                 .filter(r -> r.getRevokedAt() == null && r.getDelegationType() == PatientRepresentative.DelegationType.GUARDIAN)
                 .orElseThrow(() -> new ApiException(409, "NOT_A_GUARDIAN", "Tell us you are the patient's parent or legal guardian first"));
-        requireUsableEvidence(caseId, documentId);
+        requireUsableEvidence(caseId, documentId, actor.subject());
         rep.attachEvidence(documentId);
         representatives.saveAndFlush(rep);
         audit("GUARDIAN_EVIDENCE_ATTACHED", actor.subject(), "PATIENT_REPRESENTATIVE", caseId, rep.getId(), null);
@@ -200,11 +200,22 @@ public class GuardianService {
         catch (IllegalArgumentException e) { throw new ApiException(400, "GUARDIAN_LEGAL_BASIS_REQUIRED", "Say whether you are the patient's parent, legal guardian or hold a court order"); }
     }
 
-    /** Evidence is a document of this case that the scanner has cleared. */
-    private void requireUsableEvidence(UUID caseId, UUID documentId) {
-        if (!documents.existsByIdAndMedicalCaseIdAndStatus(documentId, caseId, DocumentStatus.CLEAN))
-            throw new ApiException(409, "GUARDIAN_EVIDENCE_INVALID", "Upload the document to this case first and wait until it has been checked");
+    /**
+     * Evidence is a document of this case that the scanner has cleared, supplied from the patient's side: uploaded by the
+     * guardian themselves or through a patient channel (intake, secure link, WhatsApp) — never a file the case team filed
+     * (deep validation D-10 review: staff paperwork must not stand in for a guardian's proof).
+     */
+    private void requireUsableEvidence(UUID caseId, UUID documentId, String guardian) {
+        var document = documents.findByIdAndMedicalCaseId(documentId, caseId).filter(d -> d.getStatus() == DocumentStatus.CLEAN)
+                .orElseThrow(() -> new ApiException(409, "GUARDIAN_EVIDENCE_INVALID", "Upload the document to this case first and wait until it has been checked"));
+        String uploader = document.getUploadedBy();
+        if (uploader != null && !uploader.equals(guardian) && !PATIENT_CHANNELS.contains(uploader))
+            throw new ApiException(409, "GUARDIAN_EVIDENCE_INVALID", "Upload the document that proves your authority yourself");
     }
+
+    private static final java.util.Set<String> PATIENT_CHANNELS = java.util.Set.of(
+            com.rehletshifaa.document.application.DocumentService.INTAKE, com.rehletshifaa.document.application.DocumentService.SECURE_LINK,
+            com.rehletshifaa.document.application.DocumentService.WHATSAPP);
 
     private void audit(String type, String subject, String role, UUID caseId, UUID entityId, String reason) {
         auditTrail.event(type).actor(subject, role).caseId(caseId).entity("PatientRepresentative", entityId).action("GUARDIAN").outcome("SUCCESS").reason(reason).record();

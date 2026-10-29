@@ -47,6 +47,17 @@ class RefundRecordingTest {
         verifyNoInteractions(audit, policy);
         verify(ledger, never()).append(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
+    /** Deep validation D-14: once the full refund closed the work (and the access it gave), the recorder's replay still answers. */
+    @Test void theRecordersReplayAnswersEvenAfterTheRefundClosedTheirAccess() {
+        var service = service();
+        when(authority.allowed(eq(Permission.CASE_READ), any(Resource.class))).thenReturn(false);
+        when(authority.require(eq(Permission.CASE_DEPOSIT_READ), any(Resource.class)))
+                .thenThrow(new com.rehletshifaa.shared.api.ApiException(403, "OUT_OF_SCOPE", "no access"));
+        when(ledger.existsByIdempotencyKeyAndDepositIdAndActorSubject("refund:" + depositId + ":done", depositId, "finance")).thenReturn(true);
+        service.recordRefund(caseId, depositId, new RefundRequest(amount, RefundReason.PATIENT_CANCELLED, null, "done"));
+        verify(ledger, never()).append(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(policy);
+    }
     @Test void refundKeepsOriginalRailAndNamespacedIdempotencyKey() {
         var service = service();
         var original = mock(PaymentEventRepository.OriginalPayment.class);

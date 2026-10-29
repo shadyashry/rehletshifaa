@@ -28,10 +28,13 @@ public class PatientDocumentService {
     private final Authority authority;
     private final MedicalCaseRepository cases;
     private final DocumentService documents;
+    private final com.rehletshifaa.document.infrastructure.MedicalDocumentRepository documentsOnCase;
     private final AuditTrail auditTrail;
     private final Clock clock;
 
-    public PatientDocumentService(Authority authority, MedicalCaseRepository cases, DocumentService documents, AuditTrail auditTrail, Clock clock) {
+    public PatientDocumentService(Authority authority, MedicalCaseRepository cases, DocumentService documents, AuditTrail auditTrail, Clock clock,
+                                  com.rehletshifaa.document.infrastructure.MedicalDocumentRepository documentsOnCase) {
+        this.documentsOnCase = documentsOnCase;
         this.authority = authority; this.cases = cases; this.documents = documents; this.auditTrail = auditTrail; this.clock = clock;
     }
 
@@ -42,6 +45,10 @@ public class PatientDocumentService {
 
     public ConfirmResponse confirm(UUID caseId, ConfirmRequest request) {
         Actor actor = requirePatientOnCase(caseId);
+        // As for the case team: an upload is confirmed by the account that started it (deep validation D-10 review).
+        String uploader = documentsOnCase.findByIdAndMedicalCaseId(request.documentId(), caseId).map(d -> d.getUploadedBy()).orElse(null);
+        if (uploader != null && !uploader.equals(actor.subject()))
+            throw new ApiException(403, "NOT_YOUR_UPLOAD", "Only the person who added this file confirms it");
         ConfirmResponse confirmed = documents.confirmAdditional(caseId, request);
         auditTrail.event("PATIENT_DOCUMENT_UPLOADED").actor(actor.subject(), actor.label()).caseId(caseId)
                 .entity("MedicalDocument", confirmed.documentId()).action("UPLOAD").record();
