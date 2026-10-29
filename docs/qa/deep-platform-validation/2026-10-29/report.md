@@ -113,7 +113,7 @@ were also verified live.
 1. On the QA stack: extend the live journey past the travel gate (arrival, final assessment/quote, admission, voucher,
    treatment, discharge, follow-up) and run the two-team, departure, refund and cancellation variants. Start it with
    `docker compose -p rehletshifaa-qa -f docker-compose.yml -f docker-compose.qa.yml up -d` (state kept); run specs with
-   the session's `qa-live.sh` pattern (`checkpoint.md`).
+   `scripts/qa-live.sh <spec>` (`checkpoint.md`).
 2. UX session: update the 10 stale browser specs to today's area-X copy (`case-cover` ×2, `final-quote-holds` ×3,
    `my-care-safety` ×4, `public-batch-3` ×1) and the stale live assertions (`my-care-live` deposit copy after DEP-3,
    `uat-walkthrough-live` hand-off sentence, `portal-gateway-live` Arabic "خطوتك").

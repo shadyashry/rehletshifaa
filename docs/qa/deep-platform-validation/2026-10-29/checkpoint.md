@@ -44,7 +44,7 @@ Tester impact: the auto-routed synthetic cases appear in the seeded coordinator'
   http://localhost:18180, Mailpit http://localhost:18025. Throw away with `down -v`.
 - Identities: the realm's seeded accounts, freshly imported. Their authenticator secrets and Finance's virtual passkey
   are in `frontend/.e2e/mfa-qa/` (git-ignored); the runner moves them to `.e2e/mfa` for a run and back afterwards.
-- Runner (session scratchpad `qa-live.sh`): exports the seeded passwords from the realm file without printing them,
+- Runner `scripts/qa-live.sh <spec…>`: exports the seeded passwords from the realm file without printing them,
   sets `PLAYWRIGHT_*` to the QA URLs and `MAILPIT_URL=http://localhost:18025`, runs `npx playwright test --workers=1`.
 - QA data: RS-2026-000001..000010 on the QA stack (synthetic, "Playwright Ops Gate").
 
