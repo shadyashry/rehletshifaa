@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import Link from "next/link";
 import { AlertTriangle, Check, CircleDot, Clock, Info, MoreHorizontal, XCircle } from "lucide-react";
-import type { Locale } from "@/lib/i18n";
+import { latinDigits, type Locale } from "@/lib/i18n";
 import { isReauthenticationCode, reauthenticationCopy } from "@/lib/reauthentication";
 import { ReauthenticationPrompt } from "@/components/ReauthenticationNotices";
 import type { Tone } from "./admin-labels";
@@ -156,6 +156,37 @@ export function Facts({ items }: { items: [string, ReactNode][] }) {
 }
 export function TechnicalDetails({ locale, items }: { locale: Locale; items: [string, ReactNode][] }) {
   return <details className="cc-technical"><summary>{locale === "ar" ? "تفاصيل تقنية" : "Technical details"}</summary><dl>{items.map(([k, v]) => <div key={k}><dt>{k}</dt><dd><bdi dir="ltr">{v}</bdi></dd></div>)}</dl></details>;
+}
+
+/**
+ * UX X: a number field that keeps Arabic keypad digits. `type="number"` throws ٠–٩ away before any handler sees them, so
+ * this is a text field that writes them as Latin digits and keeps min, max and the step's decimals as its own refusal.
+ */
+export function NumberInput({ min, max, step, onChange, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
+  const lo = min != null && min !== "" ? Number(min) : null;
+  const hi = max != null && max !== "" ? Number(max) : null;
+  const decimals = step == null || step === "any" ? null : String(step).split(".")[1]?.length ?? 0;
+  const check = (field: HTMLInputElement) => {
+    const raw = field.value.trim();
+    const value = Number(raw);
+    const fits = !raw || (/^-?\d+(\.\d+)?$/.test(raw) && (lo == null || value >= lo) && (hi == null || value <= hi)
+      && (decimals == null || (raw.split(".")[1]?.length ?? 0) <= decimals));
+    const ar = field.closest("[lang]")?.getAttribute("lang")?.startsWith("ar");
+    const range = lo != null && hi != null ? (ar ? ` بين ${lo} و${hi}` : ` from ${lo} to ${hi}`)
+      : lo != null ? (ar ? ` لا يقل عن ${lo}` : ` of at least ${lo}`) : hi != null ? (ar ? ` لا يزيد على ${hi}` : ` up to ${hi}`) : "";
+    const places = decimals === 0 ? (ar ? "، دون كسور" : ", whole") : decimals ? (ar ? `، وبحد أقصى ${decimals} بعد الفاصلة العشرية` : `, up to ${decimals} decimals`) : "";
+    field.setCustomValidity(fits ? "" : ar ? `أدخل رقمًا${range}${places}.` : `Enter a number${range}${places}.`);
+  };
+  return <input {...rest} type="text" inputMode={decimals === 0 ? "numeric" : "decimal"} autoComplete="off" spellCheck={false}
+                ref={field => { if (field) check(field); }}
+                onChange={event => {
+                  const field = event.currentTarget;
+                  // As a number field does: Latin digits, one decimal point and a sign only.
+                  const latin = latinDigits(field.value).replace(/٫/g, ".").replace(/[^\d.-]/g, "");
+                  if (latin !== field.value) field.value = latin;
+                  check(field);
+                  onChange?.(event);
+                }}/>;
 }
 
 export function Field({ label, hint, error, required, optionalLabel, children }: { label: string; hint?: string; error?: string; required?: boolean; optionalLabel?: string; children: ReactNode }) {

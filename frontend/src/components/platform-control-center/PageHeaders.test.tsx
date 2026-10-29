@@ -33,8 +33,8 @@ describe("Commercial › Margin & Deposit", () => {
     render(<MarginDeposit locale="en" />);
     expect(await screen.findByText("Minimum coordination fee EGP 250")).toBeVisible();
     expect(screen.getByText("Refund cutoff: 12 days before the first appointment")).toBeVisible();
-    expect(screen.getByLabelText("Minimum coordination fee (EGP)")).toHaveValue(250);
-    expect(screen.getByLabelText("Refund cutoff before appointment (days)")).toHaveValue(12);
+    expect(screen.getByLabelText("Minimum coordination fee (EGP)")).toHaveValue("250");
+    expect(screen.getByLabelText("Refund cutoff before appointment (days)")).toHaveValue("12");
     fireEvent.change(screen.getByLabelText("Coordination deposit (% of the estimate)"), { target: { value: "15" } });
     fireEvent.change(screen.getByLabelText("Refund cutoff before appointment (days)"), { target: { value: "8" } });
     fireEvent.click(screen.getAllByRole("button", { name: "Review new version" })[1]);
@@ -87,8 +87,8 @@ describe("Commercial › Margin & Deposit", () => {
     render(<MarginDeposit locale="en" />);
     expect(await screen.findByText("Final quote valid 7 days · Finance re-approves a rate move beyond 5.00%")).toBeVisible();
     // Prefilled from the active version, so a revision never resets them silently.
-    expect(screen.getByLabelText(/Final quote validity/)).toHaveValue(7);
-    expect(screen.getByLabelText(/Exchange-rate tolerance/)).toHaveValue(5);
+    expect(screen.getByLabelText(/Final quote validity/)).toHaveValue("7");
+    expect(screen.getByLabelText(/Exchange-rate tolerance/)).toHaveValue("5");
     fireEvent.change(screen.getByLabelText("Margin %"), { target: { value: "15" } });
     fireEvent.change(screen.getByLabelText(/Final quote validity/), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText(/Exchange-rate tolerance/), { target: { value: "2.5" } });
@@ -106,13 +106,13 @@ describe("Commercial › Margin & Deposit", () => {
       fxToleranceRate: 0.03, changeOrderBandRate: 0.08, changeOrderBandEgp: 9000, fitToFlyHours: 96, followUpFreeDays: 45, active: true, version: 3 }] }));
     render(<MarginDeposit locale="en" />);
     expect(await screen.findByText("Change orders up to 8.00% of the package or EGP 9000 (the lower) are Finance's to decide")).toBeVisible();
-    expect(screen.getByLabelText(/Change-order band \(% of the package\)/)).toHaveValue(8);
-    expect(screen.getByLabelText("Change-order band cap (EGP)")).toHaveValue(9000);
+    expect(screen.getByLabelText(/Change-order band \(% of the package\)/)).toHaveValue("8");
+    expect(screen.getByLabelText("Change-order band cap (EGP)")).toHaveValue("9000");
     // P1-17 (D-F): the fit-to-fly window, prefilled from the active version and shown on it.
-    expect(screen.getByLabelText(/Fit-to-fly window \(hours\)/)).toHaveValue(96);
+    expect(screen.getByLabelText(/Fit-to-fly window \(hours\)/)).toHaveValue("96");
     expect(screen.getByText("A fit to fly is valid 96 hours after the examination")).toBeVisible();
     // P1-18 (D-G): the free follow-up, prefilled from the active version and shown on it.
-    expect(screen.getByLabelText(/Free follow-up \(days\)/)).toHaveValue(45);
+    expect(screen.getByLabelText(/Free follow-up \(days\)/)).toHaveValue("45");
     expect(screen.getByText("Free follow-up for 45 days after discharge")).toBeVisible();
     fireEvent.change(screen.getByLabelText("Margin %"), { target: { value: "15" } });
     fireEvent.change(screen.getByLabelText(/Change-order band \(% of the package\)/), { target: { value: "5" } });

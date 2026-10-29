@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { ErrorNotice, Field, Section, StatusBadge, SuccessNotice } from "./cc-ui";
+import { ErrorNotice, Field, Section, StatusBadge, SuccessNotice, NumberInput } from "./cc-ui";
 import { CARE_AREAS, careAreaLabel, formatDate } from "./admin-labels";
 import { coordCopy } from "./coordination-copy";
 import { earliestStart, plusYear, versionEnd, versionStart } from "./coordination-dates";
@@ -135,12 +135,12 @@ function PublishDialog({ ctx, latest, base: seed, onClose, onDone }: { ctx: Coor
       </fieldset>
       <Field label={t.defaultTeam}>{teamSelect(defaultTeam, setDefaultTeam)}</Field>
       <Field label={t.policyFallback}>{teamSelect(fallbackTeam, setFallbackTeam)}</Field>
-      <Field label={t.queueHours} required><input type="number" required min={1} max={720} dir="ltr" value={queueHours} onChange={(e) => setQueueHours(e.target.value)} /></Field>
+      <Field label={t.queueHours} required><NumberInput required min={1} max={720} dir="ltr" value={queueHours} onChange={(e) => setQueueHours(e.target.value)} /></Field>
       <details className="cc-technical"><summary>{t.advancedSettings}</summary>
         <p className="cc-meta">{t.weights} — {t.weightsHint}</p>
         <div className="cc-form-grid">
-          <Field label={t.capacityWeight} required><input type="number" required min={0} max={100} dir="ltr" value={capacityWeight} onChange={(e) => setCapacityWeight(e.target.value)} /></Field>
-          <Field label={t.languageWeight} required><input type="number" required min={0} max={100} dir="ltr" value={languageWeight} onChange={(e) => setLanguageWeight(e.target.value)} /></Field>
+          <Field label={t.capacityWeight} required><NumberInput required min={0} max={100} dir="ltr" value={capacityWeight} onChange={(e) => setCapacityWeight(e.target.value)} /></Field>
+          <Field label={t.languageWeight} required><NumberInput required min={0} max={100} dir="ltr" value={languageWeight} onChange={(e) => setLanguageWeight(e.target.value)} /></Field>
         </div>
       </details>
       {!weightsValid && <p role="alert" className="cc-field-error">{t.weightsInvalid}</p>}

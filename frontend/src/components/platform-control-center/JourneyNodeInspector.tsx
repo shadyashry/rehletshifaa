@@ -5,6 +5,7 @@ import type { Locale } from "@/lib/i18n";
 import { actorTypeLabel, factLabel, journeyCopy, stageTypeLabel } from "./journey-copy";
 import type { JourneyCapability, JourneyGraph, JourneyNode, JourneyRegistryMetadata, StageType } from "./journey-types";
 import { isControlStage } from "./journey-types";
+import { NumberInput } from "./cc-ui";
 import { addNode, blankNode, connect, incoming, insertAfter, insertBefore, moveEarlier, moveLater, nextKey, outgoing, removeEdge, removeNode, updateEdge, updateNode } from "./journey-graph-utils";
 
 const STAGE_TYPES: StageType[] = ["STAFF_TASK", "PATIENT_ACTION", "DECISION", "WAIT", "TIMER", "NOTIFICATION", "SYSTEM_ACTION", "END"];
@@ -148,7 +149,7 @@ export function JourneyNodeInspector({
 
       {n.type === "TIMER" && (
         <div className="jd-field">
-          <label>{t.timerMinutes}<input disabled={disabled} type="number" min={1} max={525600} value={n.timerMinutes ?? 60} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { timerMinutes: Number(e.target.value) }))} /></label>
+          <label>{t.timerMinutes}<NumberInput disabled={disabled} min={1} max={525600} value={n.timerMinutes ?? 60} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { timerMinutes: Number(e.target.value) }))} /></label>
         </div>
       )}
 
@@ -190,9 +191,9 @@ export function JourneyNodeInspector({
           {registryMeta?.slaSupported && <details>
             <summary style={{ cursor: "pointer" }}>{t.sla}</summary>
             <div className="jd-inline">
-              <label>{t.dueMinutes}<input disabled={disabled} type="number" min={1} max={525600} value={n.sla?.dueMinutes ?? ""} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { sla: { dueMinutes: e.target.value ? Number(e.target.value) : null, reminderMinutes: n.sla?.reminderMinutes ?? null, escalationMinutes: n.sla?.escalationMinutes ?? null } }))} /></label>
-              <label>{t.reminderMinutes}<input disabled={disabled} type="number" min={1} max={525600} value={n.sla?.reminderMinutes ?? ""} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { sla: { dueMinutes: n.sla?.dueMinutes ?? null, reminderMinutes: e.target.value ? Number(e.target.value) : null, escalationMinutes: n.sla?.escalationMinutes ?? null } }))} /></label>
-              <label>{t.escalationMinutes}<input disabled={disabled} type="number" min={1} max={525600} value={n.sla?.escalationMinutes ?? ""} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { sla: { dueMinutes: n.sla?.dueMinutes ?? null, reminderMinutes: n.sla?.reminderMinutes ?? null, escalationMinutes: e.target.value ? Number(e.target.value) : null } }))} /></label>
+              <label>{t.dueMinutes}<NumberInput disabled={disabled} min={1} max={525600} value={n.sla?.dueMinutes ?? ""} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { sla: { dueMinutes: e.target.value ? Number(e.target.value) : null, reminderMinutes: n.sla?.reminderMinutes ?? null, escalationMinutes: n.sla?.escalationMinutes ?? null } }))} /></label>
+              <label>{t.reminderMinutes}<NumberInput disabled={disabled} min={1} max={525600} value={n.sla?.reminderMinutes ?? ""} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { sla: { dueMinutes: n.sla?.dueMinutes ?? null, reminderMinutes: e.target.value ? Number(e.target.value) : null, escalationMinutes: n.sla?.escalationMinutes ?? null } }))} /></label>
+              <label>{t.escalationMinutes}<NumberInput disabled={disabled} min={1} max={525600} value={n.sla?.escalationMinutes ?? ""} onChange={(e) => onChangeGraph(updateNode(graph, n.key, { sla: { dueMinutes: n.sla?.dueMinutes ?? null, reminderMinutes: n.sla?.reminderMinutes ?? null, escalationMinutes: e.target.value ? Number(e.target.value) : null } }))} /></label>
             </div>
           </details>}
         </>

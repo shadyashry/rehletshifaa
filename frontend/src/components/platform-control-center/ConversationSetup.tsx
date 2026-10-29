@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { intlLocale, type Locale } from "@/lib/i18n";
-import { ErrorNotice, EmptyState, Facts, Field, Section, StatusBadge, SuccessNotice } from "./cc-ui";
+import { ErrorNotice, EmptyState, Facts, Field, Section, StatusBadge, SuccessNotice, NumberInput } from "./cc-ui";
 import { coordCopy } from "./coordination-copy";
 import { FocusTrapDialog } from "./FocusTrapDialog";
 import type { CoordinationContext } from "./CareCoordinationWorkspace";
@@ -191,9 +191,9 @@ function LevelsDialog({ ctx, levels, onClose, onDone }: { ctx: CoordinationConte
       firstResponseMinutes: Number(first), escalationMinutes: Number(escalation), idleCloseHours: Number(idle), reason } }))}>
       <WeekEditor locale={locale} value={hours} onChange={setHours} />
       <ZoneSelect locale={locale} value={zone} onChange={setZone} />
-      <Field label={t.reminder} required><input type="number" dir="ltr" required min={1} max={10079} value={first} onChange={(e) => setFirst(e.target.value)} /></Field>
-      <Field label={t.escalation} required><input type="number" dir="ltr" required min={2} max={10080} value={escalation} onChange={(e) => setEscalation(e.target.value)} /></Field>
-      <Field label={t.idle} required><input type="number" dir="ltr" required min={1} max={720} value={idle} onChange={(e) => setIdle(e.target.value)} /></Field>
+      <Field label={t.reminder} required><NumberInput dir="ltr" required min={1} max={10079} value={first} onChange={(e) => setFirst(e.target.value)} /></Field>
+      <Field label={t.escalation} required><NumberInput dir="ltr" required min={2} max={10080} value={escalation} onChange={(e) => setEscalation(e.target.value)} /></Field>
+      <Field label={t.idle} required><NumberInput dir="ltr" required min={1} max={720} value={idle} onChange={(e) => setIdle(e.target.value)} /></Field>
       <ReasonField locale={locale} value={reason} onChange={setReason} />
       <div className="cc-form-actions"><button type="button" className="cc-secondary" onClick={onClose}>{cc.cancel}</button><button disabled={busy || !reason.trim() || !Object.keys(hours).length}>{cc.save}</button></div>
     </form>
@@ -215,7 +215,7 @@ function IntakeDialog({ ctx, subject, name, current, onClose, onDone }: { ctx: C
     <form onSubmit={(e) => void run(e, () => api(`${base}/intake-settings/${encodeURIComponent(subject)}`, { method: "PUT", body: {
       intakeEligible: eligible, maxIntake: Number(max), schedule: Object.keys(week).length ? week : null, timeZone: zone, reason } }))}>
       <label className="cc-choice"><input type="checkbox" checked={eligible} onChange={(e) => setEligible(e.target.checked)} /><span>{t.eligible}</span></label>
-      <Field label={t.maxIntake} required><input type="number" dir="ltr" required min={0} max={1000} value={max} onChange={(e) => setMax(e.target.value)} /></Field>
+      <Field label={t.maxIntake} required><NumberInput dir="ltr" required min={0} max={1000} value={max} onChange={(e) => setMax(e.target.value)} /></Field>
       <p className="cc-field-hint">{t.scheduleHint}</p>
       <WeekEditor locale={locale} value={week} onChange={setWeek} />
       <ZoneSelect locale={locale} value={zone} onChange={setZone} />

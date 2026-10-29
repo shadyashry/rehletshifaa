@@ -7,7 +7,7 @@ import { ControlCenterShell } from "./ControlCenterShell";
 import { useControlCenterAccess } from "./control-center-access";
 import { useAdminApi } from "./admin-api";
 import type { Tone } from "./admin-labels";
-import { EmptyState, ErrorNotice, Facts, Field, Section, StatusBadge, SuccessNotice } from "./cc-ui";
+import { EmptyState, ErrorNotice, Facts, Field, Section, StatusBadge, SuccessNotice, NumberInput } from "./cc-ui";
 import { FocusTrapDialog } from "./FocusTrapDialog";
 import { facilityText, type FacilityCopy } from "./facility-copy";
 import { FacilitySuspension, type Suspension, type SuspensionCopy } from "./FacilitySuspension";
@@ -191,8 +191,8 @@ export function FacilityCatalog({ locale, suspensionCopy }: { locale: Locale; su
           <Field label={t.procedureCode} hint={t.procedureCodeHint} required><input name="procedureCode" required maxLength={40} dir="ltr" /></Field>
           <Field label={t.packageName} required><input name="name" required maxLength={200} /></Field>
           <Field label={t.careArea} required><select name="careCategory" required>{careAreas.map((a) => <option key={a.slug} value={a.slug}>{ar ? a.nameAr : a.nameEn}</option>)}</select></Field>
-          <Field label={t.minEgp} required><input name="minEgp" type="number" min="0" step="1" required dir="ltr" /></Field>
-          <Field label={t.maxEgp} required><input name="maxEgp" type="number" min="0" step="1" required dir="ltr" /></Field>
+          <Field label={t.minEgp} required><NumberInput name="minEgp" min="0" step="1" required dir="ltr" /></Field>
+          <Field label={t.maxEgp} required><NumberInput name="maxEgp" min="0" step="1" required dir="ltr" /></Field>
           <Field label={t.inclusions} hint={t.inclusionsHint} required><textarea name="inclusions" required maxLength={2000} rows={3} /></Field>
           <Field label={t.exclusions}><textarea name="exclusions" maxLength={2000} rows={2} /></Field>
           <Field label={t.validFrom} required><input name="validFrom" type="date" required dir="ltr" defaultValue={new Date().toISOString().slice(0, 10)} /></Field>

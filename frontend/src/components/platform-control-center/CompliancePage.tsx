@@ -7,7 +7,7 @@ import { intlLocale, type Locale } from "@/lib/i18n";
 import { fillTemplate } from "@/lib/portal-labels";
 import type { AffiliationFlag, Declaration } from "@/components/virtual-clinic/virtual-clinic-model";
 import type { AdminApi } from "./admin-api";
-import { EmptyState, ErrorNotice, Facts, SectionTabs, StatusBadge, TabPanel, WordedErrorNotice } from "./cc-ui";
+import { EmptyState, ErrorNotice, Facts, SectionTabs, StatusBadge, TabPanel, WordedErrorNotice, NumberInput } from "./cc-ui";
 import { WorkforcePage, json, syncQuery, useRead } from "./workforce-ui";
 
 /** The page's words, plus the relationship words the Consultant's own page uses (`portalWork.affiliations.kindsShort`). */
@@ -395,7 +395,7 @@ function Samples({ locale, copy, api, canReview }: { locale: Locale; copy: Compl
       <h3 id="draw-title" className="cc-subhead">{t.drawTitle}</h3>
       <div className="cc-filterbar">
         <label>{t.month}<input type="month" dir="ltr" required value={month} onChange={(e) => setMonth(e.target.value)} aria-describedby="draw-hint" /></label>
-        <label>{t.size}<input type="number" dir="ltr" required min={1} max={50} value={size} onChange={(e) => setSize(e.target.value)} aria-describedby="draw-hint" style={{ width: "7rem" }} /></label>
+        <label>{t.size}<NumberInput dir="ltr" required min={1} max={50} value={size} onChange={(e) => setSize(e.target.value)} aria-describedby="draw-hint" style={{ width: "7rem" }} /></label>
         <button type="submit" disabled={busy}>{t.draw}</button>
       </div>
       <p id="draw-hint" className="cc-meta">{t.drawHint}</p>

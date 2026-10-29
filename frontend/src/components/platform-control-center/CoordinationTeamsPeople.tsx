@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { ErrorNotice, EmptyState, Field, Section, StatusBadge, SuccessNotice } from "./cc-ui";
+import { ErrorNotice, EmptyState, Field, Section, StatusBadge, SuccessNotice, NumberInput } from "./cc-ui";
 import { CARE_AREAS, careAreaLabel } from "./admin-labels";
 import { coordCopy, LANGUAGES, languageLabel } from "./coordination-copy";
 import { FocusTrapDialog } from "./FocusTrapDialog";
@@ -152,7 +152,7 @@ function CapacityDialog({ ctx, person, onClose, onDone }: { ctx: CoordinationCon
     <h2><bdi>{title}</bdi></h2>
     <ErrorNotice error={error} locale={locale} />
     <form onSubmit={submit}>
-      <Field label={t.maximum} hint={t.maximumHint} required><input type="number" required min={0} max={10000} dir="ltr" value={maximum} onChange={(e) => setMaximum(e.target.value)} /></Field>
+      <Field label={t.maximum} hint={t.maximumHint} required><NumberInput required min={0} max={10000} dir="ltr" value={maximum} onChange={(e) => setMaximum(e.target.value)} /></Field>
       <label className="cc-choice"><input type="checkbox" checked={onDuty} onChange={(e) => setOnDuty(e.target.checked)} /><span>{t.onDutyLabel}</span></label>
       <fieldset className="cc-choices"><legend className="cc-field-label">{t.capacityLanguages}</legend>
         {languageOptions.map((code) => <label key={code} className="cc-choice"><input type="checkbox" checked={languages.includes(code)} onChange={() => setLanguages((l) => toggle(l, code))} /><span>{languageLabel(code, locale)}</span></label>)}

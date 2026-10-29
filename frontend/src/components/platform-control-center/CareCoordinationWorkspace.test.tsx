@@ -80,7 +80,7 @@ describe("Teams & People", () => {
     render(<CareCoordinationWorkspace locale="en" />);
     fireEvent.click((await screen.findAllByRole("button", { name: "Set capacity" }))[0]);
     const dialog = screen.getByRole("dialog");
-    fireEvent.change(within(dialog).getByRole("spinbutton", { name: /Maximum active cases/ }), { target: { value: "8" } });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /Maximum active cases/ }), { target: { value: "8" } });
     fireEvent.click(within(dialog).getByRole("checkbox", { name: "Cardiology" }));
     fireEvent.change(within(dialog).getByRole("textbox", { name: /Reason/ }), { target: { value: "Part time" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
@@ -115,9 +115,9 @@ describe("Consultant Preferences and Rules", () => {
     expect(screen.queryByText("Organization team")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Publish new version" }));
     const dialog = screen.getByRole("dialog");
-    fireEvent.change(within(dialog).getByRole("spinbutton", { name: /Spare capacity/ }), { target: { value: "70" } });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /Spare capacity/ }), { target: { value: "70" } });
     expect(within(dialog).getByRole("button", { name: "Publish new version" })).toBeDisabled();
-    fireEvent.change(within(dialog).getByRole("spinbutton", { name: /Language match/ }), { target: { value: "30" } });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /Language match/ }), { target: { value: "30" } });
     fireEvent.change(within(dialog).getByRole("textbox", { name: /Reason/ }), { target: { value: "Quarterly review" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Publish new version" }));
     await screen.findByText("New rules version published.");

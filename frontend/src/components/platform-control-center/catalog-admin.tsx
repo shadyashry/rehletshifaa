@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, Plus } from "lucide-react";
 import { intlLocale, type Locale } from "@/lib/i18n";
 import type { AdminApi } from "./admin-api";
-import { ActionMenu, EmptyState, ErrorNotice, Field, SectionTabs, StatusBadge, SuccessNotice } from "./cc-ui";
+import { ActionMenu, EmptyState, ErrorNotice, Field, SectionTabs, StatusBadge, SuccessNotice, NumberInput } from "./cc-ui";
 import { careAreaLabel } from "./admin-labels";
 
 /*
@@ -69,7 +69,7 @@ export function ConsultantPriceList({ locale, api, practitionerId, careArea, edi
             <Field label={ar ? "اسم الخدمة" : "Service name"} required><input name="name" required /></Field>
             <Field label={ar ? "رمز الخدمة" : "Service code"} hint={ar ? "رمز ثابت لا يتغير" : "A stable code that never changes"} required><input name="code" dir="ltr" required /></Field>
             <Field label={ar ? "الفئة" : "Category"} optionalLabel={ar ? "اختياري" : "optional"}><input name="category" /></Field>
-            <Field label={ar ? "السعر (ج.م)" : "Price (EGP)"} required><input name="price" type="number" min="0" step="0.01" dir="ltr" required /></Field>
+            <Field label={ar ? "السعر (ج.م)" : "Price (EGP)"} required><NumberInput name="price" min="0" step="0.01" dir="ltr" required /></Field>
           </div>
           <div className="cc-form-actions"><button disabled={busy}>{ar ? "إضافة الخدمة" : "Add service"}</button><button type="button" className="cc-secondary" onClick={() => setAdding(false)}>{ar ? "إلغاء" : "Cancel"}</button></div>
         </form>
@@ -81,7 +81,7 @@ export function ConsultantPriceList({ locale, api, practitionerId, careArea, edi
           <tbody>{rows.map((r) => <tr key={r.id}>
             <td>{editable ? <input aria-label={ar ? "اسم الخدمة" : "Service name"} value={r.serviceName} onChange={(e) => patch(r.id, "serviceName", e.target.value)} /> : r.serviceName}<span className="cc-row-sub" dir="ltr">{r.serviceCode}</span></td>
             <td>{editable ? <input aria-label={ar ? "الفئة" : "Category"} value={r.category ?? ""} onChange={(e) => patch(r.id, "category", e.target.value)} /> : r.category}</td>
-            <td>{editable ? <input aria-label={ar ? "السعر" : "Price"} type="number" min="0" step="0.01" dir="ltr" value={r.priceEgp} onChange={(e) => patch(r.id, "priceEgp", Number(e.target.value))} /> : money(r.priceEgp, "EGP", locale)}{display !== "EGP" && rate && <span className="cc-row-sub">≈ {money(r.priceEgp * rate, display, locale)}</span>}</td>
+            <td>{editable ? <NumberInput aria-label={ar ? "السعر" : "Price"} min="0" step="0.01" dir="ltr" defaultValue={r.priceEgp} onChange={(e) => patch(r.id, "priceEgp", Number(e.target.value))} /> : money(r.priceEgp, "EGP", locale)}{display !== "EGP" && rate && <span className="cc-row-sub">≈ {money(r.priceEgp * rate, display, locale)}</span>}</td>
             <td><input type="checkbox" aria-label={ar ? "مفعّلة" : "Active"} checked={r.active} disabled={!editable} onChange={(e) => patch(r.id, "active", e.target.checked)} /></td>
             {editable && <td><span className="cc-row-actions"><button type="button" className="cc-secondary cc-small" disabled={busy} onClick={() => void run(() => api(`${base}/${r.id}`, json("PUT", { serviceCode: r.serviceCode, serviceName: r.serviceName, category: r.category, priceEgp: r.priceEgp, active: r.active })))}>{ar ? "حفظ" : "Save"}</button>
               <ActionMenu label={ar ? "إجراءات الخدمة" : "Service actions"} actions={[{ label: ar ? "إيقاف الخدمة" : "Deactivate service", destructive: true, disabled: busy, onSelect: () => void run(() => api(`${base}/${r.id}`, json("DELETE"))) }]} /></span></td>}
@@ -170,7 +170,7 @@ function FxRow({ f, locale, busy, editable, onPin }: { f: FxRate; locale: Locale
         {stored > 0 && <span className="cc-row-sub"><bdi dir="ltr">1,000 EGP ≈ {money(1000 * f.rate, f.currency, "en")}</bdi></span>}</div>
       <div><span className="cc-meta">{ar ? "المصدر" : "Source"}</span>{f.source === "MANUAL" ? <StatusBadge tone="info">{source[ar ? 1 : 0]}</StatusBadge> : <strong>{source[ar ? 1 : 0]}</strong>}<span className="cc-row-sub">{source[ar ? 3 : 2]} · <bdi dir="ltr">{f.rateDate}</bdi></span></div>
       {editable ? <div>
-        <label className="cc-field"><span className="cc-field-label">{ar ? `جنيه لكل 1 ${f.currency}` : `EGP per 1 ${f.currency}`}</span><input type="number" min="0" step="0.0001" dir="ltr" value={egpPer} onChange={(e) => setEgpPer(e.target.value)} /></label>
+        <label className="cc-field"><span className="cc-field-label">{ar ? `جنيه لكل 1 ${f.currency}` : `EGP per 1 ${f.currency}`}</span><NumberInput min="0" step="0.0001" dir="ltr" value={egpPer} onChange={(e) => setEgpPer(e.target.value)} /></label>
         <button type="button" className="cc-secondary cc-small" disabled={busy || !(per > 0)} onClick={() => void onPin(f.currency, 1 / per)}>{ar ? "حفظ السعر لليوم" : "Save rate for today"}</button>
         <span className="cc-row-sub">{ar ? "لليوم فقط؛ غدًا يُستخدم سعر السوق اليومي مجددًا ما لم تحفظ سعرًا آخر." : "Today only; tomorrow the daily market rate is used again unless you save another."}</span>
       </div> : <div />}
@@ -217,7 +217,7 @@ export function CareAreaTemplates({ locale, api, editable }: { locale: Locale; a
               <Field label={ar ? "اسم الخدمة" : "Service name"} required><input name="name" required /></Field>
               <Field label={ar ? "رمز ثابت" : "Stable code"} required><input name="code" dir="ltr" required /></Field>
               <Field label={ar ? "الفئة" : "Category"} optionalLabel={ar ? "اختياري" : "optional"}><input name="category" /></Field>
-              <Field label={ar ? "سعر مقترح (ج.م)" : "Suggested price (EGP)"} optionalLabel={ar ? "اختياري" : "optional"}><input name="price" type="number" min="0" step="0.01" dir="ltr" /></Field>
+              <Field label={ar ? "سعر مقترح (ج.م)" : "Suggested price (EGP)"} optionalLabel={ar ? "اختياري" : "optional"}><NumberInput name="price" min="0" step="0.01" dir="ltr" /></Field>
             </div>
             <div className="cc-form-actions"><button disabled={busy}>{ar ? "إضافة للقالب" : "Add to template"}</button><button type="button" className="cc-secondary" onClick={() => setAdding(false)}>{ar ? "إلغاء" : "Cancel"}</button></div>
           </form>
