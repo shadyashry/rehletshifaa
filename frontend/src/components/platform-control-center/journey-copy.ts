@@ -212,16 +212,16 @@ export const journeyCopy = {
     } as Record<string, string>,
 
     actorTypes: {
-      PATIENT: "المريض", REPRESENTATIVE: "الممثل", COORDINATOR: "المنسق", CONSULTANT: "الاستشاري",
+      PATIENT: "المريض", REPRESENTATIVE: "الممثل", COORDINATOR: "المنسّق", CONSULTANT: "الاستشاري",
       ASSOCIATE_DOCTOR: "الطبيب المشارك", PRACTICE_STAFF: "فريق العيادة", OPERATIONS: "العمليات",
       FINANCE: "المالية", PLATFORM_STAFF: "فريق المنصة", SYSTEM: "النظام",
     } as Record<string, string>,
 
     facts: {
-      PROPOSAL_ACCEPTED: "قبل المريض العرض", DEPOSIT_SATISFIED: "سُدّدت وديعة التنسيق",
+      PROPOSAL_ACCEPTED: "قبل المريض التقدير", DEPOSIT_SATISFIED: "سُدّدت دفعة التنسيق",
       PROFILE_COMPLETE: "ملف المريض مكتمل", INFORMATION_COMPLETE: "اكتملت المعلومات المطلوبة",
       CONSULTANT_ACCEPTED: "قبل الاستشاري التعيين", CLINICAL_ACCEPTED: "تم قبول المراجعة السريرية",
-      PROPOSAL_NEEDS_REWORK: "يحتاج العرض إلى إعادة عمل",
+      PROPOSAL_NEEDS_REWORK: "يحتاج التقدير إلى إعادة عمل",
     } as Record<string, string>,
 
     selectNode: "اختر خطوة لعرض تفاصيلها وتغييرها.", nodeName: "الاسم المعروض", nodeKey: "مفتاح الخطوة", nodeType: "نوع الخطوة",

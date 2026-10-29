@@ -2293,6 +2293,44 @@ on the base. The specs' PNGs were restored, not updated.
 
 **Next:** X-2 one term per concept (plan row).
 
+### X-2 one term per concept (2026-10-29, worktree `hopeful-brahmagupta-2feacc`, branch `claude/hopeful-brahmagupta-2feacc` from X-1 @ `55491edf`)
+
+**Delivered.**
+- The glossary (`plans/arabic-first.md`) applied to `messages/ar.json`, inserted textually (values spliced at their exact spans by a
+  path-aware scan, never re-serialised; the diff is only the changed lines): **357 strings** (259 reworded, 98 shadda only) — the deposit «دفعة التنسيق» (was «الوديعة»,
+  «وديعة التنسيق», «العربون», «الدفعة المقدمة»; verbs «سدّد»/«تُسدَّد»), Finance acting «الفريق المالي» with masculine agreement
+  («المالية» kept for role, queue and thread labels), «الشروط التجارية» for every "commercial terms", «منسّق» with shadda (every form),
+  and the 90 bare «العرض» inventoried one by one: estimate-stage → «التقدير», either document → «عرض السعر», final → «عرض السعر النهائي»;
+  the verb "show/view" and the Consultant's assignment *offer* kept. Also backlog 434's «تمّت تسوية…», «وضع الحالة», «قدّم رأيك الطبي الثاني».
+- The same rows in the Arabic hard-coded in components: `portal-ui`, `portal-model`, `CoordinatorActions`, `JourneySnapshot`,
+  `CaseBlockers`, `ProfileActivation` (consent term only), and the Control Center (`MarginDeposit`, `control-center-nav`, `journey-copy`,
+  `facility-copy`); shadda in 25 component files.
+- `en.json`: "our finance team" → "our Finance team" (8) and "finance approval" → "Finance approval" (1), matching the team name.
+- Keycloak: both Arabic bundles already followed the glossary (only «منسّق», with shadda); no change. Rows 779/783/797 stay with the
+  native reviewer.
+- `scripts/arabic-terms.mjs`: counts each glossary row over `ar.json`, both Keycloak Arabic bundles and the Arabic in `frontend/src`
+  (minus tests), lists the keys kept for another concept, and exits 1 when a replaced variant comes back. At X-2: deposit 71, Finance 67,
+  commercial terms 6, coordinator 226, estimate 124, priced proposal 115; "One term per glossary row."
+- Reviewer doc: every changed string (key, before, after; shadda-only keys grouped) plus notes for the reviewer and legal.
+  No native or legal sign-off claimed.
+
+**Reviews** (four, read-only; copy-only slice, so RB and composition had nothing beyond the string literals). RTL/Arabic review: no
+agreement error from the swaps, no leftover variant; HIGH fixed — `ackShortFinal` (the acceptance attestation) said "I understand
+accepting is a financial agreement", not the English; MEDIUM fixed — "the final price is fixed when the estimate is sent" (now the
+exchange rate), «أقرّره» ("ratify") for accept-or-decline, `payNowNote` and `nextPrelim[2]` back to the English meaning; LOW fixed — a
+repeated term, «سعر» stacked three times, «تُدفع/تُسدَّد», the brand «رحلة شفاء», «لحالتك». Impeccable clarify: «ادفع دفعة» root
+repetition. WG: no markup change. Deferred to backlog "Area X": the backend's own Arabic (WhatsApp templates, status/readiness labels,
+activation consent), "Your proposal" read two ways (deliberate), the four legal sentences.
+
+**Verify.** `tsc` clean; eslint on the touched files 0 errors (2 pre-existing warnings); vitest 811/812 (the known `StaffOperationalUi`
+W-44); Playwright (a11y en + ar, keycloak-theme, arabic-proposal-decision, care-coordination, finance-workspace, my-care-visuals,
+`my-care`, public-batch-3, status-proposal) 126 passed, 15 skipped, 1 failed: `public-batch-3` "nothing waits for a scroll", as on the
+base; after the review fixes the proposal specs again 42/42. Specs updated for the new words: `arabic-proposal-decision`, `care-coordination`, `finance-workspace`,
+`my-care-visuals`, `my-care`, `public-batch-3`; unit tests `portal-labels`, `MyCare`, `PatientDepositPayment`, `TreatmentPanel`,
+`CaseBlockers`. The specs' PNGs were restored, not updated.
+
+**Next:** X-3 register, the backlog's native rows, close (plan row; re-critique ≥ 32/40).
+
 ## Control Center — Consultant public profiles (2026-10-17)
 
 The existing Consultant directory, Consultant page and onboarding screen now include the public-profile workflow. The

@@ -64,5 +64,5 @@ test("the deposit is tracked: checking stamped Sent, confirmed stamped Received,
   await setupPatient(page, "pay-deposit-rejected");
   await page.goto("/ar/portal");
   await expect(page.getByRole("list", { name: "خطوات الدفع" }).locator("[aria-current='step']")).toContainText("تدفع وترسل");
-  await expect(page.getByRole("img", { name: /استُلم .*200.* من وديعة قيمتها .*500/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: /استُلم .*200.* من دفعة تنسيق قيمتها .*500/ })).toBeVisible();
 });

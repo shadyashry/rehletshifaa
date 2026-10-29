@@ -24,7 +24,7 @@ for (const locale of ["en", "ar"] as const) {
     await expect(page.locator(".page-hero-aside ol > li")).toHaveText([...STAGES[locale]]);
     const costs = page.getByRole("region", { name: locale === "en" ? "How the cost is settled" : "كيف تُحسم التكلفة" });
     await expect(costs.getByText(locale === "en" ? "Preliminary estimate" : "التقدير المبدئي", { exact: true })).toBeVisible();
-    await expect(costs.getByText(locale === "en" ? "Final quote" : "العرض النهائي", { exact: true })).toBeVisible();
+    await expect(costs.getByText(locale === "en" ? "Final quote" : "عرض السعر النهائي", { exact: true })).toBeVisible();
     // The "You" / "Next" labels are at the 13px floor, not 10.5px.
     const size = await page.locator("main dl dt").first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
     expect(size).toBeGreaterThanOrEqual(13);

@@ -72,7 +72,7 @@ for (const locale of ["en", "ar"] as const) test(`Staff Portal team queue, trans
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/${locale}/portal`);
   await staffView(page, en ? /Team queue/ : /قائمة الفريق/).click();
-  await expect(page.getByRole("tab", { name: en ? "Needs an owner" : "بلا منسق مسؤول" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: en ? "Needs an owner" : "بلا منسّق مسؤول" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText("Layla Hassan")).toBeVisible();
   await sane(page); await shot("team-queue-unowned-desktop");
   await page.getByRole("tab", { name: en ? "Owned by your team" : "يتولاها فريقي" }).click();

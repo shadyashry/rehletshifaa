@@ -52,7 +52,7 @@ describe("MyCare", () => {
     renderWithWork(<MyCare locale="ar" caseSummary={{ ...base, careCategory: "general-surgery" }} actions={wait("WAIT_PAYMENT_CHECK")} patientProposal={accepted} proposal={proposal}
                    deposit={{ status: "REQUESTED", currency: "USD", totalDisplay: 500, transfer: { reference: "FT123456", status: "SUBMITTED" } }} documents={[]} unreadMessages={0} cases={[base]}
                    view="care" onView={vi.fn()} onOpenCase={vi.fn()} onOpenProposal={vi.fn()} messagesPanel={null}/>, "ar");
-    const deposit = screen.getByRole("region", { name: "وديعة التنسيق" });
+    const deposit = screen.getByRole("region", { name: "دفعة التنسيق" });
     const figure = within(deposit).getByText(/500/);
     expect(figure.tagName).toBe("BDI");
     expect(figure.closest("[dir='ltr']")).toBe(figure);
@@ -263,7 +263,7 @@ describe("MyCare", () => {
     expect(screen.getByRole("heading", { name: "نتحقق من دفعتك" })).toBeTruthy();
     expect(screen.getByText("لا يلزم منك أي إجراء الآن.")).toBeTruthy();
     expect(screen.getByText("قيد التحقق")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /الاطلاع على العرض/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /الاطلاع على عرض السعر/ })).toHaveLength(1);
     expect(screen.getByRole("button", { name: /مراسلة/ })).toBeTruthy();
   });
 

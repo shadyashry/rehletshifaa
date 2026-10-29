@@ -1341,7 +1341,7 @@
         "release": "Send final quote to patient",
         "releaseHint": "Sends a secure link. The case stays at arrival confirmed.",
         "needReview": "The Consultant must record an approved final assessment first.",
-        "financeWait": "Waiting for finance approval of the manually-priced services."
+        "financeWait": "Waiting for Finance approval of the manually-priced services."
       },
       "deposit": {
         "title": "Coordination deposit & payments",
@@ -2357,11 +2357,11 @@
         "PAY_DEPOSIT": {
           "title": "Pay your coordination deposit",
           "body": "Your profile is complete. Pay the deposit by bank transfer or through an agent, then enter the reference or receipt number you are given.",
-          "next": "Once our finance team confirms your payment, your coordinator starts arranging your treatment."
+          "next": "Once our Finance team confirms your payment, your coordinator starts arranging your treatment."
         },
         "WAIT_PAYMENT_CHECK": {
           "title": "We're checking your payment",
-          "body": "Thank you. Our finance team is matching your payment with the number you sent, and we'll let you know as soon as it's confirmed.",
+          "body": "Thank you. Our Finance team is matching your payment with the number you sent, and we'll let you know as soon as it's confirmed.",
           "next": "Once your payment is confirmed, your coordinator starts arranging your treatment.",
           "meanwhile": "Keep your transfer or agent receipt. There is no need to pay again."
         },
@@ -2426,11 +2426,11 @@
         "PAY_BALANCE": {
           "title": "Pay the balance at the hospital",
           "body": "Show your voucher number at the hospital cashier and pay the amount below. Keep the receipt; the hospital sends us a copy.",
-          "next": "Our finance team checks the receipt, then you are cleared for admission."
+          "next": "Our Finance team checks the receipt, then you are cleared for admission."
         },
         "WAIT_BALANCE_CHECK": {
           "title": "We are checking your hospital receipt",
-          "body": "The hospital's receipt for your balance is recorded. Our finance team is checking it.",
+          "body": "The hospital's receipt for your balance is recorded. Our Finance team is checking it.",
           "next": "Once it is checked, you are cleared for admission.",
           "meanwhile": "Keep your receipt and your reports with you."
         },
@@ -2482,7 +2482,7 @@
         "agentHint": "As it is written on your receipt, for example the exchange office and its city.",
         "agentRequired": "Enter the name of the agent you paid.",
         "receiptLabel": "Receipt number",
-        "receiptWhat": "The agent gives you a receipt with a number. Enter it here so our finance team can confirm your payment with the agent.",
+        "receiptWhat": "The agent gives you a receipt with a number. Enter it here so our Finance team can confirm your payment with the agent.",
         "receiptInvalid": "Enter the receipt number exactly as it is printed: letters and numbers, 4 to 64 characters.",
         "submitReceipt": "Send receipt number",
         "bankTitle": "Transfer to this account",
@@ -2494,7 +2494,7 @@
         "paymentReference": "Payment reference",
         "paymentReferenceHint": "Write this on your transfer so we can match it to your case.",
         "referenceLabel": "Transaction reference number",
-        "referenceWhat": "After you transfer, your bank gives you a reference number for the transaction. Enter it here so our finance team can find your payment and confirm it.",
+        "referenceWhat": "After you transfer, your bank gives you a reference number for the transaction. Enter it here so our Finance team can find your payment and confirm it.",
         "referenceWhere": "You'll find it in your bank's confirmation SMS or email, on the transfer receipt, or in your banking app under the transfer details. Banks may call it the transfer ID, FT number or reference number.",
         "referenceInvalid": "Enter the reference exactly as your bank shows it: letters and numbers, 4 to 64 characters.",
         "submit": "Send transfer reference",
@@ -5750,7 +5750,7 @@
       "loading": "Loading…",
       "nextPay": "Pay your coordination deposit",
       "amountDue": "Amount due",
-      "nextPayHow": "You pay it in My Care, by bank transfer or through an agent, and then enter the reference your bank or agent gives you. Your coordinator starts arranging your care once our finance team confirms it.",
+      "nextPayHow": "You pay it in My Care, by bank transfer or through an agent, and then enter the reference your bank or agent gives you. Your coordinator starts arranging your care once our Finance team confirms it.",
       "signInToPay": "Sign in to pay",
       "stepDepositWaived": "No deposit needed",
       "relationship": {
@@ -5805,7 +5805,7 @@
         },
         "deposit": {
           "title": "Your coordination deposit",
-          "body": "If you have not paid it yet, sign in to My Care to pay it by bank transfer or through an agent, and enter the reference you are given. If you already sent the reference, our finance team is checking it.",
+          "body": "If you have not paid it yet, sign in to My Care to pay it by bank transfer or through an agent, and enter the reference you are given. If you already sent the reference, our Finance team is checking it.",
           "next": "Once confirmed, your coordinator starts arranging your treatment."
         },
         "treatment": {

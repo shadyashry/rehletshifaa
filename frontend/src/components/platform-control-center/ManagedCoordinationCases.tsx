@@ -18,7 +18,7 @@ export function ManagedCoordinationCases({ locale, api }: { locale: Locale; api:
       <h3>{item.caseReference}</h3>
       <Facts items={[
         [ar ? "المرحلة" : "Stage", item.stage],
-        [ar ? "المنسق" : "Assigned coordinator", item.coordinatorName ?? (ar ? "اسم غير مسجّل" : "Name not recorded")],
+        [ar ? "المنسّق" : "Assigned coordinator", item.coordinatorName ?? (ar ? "اسم غير مسجّل" : "Name not recorded")],
         [ar ? "العمل المفتوح" : "Open work", item.openWork],
         [ar ? "العمل المتأخر" : "Overdue work", item.overdueWork],
         [ar ? "العوائق" : "Blockers", item.blockingWork],

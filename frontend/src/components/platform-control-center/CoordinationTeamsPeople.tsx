@@ -67,7 +67,7 @@ export function CoordinationTeamsPeople(ctx: CoordinationContext) {
             <li className="cc-card" key={person.subject}>
               <h3><bdi>{person.name ?? t.unnamed}</bdi></h3>
               <p>
-                <StatusBadge tone={person.account === "ACTIVE" ? "success" : person.account === "DISABLED" ? "danger" : "neutral"}>{person.account === "ACTIVE" ? t.person.active : person.account === "DISABLED" ? t.person.disabled : (ar ? "ليس منسقًا حاليًا" : "Not currently a Coordinator")}</StatusBadge>
+                <StatusBadge tone={person.account === "ACTIVE" ? "success" : person.account === "DISABLED" ? "danger" : "neutral"}>{person.account === "ACTIVE" ? t.person.active : person.account === "DISABLED" ? t.person.disabled : (ar ? "ليس منسّقًا حاليًا" : "Not currently a Coordinator")}</StatusBadge>
                 {" "}{person.capacity && <StatusBadge tone={person.capacity.onDuty ? "success" : "neutral"}>{person.capacity.onDuty ? t.onDuty : t.offDuty}</StatusBadge>}
               </p>
               <p className="cc-meta">{t.person.teams}: {person.teams.length ? person.teams.map((m) => <span key={m.team}><bdi>{teamName(m.team)}</bdi>{m.lead ? ` (${t.lead})` : ""} </span>) : t.person.noTeams}</p>

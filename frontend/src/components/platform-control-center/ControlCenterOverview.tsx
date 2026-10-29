@@ -30,7 +30,7 @@ const SOURCES: Source[] = [
     find: async ({ api, locale }) => ({ count: (await api<{ credentialingStatus?: string }[]>("/admin/practitioners")).filter((p) => p.credentialingStatus === "UNDER_REVIEW").length, href: ccHref(locale, "/consultants") }) },
   { key: "identity", group: "reviews", label: ["Identity checks waiting for a decision", "طلبات تحقق من الهوية بانتظار قرار"], applies: (a) => a.can("PATIENT_IDENTITY_REVIEW"),
     find: async ({ api, locale }) => ({ count: (await api<unknown[]>("/identity-review/queue")).length, href: ccHref(locale, "/identity-checks") }) },
-  { key: "queue", group: "operations", label: ["Cases waiting for a coordinator", "حالات بانتظار منسق"], applies: (a) => a.can("ROUTING_ASSIGN"),
+  { key: "queue", group: "operations", label: ["Cases waiting for a coordinator", "حالات بانتظار منسّق"], applies: (a) => a.can("ROUTING_ASSIGN"),
     find: async ({ api, locale }) => ({ count: (await api<unknown[]>("/admin/coordination/queue")).length, href: ccHref(locale, "/coordination?tab=advanced") }) },
   { key: "invitations", group: "workforce", label: ["Staff invitations not yet accepted", "دعوات موظفين لم تُقبل بعد"], applies: (a) => a.can("WORKFORCE_READ"),
     find: async ({ api, locale }) => ({ count: (await api<{ invitations: { status: string }[] }>("/admin/platform-access/staff")).invitations.filter((i) => i.status === "QUEUED" || i.status === "SENT").length, href: ccHref(locale, "/people") }) },

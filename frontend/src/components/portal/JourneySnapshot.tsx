@@ -105,9 +105,9 @@ export function FullJourneyDialog({ locale, timeline, caseNumber, onClose }: {
 const PHASES: { key: string; en: string; ar: string; statuses: string[] }[] = [
   { key: "intake", en: "Intake", ar: "الاستقبال", statuses: ["DRAFT", "RECEIVED", "INTAKE_REVIEW", "INFORMATION_REQUIRED"] },
   { key: "consultant", en: "Consultant", ar: "الاستشاري", statuses: ["READY_FOR_CONSULTANT", "CONSULTANT_ASSIGNMENT_PENDING", "CONSULTANT_REVIEW", "CLINICAL_RECOMMENDATION_READY", "CLINICALLY_NOT_SUITABLE"] },
-  { key: "proposal", en: "Proposal", ar: "العرض", statuses: ["PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL", "REVISION_REQUESTED"] },
+  { key: "proposal", en: "Proposal", ar: "التقدير", statuses: ["PROPOSAL_PREPARATION", "PROPOSAL_INTERNAL_APPROVAL", "REVISION_REQUESTED"] },
   { key: "decision", en: "Patient decision", ar: "قرار المريض", statuses: ["PATIENT_DECISION", "DECLINED", "EXPIRED"] },
-  { key: "deposit", en: "Coordination deposit", ar: "وديعة التنسيق", statuses: ["ACCEPTED"] },
+  { key: "deposit", en: "Coordination deposit", ar: "دفعة التنسيق", statuses: ["ACCEPTED"] },
   { key: "treatment", en: "Treatment", ar: "العلاج", statuses: ["TRAVEL_COORDINATION", "ARRIVAL_CONFIRMED", "ADMISSION_READY", "TREATMENT_IN_PROGRESS"] },
   { key: "followup", en: "Follow-up", ar: "المتابعة", statuses: ["DISCHARGED", "FOLLOW_UP", "CLOSED", "CANCELLED"] },
 ];
@@ -143,11 +143,11 @@ const STAGES: Record<string, { en: string; ar: string }> = {
   CONSULTANT_REVIEW: { en: "Under Consultant review", ar: "قيد مراجعة الاستشاري" },
   CLINICAL_RECOMMENDATION_READY: { en: "Clinical recommendation ready", ar: "التوصية السريرية جاهزة" },
   CLINICALLY_NOT_SUITABLE: { en: "Not clinically suitable", ar: "غير مناسبة سريريًا" },
-  PROPOSAL_PREPARATION: { en: "Preparing proposal", ar: "تجهيز العرض" },
+  PROPOSAL_PREPARATION: { en: "Preparing proposal", ar: "تجهيز التقدير" },
   PROPOSAL_INTERNAL_APPROVAL: { en: "Ready to release", ar: "جاهز للإرسال" },
   REVISION_REQUESTED: { en: "Revision requested", ar: "طلب تعديل" },
   PATIENT_DECISION: { en: "With the patient", ar: "لدى المريض" },
-  ACCEPTED: { en: "Proposal accepted", ar: "تم قبول العرض" },
+  ACCEPTED: { en: "Proposal accepted", ar: "تم قبول التقدير" },
   DECLINED: { en: "Declined", ar: "مرفوض" },
   EXPIRED: { en: "Expired", ar: "منتهي" },
   TRAVEL_COORDINATION: { en: "Treatment coordination", ar: "تنسيق العلاج" },
@@ -166,7 +166,7 @@ export function stageLabel(value: string, locale: Locale) {
 }
 
 const ROLES: Record<string, { en: string; ar: string }> = {
-  COORDINATOR: { en: "Coordinator", ar: "منسق" },
+  COORDINATOR: { en: "Coordinator", ar: "منسّق" },
   DOCTOR: { en: "Consultant", ar: "استشاري" },
   OPERATIONS: { en: "Operations", ar: "العمليات" },
   FINANCE: { en: "Finance", ar: "المالية" },

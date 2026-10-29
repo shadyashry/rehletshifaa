@@ -22,7 +22,7 @@ export function AssignmentHistory({ locale, caseId, load }: { locale: Locale; ca
     ? { title: "سجل التعيينات", loading: "جارٍ تحميل السجل…", failed: "تعذّر تحميل سجل التعيينات.", empty: "لا توجد تعيينات مسجلة على هذه الحالة بعد.", by: "بواسطة", routing: "التوجيه الآلي", system: "النظام", someone: "عضو في الفريق", reason: "السبب", current: "حالي", pending: "بانتظار القبول", declined: "مرفوض", ended: "انتهى", unknown: "اسم غير مسجّل" }
     : { title: "Assignment history", loading: "Loading history…", failed: "Assignment history could not be loaded.", empty: "No assignments are recorded on this case yet.", by: "By", routing: "automatic routing", system: "the system", someone: "a team member", reason: "Reason", current: "Current", pending: "Awaiting acceptance", declined: "Declined", ended: "Ended", unknown: "Name not recorded" };
   const roleLabel = (role: string) => ({
-    COORDINATOR: ar ? "مالك الحالة (المنسق)" : "Case owner (coordinator)", DOCTOR: ar ? "الاستشاري" : "Consultant",
+    COORDINATOR: ar ? "مالك الحالة (المنسّق)" : "Case owner (coordinator)", DOCTOR: ar ? "الاستشاري" : "Consultant",
     OPERATIONS: ar ? "العمليات" : "Operations", FINANCE: ar ? "المالية" : "Finance",
   } as Record<string, string>)[role] ?? role;
   const [entries, setEntries] = useState<AssignmentHistoryEntry[] | null>(null);

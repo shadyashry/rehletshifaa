@@ -204,7 +204,7 @@ test("Arabic is right-to-left with the same single-action discipline", async ({ 
   await expect(page.getByRole("heading", { level: 1, name: "رعايتي" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "نتحقق من دفعتك" })).toBeVisible();
   await expect(page.getByText("لا يلزم منك أي إجراء الآن.")).toBeVisible();
-  await expect(page.getByRole("button", { name: /الاطلاع على العرض/ })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /الاطلاع على عرض السعر/ })).toHaveCount(1);
   await noOverflow(page);
   await page.screenshot({ path: "e2e/screenshots/my-care-deposit-ar-390.png", fullPage: true });
   await page.setViewportSize({ width: 1440, height: 900 });

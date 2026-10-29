@@ -51,12 +51,12 @@ export const NAV_GROUPS: NavGroup[] = [
   { key: "commercial", label: ["Commercial", "الشؤون التجارية"], icon: Tags, items: [
     { key: "pricing", path: "/commercial/prices", label: ["Price Lists", "قوائم الأسعار"], summary: ["Consultant price lists and care-area service templates.", "قوائم أسعار الاستشاريين وقوالب الخدمات لكل مجال رعاية."], visible: (a) => a.can("CONSULTANT_CATALOG_MANAGE") },
     { key: "exchangeRates", path: "/commercial/exchange-rates", label: ["Exchange Rates", "أسعار الصرف"], summary: ["The rates used to show EGP prices in other currencies.", "الأسعار المستخدمة لعرض الأسعار بعملات غير الجنيه."], visible: (a) => a.can("REFERENCE_DATA_READ") && a.canAny(["COMMERCIAL_POLICY_READ", "COMMERCIAL_POLICY_MANAGE"]) },
-    { key: "marginDeposit", path: "/commercial/margin-deposit", label: ["Margin & Deposit", "الهامش والدفعة المقدمة"], summary: ["The margin and coordination deposit applied to new cases.", "الهامش ودفعة التنسيق المقدمة المطبّقان على الحالات الجديدة."], visible: (a) => a.can("COMMERCIAL_POLICY_READ") },
+    { key: "marginDeposit", path: "/commercial/margin-deposit", label: ["Margin & Deposit", "الهامش ودفعة التنسيق"], summary: ["The margin and coordination deposit applied to new cases.", "الهامش ودفعة التنسيق المطبّقان على الحالات الجديدة."], visible: (a) => a.can("COMMERCIAL_POLICY_READ") },
     // P0-5 (B-02): facilities are a pricing source and a destination, never users; Consultant Operations maintains, Finance approves prices.
     { key: "facilities", path: "/commercial/facilities", label: ["Facilities & Packages", "المنشآت والباقات"], summary: ["Treatment facilities, their accreditation and the package prices Finance has approved.", "منشآت العلاج واعتماداتها وأسعار الباقات التي اعتمدها الفريق المالي."], visible: (a) => a.can("FACILITY_READ") },
   ] },
   { key: "operations", label: ["Operations", "العمليات"], icon: Workflow, items: [
-    { key: "coordination", path: "/coordination", label: ["Coordination Setup", "إعداد التنسيق"], summary: ["Managed case summaries, coordinator capacity, team routing and routing rules.", "ملخصات الحالات المُدارة وسعة المنسقين وتوجيه الفرق وقواعد التوجيه."], visible: (a) => a.canAny(["ROUTING_READ", "COORDINATION_CASE_SUMMARY"]) },
+    { key: "coordination", path: "/coordination", label: ["Coordination Setup", "إعداد التنسيق"], summary: ["Managed case summaries, coordinator capacity, team routing and routing rules.", "ملخصات الحالات المُدارة وسعة المنسّقين وتوجيه الفرق وقواعد التوجيه."], visible: (a) => a.canAny(["ROUTING_READ", "COORDINATION_CASE_SUMMARY"]) },
   ] },
   // Journey design and publishing happen inside each journey (journey › version › design).
   { key: "journeys", label: ["Care Journeys", "رحلات الرعاية"], icon: Route, items: [

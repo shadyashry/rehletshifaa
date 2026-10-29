@@ -40,7 +40,7 @@ test("outside its moment the deposit is one line, with the refund behind a discl
   await page.goto("/ar/portal?case=letter");
   await page.locator("#case-heading").waitFor();
   await expect(page.locator("#deposit-payment")).toHaveCount(0);
-  const refund = page.locator("summary", { hasText: "استرداد جزء من هذه الوديعة؟" });
+  const refund = page.locator("summary", { hasText: "استرداد جزء من دفعة التنسيق هذه؟" });
   await expect(refund).toBeVisible();
   await expect(page.getByLabel("سبب الاسترداد")).toBeHidden();
 });

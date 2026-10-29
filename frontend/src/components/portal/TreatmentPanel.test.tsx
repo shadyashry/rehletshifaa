@@ -201,7 +201,7 @@ describe("TreatmentPanel — Finance and Operations", () => {
     setup("finance", { locale: "ar" });
     expect(await screen.findByRole("heading", { name: "العلاج" })).toBeTruthy();
     expect(screen.getByText("الحساب الجاري")).toBeTruthy();
-    expect(screen.getByText("لدى المالية للتسعير")).toBeTruthy();
+    expect(screen.getByText("لدى الفريق المالي للتسعير")).toBeTruthy();
     expect(screen.getByRole("button", { name: "احفظ الأسعار" })).toBeTruthy();
     // Not Finance's current treatment work: the pricing is offered but does not take the page's primary action.
     expect(primaries()).toHaveLength(0);

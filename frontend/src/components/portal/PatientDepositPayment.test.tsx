@@ -38,7 +38,7 @@ describe("PatientDepositPayment", () => {
     const { mutate } = renderPayment();
     const field = screen.getByRole("textbox", { name: /Transaction reference number/ });
     expect(field.getAttribute("aria-describedby")).toBeTruthy();
-    expect(screen.getByText(/so our finance team can find your payment and confirm it/)).toBeTruthy();
+    expect(screen.getByText(/so our Finance team can find your payment and confirm it/)).toBeTruthy();
     expect(screen.getByText(/confirmation SMS or email, on the transfer receipt, or in your banking app/)).toBeTruthy();
     const submit = screen.getByRole("button", { name: "Send transfer reference" });
     // Mandatory: sending nothing explains the fix inline and puts the focus on the field; nothing is sent.

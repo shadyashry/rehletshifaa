@@ -34,7 +34,7 @@ const roleNames: Record<string, [string, string]> = {
   CONSULTANT_OPERATIONS_MANAGER: ["Consultant Operations Manager", "مدير عمليات الاستشاريين"],
   CREDENTIAL_VERIFIER: ["Credential Verification Officer", "مسؤول التحقق من الاعتمادات"],
   CARE_COORDINATION_MANAGER: ["Care Coordination Manager", "مدير تنسيق الرعاية"],
-  COORDINATOR: ["Care Coordinator", "منسق رعاية"],
+  COORDINATOR: ["Care Coordinator", "منسّق رعاية"],
   OPERATIONS: ["Operations Specialist", "أخصائي عمليات"],
   OPERATIONS_MANAGER: ["Operations Manager", "مدير العمليات"],
   FINANCE: ["Finance Officer", "مسؤول مالي"],

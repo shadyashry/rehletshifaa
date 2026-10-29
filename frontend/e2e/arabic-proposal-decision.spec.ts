@@ -76,9 +76,9 @@ test("My Care in Arabic: the drawer offers the coordinator, and Decline asks aga
   await expect(dialog.getByRole("status").filter({ hasText: "ستصلك رسالة من" })).toBeFocused();
   expect(writes.some(w => w.path.endsWith("/proposals/v1/assistance"))).toBe(true);
   await page.screenshot({ path: shots("my-care-assisted-ar-390"), fullPage: true });
-  await dialog.getByRole("button", { name: "لا أرغب في المتابعة بهذا المقترح" }).click();
-  await expect(dialog.getByRole("button", { name: "الإبقاء على المقترح" })).toBeFocused();
-  await dialog.getByRole("button", { name: "الإبقاء على المقترح" }).click();
+  await dialog.getByRole("button", { name: "لا أرغب في المتابعة بعرض السعر هذا" }).click();
+  await expect(dialog.getByRole("button", { name: "الإبقاء على عرض السعر" })).toBeFocused();
+  await dialog.getByRole("button", { name: "الإبقاء على عرض السعر" }).click();
   expect(writes.some(w => w.path.endsWith("/decision"))).toBe(false);
 });
 
@@ -87,7 +87,7 @@ for (const locale of ["en", "ar"] as const) {
     await page.setViewportSize({ width: 1440, height: 900 });
     await setupPatient(page, "proposal-recorded");
     await page.goto(`/${locale}/portal`);
-    await page.getByRole("button", { name: locale === "ar" ? /الاطلاع على العرض/ : /View proposal/ }).first().click();
+    await page.getByRole("button", { name: locale === "ar" ? /الاطلاع على عرض السعر/ : /View proposal/ }).first().click();
     await expect(page.getByRole("dialog")).toContainText(locale === "ar" ? "سُجّل هذا القرار بواسطة" : "Recorded by");
     await expect(page.getByRole("dialog")).toContainText(locale === "ar" ? "مكالمة واتساب" : "WhatsApp call with you");
     await page.screenshot({ path: shots(`my-care-recorded-${locale}-1440`), fullPage: true });
@@ -121,7 +121,7 @@ for (const locale of ["en", "ar"] as const) {
     const form = panel.getByRole("group", { name: ar ? "تسجيل قرار المريض" : "Record the patient's decision" });
     await expect(form).toBeVisible();
     // Worded from the work item's code in the page's language, never the backend's English on an Arabic page.
-    await expect(panel).toContainText(ar ? "طلب المريض مراجعة شروط المقترح معه بالعربية" : "The patient asked you to go through the proposal’s terms with them in Arabic");
+    await expect(panel).toContainText(ar ? "طلب المريض مراجعة شروط عرض السعر معه بالعربية" : "The patient asked you to go through the proposal’s terms with them in Arabic");
     // Offered once: not again in More actions while it is the current action.
     await page.getByRole("button", { name: ar ? "المزيد" : "More" }).click();
     await expect(page.getByRole("dialog").getByRole("button", { name: ar ? /تسجيل قرار المريض/ : /Record the patient's decision/ })).toHaveCount(0);

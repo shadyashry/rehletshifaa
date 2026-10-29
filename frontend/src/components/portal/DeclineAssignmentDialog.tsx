@@ -34,8 +34,8 @@ export function DeclineAssignmentDialog({ locale, caseNumber, busy, onConfirm, o
 }) {
   const ar = locale === "ar";
   const t = ar
-    ? { title: "رفض التعيين", intro: "ستعود الحالة إلى المنسق لإعادة تعيينها. اختر سببًا حتى يعرف المنسق ما يفعله بعد ذلك.",
-        reason: "سبب الرفض", note: "ملاحظة للمنسق (اختياري)", notePlaceholder: "أي سياق يساعد المنسق",
+    ? { title: "رفض التعيين", intro: "ستعود الحالة إلى المنسّق لإعادة تعيينها. اختر سببًا حتى يعرف المنسّق ما يفعله بعد ذلك.",
+        reason: "سبب الرفض", note: "ملاحظة للمنسّق (اختياري)", notePlaceholder: "أي سياق يساعد المنسّق",
         cancel: "إلغاء", confirm: "رفض التعيين", close: "إغلاق", required: "اختر سببًا للمتابعة." }
     : { title: "Decline assignment", intro: "The case goes back to the coordinator to reassign. Pick a reason so they know what to do next.",
         reason: "Reason", note: "Note for the coordinator (optional)", notePlaceholder: "Anything that helps the coordinator",

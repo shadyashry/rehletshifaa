@@ -103,7 +103,7 @@ describe("workCopyText", () => {
     const copy = { code: "PROPOSAL_DECLINED", params: { said: "Too far to travel" } };
     expect(workCopyText(copy, en.portalWork.workCopy)).toEqual({ title: "Patient declined the proposal",
       context: `The patient declined this proposal. They said: “${iso("Too far to travel")}”` });
-    expect(workCopyText(copy, ar.portalWork.workCopy)?.title).toBe("رفض المريض العرض");
+    expect(workCopyText(copy, ar.portalWork.workCopy)?.title).toBe("رفض المريض عرض السعر");
     expect(workCopyText(copy, ar.portalWork.workCopy)?.context).toContain(`«${iso("Too far to travel")}»`);
     expect(workCopyText({ code: "RECOMMENDATION_READY", params: { consultant: "Dr Ahmed Alashry" } }, ar.portalWork.workCopy)?.context).toContain(iso("Dr Ahmed Alashry"));
   });
@@ -119,7 +119,7 @@ describe("waitingReasonText", () => {
   const arWork = { waitingReason: ar.portalWork.waitingReason, workCopy: ar.portalWork.workCopy };
   it("words a fixed reason, a work item and a patient step, and keeps the English for anything unknown", () => {
     expect(waitingReasonText({ waitingReasonCode: "DEFAULT_PATIENT", waitingReason: "Waiting for information requested from the patient" }, enWork, "en")).toBe("Waiting for the patient");
-    expect(waitingReasonText({ waitingReasonCode: "WORK:PROPOSAL_CHANGES_REQUESTED" }, arWork, "ar")).toBe("طلب المريض تعديلات على العرض");
+    expect(waitingReasonText({ waitingReasonCode: "WORK:PROPOSAL_CHANGES_REQUESTED" }, arWork, "ar")).toBe("طلب المريض تعديلات على عرض السعر");
     const blockers = [{ code: "CONTACT_NOT_VERIFIED", labelEn: "Contact channel verification", labelAr: "تأكيد وسيلة التواصل" }];
     expect(waitingReasonText({ waitingReasonCode: "PATIENT_STEP:CONTACT_NOT_VERIFIED", blockers }, arWork, "ar")).toBe("بانتظار المريض: تأكيد وسيلة التواصل");
     expect(waitingReasonText({ waitingReasonCode: "SOMETHING_NEW", waitingReason: "Legacy English" }, arWork, "ar")).toBe("Legacy English");

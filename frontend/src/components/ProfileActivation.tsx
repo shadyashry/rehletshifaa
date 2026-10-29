@@ -52,7 +52,7 @@ export type ActivationCopy = Dictionary["secureLink"]["activation"];
  * The deposit consent is legal wording: English is read from lib/commercial-terms, the Arabic kept verbatim beside it
  * until the legal review. Every other consent's words are `secureLink.activation.consents`.
  */
-const DEPOSIT_CONSENT = { en: DEPOSIT_TERMS_CONSENT, ar: "قرأت وأقبل شروط وديعة التنسيق والإلغاء والاسترداد." };
+const DEPOSIT_CONSENT = { en: DEPOSIT_TERMS_CONSENT, ar: "قرأت وأقبل شروط دفعة التنسيق والإلغاء والاسترداد." };
 
 type PatientAction = "COMPLETE_PROFILE" | "SET_UP_ACCOUNT" | "NONE" | "CONTINUE_IN_PORTAL";
 type JourneyStage = "PROFILE" | "ACCOUNT_SETUP" | "DEPOSIT" | "CARE_COORDINATION";
