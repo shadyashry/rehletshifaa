@@ -64,6 +64,19 @@ test("writes have their own, smaller budget", async ({ request }) => {
   expect(abuse.filter(s => s === 429).length).toBeGreaterThan(0);
 });
 
+/** An unsigned bearer token naming `sub`: the gateway only reads the subject to pick a bucket; the backend refuses it (401). */
+const bearer = (sub: string) => `Bearer ${Buffer.from('{"alg":"none"}').toString("base64url")}.${Buffer.from(JSON.stringify({ sub })).toString("base64url")}.c2ln`;
+
+test("signed-in colleagues behind one address keep their own write budgets (D-11)", async ({ request }) => {
+  const ip = client(), path = `${GATEWAY}/api/v1/coordinator/cases/00000000-0000-0000-0000-000000000000/claim`;
+  const as = (sub: string, count: number) => Promise.all(Array.from({ length: count }, () =>
+    request.post(path, { headers: { "CF-Connecting-IP": ip, Authorization: bearer(sub) }, data: {} }))).then(r => r.map(x => x.status()));
+  const busy = await as(`busy-${ip}`, 120);
+  expect(busy.filter(s => s === 429).length, "one user hammering writes is still throttled").toBeGreaterThan(0);
+  const colleague = await as(`colleague-${ip}`, 10);
+  expect(colleague.filter(s => s === 429), "a colleague on the same address is not").toHaveLength(0);
+});
+
 test("public secure-link routes are the tightest, and a patient flow fits inside them", async ({ request }) => {
   const flow = await burst(request, client(), 8, "/api/v1/public/proposals/not-a-real-token");
   expect(flow.filter(s => s === 429)).toHaveLength(0);

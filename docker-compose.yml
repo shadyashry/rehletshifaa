@@ -162,6 +162,7 @@ services:
     volumes:
       - ./infrastructure/api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infrastructure/api-gateway/upstream.inc:/etc/nginx/conf.d/upstream.inc:ro
+      - ./infrastructure/api-gateway/write-budget.js:/etc/nginx/conf.d/write-budget.js:ro
     ports: ["8081:80"]
     depends_on: [backend]
     healthcheck: { test: ["CMD","wget","-qO-","http://127.0.0.1/gateway/health"], interval: 10s, timeout: 3s, retries: 5 }

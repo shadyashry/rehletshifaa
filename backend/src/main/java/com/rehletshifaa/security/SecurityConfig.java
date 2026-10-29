@@ -5,7 +5,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 @Configuration
 public class SecurityConfig {
-    @Bean SecurityFilterChain security(HttpSecurity http,@Value("${app.security.enabled:false}")boolean securityEnabled,CorsConfigurationSource corsConfigurationSource,DatabaseAuthenticationConverter databaseRoles,RestoreSignInBlockFilter restoreSignInBlock,MetricsPort metricsPort)throws Exception{http.csrf(csrf->csrf.disable()).cors(cors->cors.configurationSource(corsConfigurationSource)).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)).authorizeHttpRequests(auth->auth
+    @Bean SecurityFilterChain security(HttpSecurity http,@Value("${app.security.enabled:false}")boolean securityEnabled,CorsConfigurationSource corsConfigurationSource,DatabaseAuthenticationConverter databaseRoles,RestoreSignInBlockFilter restoreSignInBlock,RateLimitFilter rateLimit,MetricsPort metricsPort)throws Exception{http.csrf(csrf->csrf.disable()).cors(cors->cors.configurationSource(corsConfigurationSource)).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)).authorizeHttpRequests(auth->auth
         .requestMatchers(HttpMethod.POST,"/api/v1/cases").permitAll()
         .requestMatchers(HttpMethod.POST,"/api/v1/cases/*/documents/presign","/api/v1/cases/*/documents/confirm","/api/v1/cases/*/submit").permitAll()
         .requestMatchers(HttpMethod.PUT,"/api/v1/local-uploads/*").permitAll()
@@ -38,7 +38,11 @@ public class SecurityConfig {
         .requestMatchers("/api/v1/admin/**").authenticated()
         .requestMatchers(HttpMethod.GET,"/api/v1/documents/*/download","/api/v1/documents/*/view").authenticated()
         .requestMatchers(HttpMethod.GET,"/api/v1/cases/*/documents").authenticated()
-        .anyRequest().denyAll());if(securityEnabled)http.oauth2ResourceServer(oauth2->oauth2.jwt(jwt->jwt.jwtAuthenticationConverter(databaseRoles)));http.addFilterAfter(restoreSignInBlock,org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class);return http.headers(headers->headers.contentSecurityPolicy(csp->csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))).build();}
+        .anyRequest().denyAll());if(securityEnabled)http.oauth2ResourceServer(oauth2->oauth2.jwt(jwt->jwt.jwtAuthenticationConverter(databaseRoles)));http.addFilterAfter(restoreSignInBlock,org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class);
+        // D-11 (owner, 2026-10-29): the write budget is counted once the bearer token is verified, so a signed-in write spends its user's budget.
+        http.addFilterAfter(rateLimit,org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class);return http.headers(headers->headers.contentSecurityPolicy(csp->csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))).build();}
+    /** The write budget runs inside the security chain (above), never also as a plain servlet filter: one count per request. */
+    @Bean org.springframework.boot.web.servlet.FilterRegistrationBean<RateLimitFilter> rateLimitOutsideTheChain(RateLimitFilter rateLimit){var registration=new org.springframework.boot.web.servlet.FilterRegistrationBean<>(rateLimit);registration.setEnabled(false);return registration;}
     @Bean CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins}")String configured){var config=new CorsConfiguration();config.setAllowedOrigins(Arrays.stream(configured.split(",")).map(String::trim).filter(s->!s.isBlank()).toList());config.setAllowedMethods(ListHolder.METHODS);config.setAllowedHeaders(ListHolder.HEADERS);config.setExposedHeaders(ListHolder.EXPOSED);config.setAllowCredentials(false);config.setMaxAge(3600L);var source=new UrlBasedCorsConfigurationSource();source.registerCorsConfiguration("/api/**",config);return source;}
     @Bean @ConditionalOnProperty(name="app.security.enabled",havingValue="true") JwtDecoder jwtDecoder(
             @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")String issuer,

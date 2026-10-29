@@ -48,10 +48,8 @@ services:
       S3_PUBLIC_ENDPOINT: http://localhost:19100
       FRONTEND_ALLOWED_ORIGINS: http://localhost:13000
       RATE_LIMIT_TRUST_PROXY: "true"
-      # Every QA identity (coordinator, consultant, Operations, Finance, the patient) writes from this one loopback address,
-      # like testers behind one office NAT (the UAT .env override): the per-address budget is raised for the stack, not the
-      # product. The finding itself is AR-06 / D-11 in docs/qa/deep-platform-validation.
-      RATE_LIMIT_REQUESTS: ${QA_RATE_LIMIT_REQUESTS:-240}
+      # Every QA identity writes from this one loopback address, like staff behind one office NAT; since D-11 a signed-in
+      # write spends its user's budget, so the product default holds here too.
       APP_PUBLIC_BASE_URL: http://localhost:18081
       APP_WEB_BASE_URL: http://localhost:13000
     ports: !override ["127.0.0.1:18080:8080"]
