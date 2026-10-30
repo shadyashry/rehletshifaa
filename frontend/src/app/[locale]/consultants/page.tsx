@@ -82,7 +82,8 @@ export default async function Consultants({ params }: Props) {
             </div>
             <p className="max-w-[52ch] text-[1rem] leading-7 text-ink-600">{page.panel.intro}</p>
           </div>
-          <ConsultantPanel entries={entries} systems={systems} locale={locale} copy={{ ...page.panel, count: d.portalWork.plural.consultants, view: ui.viewProfile }} />
+          <ConsultantPanel entries={entries} systems={systems} locale={locale} copy={{ ...page.panel, count: d.portalWork.plural.consultants, view: ui.viewProfile,
+            send: { label: d.common.send, href: localeHref(locale, "send-my-case") } }} />
         </div>
       </section>
 

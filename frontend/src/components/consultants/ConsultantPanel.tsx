@@ -1,9 +1,10 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { ArrowRight, Search, X } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 
 import { SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
+import { TrackedLink } from "@/components/TrackedLink";
 import type { CareAreaIconName, CareSystem } from "@/lib/care-area-catalog";
 import type { ConsultantProfile } from "@/lib/consultants";
 import type { Locale } from "@/lib/i18n";
@@ -32,6 +33,8 @@ type Copy = {
   distinction: string;
   focus: string;
   view: string;
+  /** Offered when nothing matches: the case form, where no name or specialty is needed. */
+  send: { label: string; href: string };
 };
 
 /**
@@ -128,6 +131,11 @@ export function ConsultantPanel({ entries, systems, locale, copy }: {
         <div className="mt-2 rounded-[18px] border border-dashed border-border-card bg-surface-default px-6 py-12 text-center">
           <p className="text-[1.0625rem] font-semibold text-brand-900">{copy.empty}</p>
           <p className="mx-auto mt-2 max-w-[44ch] text-[0.9375rem] leading-6 text-ink-600">{copy.emptyHint}</p>
+          {/* No match is not "not covered": the case form is the way forward, so it is offered right here. */}
+          <TrackedLink event="send_case_cta_clicked" className="link-cta mt-4 inline-flex text-[0.9375rem]" href={copy.send.href}>
+            {copy.send.label}
+            <ArrowRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
+          </TrackedLink>
         </div>
       )}
     </>

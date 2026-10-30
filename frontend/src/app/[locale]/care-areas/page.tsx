@@ -29,10 +29,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 /**
- * The care-areas selection page, organised as a care atlas: a hero whose visual is the platform's promise
- * (one case at the centre, every specialty around it, grouped by body system), the atlas itself — numbered
- * body systems, each with its care-area cards and the named Consultants behind them — and a closing
- * router that tells the undecided patient they never have to choose. Counts are derived, never typed.
+ * The care-areas page, organised as a care atlas: a hero whose visual is the platform's promise (one case at the
+ * centre, every specialty around it, grouped by body system), then the router that tells the undecided patient they
+ * never have to choose, then the atlas itself — body systems, each with its care-area cards and the named Consultants
+ * behind them — as coverage to read, not a menu to pick from. Counts are derived, never typed.
  */
 export default async function CareAreas({ params }: Props) {
   const { locale } = await params;
@@ -61,6 +61,9 @@ export default async function CareAreas({ params }: Props) {
           </a>
         </div>
       </PageHero>
+
+      {/* The answer to "which one is mine?" comes before the atlas, not after nine cards: the patient never has to choose. */}
+      <CaseRouter locale={locale} copy={page.router} button={d.common.send} />
 
       <section id="atlas" aria-labelledby="atlas-title" className="scroll-mt-20 bg-surface-pearl pb-6 pt-14 md:pt-20">
         <div className="container-site">
@@ -128,8 +131,6 @@ export default async function CareAreas({ params }: Props) {
           </div>
         </div>
       </section>
-
-      <CaseRouter locale={locale} copy={page.router} button={d.common.send} />
     </>
   );
 }

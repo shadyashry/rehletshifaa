@@ -751,7 +751,7 @@
     "atlas": {
       "eyebrow": "The care atlas",
       "title": "{count} care areas, organised by body system",
-      "intro": "Each care area is led by named Consultants who own the clinical decision. Choose the one closest to your need — or let your coordinator choose for you.",
+      "intro": "What each care area reviews, and who leads it. You don't need to pick one: your coordinator routes your case to the right Consultant.",
       "index": "Jump to a body system",
       "areas": {
         "one": "{count} care area",
@@ -899,7 +899,7 @@
     "panel": {
       "eyebrow": "The Consultant panel",
       "title": "Senior specialists, organised by body system",
-      "intro": "Browse by body system, or search for a condition, procedure or name. Every profile is drawn from a supplied CV and checked before matching.",
+      "intro": "Browse by body system, or search by procedure or name. Every profile is prepared from the Consultant's CV, and credentials are reviewed before any case is matched.",
       "search": "Search by name, specialty or expertise",
       "searchPlaceholder": "e.g. knee replacement, dysphagia, PCI",
       "systems": "Filter by body system",

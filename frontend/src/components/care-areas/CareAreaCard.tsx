@@ -10,7 +10,9 @@ const MAX_MONOGRAMS = 3;
 /**
  * One care area in the atlas: system-tinted icon well, title, body, three sub-area facets and the named
  * Consultants who lead it (monograms — never portraits we have not approved). The whole card is the link;
- * it is also the target of the care-network node above, so it lights up when reached from there.
+ * it is also the target of the care-network node above, so it lights up when reached from there. On phones the
+ * card is a short entry (icon, title, who leads it): the body and facets are on the care-area page one tap away,
+ * so nine areas do not cost nine screens.
  */
 export function CareAreaCard({ area, href, action, consultantsLabel, wide }: {
   area: AtlasArea;
@@ -26,7 +28,7 @@ export function CareAreaCard({ area, href, action, consultantsLabel, wide }: {
   return (
     <li
       id={`area-${area.slug}`}
-      className={`group relative isolate flex scroll-mt-28 flex-col overflow-hidden rounded-[16px] border border-border-card bg-surface-default p-6 shadow-[0_1px_2px_rgba(36,64,74,0.04)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_22px_44px_-28px_rgba(36,64,74,0.45)] has-[a:focus-visible]:border-brand-500 target:border-brand-400 target:ring-4 target:ring-brand-100 motion-reduce:transform-none sm:p-7 ${wide ? "sm:col-span-2" : ""}`}
+      className={`group relative isolate flex scroll-mt-28 flex-col overflow-hidden rounded-[16px] border border-border-card bg-surface-default p-6 shadow-[0_1px_2px_rgba(36,64,74,0.04)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_22px_44px_-28px_rgba(36,64,74,0.45)] has-[a:focus-visible]:border-brand-500 target:border-brand-400 target:ring-4 target:ring-brand-100 motion-reduce:transform-none p-5 sm:p-7 ${wide ? "sm:col-span-2" : ""}`}
     >
       <CareAreaIcon
         name={area.icon}
@@ -37,10 +39,10 @@ export function CareAreaCard({ area, href, action, consultantsLabel, wide }: {
         <CareAreaIcon name={area.icon} size={22} strokeWidth={1.7} />
       </span>
 
-      <h4 className="mt-5 text-[1.25rem] font-semibold leading-[1.3] tracking-[-0.01em] text-brand-900 [text-wrap:balance] rtl:tracking-normal sm:text-[1.25rem]">{area.title}</h4>
-      <p className={`mt-2 text-[0.9375rem] leading-6 text-ink-600 sm:text-[1rem] sm:leading-7 ${wide ? "max-w-[62ch]" : ""}`}>{area.body}</p>
+      <h4 className="mt-4 text-[1.25rem] sm:mt-5 font-semibold leading-[1.3] tracking-[-0.01em] text-brand-900 [text-wrap:balance] rtl:tracking-normal sm:text-[1.25rem]">{area.title}</h4>
+      <p className={`mt-2 hidden text-[0.9375rem] leading-6 text-ink-600 sm:block sm:text-[1rem] sm:leading-7 ${wide ? "max-w-[62ch]" : ""}`}>{area.body}</p>
 
-      <p className="mt-4 flex flex-wrap gap-1.5">
+      <p className="mt-4 hidden flex-wrap gap-1.5 sm:flex">
         {area.facets.map((facet) => (
           <span key={facet} className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface-pearl px-2.5 py-1 text-[0.8125rem] leading-5 text-ink-700">
             <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${system.dot}`} />
@@ -49,7 +51,7 @@ export function CareAreaCard({ area, href, action, consultantsLabel, wide }: {
         ))}
       </p>
 
-      <div className="mt-auto pt-6">
+      <div className="mt-auto pt-4 sm:pt-6">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border-subtle pt-4">
           {area.consultants.length > 0 ? (
             <div className="flex items-center gap-2.5">
