@@ -148,7 +148,9 @@ export function ProfileActivation({ locale, token, copy: t, guardianConsent }: {
     if (err?.code && INACTIVE.has(err.code)) { setInvalidReason(t.invalidInactive); setStage("invalid"); return null; }
     // The short-lived grant lapsed on a later step: verify again, keeping everything typed.
     if (err?.status === 401 && grant) { expireSession(); return null; }
+    if (err?.code === "RESEND_TOO_SOON") return t.resendTooSoon;
     if (err?.status === 429) return t.tooMany;
+    if (err?.code === "VERIFICATION_EXPIRED") return t.codeExpired;
     if (err?.code === "VERIFICATION_INVALID") return t.codeInvalid;
     return t.error;
   }
@@ -351,7 +353,8 @@ export function ProfileActivation({ locale, token, copy: t, guardianConsent }: {
           <div className="mt-4 border-t border-line pt-5">
             {/* This endpoint accepts a channel: before a code is sent the other one is offered (and sends there). */}
             <OneTimeCodeStep round={codeRound} error={notice}
-                             copy={{ sendTo: t.verifyIntro, sentTo: t.codeSent, send: t.sendCode, sending: t.sending, codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend, incomplete: t.codeIncomplete }}
+                             copy={{ sendTo: t.verifyIntro, sentTo: t.codeSent, send: t.sendCode, sending: t.sending, codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend, incomplete: t.codeIncomplete,
+                                     lifetime: t.codeLifetime, resendIn: t.resendIn }}
                              destination={summary?.destinationHint} sent={codeSent} busy={busy}
                              notice={codeSent && codeRound > 1 ? t.codeResent : null}
                              onSend={() => void sendCode()} onVerify={code => void verify(code)}

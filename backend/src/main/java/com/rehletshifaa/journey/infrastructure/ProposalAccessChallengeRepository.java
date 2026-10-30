@@ -11,6 +11,8 @@ import java.util.UUID;
 
 public interface ProposalAccessChallengeRepository extends BaseRepository<ProposalAccessChallenge, UUID> {
     long countByShareTokenIdAndCreatedAtAfter(UUID shareTokenId, Instant since);
+    /** Whether a code went to this channel since the instant (the wait before a resend to the same channel). */
+    boolean existsByShareTokenIdAndDeliveryChannelAndCreatedAtAfter(UUID shareTokenId, String deliveryChannel, Instant since);
 
     interface CodeRow {
         UUID getId(); String getCodeHash(); Instant getExpiresAt(); Integer getAttempts(); Integer getMaxAttempts(); Instant getConsumedAt();

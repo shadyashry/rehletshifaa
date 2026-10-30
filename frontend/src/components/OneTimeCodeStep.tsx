@@ -15,7 +15,15 @@ export type OneTimeCodeCopy = {
   resend: string;
   /** Said under the field when Verify is pressed with fewer than six digits. A link that passes it keeps Verify enabled. */
   incomplete?: string;
+  /** Said once under the field, never as a ticking clock: "The code works for 10 minutes." */
+  lifetime?: string;
+  /** The resend button while it waits after a send, with `{time}` as m:ss: "Send a new code in {time}". */
+  resendIn?: string;
 };
+
+/** Matches the backend's wait before a resend to the same channel (PublicCaseAccessService.RESEND_WAIT). */
+const RESEND_WAIT_SECONDS = 60;
+const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 /**
  * The one-time-code step shared by the three secure links (status, proposal, profile activation). Possession of a link
@@ -50,10 +58,22 @@ export function OneTimeCodeStep({ copy, destination, sent, busy, onSend, onVerif
   const [code, setCode] = useState("");
   const [short, setShort] = useState(false);
   const [seenRound, setSeenRound] = useState(round);
-  if (round !== seenRound) { setSeenRound(round); setCode(""); setShort(false); }
+  // Each successful send makes Resend wait a minute, so a repeated tap never cancels a code still on its way.
+  const [wait, setWait] = useState(round > 0 && copy.resendIn ? RESEND_WAIT_SECONDS : 0);
+  if (round !== seenRound) { setSeenRound(round); setCode(""); setShort(false); setWait(copy.resendIn ? RESEND_WAIT_SECONDS : 0); }
+  useEffect(() => {
+    if (round < 1 || !copy.resendIn) return;
+    const until = Date.now() + RESEND_WAIT_SECONDS * 1000;
+    const timer = setInterval(() => {
+      const left = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+      setWait(left);
+      if (left === 0) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [round, copy.resendIn]);
   const fieldRef = useRef<HTMLInputElement>(null);
   const fieldId = useId();
-  const errorId = `${fieldId}-error`, destinationId = `${fieldId}-destination`;
+  const errorId = `${fieldId}-error`, destinationId = `${fieldId}-destination`, lifetimeId = `${fieldId}-lifetime`;
   // A wrong or expired code puts the patient back in the field with the digits selected, ready to retype.
   useEffect(() => { if (error && sent) { fieldRef.current?.focus(); fieldRef.current?.select(); } }, [error, sent]);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new round moves focus, not the step's other state
@@ -86,8 +106,10 @@ export function OneTimeCodeStep({ copy, destination, sent, busy, onSend, onVerif
           <label htmlFor={fieldId} className="block text-sm font-bold text-ink-800">{copy.codeLabel}</label>
           <input ref={fieldRef} id={fieldId} className="field mt-2 max-w-[16rem] text-center text-2xl tabular-nums tracking-[0.4em]" dir="ltr"
                  name="one-time-code" inputMode="numeric" autoComplete="one-time-code" spellCheck={false} enterKeyHint="done" autoFocus
-                 aria-invalid={problem ? true : undefined} aria-describedby={[destination ? destinationId : "", problem ? errorId : ""].join(" ").trim() || undefined}
+                 aria-invalid={problem ? true : undefined}
+                 aria-describedby={[destination ? destinationId : "", copy.lifetime ? lifetimeId : "", problem ? errorId : ""].filter(Boolean).join(" ") || undefined}
                  value={code} onChange={event => { setShort(false); setCode(latinDigits(event.target.value).replace(/\D/g, "").slice(0, 6)); }}/>
+          {copy.lifetime && <p id={lifetimeId} className="mt-2 text-[0.9375rem] leading-6 text-ink-700">{copy.lifetime}</p>}
           {message}
           {/* Always rendered so the confirmation is announced when it appears. */}
           <p role="status" className={!problem && !busy && notice ? "mt-3 text-[0.9375rem] leading-6 text-brand-800" : "sr-only"}>
@@ -95,7 +117,9 @@ export function OneTimeCodeStep({ copy, destination, sent, busy, onSend, onVerif
           </p>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-5">
             <button className="btn-primary w-full sm:w-auto" disabled={busy || (!copy.incomplete && code.length !== 6)}>{busy ? copy.verifying : copy.verify}</button>
-            <button type="button" className="link-cta inline-flex min-h-11 items-center self-start text-[0.9375rem] sm:self-auto" disabled={busy} onClick={onSend}>{copy.resend}</button>
+            <button type="button" className="link-cta inline-flex min-h-11 items-center self-start text-[0.9375rem] sm:self-auto" disabled={busy || wait > 0} onClick={onSend}>
+              {wait > 0 && copy.resendIn ? copy.resendIn.replace("{time}", clock(wait)) : copy.resend}
+            </button>
           </div>
         </form>
       )}

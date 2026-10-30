@@ -156,7 +156,8 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
   function codeFailure(e: unknown) {
     const failure = e as Failure;
     if (failure.code === "CASE_LINK_INVALID") { setPhase("invalid"); return; }
-    setError(failure.code === "TOO_MANY_REQUESTS" ? t.tooManyCodes : failure.code === "VERIFICATION_INVALID" ? t.codeInvalid : t.error);
+    setError(failure.code === "TOO_MANY_REQUESTS" ? t.tooManyCodes : failure.code === "RESEND_TOO_SOON" ? t.resendTooSoon
+      : failure.code === "VERIFICATION_EXPIRED" ? t.codeExpired : failure.code === "VERIFICATION_INVALID" ? t.codeInvalid : t.error);
   }
 
   async function request() {
@@ -369,7 +370,8 @@ export function CaseStatusAccess({ locale, token, emergency, copy: t, journeyCop
           <OneTimeCodeStep round={codeRound} notice={phase === "code" && codeRound > 1 ? t.codeResent : null}
                            copy={{ sendTo: channel === "WHATSAPP" ? t.sendToWhatsApp : channel === "EMAIL" ? t.sendToEmail : t.sendTo,
                                    sentTo: channel === "WHATSAPP" ? t.sentWhatsApp : channel === "EMAIL" ? t.sentEmail : t.sent,
-                                   send: t.send, sending: t.sending, codeLabel: t.code, verify: t.verify, verifying: t.verifying, resend: t.resend, incomplete: t.codeIncomplete }}
+                                   send: t.send, sending: t.sending, codeLabel: t.code, verify: t.verify, verifying: t.verifying, resend: t.resend, incomplete: t.codeIncomplete,
+                                   lifetime: t.codeLifetime, resendIn: t.resendIn }}
                            destination={summary?.destinationHint} sent={phase === "code"} busy={busy} error={error || null}
                            onSend={() => void request()} onVerify={code => void verify(code)}>
             <p className="mt-2 flex items-start gap-2 text-[0.9375rem] leading-6 text-ink-600">

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 import { OneTimeCodeStep, type OneTimeCodeCopy } from "./OneTimeCodeStep";
 import { CaseJourney } from "./CaseJourney";
@@ -51,6 +51,28 @@ describe("OneTimeCodeStep", () => {
     expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(field.getAttribute("aria-describedby")?.split(" ").map(id => document.getElementById(id)?.textContent)).toEqual(["We sent a code to •••• 7898", "That code is not right."]);
     expect(screen.getByRole("alert").textContent).toBe("That code is not right.");
+  });
+
+  it("says once how long the code works, and makes Resend wait a minute after each send", () => {
+    vi.useFakeTimers();
+    try {
+      const timed = { ...copy, lifetime: "The code works for 10 minutes.", resendIn: "Send a new code in {time}" };
+      const onSend = vi.fn();
+      const { rerender } = render(<OneTimeCodeStep copy={timed} destination="•••• 7898" sent busy={false} round={1} onSend={onSend} onVerify={vi.fn()}/>);
+      const field = screen.getByLabelText("Enter the 6-digit code");
+      expect(field.getAttribute("aria-describedby")?.split(" ").map(id => document.getElementById(id)?.textContent))
+        .toEqual(["We sent a code to •••• 7898", "The code works for 10 minutes."]);
+      const wait = screen.getByRole("button", { name: "Send a new code in 1:00" }) as HTMLButtonElement;
+      expect(wait.disabled).toBe(true);
+      act(() => { vi.advanceTimersByTime(15_000); });
+      expect(screen.getByRole("button", { name: "Send a new code in 0:45" })).toBeTruthy();
+      act(() => { vi.advanceTimersByTime(45_000); });
+      fireEvent.click(screen.getByRole("button", { name: "Resend code" }));
+      expect(onSend).toHaveBeenCalledOnce();
+      // A successful resend starts the wait again.
+      rerender(<OneTimeCodeStep copy={timed} destination="•••• 7898" sent busy={false} round={2} onSend={onSend} onVerify={vi.fn()}/>);
+      expect((screen.getByRole("button", { name: "Send a new code in 1:00" }) as HTMLButtonElement).disabled).toBe(true);
+    } finally { vi.useRealTimers(); }
   });
 });
 

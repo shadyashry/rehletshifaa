@@ -10,7 +10,7 @@ beforeAll(() => {
   };
 });
 
-import { cleanup, configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 // Each case walks the code step first; under a full parallel run the default 1s wait for the next page can run out.
 configure({ asyncUtilTimeout: 3000 });
@@ -414,12 +414,26 @@ describe("ProposalSign — the estimate as a document (slice C)", () => {
     expect(screen.queryByText(/The verification code is invalid/)).toBeNull();
   });
 
-  it("confirms a resent code", async () => {
-    stubSealed();
+  it("says how long the code works, makes Resend wait a minute, then confirms a resent code", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      stubSealed();
+      fireEvent.click(await screen.findByRole("button", { name: en.sendCode }));
+      await screen.findByLabelText(en.codeLabel);
+      expect(screen.getByText(en.codeLifetime)).toBeTruthy();
+      expect((screen.getByRole("button", { name: en.resendIn.replace("{time}", "1:00") }) as HTMLButtonElement).disabled).toBe(true);
+      await act(async () => { vi.advanceTimersByTime(60_000); });
+      fireEvent.click(screen.getByRole("button", { name: en.resend }));
+      expect(await screen.findByText(en.codeResent)).toBeTruthy();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("tells the patient an expired code ran out, not that it is wrong", async () => {
+    stubSealed({ "/verify": () => ({ ok: false, status: 400, json: async () => ({ code: "VERIFICATION_EXPIRED" }) } as Response) });
     fireEvent.click(await screen.findByRole("button", { name: en.sendCode }));
-    await screen.findByLabelText(en.codeLabel);
-    fireEvent.click(screen.getByRole("button", { name: en.resend }));
-    expect(await screen.findByText(en.codeResent)).toBeTruthy();
+    fireEvent.change(await screen.findByLabelText(en.codeLabel), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: en.verify }));
+    expect(await screen.findByText(en.codeExpired)).toBeTruthy();
   });
 
   it("stamps an estimate Estimate ready with its release date, and prints no stamp without one", async () => {

@@ -236,7 +236,8 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
       return;
     }
     // The gateway's own rate limit answers 429 without a code.
-    setError(f.code === "TOO_MANY_REQUESTS" || f.status === 429 ? t.tooMany : f.code === "VERIFICATION_INVALID" ? t.codeInvalid : t.error);
+    setError(f.code === "RESEND_TOO_SOON" ? t.resendTooSoon : f.code === "TOO_MANY_REQUESTS" || f.status === 429 ? t.tooMany
+      : f.code === "VERIFICATION_EXPIRED" ? t.codeExpired : f.code === "VERIFICATION_INVALID" ? t.codeInvalid : t.error);
   }
 
   async function requestAccess(ch: "WHATSAPP" | "EMAIL" = channel) {
@@ -386,7 +387,8 @@ export function ProposalSign({ locale, token, copy }: { locale: Locale; token: s
             <div className="mt-4 border-t border-line pt-5">
               <OneTimeCodeStep round={codeRound}
                 copy={{ sendTo: channel === "WHATSAPP" ? t.verifyIntroWhatsapp : t.verifyIntroEmail, sentTo: t.codeSent, send: t.sendCode, sending: t.sending,
-                        codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend, incomplete: t.codeIncomplete }}
+                        codeLabel: t.codeLabel, verify: t.verify, verifying: t.verifying, resend: t.resend, incomplete: t.codeIncomplete,
+                        lifetime: t.codeLifetime, resendIn: t.resendIn }}
                 destination={(channel === "WHATSAPP" ? summary.whatsappHint : summary.emailHint) ?? summary.destinationHint}
                 sent={phase === "code"} busy={busy} onSend={() => void requestAccess()} onVerify={code => void verify(code)}
                 notice={phase === "code" && codeRound > 1 ? t.codeResent : null}

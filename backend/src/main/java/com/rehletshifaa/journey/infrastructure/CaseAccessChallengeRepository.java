@@ -14,6 +14,8 @@ import java.util.UUID;
 public interface CaseAccessChallengeRepository extends BaseRepository<CaseAccessChallenge, UUID> {
     /** Codes sent for the link since the instant (the hourly send limit). */
     long countByLinkIdAndCreatedAtAfter(UUID linkId, Instant after);
+    /** Whether a code went to this channel since the instant (the wait before a resend to the same channel). */
+    boolean existsByLinkIdAndDeliveryChannelAndCreatedAtAfter(UUID linkId, String deliveryChannel, Instant after);
 
     /** A code as verification judges it. */
     interface ChallengeState {

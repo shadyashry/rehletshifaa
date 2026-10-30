@@ -508,6 +508,8 @@ class PatientActivationJourneyTest {
 
     /** Verify the one-time code on the onboarding link and return the short-lived grant. */
     private String grant(Ctx ctx) throws Exception {
+        // A later visit: any earlier code on the link was sent longer ago than the wait before a resend.
+        em.flush(); jdbc.update("UPDATE case_access_challenges SET created_at = DATEADD('SECOND', -61, created_at)"); em.clear();
         publicCases.requestAccess(ctx.token, "WHATSAPP"); em.flush();
         var g = publicCases.verify(ctx.token, accessCode(ctx.token));
         SecurityContextHolder.clearContext();

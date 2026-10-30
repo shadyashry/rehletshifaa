@@ -46,6 +46,7 @@ class SecureJourneyCorrectionsTest {
         @Override public Clock withZone(ZoneId zone){throw new UnsupportedOperationException();}
     }
     private void tick(){((AdvanceableClock)clock).advance(Duration.ofSeconds(1));}
+    private void resendWait(){((AdvanceableClock)clock).advance(PublicCaseAccessService.RESEND_WAIT.plusSeconds(1));}
     @AfterEach void clear(){SecurityContextHolder.clearContext();((AdvanceableClock)clock).reset();}
 
     // ---- Core product decision: OTP timing + verification does not change status ----
@@ -94,11 +95,12 @@ class SecureJourneyCorrectionsTest {
         assertThat(count("SELECT count(*) FROM case_access_links WHERE case_id=?",draft.caseId())).isZero();
         for(int i=0;i<4;i++){publicCases.recoverStatusLink(new CaseLinkRecoveryRequest(other.caseNumber(),"+254700000092","en")); em.flush(); tick();}
         assertThat(count("SELECT count(*) FROM case_access_links WHERE case_id=? AND purpose='STATUS'",other.caseId())).isEqualTo(1+3);
-        // Codes: a resend revokes the earlier code; a wrong code counts one attempt; the open code still verifies.
+        // Codes: a resend to the same channel waits a minute, then revokes the earlier code; the open code still verifies.
         var summary=publicCases.requestAccess(token); em.flush();
         assertThat(summary).isEqualTo(new CaseAccessSummary(created.caseNumber(),"STATUS","WHATSAPP","***0091"));
         String first=caseAccessCode(token,"+254700000091");
-        tick(); publicCases.requestAccess(token,"WHATSAPP"); em.flush();
+        tick(); fails("RESEND_TOO_SOON",()->publicCases.requestAccess(token,"WHATSAPP"));
+        resendWait(); publicCases.requestAccess(token,"WHATSAPP"); em.flush();
         String second=caseAccessCode(token,"+254700000091");
         assertThat(second).isNotEqualTo(first);
         fails("VERIFICATION_INVALID",()->publicCases.verify(token,first));
@@ -111,11 +113,15 @@ class SecureJourneyCorrectionsTest {
         // A grant opens only its own link.
         fails("VERIFICATION_REQUIRED",()->publicCases.view(otherToken,grant));
         // At most five codes an hour; new codes do not revoke a grant already issued.
-        for(int i=0;i<3;i++){tick(); publicCases.requestAccess(token); em.flush();}
-        fails("TOO_MANY_REQUESTS",()->publicCases.requestAccess(token));
+        for(int i=0;i<3;i++){resendWait(); publicCases.requestAccess(token); em.flush();}
+        resendWait(); fails("TOO_MANY_REQUESTS",()->publicCases.requestAccess(token));
         assertThat(publicCases.view(token,grant).caseNumber()).isEqualTo(created.caseNumber());
+        // A code works for ten minutes; after that the patient is told it expired, not that it is wrong.
+        String last=caseAccessCode(token,"+254700000091");
+        ((AdvanceableClock)clock).advance(Duration.ofMinutes(10));
+        fails("VERIFICATION_EXPIRED",()->publicCases.verify(token,last));
         // The grant lasts 30 minutes, the status link 30 days.
-        ((AdvanceableClock)clock).advance(Duration.ofMinutes(31));
+        ((AdvanceableClock)clock).advance(Duration.ofMinutes(21));
         fails("VERIFICATION_REQUIRED",()->publicCases.view(token,grant));
         assertThat(publicCases.summary(token).caseNumber()).isEqualTo(created.caseNumber());
         ((AdvanceableClock)clock).advance(Duration.ofDays(30));
