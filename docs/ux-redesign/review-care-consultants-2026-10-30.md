@@ -64,7 +64,7 @@ Expected noise: the cream ground is the Paper token; the straggler and line-leng
    - Use neutral icons.
 
    *clarify, plus an owner content check.*
-3. **[P1] Arabic reads as a translation.** Cross-page.
+3. **[P1] Arabic reads as a translation.** Cross-page. **Fixed in `85d945f3`** (Arabic marks, six plural forms, isolated +N, one structural-heart term pending native review, search across scripts).
    - Latin initials are every Consultant's identity on Arabic pages (`CareAreaCard.tsx:57`, the matching hero, "AA" on the profile).
    - The plural is wrong for 11 and up: «13 استشاريين» (`ConsultantPanel.tsx:53` has only one/many).
    - "+1" renders as "1+" (`CareAreaCard.tsx:62`, not isolated).
