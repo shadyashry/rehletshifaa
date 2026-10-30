@@ -79,7 +79,7 @@ Expected noise: the cream ground is the Paper token; the straggler and line-leng
    - Index names in both scripts.
 
    *harden, typeset.*
-4. **[P2] Repetition inflates length.**
+4. **[P2] Repetition inflates length.** **Fixed in `083bf8dd`.**
    - On Cardiology the single Consultant is named three times, under the plural "Meet the Consultants".
    - The three facets appear three times; the scope cards keep 01–03 numerals.
    - The closing eyebrow repeats the heading's question.
@@ -87,7 +87,7 @@ Expected noise: the cream ground is the Paper token; the straggler and line-leng
    - On the profile, FEBIC appears three times, and "Professional distinction" repeats the job title: `[slug]/page.tsx:97` lacks the card's `showDistinction` check.
 
    *distill.*
-5. **[P2] Off-system decoration and vanity figures.**
+5. **[P2] Off-system decoration and vanity figures.** **Fixed in `083bf8dd`.**
    - The profile uses gradient tones, a coral ring and dots, and an endless spinning orbit (`ProfileVisuals.tsx:286-318`).
    - A blurred card is nested in the matching hero (`ConsultantMatching.tsx:271`).
    - A 22px card has a heavy shadow (`CareAreaDetail.tsx:124`).
