@@ -422,6 +422,8 @@ describe("ProposalSign — the estimate as a document (slice C)", () => {
       await screen.findByLabelText(en.codeLabel);
       expect(screen.getByText(en.codeLifetime)).toBeTruthy();
       expect((screen.getByRole("button", { name: en.resendIn.replace("{time}", "1:00") }) as HTMLButtonElement).disabled).toBe(true);
+      // The countdown starts in an effect React runs just after the field appears: wait for its timer before moving time.
+      await waitFor(() => expect(vi.getTimerCount()).toBeGreaterThan(0));
       await act(async () => { vi.advanceTimersByTime(60_000); });
       fireEvent.click(screen.getByRole("button", { name: en.resend }));
       expect(await screen.findByText(en.codeResent)).toBeTruthy();

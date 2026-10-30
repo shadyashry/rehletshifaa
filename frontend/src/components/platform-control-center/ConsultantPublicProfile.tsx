@@ -226,7 +226,7 @@ function ProfilePreview({ copy, careArea, slug, contentEn, contentAr }: { copy: 
       const profile: ConsultantProfile = { ...content, slug: slug || "consultant-preview", careAreaHref: careArea, careAreaLabel: careAreaLabel(careArea, language) };
       const ui = consultantUi[language];
       return <div key={language} dir={language === "ar" ? "rtl" : "ltr"} className="cc-profile-preview-language"><p className="cc-profile-preview-label">{language === "ar" ? copy.arabic : copy.english}</p>
-        <ConsultantCard profile={profile} system={meta.system} icon={meta.icon} href="#public-profile" labels={{ view: ui.viewProfile, viewOf: ui.viewProfileOf(profile.name), distinction: ui.verifiedRole, focus: ui.focus }} />
+        <ConsultantCard profile={profile} system={meta.system} icon={meta.icon} href="#public-profile" labels={{ view: ui.viewProfile, viewOf: ui.viewProfileOf(profile.name), distinction: ui.highlight, focus: ui.focus }} />
         <div className="cc-profile-header-preview"><ConsultantPortrait profile={profile} size="lg" /><div><h3>{profile.name || "—"}</h3><p>{profile.role || "—"}</p><p>{profile.specialty || "—"}</p></div></div>
       </div>;
     })}

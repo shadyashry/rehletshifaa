@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, Check, ChevronDown, ChevronRight, Send, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowRight, Check, ChevronDown, ChevronRight, Info, Send, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -238,7 +238,7 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
               </div>
             ) : null}
             <p className={`flex items-start gap-3 bg-surface-default px-6 py-4 text-[0.9375rem] font-medium leading-7 text-brand-900 sm:px-7 ${signGroups.length ? "border-t border-border-clinical" : ""}`}>
-              <ShieldCheck size={18} aria-hidden="true" className="mt-1 flex-none text-brand-600" />
+              <Info size={18} aria-hidden="true" className="mt-1 flex-none text-brand-600" />
               {note}
             </p>
           </div>
@@ -266,7 +266,7 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
                   system={area.system}
                   icon={area.icon}
                   href={localeHref(locale, `consultants/${profile.slug}`)}
-                  labels={{ view: ui.viewProfile, viewOf: ui.viewProfileOf(profile.name), distinction: ui.verifiedRole, focus: ui.focus }}
+                  labels={{ view: ui.viewProfile, viewOf: ui.viewProfileOf(profile.name), distinction: ui.highlight, focus: ui.focus }}
                 />
               </li>
             ))}

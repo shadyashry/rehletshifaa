@@ -1,4 +1,4 @@
-import { ArrowRight, Award, GraduationCap, MapPin } from "lucide-react";
+import { ArrowRight, GraduationCap, MapPin, Milestone } from "lucide-react";
 import Link from "next/link";
 
 import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
@@ -6,9 +6,16 @@ import { ConsultantPortrait } from "@/components/ConsultantProfileCard";
 import type { CareAreaIconName, CareSystem } from "@/lib/care-area-catalog";
 import type { ConsultantProfile } from "@/lib/consultants";
 
+/** A distinction that only restates the role line adds a second reading of the same fact: shown only when it says more. */
+export function distinctionAddsToRole(profile: Pick<ConsultantProfile, "distinction" | "role">): boolean {
+  const distinction = profile.distinction?.trim().toLowerCase();
+  const role = profile.role.trim().toLowerCase();
+  return !!distinction && !role.includes(distinction) && !distinction.includes(role);
+}
+
 /**
  * One Consultant on the panel: a body-system tinted header (identity mark, care area, credential signals),
- * then name, specialty, role, one professional distinction, three clinical-focus facets and the
+ * then name, specialty, role, one career highlight, three clinical-focus facets and the
  * location. The whole card opens the full profile; no ratings, rankings or superlatives. The name is an h3: every
  * list of cards sits under a section h2. On phones the card is shorter: no distinction (often the role again) and two
  * facets, since the full profile is one tap away.
@@ -25,10 +32,7 @@ export function ConsultantCard({ profile, system, icon, href, labels, featured =
   // Short marks (MD · EBAC · FEBIC) read as badges; a long signal is shown alone so the header stays calm.
   const short = profile.signals.filter((signal) => signal.length <= 8);
   const signals = short.length > 0 ? short.slice(0, 3) : profile.signals.slice(0, 1);
-  // A distinction that only restates the role line adds a second reading of the same fact: shown only when it says more.
-  const distinction = profile.distinction?.trim().toLowerCase();
-  const role = profile.role.trim().toLowerCase();
-  const showDistinction = !!distinction && !role.includes(distinction) && !distinction.includes(role);
+  const showDistinction = distinctionAddsToRole(profile);
   return (
     <article className={`group relative isolate flex h-full flex-col overflow-hidden rounded-[18px] border border-border-card bg-surface-default shadow-[0_1px_2px_rgba(36,64,74,0.04)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_22px_44px_-28px_rgba(36,64,74,0.45)] has-[a:focus-visible]:border-brand-500 motion-reduce:transform-none ${featured ? "md:flex-row" : ""}`}>
       <div className={`relative flex items-start justify-between gap-4 px-5 pb-4 pt-5 sm:px-7 sm:pb-5 sm:pt-6 ${style.soft} ${featured ? "flex-wrap md:w-60 md:flex-none md:flex-col md:flex-nowrap md:items-center md:justify-center md:gap-6 md:py-10" : ""}`}>
@@ -61,7 +65,7 @@ export function ConsultantCard({ profile, system, icon, href, labels, featured =
         {showDistinction ? (
           <div className="mt-4 hidden border-s-2 border-brand-400 ps-3.5 sm:block">
             <p className="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold uppercase tracking-[0.06em] text-ink-500 rtl:normal-case rtl:tracking-normal">
-              <Award size={13} aria-hidden="true" />
+              <Milestone size={13} aria-hidden="true" />
               {labels.distinction}
             </p>
             <p className="mt-1 text-[0.9375rem] font-medium leading-6 text-brand-900">{profile.distinction}</p>

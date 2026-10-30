@@ -730,7 +730,7 @@
   "careAreasPage": {
     "eyebrow": "Care areas",
     "title": "Explore care by body system",
-    "intro": "Consultant-led review across {count} care areas, each led by named senior Consultants. Explore by body system — or send your case and we will route it for you.",
+    "intro": "Consultant-led review across {count} care areas, each with a named Consultant who owns the clinical decision. Explore by body system — or send your case and we will route it for you.",
     "tabsLabel": "Care areas",
     "tabs": {
       "cardiology": "Cardiology",
@@ -910,7 +910,7 @@
       "empty": "No Consultants match your search.",
       "emptyHint": "Try a broader term — or send your case and your coordinator will find the right Consultant.",
       "reset": "Clear filters",
-      "distinction": "Professional distinction",
+      "distinction": "Career highlight",
       "focus": "Clinical focus"
     },
     "verification": {
@@ -920,15 +920,15 @@
           "body": "Each Consultant provides a current CV, qualifications and appointments."
         },
         {
-          "title": "Checked against official sources",
-          "body": "Degrees, board fellowships and appointments are checked with institutional sources."
+          "title": "Reviewed by our credentialing team",
+          "body": "Our team reviews a Consultant's credentials before they can receive any case. Until then, a profile shows what the Consultant's CV says."
         },
         {
-          "title": "Reviewed before matching",
-          "body": "A Consultant is matched to a patient's case only after this credential review."
+          "title": "Kept current",
+          "body": "A Consultant is matched to a case only while a reviewed credential is in date. When one expires, matching pauses."
         }
       ],
-      "disclaimer": "Profiles draw on supplied CVs and the sources identified on each profile. The order of profiles is not a ranking, and no credential is an outcome guarantee."
+      "disclaimer": "The order of profiles is not a ranking, and no credential is an outcome guarantee."
     },
     "router": {
       "eyebrow": "Not sure who to choose?",
@@ -5892,7 +5892,7 @@
       "cardSummary": "Card summary",
       "anchor": "Expertise anchor",
       "expertiseAreas": "Expertise areas",
-      "distinction": "Professional distinction",
+      "distinction": "Career highlight",
       "achievementBadges": "Achievement badges",
       "signals": "Card credential signals",
       "focusAreas": "Clinical focus areas",

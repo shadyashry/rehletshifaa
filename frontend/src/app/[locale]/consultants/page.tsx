@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ArrowDown, BadgeCheck, FileText, ScanSearch } from "lucide-react";
+import { ArrowDown, CalendarClock, FileText, ScanSearch } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { CaseRouter } from "@/components/care-areas/CaseRouter";
@@ -15,7 +15,7 @@ import { pageMetadata } from "@/lib/metadata";
 
 type Props = { params: Promise<{ locale: string }> };
 
-const VERIFY_ICONS = [FileText, ScanSearch, BadgeCheck] as const;
+const VERIFY_ICONS = [FileText, ScanSearch, CalendarClock] as const;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -96,7 +96,7 @@ export default async function Consultants({ params }: Props) {
           </div>
           <ol className="divide-y divide-border-subtle rounded-[18px] border border-border-card bg-surface-pearl">
             {page.verification.steps.map((step, index) => {
-              const Icon = VERIFY_ICONS[index] ?? BadgeCheck;
+              const Icon = VERIFY_ICONS[index] ?? FileText;
               return (
                 <li key={step.title} className="flex gap-4 p-5 sm:gap-5 sm:p-6">
                   <span aria-hidden className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-surface-default text-brand-700 ring-1 ring-border-clinical">

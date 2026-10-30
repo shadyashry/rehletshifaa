@@ -55,6 +55,18 @@ class ConsultantPublicProfileIntegrationTest {
         mvc=MockMvcBuilders.standaloneSetup(new ConsultantPublicProfileController(profiles)).setControllerAdvice(new GlobalExceptionHandler()).build();
     }
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
+
+    /** Review 2026-10-30: sourcing notes live on each profile's sources line, never in what a patient reads as fact. */
+    @Test void seededProfilesKeepCvNotesOnTheSourcesLineOnly() throws Exception {
+        for (Map<String,Object> row : jdbc.queryForList("select slug, content_en, content_ar from consultant_directory_profiles")) {
+            for (String column : List.of("content_en","content_ar")) {
+                ObjectNode content=(ObjectNode)json.readTree((String)row.get(column));
+                content.remove("verification");
+                assertThat(content.toString()).as("%s %s",row.get("slug"),column)
+                    .doesNotContain("CV-reported","CV-listed","listed in the CV","reported in the December 2025 CV","وفق سيرة","وفق السيرة","بحسب السيرة");
+            }
+        }
+    }
     void signIn(Role role) { TestPrincipals.signIn(jdbc,crypto,"public-profile-"+role.name(),role); }
     Edit edit(View view) { return new Edit(view.version(),view.slug(),view.contentEn(),view.contentAr()); }
     long queued() { return jdbc.queryForObject("select count(*) from notification_outbox where channel='REVALIDATION'",Long.class); }

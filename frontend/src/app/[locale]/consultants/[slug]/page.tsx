@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ArrowRight, Award, BookOpen, Building2, ChevronRight, ExternalLink, FileText, Landmark, Presentation, ShieldCheck } from "lucide-react";
+import { ArrowRight, Award, BookOpen, Building2, ChevronRight, ExternalLink, FileText, Landmark, Presentation } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { CareAreaIcon } from "@/components/care-areas/CareAreaIcon";
 import { SpecialtyMotif } from "@/components/care-areas/SpecialtyMotif";
 import { ConsultantPortrait } from "@/components/ConsultantProfileCard";
+import { distinctionAddsToRole } from "@/components/consultants/ConsultantCard";
 import { FocusMap, PROFILE_TONES as tone } from "@/components/consultants/ProfileVisuals";
 import { careAreaMeta } from "@/lib/care-area-catalog";
 import { consultantUi, getConsultant, getConsultants } from "@/lib/consultants";
@@ -94,7 +95,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
 
   const facts = [
     same(profile.specialty, profile.expertise.anchor) ? null : { label: t.specialty, value: profile.specialty },
-    profile.distinction ? { label: ui.verifiedRole, value: profile.distinction } : null,
+    distinctionAddsToRole(profile) ? { label: ui.highlight, value: profile.distinction } : null,
     latest ? { label: t.latestQualification, value: [latest.head, latest.year].filter(Boolean).join(locale === "ar" ? "، " : ", ") } : null,
     { label: t.basedIn, value: profile.location },
   ].filter((fact) => fact !== null);
@@ -216,7 +217,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
 
             {profile.professionalStanding.length ? (
               <CvSection id="standing" title={ui.standing}>
-                <ul className="grid">{profile.professionalStanding.map((item) => <Entry key={item} text={item} icon={<ShieldCheck size={16} strokeWidth={1.8} />} />)}</ul>
+                <ul className="grid">{profile.professionalStanding.map((item) => <Entry key={item} text={item} icon={<Landmark size={16} strokeWidth={1.8} />} />)}</ul>
               </CvSection>
             ) : null}
 
