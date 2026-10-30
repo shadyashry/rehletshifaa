@@ -37,7 +37,7 @@ Expected noise: the cream ground is the Paper token; the straggler and line-leng
 
 ## Priority issues
 
-1. **[P1] The step asks visitors to classify themselves, though the product promises routing.** Cross-page.
+1. **[P1] The step asks visitors to classify themselves, though the product promises routing.** Cross-page. **Fixed in `4d1024f9`** (router under the hero, atlas intro as coverage, compact phone cards, honest search wording, Send my case in the empty state); lay-term synonyms in search left for later.
    - The atlas intro says "Choose the one closest to your need".
    - The "you don't need to choose" router sits after 9 cards (`care-areas/page.tsx:132`).
    - Search only matches names, specialties, focus and qualifications (`ConsultantPanel.tsx:169`), so lay words give 0.
