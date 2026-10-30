@@ -7,6 +7,7 @@ import type { Dictionary } from "@/lib/dictionary";
 import { formatCount, type Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 import { CareSystemsGrid, type GridSystem } from "./CareSystemsGrid";
+import { consultantMark } from "@/lib/monogram";
 
 /** Each body system's mark on its card. */
 const SYSTEM_ICON: Record<CareSystem, CareAreaIconName> = {
@@ -42,7 +43,7 @@ export async function CarePathways({ locale, d }: { locale: Locale; d: Dictionar
       title: system.title,
       body: system.body,
       areas: system.areas.map((area) => ({ slug: area.slug, href: localeHref(locale, area.slug), title: area.title })),
-      people: people.map((profile) => ({ slug: profile.slug, initials: profile.initials, ...(profile.portrait ? { portrait: profile.portrait } : {}) })),
+      people: people.map((profile) => ({ slug: profile.slug, initials: consultantMark(profile), ...(profile.portrait ? { portrait: profile.portrait } : {}) })),
       ledBy: ledBy(people.map((profile) => profile.name)),
     };
   });

@@ -4,7 +4,7 @@ import { intlLocale, type Locale } from "@/lib/i18n";
 /** Staff work copy (`messages/*.json` → `portalWork`) plus the care-area titles for this locale, keyed by slug. */
 /** `guardianConsent`: P1-13, the GUARDIAN_AUTHORIZATION wording (`guardianConsent.text`, one key per locale; placeholder pending counsel). */
 export type WorkCopy = Dictionary["portalWork"] & { careAreas: Record<string, string>; guardianConsent: string };
-type PluralForms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string };
+export type PluralForms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string };
 
 /**
  * UX X-1 (DESIGN.md "Numerals and isolation"): the placeholders that carry a left-to-right value are isolated wherever the

@@ -1,6 +1,7 @@
 import Image from "next/image";
 
 import type { ConsultantProfile } from "@/lib/consultants";
+import { consultantMark } from "@/lib/monogram";
 
 /**
  * A Consultant's identity mark. With an approved portrait: a consistent chest-up crop on the pale clinical
@@ -18,7 +19,7 @@ export function ConsultantPortrait({ profile, size = "md" }: { profile: Consulta
   }
   return (
     <span aria-hidden className={`grid flex-none place-items-center rounded-full bg-surface-clinical font-semibold tracking-[0.04em] text-brand-800 ring-1 ring-border-clinical ${box}`}>
-      {profile.initials}
+      {consultantMark(profile)}
     </span>
   );
 }

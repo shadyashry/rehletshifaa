@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import type { AtlasArea } from "@/lib/care-area-catalog";
 import { CareAreaIcon, SYSTEM_STYLES } from "./CareAreaIcon";
+import { consultantMark } from "@/lib/monogram";
 
 const MAX_MONOGRAMS = 3;
 
@@ -55,11 +56,11 @@ export function CareAreaCard({ area, href, action, consultantsLabel, wide }: {
               <span aria-hidden className="flex -space-x-2 rtl:space-x-reverse">
                 {shown.map((profile) => (
                   <span key={profile.slug} className={`grid h-8 w-8 place-items-center rounded-full text-[0.75rem] font-semibold tracking-[0.03em] text-brand-800 ring-2 ring-surface-default ${system.well}`}>
-                    {profile.initials}
+                    {consultantMark(profile)}
                   </span>
                 ))}
                 {more > 0 ? (
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-surface-pearl text-[0.75rem] font-semibold text-ink-600 ring-2 ring-surface-default">+{more}</span>
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-surface-pearl text-[0.75rem] font-semibold text-ink-600 ring-2 ring-surface-default"><bdi dir="ltr">+{more}</bdi></span>
                 ) : null}
               </span>
               <span className="text-[0.8125rem] font-medium leading-5 text-ink-500">{consultantsLabel}</span>

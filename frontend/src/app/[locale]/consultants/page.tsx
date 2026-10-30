@@ -12,6 +12,7 @@ import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 import { pageMetadata } from "@/lib/metadata";
+import { consultantMark } from "@/lib/monogram";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -35,12 +36,13 @@ export default async function Consultants({ params }: Props) {
   const d = getDictionary(locale);
   const ui = consultantUi[locale];
   const page = d.consultantsPage;
-  const profiles = await getConsultants(locale);
+  const [profiles, otherProfiles] = await Promise.all([getConsultants(locale), getConsultants(locale === "ar" ? "en" : "ar")]);
+  const otherName = new Map(otherProfiles.map((profile) => [profile.slug, profile.name]));
 
   const entries: PanelEntry[] = profiles.flatMap((profile) => {
     const meta = careAreaMeta(profile.careAreaHref);
     if (!meta) return [];
-    return [{ profile, ...meta, href: localeHref(locale, `consultants/${profile.slug}`), viewOf: ui.viewProfileOf(profile.name) }];
+    return [{ profile, ...meta, href: localeHref(locale, `consultants/${profile.slug}`), viewOf: ui.viewProfileOf(profile.name), otherName: otherName.get(profile.slug) }];
   });
   const systems = CARE_SYSTEMS.filter((key) => entries.some((entry) => entry.system === key)).map((key) => ({ key, title: d.careAreasPage.systems[key].title }));
 
@@ -57,7 +59,7 @@ export default async function Consultants({ params }: Props) {
             stages={ui.matching}
             criteria={page.matching.criteria}
             matched={page.matching.matched}
-            initials={entries.map((entry) => entry.profile.initials)}
+            initials={entries.map((entry) => consultantMark(entry.profile))}
           />
         }
       >
@@ -80,7 +82,7 @@ export default async function Consultants({ params }: Props) {
             </div>
             <p className="max-w-[52ch] text-[1rem] leading-7 text-ink-600">{page.panel.intro}</p>
           </div>
-          <ConsultantPanel entries={entries} systems={systems} locale={locale} copy={{ ...page.panel, view: ui.viewProfile }} />
+          <ConsultantPanel entries={entries} systems={systems} locale={locale} copy={{ ...page.panel, count: d.portalWork.plural.consultants, view: ui.viewProfile }} />
         </div>
       </section>
 

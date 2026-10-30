@@ -21,6 +21,7 @@ import { formatMoney } from "@/lib/money";
 import type { CaseActions } from "@/components/portal/CurrentAction";
 import { patientStepText, type StepText } from "@/components/portal/patient-step";
 import { isGuardianStep } from "@/lib/guardian";
+import { initials } from "@/lib/monogram";
 import { ADMISSION_STEPS, DISCHARGE_STEPS, FOLLOW_UP_STEPS, TREATMENT_STEPS } from "@/components/portal/admission-steps";
 /** The backend's one answer to "may the patient see a proposal, and which one" — rendered, never re-derived from the stage. */
 export type PatientProposalState = { state: string; action?: "REVIEW_PROPOSAL" | "VIEW_PROPOSAL" | null; versionId?: string | null; versionNumber?: number | null; validUntil?: string | null; decidedAt?: string | null; releasedAt?: string | null;
@@ -417,15 +418,6 @@ function Monogram({ name, lead = false }: { name?: string | null; lead?: boolean
       {letters || <UserRound size={lead ? 20 : 18}/>}
     </span>
   );
-}
-
-const TITLES = /^(dr\.?|prof\.?|mr\.?|mrs\.?|ms\.?|د\.?|أ\.د\.?|الدكتور|الدكتورة|الأستاذ|الأستاذة)$/i;
-function initials(name: string) {
-  const words = name.trim().split(/\s+/).filter(word => word && !TITLES.test(word));
-  // Two Arabic letters side by side join into what reads as a word, so an Arabic name shows its first letter only.
-  const arabic = /\p{Script=Arabic}/u.test(words[0] ?? "");
-  const picked = words.length > 1 && !arabic ? [words[0], words[words.length - 1]] : words.slice(0, 1);
-  return picked.map(word => Array.from(word.length > 3 && word.startsWith("ال") ? word.slice(2) : word)[0] ?? "").join("").toLocaleUpperCase();
 }
 
 function proposalTone(state: string): StatusTone {

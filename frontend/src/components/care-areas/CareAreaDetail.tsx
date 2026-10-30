@@ -11,6 +11,8 @@ import { consultantUi, getConsultants, universityFacultySlugs } from "@/lib/cons
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
+import { plural } from "@/lib/portal-labels";
+import { consultantMark } from "@/lib/monogram";
 
 export type AreaScope = readonly { title: string; items: readonly string[]; signs?: readonly string[] }[];
 
@@ -53,7 +55,7 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
   const signGroups = scope.filter((section) => section.signs?.length);
   const PREVIEW = 4;
   const focusCount = scope.reduce((sum, section) => sum + section.items.length, 0);
-  const led = (n: number) => (n === 1 ? d.careAreasPage.atlas.consultantsOne : n === 2 ? d.careAreasPage.atlas.consultantsTwo : fill(d.careAreasPage.atlas.consultantsMany, { n }));
+  const led = (n: number) => plural(locale, n, d.portalWork.plural.consultants);
   const siblings = system.areas.filter((item) => item.slug !== slug);
   const others = atlas.filter((item) => item.slug !== slug && item.system !== area.system);
   const router = closing ? { ...d.careAreasPage.router, title: closing.title, body: closing.body } : d.careAreasPage.router;
@@ -90,7 +92,7 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
                       <li key={profile.slug}>
                         <Link href={localeHref(locale, `consultants/${profile.slug}`)} className="group flex items-center gap-3 rounded-xl">
                           <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-full text-[0.8125rem] font-semibold tracking-[0.03em] text-brand-800 ring-1 ${style.well} ${style.ring}`}>
-                            {profile.initials}
+                            {consultantMark(profile)}
                           </span>
                           <span className="min-w-0">
                             <span className="block text-[1rem] font-semibold leading-6 text-brand-900 group-hover:text-brand-700">{profile.name}</span>
@@ -145,7 +147,7 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
                 <span className="flex -space-x-2 rtl:space-x-reverse">
                   {area.consultants.slice(0, 4).map((profile) => (
                     <span key={profile.slug} className={`grid h-9 w-9 place-items-center rounded-full text-[0.75rem] font-semibold tracking-[0.03em] text-brand-800 ring-2 ring-surface-pearl ${style.well}`}>
-                      {profile.initials}
+                      {consultantMark(profile)}
                     </span>
                   ))}
                 </span>

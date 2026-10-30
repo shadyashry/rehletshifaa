@@ -12,6 +12,7 @@ import { getConsultants } from "@/lib/consultants";
 import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
+import { plural } from "@/lib/portal-labels";
 import { pageMetadata } from "@/lib/metadata";
 
 type Props = { params: Promise<{ locale: string }> };
@@ -41,9 +42,8 @@ export default async function CareAreas({ params }: Props) {
   const areas = careAreaAtlas(locale, d, await getConsultants(locale));
   const systems = careAtlasSystems(areas, d);
 
-  const consultantsLabel = (n: number) =>
-    fill(n === 1 ? page.atlas.consultantsOne : n === 2 ? page.atlas.consultantsTwo : page.atlas.consultantsMany, { n });
-  const areasLabel = (n: number) => (n === 1 ? page.atlas.areasOne : fill(page.atlas.areasMany, { n }));
+  const consultantsLabel = (n: number) => plural(locale, n, d.portalWork.plural.consultants);
+  const areasLabel = (n: number) => plural(locale, n, page.atlas.areas);
 
   return (
     <>

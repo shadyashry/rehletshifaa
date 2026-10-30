@@ -6,6 +6,7 @@ import { getConsultants, universityFacultySlugs } from "@/lib/consultants";
 import type { Dictionary } from "@/lib/dictionary";
 import type { Locale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
+import { consultantMark } from "@/lib/monogram";
 
 const SHOWN_MONOGRAMS = 5;
 
@@ -69,7 +70,7 @@ export async function PromiseSection({ d, locale }: { d: Dictionary; locale: Loc
             <span aria-hidden className="flex flex-none -space-x-2 rtl:space-x-reverse">
               {profiles.slice(0, SHOWN_MONOGRAMS).map((profile, index) => (
                 <span key={profile.slug} className={`grid h-11 w-11 place-items-center rounded-full text-[0.8125rem] font-semibold tracking-[0.03em] ring-2 ring-surface-default ${index === 0 ? "bg-brand-700 text-white" : "bg-surface-clinical text-brand-800"}`}>
-                  {profile.initials}
+                  {consultantMark(profile)}
                 </span>
               ))}
               {profiles.length > SHOWN_MONOGRAMS ? (

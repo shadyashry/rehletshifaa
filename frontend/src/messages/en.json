@@ -753,11 +753,10 @@
       "title": "{count} care areas, organised by body system",
       "intro": "Each care area is led by named Consultants who own the clinical decision. Choose the one closest to your need — or let your coordinator choose for you.",
       "index": "Jump to a body system",
-      "areasOne": "1 care area",
-      "areasMany": "{n} care areas",
-      "consultantsOne": "1 Consultant",
-      "consultantsTwo": "2 Consultants",
-      "consultantsMany": "{n} Consultants"
+      "areas": {
+        "one": "{count} care area",
+        "other": "{count} care areas"
+      }
     },
     "systems": {
       "heart": {
@@ -905,8 +904,6 @@
       "searchPlaceholder": "e.g. knee replacement, dysphagia, PCI",
       "systems": "Filter by body system",
       "all": "All",
-      "countOne": "1 Consultant",
-      "countMany": "{n} Consultants",
       "empty": "No Consultants match your search.",
       "emptyHint": "Try a broader term — or send your case and your coordinator will find the right Consultant.",
       "reset": "Clear filters",
@@ -1809,6 +1806,10 @@
       "patientResponded": "Patient responded"
     },
     "plural": {
+      "consultants": {
+        "one": "{count} Consultant",
+        "other": "{count} Consultants"
+      },
       "retentionDays": {
         "one": "{count} day",
         "other": "{count} days"

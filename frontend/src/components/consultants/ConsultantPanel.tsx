@@ -6,10 +6,16 @@ import { useState, useSyncExternalStore } from "react";
 import { SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import type { CareAreaIconName, CareSystem } from "@/lib/care-area-catalog";
 import type { ConsultantProfile } from "@/lib/consultants";
-import { formatCount, type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
+import { plural, type PluralForms } from "@/lib/portal-labels";
 import { ConsultantCard } from "./ConsultantCard";
 
-export type PanelEntry = { profile: ConsultantProfile; system: CareSystem; icon: CareAreaIconName; href: string; viewOf: string };
+/** `otherName` is the Consultant's name in the other language, so a name typed in either script finds them. */
+export type PanelEntry = { profile: ConsultantProfile; system: CareSystem; icon: CareAreaIconName; href: string; viewOf: string; otherName?: string };
+
+/** Folds case, Arabic diacritics and letter variants (أ إ آ → ا, ة → ه, ى → ي), so a search need not match the spelling exactly. */
+const fold = (text: string, locale: Locale) =>
+  text.normalize("NFKC").toLocaleLowerCase(locale).replace(/[\p{Mn}\p{Lm}]/gu, "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
 
 const noSubscribe = () => () => {};
 
@@ -18,8 +24,8 @@ type Copy = {
   searchPlaceholder: string;
   systems: string;
   all: string;
-  countOne: string;
-  countMany: string;
+  /** Every plural form of "{count} Consultants" (Arabic has six). */
+  count: PluralForms;
   empty: string;
   emptyHint: string;
   reset: string;
@@ -43,14 +49,14 @@ export function ConsultantPanel({ entries, systems, locale, copy }: {
   const [system, setSystem] = useState<CareSystem | "">("");
   // The chips only work once React has hydrated; until then they say so rather than silently dropping a click.
   const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
-  const needle = query.trim().normalize("NFKC").toLocaleLowerCase(locale);
+  const needle = fold(query.trim(), locale);
   const matches = (entry: PanelEntry) => {
     const p = entry.profile;
-    return [p.name, p.specialty, p.role, p.careAreaLabel, ...p.focusAreas, ...p.qualifications].join(" ").normalize("NFKC").toLocaleLowerCase(locale).includes(needle);
+    return fold([p.name, entry.otherName ?? "", p.specialty, p.role, p.careAreaLabel, ...p.focusAreas, ...p.qualifications].join(" "), locale).includes(needle);
   };
   const searched = entries.filter(matches);
   const visible = searched.filter((entry) => !system || entry.system === system);
-  const count = (n: number) => (n === 1 ? copy.countOne : copy.countMany.replace("{n}", formatCount(n, locale)));
+  const count = (n: number) => plural(locale, n, copy.count);
   const order = (key: CareSystem) => systems.findIndex((s) => s.key === key);
   const ordered = [...visible].sort((a, b) => order(a.system) - order(b.system));
 
