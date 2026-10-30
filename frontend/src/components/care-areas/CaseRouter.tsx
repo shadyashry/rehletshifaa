@@ -22,8 +22,8 @@ export function CaseRouter({ locale, copy, button }: {
     <section aria-labelledby="case-router-title" className="canvas-clinical py-16 md:py-20">
       <div className="container-site grid items-center gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
         <div>
-          <p className="eyebrow">{copy.eyebrow}</p>
-          <h2 id="case-router-title" className="mt-3 max-w-[20ch] text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal sm:text-[2.125rem]">
+          {copy.eyebrow ? <p className="eyebrow">{copy.eyebrow}</p> : null}
+          <h2 id="case-router-title" className="max-w-[20ch] text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal sm:text-[2.125rem] [.eyebrow+&]:mt-3">
             {copy.title}
           </h2>
           <p className="mt-4 max-w-[48ch] text-[1rem] leading-7 text-ink-600">{copy.body}</p>

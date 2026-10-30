@@ -952,6 +952,7 @@
   "careAreaDetail": {
     "careAreas": "Care areas",
     "meet": "Meet the Consultants",
+    "meetOne": "Meet {name}",
     "stats": {
       "consultants": "Consultants",
       "faculty": "University faculty",
@@ -968,6 +969,7 @@
     "consultantsEyebrow": "The Consultants",
     "consultantsTitle": "Who leads {area}",
     "consultantsIntro": "Senior specialists in this area. Your coordinator matches your case to the most appropriate one.",
+    "consultantsIntroOne": "The Consultant who reviews cases in this area. Your coordinator prepares your case before it reaches them.",
     "relatedEyebrow": "Keep exploring",
     "relatedTitle": "Other care areas",
     "sameSystem": "Also in {system}",
@@ -979,7 +981,6 @@
   "consultantProfile": {
     "verified": "CV-sourced profile",
     "highlights": "Professional highlights",
-    "latestQualification": "Latest qualification",
     "basedIn": "Based in",
     "timeline": "Qualifications timeline",
     "sourcesTitle": "Profile sources",
@@ -990,10 +991,7 @@
     "overview": "Overview",
     "specialty": "Specialty",
     "matchNote": "You don’t need to choose a Consultant — your coordinator matches your case to the right specialist by clinical need.",
-    "matchLink": "Send your case",
-    "statYears": "years since graduation",
-    "statQualifications": "qualifications",
-    "statFocus": "focus areas"
+    "matchLink": "Send your case"
   },
   "portalProposal": {
     "price": {

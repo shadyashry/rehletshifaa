@@ -956,6 +956,7 @@
   "careAreaDetail": {
     "careAreas": "مجالات الرعاية",
     "meet": "تعرّف على الاستشاريين",
+    "meetOne": "تعرّف على {name}",
     "stats": {
       "consultants": "استشاريون",
       "faculty": "أعضاء هيئة تدريس جامعية",
@@ -972,6 +973,7 @@
     "consultantsEyebrow": "الاستشاريون",
     "consultantsTitle": "من يقود {area}",
     "consultantsIntro": "استشاريون كبار في هذا المجال. يوجّه منسّقك حالتك إلى الأنسب منهم.",
+    "consultantsIntroOne": "الاستشاري الذي يراجع الحالات في هذا المجال. يُعدّ منسّقك حالتك قبل مراجعتها.",
     "relatedEyebrow": "واصل الاستكشاف",
     "relatedTitle": "مجالات رعاية أخرى",
     "sameSystem": "أيضًا في {system}",
@@ -983,7 +985,6 @@
   "consultantProfile": {
     "verified": "ملف مستند إلى السيرة الذاتية",
     "highlights": "أبرز الإنجازات",
-    "latestQualification": "أحدث مؤهل",
     "basedIn": "مكان الممارسة",
     "timeline": "المسار الأكاديمي",
     "sourcesTitle": "مصادر الملف",
@@ -994,10 +995,7 @@
     "overview": "نبذة",
     "specialty": "التخصص",
     "matchNote": "لا تحتاج إلى اختيار استشاري، إذ يوجّه منسّقك حالتك إلى الأخصائي المناسب وفق الحاجة السريرية.",
-    "matchLink": "أرسل حالتك",
-    "statYears": "سنة منذ التخرج",
-    "statQualifications": "مؤهلات",
-    "statFocus": "مجالات تركيز"
+    "matchLink": "أرسل حالتك"
   },
   "portalProposal": {
     "price": {

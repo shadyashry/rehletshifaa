@@ -12,7 +12,6 @@ import { getDictionary } from "@/lib/dictionary";
 import { isLocale } from "@/lib/i18n";
 import { localeHref } from "@/lib/links";
 import { pageMetadata } from "@/lib/metadata";
-import { consultantMark } from "@/lib/monogram";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -59,7 +58,7 @@ export default async function Consultants({ params }: Props) {
             stages={ui.matching}
             criteria={page.matching.criteria}
             matched={page.matching.matched}
-            initials={entries.map((entry) => consultantMark(entry.profile))}
+            panelSize={entries.length}
           />
         }
       >

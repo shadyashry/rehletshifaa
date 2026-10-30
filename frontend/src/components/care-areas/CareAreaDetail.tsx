@@ -58,12 +58,13 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
   const led = (n: number) => plural(locale, n, d.portalWork.plural.consultants);
   const siblings = system.areas.filter((item) => item.slug !== slug);
   const others = atlas.filter((item) => item.slug !== slug && item.system !== area.system);
-  const router = closing ? { ...d.careAreasPage.router, title: closing.title, body: closing.body } : d.careAreasPage.router;
+  // A page that closes on its own question needs no eyebrow asking it first.
+  const router = closing ? { ...d.careAreasPage.router, eyebrow: "", title: closing.title, body: closing.body } : d.careAreasPage.router;
 
   return (
     <>
       {/* 1 — hero */}
-      <section className="page-hero border-b border-border-subtle bg-surface-pearl bg-[radial-gradient(70%_120%_at_88%_-10%,var(--color-surface-clinical),var(--color-surface-pearl)_72%)]">
+      <section className="page-hero border-b border-border-subtle bg-surface-pearl">
         <div className="container-site grid gap-9 pb-12 pt-8 md:pt-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pb-14">
           <div>
             <nav aria-label={t.careAreas} className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-ink-500">
@@ -116,14 +117,14 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
             {/* One in-content route to the form, at the close (CaseRouter); the header carries the primary action. */}
             <div className="mt-6">
               <a href="#area-consultants" className="link-cta text-[0.9375rem]">
-                {t.meet}
+                {singleConsultant ? fill(t.meetOne, { name: area.consultants[0].name }) : t.meet}
                 <ArrowDown size={16} aria-hidden="true" />
               </a>
             </div>
           </div>
 
           {/* The area snapshot: icon, sub-areas, and the Consultants who lead it. */}
-          <figure aria-hidden className={`hero-island relative mx-auto w-full max-w-[26rem] overflow-hidden rounded-[22px] border border-border-card bg-surface-default shadow-[0_30px_60px_-42px_rgba(36,64,74,0.6)] ${singleConsultant ? "hidden lg:block" : ""}`}>
+          <figure aria-hidden className={`hero-island relative mx-auto w-full max-w-[26rem] overflow-hidden rounded-lg border border-border-card bg-surface-default shadow-[0_1px_2px_rgba(20,38,43,0.05)] ${singleConsultant ? "hidden lg:block" : ""}`}>
             <div className={`relative px-6 pb-6 pt-6 ${style.soft}`}>
               <CareAreaIcon name={area.icon} strokeWidth={0.7} className={`pointer-events-none absolute end-3 top-3 h-28 w-28 opacity-[0.16] ${style.line}`} />
               <span className={`relative grid h-14 w-14 place-items-center rounded-2xl bg-surface-default text-brand-800 shadow-[0_10px_24px_-14px_rgba(36,64,74,0.6)] ring-1 ${style.ring}`}>
@@ -142,7 +143,7 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
                 </li>
               ))}
             </ul>
-            {area.consultants.length > 0 ? (
+            {area.consultants.length > 0 && !namedLeads ? (
               <div className="mt-1 flex items-center gap-3 border-t border-border-subtle bg-surface-pearl px-6 py-4">
                 <span className="flex -space-x-2 rtl:space-x-reverse">
                   {area.consultants.slice(0, 4).map((profile) => (
@@ -154,7 +155,7 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
                 <span className="min-w-0 text-[0.875rem] leading-5 text-ink-600">
                   {t.snapshotLed}{" "}
                   <span className="font-semibold text-brand-900">
-                    {namedLeads ? area.consultants.map((profile) => profile.name).join(locale === "ar" ? " و" : " & ") : led(area.consultants.length)}
+                    {led(area.consultants.length)}
                   </span>
                 </span>
               </div>
@@ -175,11 +176,11 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
           </div>
 
           <div className={`mt-8 grid gap-5 ${scope.length > 1 ? "lg:grid-cols-2" : ""} ${scope.length === 3 ? "xl:grid-cols-3" : ""}`}>
-            {scope.map((section, index) => (
+            {scope.map((section) => (
               <article key={section.title} className="flex flex-col rounded-[18px] border border-border-card bg-surface-default p-6 shadow-[0_1px_2px_rgba(36,64,74,0.04)] sm:p-7">
                 <div className="flex items-center gap-3.5">
-                  <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-full text-[0.8125rem] font-semibold tabular-nums text-brand-800 ring-1 ${style.well} ${style.ring}`}>
-                    {scope.length === 1 ? <CareAreaIcon name={area.icon} size={18} strokeWidth={1.8} /> : String(index + 1).padStart(2, "0")}
+                  <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-full text-brand-800 ring-1 ${style.well} ${style.ring}`}>
+                    <CareAreaIcon name={area.icon} size={18} strokeWidth={1.8} />
                   </span>
                   <h3 className="text-[1.125rem] font-semibold leading-snug text-brand-900 [text-wrap:balance]">{section.title}</h3>
                 </div>
@@ -257,7 +258,7 @@ export async function CareAreaDetail({ locale, d, slug, scope, note, highlight, 
                 {fill(t.consultantsTitle, { area: area.title })}
               </h2>
             </div>
-            <p className={`mt-4 text-[1rem] leading-7 text-ink-600 ${singleConsultant ? "max-w-[70ch]" : "max-w-[44ch]"}`}>{t.consultantsIntro}</p>
+            <p className={`mt-4 text-[1rem] leading-7 text-ink-600 ${singleConsultant ? "max-w-[70ch]" : "max-w-[44ch]"}`}>{singleConsultant ? t.consultantsIntroOne : t.consultantsIntro}</p>
           </div>
           <ul className={`grid grid-cols-1 gap-5 ${singleConsultant ? "" : "md:grid-cols-2"}`}>
             {area.consultants.map((profile) => (

@@ -4,8 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { CareAreaIcon } from "@/components/care-areas/CareAreaIcon";
-import { SpecialtyMotif } from "@/components/care-areas/SpecialtyMotif";
+import { CareAreaIcon, SYSTEM_STYLES } from "@/components/care-areas/CareAreaIcon";
 import { ConsultantPortrait } from "@/components/ConsultantProfileCard";
 import { distinctionAddsToRole } from "@/components/consultants/ConsultantCard";
 import { FocusMap, PROFILE_TONES as tone } from "@/components/consultants/ProfileVisuals";
@@ -70,10 +69,10 @@ function Entry({ text, icon }: { text: string; icon: ReactNode }) {
 
 /**
  * A Consultant's profile, set as a clinical dossier — no sales furniture. On desktop a fixed identity column (portrait
- * mark with the specialty icon, name, role, three figures from the CV, the facts a patient checks first) sits beside
+ * mark with the specialty icon, name, role, the facts a patient checks first) sits beside
  * the CV itself: overview, clinical focus drawn as a map around the specialty, highlights marked by kind, qualifications
- * as a dated timeline, appointments, standing and sources, separated by hairlines. The brand wash and the specialty's line
- * drawing wash the top of the page. The page carries no buttons of its own: one quiet line at the end says the patient
+ * as a dated timeline, appointments, standing and sources, separated by hairlines, on a flat white page (no washes or
+ * figures strip: counts of years or qualifications read as performance). The page carries no buttons of its own: one quiet line at the end says the patient
  * never has to choose, and the header keeps the single "Send my case". Other Consultants follow as a list of names.
  */
 export default async function ConsultantProfilePage({ params }: Props) {
@@ -91,21 +90,12 @@ export default async function ConsultantProfilePage({ params }: Props) {
   const timeline = profile.qualifications
     .map((text, index) => ({ text, year: yearOf(text), index }))
     .sort((a, b) => (b.year ?? "0").localeCompare(a.year ?? "0") || a.index - b.index);
-  const latest = timeline[0] ? { ...splitLine(timeline[0].text), year: timeline[0].year } : undefined;
 
   const facts = [
     same(profile.specialty, profile.expertise.anchor) ? null : { label: t.specialty, value: profile.specialty },
     distinctionAddsToRole(profile) ? { label: ui.highlight, value: profile.distinction } : null,
-    latest ? { label: t.latestQualification, value: [latest.head, latest.year].filter(Boolean).join(locale === "ar" ? "، " : ", ") } : null,
     { label: t.basedIn, value: profile.location },
   ].filter((fact) => fact !== null);
-
-  const firstYear = profile.qualifications.map(yearOf).filter((y) => y !== undefined).sort()[0];
-  const stats = [
-    firstYear ? { value: String(new Date().getFullYear() - Number(firstYear)), label: t.statYears } : null,
-    { value: String(profile.qualifications.length), label: t.statQualifications },
-    { value: String(profile.focusAreas.length), label: t.statFocus },
-  ].filter((stat) => stat !== null);
 
   const all = (await getConsultants(locale)).filter((p) => p.slug !== profile.slug);
   const sameSystem = all.filter((p) => careAreaMeta(p.careAreaHref)?.system === meta.system);
@@ -113,22 +103,19 @@ export default async function ConsultantProfilePage({ params }: Props) {
 
   return (
     <div className="relative isolate overflow-x-clip bg-surface-default">
-      {/* The brand wash (tint → paper → coral blush) and the specialty's line drawing in a brand tone fade into the white page. */}
-      <div aria-hidden className={`absolute inset-x-0 top-0 -z-10 h-[24rem] ${tone.wash} [mask-image:linear-gradient(to_bottom,black_45%,transparent)]`} />
-      <SpecialtyMotif system={meta.system} className={`absolute -end-24 -top-28 -z-10 h-[20rem] w-[44rem] opacity-50 [mask-image:linear-gradient(to_left,black_30%,transparent_75%)] rtl:-scale-x-100 ${tone.motif}`} />
       <div className="container-site pb-16 pt-8 md:pb-20 md:pt-10">
         <nav aria-label={ui.back} className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-ink-500">
           <Link href={localeHref(locale, "consultants")} className="rounded px-0.5 hover:text-brand-700">{ui.back}</Link>
           <ChevronRight size={14} aria-hidden="true" className="rtl:-scale-x-100" />
-          <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden className="h-2 w-2 rounded-full bg-coral" />
+          <Link href={`${localeHref(locale, "care-areas")}#system-${meta.system}`} className="inline-flex items-center gap-1.5 rounded px-0.5 hover:text-brand-700">
+            <span aria-hidden className={`h-2 w-2 rounded-full ${SYSTEM_STYLES[meta.system].dot}`} />
             {systemTitle}
-          </span>
+          </Link>
         </nav>
 
         <div className="mt-8 grid gap-10 md:mt-10 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-16 xl:grid-cols-[19rem_minmax(0,1fr)] xl:gap-24">
           <header className="lg:top-28 lg:self-start lg:[@media(min-height:50rem)]:sticky">
-            <span className={`relative inline-block rounded-full p-[3px] shadow-[0_20px_40px_-28px_rgba(14,79,85,0.55)] ${tone.edge}`}>
+            <span className={`relative inline-block rounded-full p-px ${tone.edge}`}>
               <span className="block rounded-full bg-surface-default p-1"><ConsultantPortrait profile={profile} size="lg" /></span>
               <span aria-hidden className={`absolute -bottom-0.5 -end-0.5 grid h-9 w-9 place-items-center rounded-full ring-4 ring-surface-default ${tone.disc}`}>
                 <CareAreaIcon name={meta.icon} size={17} strokeWidth={2} />
@@ -136,16 +123,6 @@ export default async function ConsultantProfilePage({ params }: Props) {
             </span>
             <h1 className="mt-6 text-[1.75rem] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-900 [text-wrap:balance] rtl:leading-snug rtl:tracking-normal">{profile.name}</h1>
             <p className="mt-2 text-[1rem] leading-7 text-ink-600">{profile.role}</p>
-
-            <dl className={`relative mt-6 grid divide-x divide-line overflow-hidden rounded-[16px] bg-surface-default py-3.5 shadow-[0_20px_40px_-34px_rgba(14,79,85,0.55)] ring-1 ring-line rtl:divide-x-reverse ${stats.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
-              <span aria-hidden className={`absolute inset-x-0 top-0 h-[3px] ${tone.edge}`} />
-              {stats.map((stat) => (
-                <div key={stat.label} className="flex flex-col px-3 text-center">
-                  <dd className="order-1 text-[1.75rem] font-semibold tabular-nums leading-none tracking-[-0.02em] text-brand-800">{stat.value}</dd>
-                  <dt className="order-2 mt-1.5 text-[0.75rem] leading-4 text-ink-500">{stat.label}</dt>
-                </div>
-              ))}
-            </dl>
 
             <dl className="mt-6 border-t border-border-subtle">
               {facts.map(({ label, value }) => (
@@ -172,7 +149,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
             </CvSection>
 
             <CvSection id="focus" title={ui.focus}>
-              <FocusMap anchor={profile.expertise.anchor} areas={profile.focusAreas} icon={meta.icon} system={meta.system} />
+              <FocusMap anchor={profile.expertise.anchor} areas={profile.focusAreas} icon={meta.icon} />
             </CvSection>
 
             {profile.achievements?.length ? (
@@ -182,7 +159,7 @@ export default async function ConsultantProfilePage({ params }: Props) {
                     const Icon = highlightIcon(achievement);
                     return (
                       <li key={achievement} className="flex gap-4">
-                        <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-full shadow-[0_10px_20px_-12px_rgba(14,79,85,0.85)] ${tone.disc}`}><Icon size={18} strokeWidth={1.8} /></span>
+                        <span aria-hidden className={`grid h-10 w-10 flex-none place-items-center rounded-full ${tone.disc}`}><Icon size={18} strokeWidth={1.8} /></span>
                         <p className="pt-1.5 text-[1rem] leading-7 text-ink-700">{achievement}</p>
                       </li>
                     );

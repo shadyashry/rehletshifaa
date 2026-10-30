@@ -82,7 +82,9 @@ test("every care-area detail page fits a phone in both languages", async ({ page
 test("small teams are named in the hero; larger teams are counted", async ({ page }) => {
   await page.goto("/en/cardiology");
   const hero = page.locator("main > section").first();
-  await expect(hero.getByRole("link", { name: /Dr Ahmed AlAshry/ })).toHaveAttribute("href", /\/en\/consultants\/ahmed-alashry$/);
+  await expect(hero.getByRole("link", { name: /^Dr Ahmed AlAshry/ })).toHaveAttribute("href", /\/en\/consultants\/ahmed-alashry$/);
+  // One Consultant is met by name, not as "the Consultants".
+  await expect(hero.getByRole("link", { name: "Meet Dr Ahmed AlAshry" })).toHaveAttribute("href", "#area-consultants");
   await expect(hero.getByText("Consultants", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Send us your case if…")).toBeVisible();
   await page.goto("/en/orthopedics");
