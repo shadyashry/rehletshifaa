@@ -49,7 +49,7 @@ Expected noise: the cream ground is the Paper token; the straggler and line-leng
    - Put the Send my case link inside the empty state.
 
    *distill, then clarify.*
-2. **[P1] Trust claims outrun the evidence shown.** Consultants page and profile. **Fixed in `107ec766`** (review steps, hero count, V110 CV notes, label, icons); open: owner content checks (EBAC, Bavaria, highlights, listing unreviewed profiles).
+2. **[P1] Trust claims outrun the evidence shown.** Consultants page and profile. **Fixed in `107ec766`** (review steps, hero count, V110 CV notes, label, icons); owner decision 2026-10-30: unreviewed profiles stay listed, with the honest wording; open: owner content checks (EBAC, Bavaria, highlights).
    - "Checked against official sources … with institutional sources" (`consultantsPage.verification.steps[1]`) is contradicted on the profile, whose only source is "consultant-supplied curriculum vitae".
    - Sourcing notes leak into patient copy ("(CV-reported)", «وفق سيرة 2024»).
    - "Professional distinction" labels trainings and talks.
